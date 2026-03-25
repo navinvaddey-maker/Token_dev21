@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Token Compress Engine — CRISP framework powered token optimization with neuroscience-based compression">
+    <title>Token Compress Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.8);
+            --bg-glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(99, 102, 241, 0.5);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.25);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.2);
+            --gradient-1: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+            --gradient-2: linear-gradient(135deg, #10b981, #34d399);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Animated background ─────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(16,185,129,0.04) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite;
+            z-index: -1;
+        }
+        @keyframes bgShift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(-2%, 1%) rotate(1deg); }
+            66% { transform: translate(1%, -1%) rotate(-0.5deg); }
+        }
+
+        /* ── Layout ──────────────────────────────────────── */
+        .app { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
+
+        header {
+            text-align: center;
+            padding: 40px 0 32px;
+        }
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+        header p {
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-size: 0.95rem;
+        }
+
+        /* ── Cards ───────────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(12px);
+            transition: var(--transition);
+        }
+        .card:hover { border-color: rgba(255,255,255,0.12); }
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* ── Auth section ────────────────────────────────── */
+        #auth-section { max-width: 400px; margin: 0 auto; }
+        .auth-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-glass);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .auth-tab.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 8px var(--accent-glow);
+        }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+
+        /* ── Form elements ───────────────────────────────── */
+        label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: var(--transition);
+            outline: none;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--border-active);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        textarea {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88rem;
+            resize: vertical;
+            min-height: 140px;
+            line-height: 1.6;
+        }
+        select {
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        .form-row {
+            margin-bottom: 16px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* ── Buttons ─────────────────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 2px 12px var(--accent-glow);
+            width: 100%;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+        }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-ghost {
+            background: var(--bg-glass);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { border-color: var(--border-active); color: var(--text-primary); }
+
+        /* ── Results ─────────────────────────────────────── */
+        #main-section { display: none; }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-value.green {
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-top: 4px;
+        }
+
+        .result-output {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            color: var(--text-primary);
+        }
+
+        .feedback-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        /* ── History ─────────────────────────────────────── */
+        .history-item {
+            padding: 14px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 10px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .history-item:hover { border-color: var(--border-active); }
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-accent { background: var(--accent-glow); color: var(--accent); }
+        .badge-success { background: var(--success-glow); color: var(--success); }
+
+        /* ── Navigation ──────────────────────────────────── */
+        .nav-bar {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .nav-tab.active {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── Toast ───────────────────────────────────────── */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 14px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            max-width: 380px;
+        }
+        .toast-error { background: var(--danger); color: white; }
+        .toast-success { background: var(--success); color: white; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* ── User bar ────────────────────────────────────── */
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .user-info {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .user-info strong { color: var(--text-primary); }
+
+        /* ── Loading ─────────────────────────────────────── */
+        .loading { opacity: 0.6; pointer-events: none; }
+        .spinner {
+            display: inline-block;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width: 640px) {
+            .stats-row { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+            header h1 { font-size: 1.5rem; }
+        }
+
+        /* ── Scrollbar ───────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>⚡ Token Compress Engine</h1>
+            <p>CRISP framework · Six neuroscience principles · Feedback learning</p>
+        </header>
+
+        <!-- ── Auth Section ──────────────────────────────── -->
+        <div id="auth-section">
+            <div class="card">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" onclick="switchAuthTab('login')" id="tab-login">Login</button>
+                    <button class="auth-tab" onclick="switchAuthTab('register')" id="tab-register">Register</button>
+                </div>
+
+                <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+                    <div class="form-row">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" placeholder="Enter username" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+                </form>
+
+                <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
+                    <div class="form-row">
+                        <label for="reg-username">Username</label>
+                        <input type="text" id="reg-username" placeholder="Choose a username" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="reg-email">Email</label>
+                        <input type="email" id="reg-email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" placeholder="Choose a password" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="reg-business">Business Type</label>
+                        <select id="reg-business">
+                            <option value="Developer">Developer</option>
+                            <option value="Business">Business</option>
+                            <option value="Researcher">Researcher</option>
+                            <option value="Legal">Legal</option>
+                            <option value="Finance">Finance</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="register-btn">Create Account</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── Main Section (after auth) ─────────────────── -->
+        <div id="main-section">
+            <div class="user-bar">
+                <div class="user-info">Signed in as <strong id="display-username"></strong></div>
+                <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+            </div>
+
+            <div class="nav-bar">
+                <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Compress</button>
+                <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
+                <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
+            </div>
+
+            <!-- ── Compress Tab ──────────────────────────── -->
+            <div class="tab-content active" id="tab-compress">
+                <div class="card">
+                    <div class="card-title">Prompt Input</div>
+                    <div class="form-row">
+                        <label for="prompt-input">Raw Prompt</label>
+                        <textarea id="prompt-input" rows="6" placeholder="Paste your prompt here..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <label for="task-input">Task Description</label>
+                        <input type="text" id="task-input" placeholder="What should the AI do with this prompt?">
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label for="use-case">Use Case</label>
+                            <select id="use-case">
+                                <option value="">Auto-detect</option>
+                                <option value="generic">Generic</option>
+                                <option value="code">Code</option>
+                                <option value="ticket">Support Ticket</option>
+                                <option value="legal">Legal</option>
+                                <option value="resume">Resume</option>
+                                <option value="research">Research</option>
+                                <option value="transcript">Transcript</option>
+                                <option value="financial">Financial</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label for="mode">Compression Mode</label>
+                            <select id="mode">
+                                <option value="balanced">Balanced</option>
+                                <option value="gentle">Gentle</option>
+                                <option value="aggressive">Aggressive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="compress()" id="compress-btn">
+                        ⚡ Compress Prompt
+                    </button>
+                </div>
+
+                <!-- Result -->
+                <div id="result-section" style="display:none;">
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-original">0</div>
+                            <div class="stat-label">Original Tokens</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-final">0</div>
+                            <div class="stat-label">Final Tokens</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value green" id="stat-saved">0</div>
+                            <div class="stat-label">Tokens Saved</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Optimized Prompt (CRISP)</div>
+                        <div class="result-output" id="result-output"></div>
+                        <div class="feedback-row">
+                            <button class="btn btn-success btn-sm" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
+                            <button class="btn btn-danger btn-sm" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
+                            <button class="btn btn-ghost btn-sm" onclick="copyResult()">📋 Copy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── History Tab ───────────────────────────── -->
+            <div class="tab-content" id="tab-history-content">
+                <div class="card">
+                    <div class="card-title">Compression History</div>
+                    <div id="history-list"></div>
+                </div>
+            </div>
+
+            <!-- ── Stats Tab ─────────────────────────────── -->
+            <div class="tab-content" id="tab-stats-content">
+                <div class="card">
+                    <div class="card-title">Usage Statistics</div>
+                    <div class="stats-row" id="global-stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dev_engine.js"></script>
+    <script src="prompt_optimizer.js"></script>
+    <script src="mock_api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
