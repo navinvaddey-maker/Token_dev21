@@ -1,0 +1,13 @@
+[package]
+name    = "learning-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+schema-engine    = { path = "../schema-engine" }
+hebbian-core     = { path = "../hebbian-core" }
+competitive-core = { path = "../competitive-core" }
+db               = { path = "../db" }
+sqlx             = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls"] }
+uuid             = { version = "1", features = ["v4", "serde"] }
+tokio            = { version = "1", features = ["full"] }

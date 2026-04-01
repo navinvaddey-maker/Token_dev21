@@ -1,6 +1,6 @@
 // static/mock_api.js — Development fallback + API wrapper
 const MockAPI = {
-    compress({ raw_text, task }) {
+    compress({ raw_text, task, deliverables, constraints, reproducibility }) {
         const words   = raw_text.split(/\s+/);
         const filler  = /\b(just|basically|actually|please|really|very)\b/gi;
         const cleaned = raw_text.replace(filler, '').replace(/\s{2,}/g, ' ').trim();
@@ -17,51 +17,60 @@ const MockAPI = {
 };
 
 const API = {
+    async call(path, options = {}) {
+        const headers = { 
+            'Content-Type': 'application/json',
+            ...options.headers 
+        };
+        
+        if (State.token) {
+            headers['Authorization'] = `Bearer ${State.token}`;
+        }
+
+        const r = await fetch(path, { ...options, headers });
+        
+        if (r.status === 401) {
+            console.error('Session expired or unauthorized');
+            if (typeof logout === 'function') logout();
+            throw new Error('Session expired. Please log in again.');
+        }
+
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.error?.message || err.error || 'Request failed');
+        }
+
+        return r.status === 204 ? null : r.json();
+    },
+
     async compress(req) {
         try {
-            const r = await fetch('/api/compress', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${State.token}` },
-                body:    JSON.stringify(req),
+            return await this.call('/api/compress', {
+                method: 'POST',
+                body: JSON.stringify(req),
             });
-            if (!r.ok) throw new Error((await r.json()).error?.message ?? 'compress failed');
-            return r.json();
         } catch (e) {
-            console.warn('Backend unreachable — using MockAPI:', e.message);
+            console.warn('Backend error — using MockAPI fallback:', e.message);
             return MockAPI.compress(req);
         }
     },
 
     async feedback(req) {
-        const r = await fetch('/api/feedback', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${State.token}` },
-            body:    JSON.stringify(req),
+        return this.call('/api/feedback', {
+            method: 'POST',
+            body: JSON.stringify(req),
         });
-        if (!r.ok) throw new Error('Feedback failed');
     },
 
     async history() {
-        const r = await fetch('/api/history', {
-            headers: { 'Authorization': `Bearer ${State.token}` },
-        });
-        if (!r.ok) throw new Error('Failed to load history');
-        return r.json();
+        return this.call('/api/history');
     },
 
     async stats() {
-        const r = await fetch('/api/stats', {
-            headers: { 'Authorization': `Bearer ${State.token}` },
-        });
-        if (!r.ok) throw new Error('Failed to load stats');
-        return r.json();
+        return this.call('/api/stats');
     },
 
     async devConfig() {
-        const r = await fetch('/api/dev/config', {
-            headers: { 'Authorization': `Bearer ${State.token}` },
-        });
-        if (!r.ok) throw new Error('Failed to load config');
-        return r.json();
+        return this.call('/api/dev/config');
     }
 };

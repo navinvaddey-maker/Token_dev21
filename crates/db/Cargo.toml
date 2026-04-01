@@ -1,0 +1,15 @@
+[package]
+name    = "db"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+schema-engine    = { path = "../schema-engine" }
+competitive-core = { path = "../competitive-core" }
+hebbian-core     = { path = "../hebbian-core" }
+sqlx  = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls",
+                                        "uuid", "time", "json"] }
+serde_json = "1"
+uuid       = { version = "1", features = ["v4", "serde"] }
+time       = { version = "0.3", features = ["serde"] }
+tokio      = { version = "1", features = ["full"] }

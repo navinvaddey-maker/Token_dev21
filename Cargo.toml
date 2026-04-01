@@ -3,15 +3,46 @@ name    = "token_compress_engine"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "debug_full_pipeline"
+path = "src/bin/debug_full_pipeline.rs"
+
+[[bin]]
+name = "debug_comparison"
+path = "src/bin/debug_comparison.rs"
+
+[[bin]]
+name = "debug_sparse"
+path = "src/bin/debug_sparse.rs"
+
+[workspace]
+members = [
+    ".",
+    "crates/schema-engine",
+    "crates/hebbian-core",
+    "crates/competitive-core",
+    "crates/db",
+    "crates/learning-engine",
+]
+resolver = "2"
+
 [dependencies]
+edit-distance = "2.1"
+# internal crates
+schema-engine    = { path = "crates/schema-engine" }
+hebbian-core     = { path = "crates/hebbian-core" }
+competitive-core = { path = "crates/competitive-core" }
+db               = { path = "crates/db" }
+learning-engine  = { path = "crates/learning-engine" }
+
 # web framework
 axum        = { version = "0.7", features = ["macros"] }
 tokio       = { version = "1",   features = ["full"] }
-tower       = "0.4"
+tower       = { version = "0.4", features = ["util"] }
 tower-http  = { version = "0.5", features = ["trace", "cors", "fs"] }
 
-# database — SQLite
-sqlx        = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "uuid", "chrono", "macros"] }
+# database — SQLite (transitioning to Postgres via db crate, but keeping here for current compilation)
+sqlx        = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "uuid", "chrono", "macros", "json"] }
 
 # auth
 bcrypt      = "0.15"
@@ -35,6 +66,14 @@ chrono    = { version = "0.4", features = ["serde"] }
 regex     = "1"
 once_cell = "1"
 dotenvy   = "0.15"
+time      = { version = "0.3", features = ["serde"] }
+
+# NEW: Token compression engine dependencies
+arrayvec   = "0.7"          # stack-allocated fixed-capacity arrays (WM slots)
+dashmap    = "5"            # concurrent HashMap for schema priors
+rayon      = "1"            # parallel salience scoring (sparse coding)
+lazy_static = "1.4"
+phf        = { version = "0.8", features = ["macros"] }          # perfect hash maps for domain phrase lookup
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -1,22 +1,20 @@
-use std::time::Instant;
 use super::PrincipleResult;
+use std::time::Instant;
 
 pub fn run(text: &str, use_case: &str) -> PrincipleResult {
     let start = Instant::now();
 
     let chunks: Vec<String> = match use_case {
-        "legal" | "research" | "code" | "financial" => {
-            text.split("\n\n")
-                .map(|c| c.trim().to_string())
-                .filter(|c| !c.is_empty())
-                .collect()
-        }
-        "ticket" | "transcript" => {
-            text.split('\n')
-                .map(|c| c.trim().to_string())
-                .filter(|c| !c.is_empty())
-                .collect()
-        }
+        "legal" | "research" | "code" | "financial" => text
+            .split("\n\n")
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect(),
+        "ticket" | "transcript" => text
+            .split('\n')
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect(),
         _ => {
             let sentences: Vec<&str> = text
                 .split(|c| c == '.' || c == '!' || c == '?')
@@ -29,10 +27,13 @@ pub fn run(text: &str, use_case: &str) -> PrincipleResult {
 
     let count = chunks.len();
     PrincipleResult {
-        text:          chunks.join("\n\n"),
+        text: chunks.join("\n\n"),
         chunks,
         items_removed: 0,
-        detail:        format!("Split into {} semantic units (strategy: {})", count, use_case),
-        duration_ms:   start.elapsed().as_millis() as u64,
+        detail: format!(
+            "Split into {} semantic units (strategy: {})",
+            count, use_case
+        ),
+        duration_ms: start.elapsed().as_millis() as u64,
     }
 }

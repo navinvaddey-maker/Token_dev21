@@ -4,15 +4,15 @@ CREATE TABLE token_history (
     user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     original_prompt  TEXT NOT NULL,
     optimized_prompt TEXT NOT NULL,
-    tokens_saved     INTEGER NOT NULL DEFAULT 0,
-    token_original   INTEGER NOT NULL DEFAULT 0,
-    token_final      INTEGER NOT NULL DEFAULT 0,
+    tokens_saved     BIGINT NOT NULL DEFAULT 0,
+    token_original   BIGINT NOT NULL DEFAULT 0,
+    token_final      BIGINT NOT NULL DEFAULT 0,
     use_case         TEXT NOT NULL DEFAULT 'generic',
     mode             TEXT NOT NULL DEFAULT 'balanced',
     engine_version   TEXT NOT NULL DEFAULT '1.0.0',
-    principle_logs   TEXT NOT NULL DEFAULT '[]',
-    warnings         TEXT NOT NULL DEFAULT '[]',
-    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    principle_logs   JSONB NOT NULL DEFAULT '[]',
+    warnings         JSONB NOT NULL DEFAULT '[]',
+    created_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_token_history_user_id    ON token_history (user_id);

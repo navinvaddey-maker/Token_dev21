@@ -19,8 +19,10 @@ mod sparse_tests {
     #[test]
     fn aggressive_removes_more() {
         let text = "Maybe you could possibly help me.";
-        assert!(sparse_coding::run(text, "aggressive").items_removed
-             >= sparse_coding::run(text, "gentle").items_removed);
+        assert!(
+            sparse_coding::run(text, "aggressive").items_removed
+                >= sparse_coding::run(text, "gentle").items_removed
+        );
     }
 
     #[test]
@@ -70,7 +72,12 @@ mod selective_attention_tests {
     #[test]
     fn protects_entity_regardless_of_score() {
         let chunks = vec!["TXN-9921 amount 1499".into(), "unrelated content".into()];
-        let r = selective_attention::run(&chunks, "quantum physics", "aggressive", &["TXN-9921".into()]);
+        let r = selective_attention::run(
+            &chunks,
+            "quantum physics",
+            "aggressive",
+            &["TXN-9921".into()],
+        );
         assert!(r.chunks.iter().any(|c| c.contains("TXN-9921")));
     }
 
@@ -101,27 +108,85 @@ mod working_memory_tests {
     #[test]
     fn truncates_to_budget() {
         let long = vec!["word"; 2000].join(" ");
-        let r    = working_memory::run(&long, 100);
+        let r = working_memory::run(&long, 100);
         assert!(r.text.split_whitespace().count() <= 80);
+    }
+
+    #[test]
+    fn truncates_body_after_separator_not_headers() {
+        let header = [
+            "Role: analyst",
+            "Audience: expert reader",
+            "Schema: X",
+            "Constraints: Y",
+            "Synthesis: Z",
+            "Task: summarize",
+            "---",
+        ]
+        .join("\n");
+
+        let body = vec!["word"; 200].join(" ");
+        let text = format!("{}\n\n{}", header, body);
+
+        let max_tokens = 100;
+        let expected_word_limit = (max_tokens as f64 / 1.3) as usize;
+        let r = working_memory::run(&text, max_tokens);
+
+        // Count only words after the `---` separator.
+        let mut after_sep = false;
+        let mut body_words = 0usize;
+        for line in r.text.lines() {
+            if line.trim() == "---" {
+                after_sep = true;
+                continue;
+            }
+            if after_sep {
+                body_words += line.split_whitespace().count();
+            }
+        }
+
+        assert!(body_words <= expected_word_limit);
+        // Header must remain present.
+        assert!(r.text.contains("Role:"));
+        assert!(r.text.contains("Audience:"));
     }
 }
 
 #[cfg(test)]
-mod hebbian_binding_tests {
-    use token_compress_engine::engine::hebbian_binding;
+mod predictive_coding_tests {
+    use token_compress_engine::engine::predictive_coding;
 
     #[test]
-    fn crisp_order_preserved() {
-        let r = hebbian_binding::run("Role: analyst.\n\n---\n\nContent.", "summarize", "generic");
-        let role_pos = r.text.find("Role:").unwrap();
-        let task_pos = r.text.find("Task:").unwrap();
-        let div_pos  = r.text.find("---").unwrap();
-        assert!(role_pos < task_pos && task_pos < div_pos);
+    fn includes_role_frame_details_and_task() {
+        let chunks = vec!["Content about payment overdue invoices.".to_string()];
+        let r = predictive_coding::run(&chunks, "summarize", "", "", "", "generic", "Claude");
+
+        assert!(r.text.contains("Role:"));
+        assert!(r.text.contains("Audience:"));
+        assert!(r.text.contains("Task:"));
+        assert!(r.text.contains("---"));
+
+        // Schema, Constraints, and Synthesis should NOT be present.
+        assert!(!r.text.contains("Schema:"));
+        assert!(!r.text.contains("Constraints:"));
+        assert!(!r.text.contains("Synthesis:"));
+
+        // Compact formatting should not contain empty-line gaps.
+        assert!(!r.text.contains("\n\n"));
     }
 
     #[test]
-    fn output_format_injected() {
-        let r = hebbian_binding::run("Role: x.\n\n---\n\nContent.", "x", "ticket");
-        assert!(r.text.contains("Output:"));
+    fn rewrites_task_verbs() {
+        let r = predictive_coding::run(
+            &vec!["Content.".to_string()],
+            "Compare and contrast the two frameworks",
+            "",
+            "",
+            "",
+            "generic",
+            "Claude",
+        );
+        assert!(!r.text.to_lowercase().contains("compare and contrast"));
+        assert!(r.text.contains("Task: map the two frameworks"));
     }
 }

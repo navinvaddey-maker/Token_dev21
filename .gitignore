@@ -1,5 +1,35 @@
+# Build artifacts
 /target
+/target-publish
+target/
+
+# Database files
 *.db
 *.db-shm
 *.db-wal
+token_compress.db*
+
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Logs
+*.log
+server.log
+
+# macOS system files
+.DS_Store
+Thumbs.db
+
+# IDEs and local tool config
+.idea/
+.vscode/
+.cursor/
+.kilo/
+*.swp
+*.swo
+
+# Dependencies
+node_modules/
+**/node_modules/

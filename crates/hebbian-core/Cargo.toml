@@ -1,0 +1,8 @@
+[package]
+name    = "hebbian-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+schema-engine = { path = "../schema-engine" }
+serde         = { version = "1", features = ["derive"] }

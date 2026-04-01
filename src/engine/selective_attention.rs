@@ -1,6 +1,6 @@
+use super::PrincipleResult;
 use std::collections::HashSet;
 use std::time::Instant;
-use super::PrincipleResult;
 
 fn tokenize(text: &str) -> HashSet<String> {
     text.to_lowercase()
@@ -17,19 +17,32 @@ fn score(chunk: &str, task_words: &HashSet<String>) -> f64 {
         .filter(|w| w.len() > 3)
         .map(String::from)
         .collect();
-    if words.is_empty() { return 0.0; }
-    words.iter().filter(|w| task_words.contains(w.as_str())).count() as f64 / words.len() as f64
+    if words.is_empty() {
+        return 0.0;
+    }
+    words
+        .iter()
+        .filter(|w| task_words.contains(w.as_str()))
+        .count() as f64
+        / words.len() as f64
 }
 
 pub fn run(chunks: &[String], task: &str, mode: &str, protected: &[String]) -> PrincipleResult {
-    let start     = Instant::now();
-    let threshold = match mode { "gentle" => 0.03, "aggressive" => 0.20, _ => 0.10 };
+    let start = Instant::now();
+    let threshold = match mode {
+        "gentle" => 0.03,
+        "aggressive" => 0.20,
+        _ => 0.10,
+    };
     let task_words = tokenize(task);
 
-    let mut kept: Vec<String> = chunks.iter()
+    let mut kept: Vec<String> = chunks
+        .iter()
         .filter(|c| {
             // always keep chunks containing a protected entity
-            let is_protected = protected.iter().any(|e| c.to_lowercase().contains(&e.to_lowercase()));
+            let is_protected = protected
+                .iter()
+                .any(|e| c.to_lowercase().contains(&e.to_lowercase()));
             is_protected || score(c, &task_words) >= threshold
         })
         .cloned()
@@ -43,11 +56,16 @@ pub fn run(chunks: &[String], task: &str, mode: &str, protected: &[String]) -> P
     let dropped = chunks.len().saturating_sub(kept.len());
 
     PrincipleResult {
-        text:          kept.join("\n\n"),
-        chunks:        kept.clone(),
+        text: kept.join("\n\n"),
+        chunks: kept.clone(),
         items_removed: dropped,
-        detail:        format!("Kept {}/{} chunks (threshold: {:.2}, protected: {})",
-                               kept.len(), chunks.len(), threshold, protected.len()),
-        duration_ms:   start.elapsed().as_millis() as u64,
+        detail: format!(
+            "Kept {}/{} chunks (threshold: {:.2}, protected: {})",
+            kept.len(),
+            chunks.len(),
+            threshold,
+            protected.len()
+        ),
+        duration_ms: start.elapsed().as_millis() as u64,
     }
 }

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | TokenCompress Engine</title>
+    <link rel="stylesheet" href="admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+    <nav class="sidebar">
+        <div class="logo">
+            <span class="logo-icon">▲</span>
+            <span class="logo-text">TokenCompress Admin</span>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-section="overview"><a href="#">Overview</a></li>
+            <li data-section="users"><a href="#">User Management</a></li>
+            <li data-section="history"><a href="#">Global History</a></li>
+            <li data-section="feedback"><a href="#">Feedback Signals</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header>
+            <h1 id="section-title">Overview</h1>
+            <div class="user-info">
+                <span id="admin-username">Admin</span>
+                <div class="avatar">N</div>
+            </div>
+        </header>
+
+        <section id="overview-section" class="active">
+            <div class="stats-grid">
+                <div class="stat-card glass">
+                    <h3>Total Users</h3>
+                    <p id="stat-total-users">0</p>
+                </div>
+                <div class="stat-card glass">
+                    <h3>Total Compressions</h3>
+                    <p id="stat-total-compressions">0</p>
+                </div>
+                <div class="stat-card glass">
+                    <h3>Total Tokens Saved</h3>
+                    <p id="stat-total-tokens-saved">0</p>
+                </div>
+            </div>
+
+            <div class="chart-container glass">
+                <h3>Compression Usage Over Time</h3>
+                <canvas id="usageChart"></canvas>
+            </div>
+        </section>
+
+        <section id="users-section">
+            <div class="table-container glass">
+                <div class="table-header">
+                    <h2>Manage Users</h2>
+                    <input type="text" id="user-search" placeholder="Search users...">
+                </div>
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Business Type</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-tbody">
+                        <!-- User rows injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="history-section">
+            <div class="table-container glass">
+                <div class="table-header">
+                    <h2>Global Compression History</h2>
+                </div>
+                <table id="history-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Original Size</th>
+                            <th>Final Size</th>
+                            <th>Saved</th>
+                            <th>Mode</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <!-- History rows injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="edit-user-modal" class="modal glass">
+        <div class="modal-content">
+            <h2>Edit User</h2>
+            <form id="edit-user-form">
+                <input type="hidden" id="edit-user-id">
+                <label for="edit-business-type">Business Type</label>
+                <select id="edit-business-type">
+                    <option value="Developer">Developer</option>
+                    <option value="Pro">Pro</option>
+                    <option value="Enterprise">Enterprise</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <div class="modal-actions">
+                    <button type="button" id="close-modal">Cancel</button>
+                    <button type="submit">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

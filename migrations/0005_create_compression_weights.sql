@@ -3,9 +3,9 @@ CREATE TABLE compression_weights (
     id         TEXT PRIMARY KEY,
     user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     entity     TEXT NOT NULL,
-    weight     REAL NOT NULL DEFAULT 1.0,
+    weight     DOUBLE PRECISION NOT NULL DEFAULT 1.0,
     use_case   TEXT NOT NULL DEFAULT 'generic',
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, entity, use_case)
 );
 

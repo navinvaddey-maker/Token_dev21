@@ -8,16 +8,14 @@ CREATE TABLE use_cases (
     chunk_strategy TEXT NOT NULL DEFAULT 'sentence',
     description    TEXT,
     active         INTEGER NOT NULL DEFAULT 1,
-    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at     TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Note: In Postgres we use gen_random_uuid(). In 0004_create_use_cases.sql we seed it.
 INSERT INTO use_cases (id, key, role_frame, output_format, chunk_strategy, description) VALUES
-(lower(hex(randomblob(16))), 'ticket',     'Role: senior support analyst. Context: customer support triage.',        'Output: JSON [{id,priority,category,action}]',      'newline',   'Customer support ticket triage'),
-(lower(hex(randomblob(16))), 'legal',      'Role: legal analyst. Context: contract risk identification.',            'Output: bullet — risk · clause · severity',         'paragraph', 'Legal contract analysis'),
-(lower(hex(randomblob(16))), 'resume',     'Role: talent screener. Context: candidate evaluation.',                  'Output: scorecard — candidate · fit_score',         'paragraph', 'Resume screening'),
-(lower(hex(randomblob(16))), 'code',       'Role: senior software engineer. Context: codebase documentation.',       'Output: markdown — function · purpose · returns',   'paragraph', 'Code documentation'),
-(lower(hex(randomblob(16))), 'research',   'Role: research analyst. Context: academic paper summarization.',          'Output: structured — finding · evidence',           'paragraph', 'Research paper summarization'),
-(lower(hex(randomblob(16))), 'transcript', 'Role: meeting coordinator. Context: action item extraction.',             'Output: action list — owner · action · deadline',   'newline',   'Meeting transcript extraction'),
-(lower(hex(randomblob(16))), 'financial',  'Role: financial analyst. Context: quarterly earnings assessment.',        'Output: health report — metric · value · signal',   'paragraph', 'Financial report analysis'),
-(lower(hex(randomblob(16))), 'generic',    'Role: analyst. Context: document processing and structured extraction.', 'Output: structured summary',                        'sentence',  'Generic document processing');
+(gen_random_uuid(), 'ticket',     'Role: senior support analyst. Context: customer support triage.',        'Output: JSON [{id,priority,category,action}]',      'newline',   'Customer support ticket triage'),
+(gen_random_uuid(), 'legal',      'Role: legal analyst. Context: contract risk identification.',            'Output: bullet — risk · clause · severity',         'paragraph', 'Legal contract analysis'),
+(gen_random_uuid(), 'resume',     'Role: talent screener. Context: candidate evaluation.',                  'Output: scorecard — candidate · fit_score',         'paragraph', 'Resume screening'),
+(gen_random_uuid(), 'code',       'Role: senior software engineer. Context: codebase documentation.',       'Output: markdown — function · purpose · returns',   'paragraph', 'Code documentation'),
+(gen_random_uuid(), 'research',   'Role: research analyst. Context: academic paper summarization.',          'Output: structured — finding · evidence',           'paragraph', 'Research paper summarization');

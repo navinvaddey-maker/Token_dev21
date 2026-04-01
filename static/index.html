@@ -164,7 +164,7 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.88rem;
             resize: vertical;
-            min-height: 140px;
+            min-height: 60px;
             line-height: 1.6;
         }
         select {
@@ -456,10 +456,13 @@
 
         <!-- ── Main Section (after auth) ─────────────────── -->
         <div id="main-section">
-            <div class="user-bar">
-                <div class="user-info">Signed in as <strong id="display-username"></strong></div>
-                <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
-            </div>
+               <div class="user-bar">
+                   <div class="user-info">Signed in as <strong id="display-username"></strong></div>
+                   <div style="display: flex; gap: 8px;">
+                       <a href="/admin.html" id="admin-link" class="btn btn-ghost btn-sm" style="display: none; text-decoration: none;">🛡️</a>
+                       <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+                   </div>
+               </div>
 
             <div class="nav-bar">
                 <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Compress</button>
@@ -473,25 +476,31 @@
                     <div class="card-title">Prompt Input</div>
                     <div class="form-row">
                         <label for="prompt-input">Raw Prompt</label>
-                        <textarea id="prompt-input" rows="6" placeholder="Paste your prompt here..."></textarea>
+                        <textarea id="prompt-input" rows="4" placeholder="Paste your prompt here..."></textarea>
                     </div>
                     <div class="form-row">
+                        <label for="deliverables-input">Deliverable Guidance</label>
+                        <textarea id="deliverables-input" rows="2" placeholder="Describe what the AI should produce..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <label for="constraints-input">Constraints</label>
+                        <textarea id="constraints-input" rows="2" placeholder="List any rules or limitations..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <label for="reproducibility-input">Reproducibility</label>
+                        <textarea id="reproducibility-input" rows="2" placeholder="How can the result be verified or reproduced?"></textarea>
+                    </div>
+                    <div class="form-row" style="display:none;">
                         <label for="task-input">Task Description</label>
-                        <input type="text" id="task-input" placeholder="What should the AI do with this prompt?">
+                        <input type="text" id="task-input" placeholder="What should the AI do with this prompt?" value="Optimize prompt">
                     </div>
                     <div class="form-grid">
                         <div class="form-row">
-                            <label for="use-case">Use Case</label>
-                            <select id="use-case">
-                                <option value="">Auto-detect</option>
-                                <option value="generic">Generic</option>
-                                <option value="code">Code</option>
-                                <option value="ticket">Support Ticket</option>
-                                <option value="legal">Legal</option>
-                                <option value="resume">Resume</option>
-                                <option value="research">Research</option>
-                                <option value="transcript">Transcript</option>
-                                <option value="financial">Financial</option>
+                            <label for="model-select">Target Model</label>
+                            <select id="model-select">
+                                <option value="Claude" selected>Claude</option>
+                                <option value="ChatGPT">ChatGPT</option>
+                                <option value="Copilot">Copilot</option>
                             </select>
                         </div>
                         <div class="form-row">
@@ -502,6 +511,20 @@
                                 <option value="aggressive">Aggressive</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="form-row" style="display:none;">
+                        <label for="use-case">Use Case</label>
+                        <select id="use-case">
+                            <option value="">Auto-detect</option>
+                            <option value="generic">Generic</option>
+                            <option value="code">Code</option>
+                            <option value="ticket">Support Ticket</option>
+                            <option value="legal">Legal</option>
+                            <option value="resume">Resume</option>
+                            <option value="research">Research</option>
+                            <option value="transcript">Transcript</option>
+                            <option value="financial">Financial</option>
+                        </select>
                     </div>
                     <button class="btn btn-primary" onclick="compress()" id="compress-btn">
                         ⚡ Compress Prompt
@@ -551,6 +574,8 @@
                     <div class="stats-row" id="global-stats"></div>
                 </div>
             </div>
+
+
         </div>
     </div>
 
