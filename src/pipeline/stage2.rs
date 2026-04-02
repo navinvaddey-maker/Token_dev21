@@ -27,4 +27,9 @@ impl Stage2 {
         out.mode = Some(result.mode);
         out.is_ambiguous = result.is_ambiguous;
     }
+
+    /// Exposes schema updates directly for the orchestrator to call post-completion.
+    pub fn update_schema(&self, delta_tokens: &[String]) {
+        self.predictive.update_schema(delta_tokens);
+    }
 }

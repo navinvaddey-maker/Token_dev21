@@ -10,22 +10,18 @@ impl SemanticFidelityScorer {
         Self
     }
 
-    /// Calculates the SFS score.
+    /// Calculates the SFS score in 0.0–10.0 range.
     ///
-    /// # Arguments
-    ///
-    /// * `field_issues` - Slice of field validation issues found in the output.
-    ///
-    /// # Returns
-    ///
-    /// A score between 0.0 and 1.0, where higher is better (fewer/severe issues).
-    pub fn score(field_issues: &[FieldValidationIssue]) -> f32 {
+    /// @param field_issues - Slice of field validation issues.
+    /// @returns (sfs_score, sfs_issues) — scaled score and passthrough issues.
+    pub fn score(field_issues: &[FieldValidationIssue]) -> (f32, Vec<FieldValidationIssue>) {
         let issue_weights = IssueWeights::sfs_weights();
         let total_weight = issue_weights.calculate_total_weight(field_issues);
         // SFS is inversely related to the total weight of issues
         // Using exponential decay: e^(-total_weight) maps [0, inf) to (0, 1]
-        // This ensures score is 1.0 when no issues, and approaches 0 as issues increase
-        (-total_weight).exp()
+        // Scale to 0-10 range
+        let sfs = ((-total_weight).exp() * 10.0).clamp(0.0, 10.0);
+        (sfs, field_issues.to_vec())
     }
 }
 
@@ -36,8 +32,8 @@ mod tests {
 
     #[test]
     fn test_sfs_no_issues() {
-        let score = SemanticFidelityScorer::score(&[]);
-        assert_eq!(score, 1.0); // No issues means perfect fidelity
+        let (score, _) = SemanticFidelityScorer::score(&[]);
+        assert_eq!(score, 10.0); // No issues means perfect fidelity (10.0)
     }
 
     #[test]
@@ -56,9 +52,9 @@ mod tests {
                 severity: "error".to_string(),
             },
         ];
-        let score = SemanticFidelityScorer::score(&field_issues);
-        // Should be less than 1.0 due to penalty from issues
-        assert!(score < 1.0);
+        let (score, _) = SemanticFidelityScorer::score(&field_issues);
+        // Should be less than 10.0 due to penalty from issues
+        assert!(score < 10.0);
         // Should still be positive
         assert!(score > 0.0);
     }
@@ -91,7 +87,7 @@ mod tests {
                 severity: "warning".to_string(),
             },
         ];
-        let score = SemanticFidelityScorer::score(&field_issues);
+        let (score, _) = SemanticFidelityScorer::score(&field_issues);
         // Should be lower than with fewer issues
         let fewer_issues = vec![FieldValidationIssue {
             field_name: "task".to_string(),
@@ -99,7 +95,7 @@ mod tests {
             description: "Task field expects String but got Number".to_string(),
             severity: "error".to_string(),
         }];
-        let score_fewer = SemanticFidelityScorer::score(&fewer_issues);
+        let (score_fewer, _) = SemanticFidelityScorer::score(&fewer_issues);
         assert!(score < score_fewer);
     }
 }

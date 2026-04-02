@@ -174,9 +174,6 @@ async function compress() {
     const mode    = document.getElementById('mode').value;
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
-    if (!deliverables) return showToast('Deliverable Guidance is required', 'error');
-    if (!constraints) return showToast('Constraints field is required', 'error');
-    if (!reproducibility) return showToast('Reproducibility field is required', 'error');
 
     // detect use_case from DevEngine if not manually set
     const detectedUseCase = useCase || DevEngine.detectUseCase(raw);

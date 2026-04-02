@@ -33,6 +33,7 @@ impl Stage4 {
             .fill(&wm_slots, layers, &delta_tokens, &clusters, Some(out));
 
         out.resolved_task = result.task.clone();
+        out.resolved_role = result.role.clone();
         out.resolved_deliverable = result.deliverable.clone();
         out.resolved_context = result.context.clone();
         out.resolved_constraints = result.constraints.clone();

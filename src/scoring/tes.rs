@@ -12,25 +12,23 @@ impl TokenEfficiencyScorer {
 }
 
 impl TokenEfficiencyScorer {
-    /// Calculates the TES score.
+    /// Calculates the TES score in 0.0–10.0 range.
     ///
-    /// # Arguments
-    ///
-    /// * `output` - The algorithm output containing token counts and compression data.
-    /// * `field_issues` - Slice of field validation issues found in the output.
-    ///
-    /// # Returns
-    ///
-    /// A score between 0.0 and 1.0, where higher is better.
-    pub fn score(output: &AlgorithmOutput, field_issues: &[FieldValidationIssue]) -> f32 {
-        Self::calculate_score(
+    /// @param output - AlgorithmOutput with input/output token counts.
+    /// @param field_issues - Slice of field validation issues.
+    /// @returns (tes_score, tes_issues) — score clamped 0.0..10.0, issues passthrough.
+    pub fn score(output: &AlgorithmOutput, field_issues: &[FieldValidationIssue]) -> (f32, Vec<FieldValidationIssue>) {
+        let raw = Self::calculate_raw(
             output.input_token_count,
             output.output_token_count,
             field_issues,
-        )
+        );
+        // Scale to 0–10: perfect compression (ratio≤0.5) scores 10; no compression scores 0.
+        let tes = (raw * 10.0).clamp(0.0, 10.0);
+        (tes, field_issues.to_vec())
     }
 
-    fn calculate_score(
+    fn calculate_raw(
         input_tokens: u32,
         output_tokens: u32,
         field_issues: &[FieldValidationIssue],
@@ -59,8 +57,8 @@ mod tests {
             output_token_count: 50,
             ..Default::default()
         };
-        let score = TokenEfficiencyScorer::score(&output, &[]);
-        assert_eq!(score, 0.5); // 50/100 = 0.5 compression ratio, no penalty
+        let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+        assert_eq!(score, 5.0); // 50/100 = 0.5 ratio -> scaled to 5.0
     }
 
     #[test]
@@ -84,9 +82,9 @@ mod tests {
                 severity: "error".to_string(),
             },
         ];
-        let score = TokenEfficiencyScorer::score(&output, &field_issues);
-        // Should be less than 0.5 due to penalty from issues
-        assert!(score < 0.5);
+        let (score, _) = TokenEfficiencyScorer::score(&output, &field_issues);
+        // Should be less than 5.0 due to penalty from issues
+        assert!(score < 5.0);
         // Should still be positive
         assert!(score > 0.0);
     }
@@ -98,8 +96,8 @@ mod tests {
             output_token_count: 100,
             ..Default::default()
         };
-        let score = TokenEfficiencyScorer::score(&output, &[]);
-        assert_eq!(score, 1.0); // 100/100 = 1.0, no penalty
+        let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+        assert_eq!(score, 10.0); // 100/100 = 1.0 ratio -> scaled to 10.0
     }
 
     #[test]
@@ -109,9 +107,8 @@ mod tests {
             output_token_count: 150,
             ..Default::default()
         };
-        let score = TokenEfficiencyScorer::score(&output, &[]);
-        assert_eq!(score, 1.5); // 150/100 = 1.5, but we expect this to be clamped in practice
-                                // Note: In practice, TES might be clamped, but the basic calculation allows expansion
+        let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+        assert_eq!(score, 10.0); // 150/100 ratio clamped to 10.0 in scaled output
     }
 
     #[test]
@@ -121,7 +118,7 @@ mod tests {
             output_token_count: 50,
             ..Default::default()
         };
-        let score = TokenEfficiencyScorer::score(&output, &[]);
+        let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
         assert_eq!(score, 0.0); // Handle division by zero
     }
 }

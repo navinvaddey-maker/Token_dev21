@@ -98,7 +98,7 @@ async fn login(
 #[derive(serde::Deserialize)]
 pub struct CompressRequest {
     pub raw_text: String,
-    pub task: String,
+    pub task: Option<String>,
     pub deliverables: Option<String>,
     pub constraints: Option<String>,
     pub reproducibility: Option<String>,

@@ -73,7 +73,7 @@ impl PipelineOrchestrator {
     pub fn process(
         &self,
         input: &str,
-        session: &SessionHistory,
+        session: &mut SessionHistory,
     ) -> Result<CompressionResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
@@ -111,13 +111,7 @@ impl PipelineOrchestrator {
         output.field_issues = field_issues.clone();
 
         // Scoring stages
-        let tes = TokenEfficiencyScorer::score(&output, &field_issues);
-        let sfs = SemanticFidelityScorer::score(&field_issues);
-        let dual_score = DualScore {
-            primary: tes,
-            secondary: sfs,
-            combined: (tes + sfs) / 2.0,
-        };
+        let dual_score = crate::scoring::compute_dual_score(&output, &field_issues);
 
         // Update output with scores
         output.dual_score = Some(dual_score.clone());
@@ -125,13 +119,22 @@ impl PipelineOrchestrator {
         // Stage 6A: Output generation
         let stage6a_output = self.stage6a.run(&output)?;
 
-        // Stage 6B: Correction cycle
-        let correction_cycle =
+        // Stage 6B: Correction cycle (conditionally triggers on low scores)
+        let correction_cycle = if dual_score.tes < 6.0 || dual_score.sfs < 6.0 {
             self.correction_cycle
-                .new_cycle(&stage6a_output, &field_issues, &dual_score);
+                .new_cycle(&stage6a_output, &field_issues, &dual_score)
+        } else {
+            // Keep empty default cycle if scores are good
+            crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number)
+        };
 
         // Update output with correction cycle
         output.correction_cycle = Some(correction_cycle.clone());
+
+        // Auto-Learn: Always update schema and push to session history
+        // This fires unconditionally regardless of mode or error paths out of process()
+        self.stage2.update_schema(&output.delta_tokens);
+        session.push(input, &output);
 
         // Package the response with all required fields
         self.package_response(

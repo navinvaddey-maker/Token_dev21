@@ -189,9 +189,10 @@ impl SchemaFilling {
         // Flatten all sources
         let all_sources: Vec<String> = sources.into_iter().flatten().collect();
 
-        // Simple heuristic: try to infer task, deliverable, context from available text
+        // Simple heuristic: try to infer task, deliverable, context, role from available text
         let task = self.infer_task(&wm_texts, &all_sources);
         let deliverable = self.infer_deliverable(&wm_texts, &all_sources);
+        let role = self.infer_role(&wm_texts, &all_sources);
         let context = self.infer_context(&wm_texts, &all_sources, &cluster_texts);
 
         // Determine what was inferred vs what was NULL
@@ -218,6 +219,7 @@ impl SchemaFilling {
         FillResult {
             task,
             deliverable,
+            role,
             context,
             constraints: self.infer_constraints(&wm_texts, &all_sources),
             null_fields,
@@ -263,15 +265,45 @@ impl SchemaFilling {
                 return Some(format!("Perform {} action", keyword));
             }
         }
-        // If all texts are vague, don't fall back to defaults
-        if self.all_texts_vague(wm_texts) {
-            return None;
+        
+        // Robust fallback chain:
+        // Try domain knowledge first
+        if let Some(t) = self.domain_knowledge.get("task") {
+            return Some(t.clone());
         }
-        // Fallback to first meaningful WM slot or domain knowledge
-        wm_texts
-            .first()
-            .cloned()
-            .or_else(|| self.domain_knowledge.get("task").cloned())
+        
+        // Then try first meaningful WM slot
+        if !self.all_texts_vague(wm_texts) {
+            if let Some(t) = wm_texts.first() {
+                return Some(t.clone());
+            }
+        }
+        
+        // Final fallback to guarantee task resolution (prevent NULL task)
+        Some("Analyze and process the provided context".to_string())
+    }
+
+    fn infer_role(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
+        // Look for domain/role keywords
+        let role_map = [
+            ("code", "Expert Software Engineer"),
+            ("develop", "Expert Software Engineer"),
+            ("design", "Architecture Specialist"),
+            ("legal", "Legal Advisor"),
+            ("finance", "Financial Analyst"),
+            ("biology", "Research Biologist"),
+            ("data", "Data Scientist"),
+            ("write", "Professional Copywriter"),
+        ];
+
+        for (keyword, role) in role_map {
+            if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword)) {
+                return Some(role.to_string());
+            }
+        }
+
+        // Fallback to a general expert role
+        Some("Domain Expert".to_string())
     }
 
     fn infer_deliverable(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
@@ -378,6 +410,7 @@ impl SchemaFilling {
 pub struct FillResult {
     pub task: Option<String>,
     pub deliverable: Option<String>,
+    pub role: Option<String>,
     pub context: Vec<String>,
     pub constraints: Option<String>,
     pub null_fields: Vec<String>,

@@ -33,3 +33,16 @@ Thumbs.db
 # Dependencies
 node_modules/
 **/node_modules/
+.rustup/
+.cargo/
+
+# Localized development scripts and metadata
+/rust-env.sh
+/CLAUDE.md
+/debug_*.rs
+src/bin/debug_*.rs
+/test_*.rs
+/run_test.rs
+/test_*.html
+/test_admin.html
+/test_admin_fixed.html

@@ -127,11 +127,8 @@ pub async fn compress_new(
     let mode = req.mode.unwrap_or_else(|| "balanced".into());
     let model = req.model.unwrap_or_else(|| "Claude".into());
     let max_tokens = req.max_tokens.unwrap_or(800);
-    let task = if req.task.trim().is_empty() || req.task == "Optimize prompt" {
-        "Optimize the following prompt for maximum token efficiency while preserving all semantic meaning and intent.".to_string()
-    } else {
-        req.task.clone()
-    };
+    // Use the explicit task if provided, otherwise leave it empty for the engine to auto-infer
+    let task = req.task.unwrap_or_default();
 
     let deliverables = req.deliverables.unwrap_or_default();
     let constraints = req.constraints.unwrap_or_default();

@@ -69,7 +69,13 @@ impl PredictiveCoding {
 
         // Session discount: if user asked about similar tokens, reduce novelty
         let discount = self.session_discount(sparse_tokens, session_history);
-        let error_score = (raw_error * (1.0 - discount)).clamp(0.0, 1.0);
+        
+        // Topology prior adjustment
+        let (_, aggressive_prior) = topology_mode_prior(topology.clone());
+        let topology_prior = aggressive_prior * 0.15; // Scaled impact
+        
+        // Final error score adds topology prior to the discounted raw error
+        let error_score = (raw_error * (1.0 - discount) + topology_prior).clamp(0.0, 1.0);
 
         let is_ambiguous = (error_score - BOUNDARY_THRESHOLD).abs()
             < (HYSTERESIS_UPPER - BOUNDARY_THRESHOLD) / 2.0;

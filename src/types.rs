@@ -82,6 +82,7 @@ pub struct AlgorithmOutput {
     // Stage 4 — Schema
     pub resolved_task: Option<String>,
     pub resolved_deliverable: Option<String>,
+    pub resolved_role: Option<String>,
     pub resolved_context: Vec<String>,
     pub resolved_constraints: Option<String>,
     pub null_fields: Vec<String>,
@@ -204,12 +205,16 @@ pub struct FieldValidationIssue {
     pub severity: String, // e.g., "error", "warning", "info"
 }
 
-/// Dual scoring mechanism (e.g., salience and novelty).
+/// Dual scoring result: Token-Efficiency Score (TES) + Semantic Fidelity Score (SFS).
+/// Both values are in the 0.0–10.0 range. Overall uses weighted blend: TES*0.45 + SFS*0.55.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DualScore {
-    pub primary: f32,
-    pub secondary: f32,
-    pub combined: f32,
+    /// @returns Token-Efficiency Score, 0.0–10.0
+    pub tes: f32,
+    /// @returns Semantic Fidelity Score, 0.0–10.0
+    pub sfs: f32,
+    /// @returns Weighted overall: tes*0.45 + sfs*0.55, clamped 0.0–10.0
+    pub overall: f32,
 }
 
 /// Issue encountered during scoring process.
@@ -279,6 +284,6 @@ impl CorrectionCycle {
 
     /// Calculate improvement based on dual score (placeholder logic).
     fn calculate_improvement(dual_score: &DualScore) -> f32 {
-        dual_score.combined * 0.1 // Placeholder
+        dual_score.overall * 0.1 // placeholder — proportional to overall quality
     }
 }
