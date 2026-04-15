@@ -17,8 +17,12 @@ use learning_engine::LearningEngine;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::pipeline::orchestrator::PipelineOrchestrator;
+
 #[derive(Clone)]
 pub struct AppState {
     pub pool: DbPool,
     pub engine: Arc<Mutex<LearningEngine>>,
+    pub pipeline: Arc<PipelineOrchestrator>,
 }
+

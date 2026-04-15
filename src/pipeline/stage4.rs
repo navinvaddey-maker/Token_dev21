@@ -24,7 +24,7 @@ impl Stage4 {
         // Determine layers based on mode (default to Gentle if not set)
         let mode = out.mode.as_ref().unwrap_or(&crate::types::Mode::Gentle);
         let layers = match mode {
-            crate::types::Mode::Gentle | crate::types::Mode::Ambiguous => 1,
+            crate::types::Mode::Gentle | crate::types::Mode::Ambiguous | crate::types::Mode::Balanced => 1,
             crate::types::Mode::Aggressive => 3,
         };
 
@@ -32,11 +32,14 @@ impl Stage4 {
             .schema
             .fill(&wm_slots, layers, &delta_tokens, &clusters, Some(out));
 
-        out.resolved_task = result.task.clone();
-        out.resolved_role = result.role.clone();
-        out.resolved_deliverable = result.deliverable.clone();
-        out.resolved_context = result.context.clone();
-        out.resolved_constraints = result.constraints.clone();
+        out.resolved_schema = crate::types::CompressionSchema {
+            role: result.role.clone(),
+            context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
+            task: result.task.clone(),
+            constraints: result.constraints.as_ref().map(|c| vec![crate::types::Constraint { name: c.clone() }]).unwrap_or_default(),
+            output: result.deliverable.as_ref().map(|d| vec![crate::types::Deliverable { name: d.clone() }]).unwrap_or_default(),
+        };
+
         out.null_fields = result.null_fields;
         out.task_inferred = result.task_inferred;
         out.deliverable_inferred = result.deliverable_inferred;

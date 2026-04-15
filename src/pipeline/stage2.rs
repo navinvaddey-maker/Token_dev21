@@ -21,6 +21,7 @@ impl Stage2 {
             &out.sparse_tokens,
             &session.turns,
             out.topology.clone().unwrap_or_default(),
+            out,
         );
         out.error_score = result.error_score;
         out.delta_tokens = result.delta_tokens;

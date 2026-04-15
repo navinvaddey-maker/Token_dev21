@@ -1,7 +1,6 @@
 use crate::types::{ScoredToken, TokenSource};
-use phf::phf_map;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// Sparse Coding — identifies the minimum active token set.
 ///
@@ -121,27 +120,43 @@ impl SparseCoding {
 
     /// Apply sparse filter: keep top N% tokens, preserve original order.
     /// Pre-boundary = use aggressive ratio (we don't know mode yet at stage 1).
-    pub fn apply(&self, tokens: &[String], keep_ratio: f32) -> Vec<ScoredToken> {
+    pub fn apply(
+        &self, 
+        tokens: &[String], 
+        keep_ratio: f32,
+        locks: &[crate::types::ConstraintToken]
+    ) -> Vec<ScoredToken> {
         let scored = self.compute_salience(tokens);
         let keep_n = ((tokens.len() as f32 * keep_ratio) as usize).max(3);
 
-        // Build survivor set from top-N
-        let survivors: HashSet<&str> = scored
+        let lock_texts: HashSet<&str> = locks.iter().map(|l| l.text.as_str()).collect();
+
+        // Build survivor set from top-N + constraint locks
+        let mut survivors: HashSet<&str> = scored
             .iter()
             .take(keep_n)
             .map(|(t, _)| t.as_str())
             .collect();
+            
+        for lock in &lock_texts {
+            survivors.insert(lock);
+        }
 
         // Return in original order with scores attached
         tokens
             .iter()
             .filter(|t| survivors.contains(t.as_str()))
             .map(|t| {
-                let salience = scored
+                let mut salience = scored
                     .iter()
                     .find(|(tok, _)| tok == t)
                     .map(|(_, s)| *s)
                     .unwrap_or(0.1);
+                    
+                if lock_texts.contains(t.as_str()) {
+                    salience = 1.0;
+                }
+                
                 ScoredToken {
                     text: t.clone(),
                     salience,
@@ -178,7 +193,7 @@ mod tests {
             .split_whitespace()
             .map(String::from)
             .collect();
-        let result = sc.apply(&tokens, 0.30);
+        let result = sc.apply(&tokens, 0.30, &[]);
         assert!(
             result.len() < tokens.len(),
             "Sparse coding must reduce token count"

@@ -1,5 +1,5 @@
 use crate::pipeline::stage0b_topology::topology_mode_prior;
-use crate::types::{Mode, PromptTopology};
+use crate::types::Mode;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -43,6 +43,7 @@ impl PredictiveCoding {
         sparse_tokens: &[crate::types::ScoredToken],
         session_history: &[SessionTurn],
         topology: crate::types::PromptTopology,
+        output: &crate::types::AlgorithmOutput,
     ) -> PredictionResult {
         if sparse_tokens.is_empty() {
             return PredictionResult {
@@ -80,7 +81,7 @@ impl PredictiveCoding {
         let is_ambiguous = (error_score - BOUNDARY_THRESHOLD).abs()
             < (HYSTERESIS_UPPER - BOUNDARY_THRESHOLD) / 2.0;
 
-        let mode = self.decide_mode(error_score, session_history.len(), topology);
+        let mode = self.decide_mode(output, session_history.len());
 
         PredictionResult {
             error_score,
@@ -131,50 +132,35 @@ impl PredictiveCoding {
 
     fn decide_mode(
         &self,
-        error_score: f32,
+        output: &crate::types::AlgorithmOutput,
         session_depth: usize,
-        topology: crate::types::PromptTopology,
     ) -> Mode {
-        // Get topology-based priors for mode selection
-        let (gentle_prior, aggressive_prior) = topology_mode_prior(topology);
-
-        // Adjust priors based on error score and session depth
-        let error_factor = if error_score < BOUNDARY_THRESHOLD {
-            // Low error favors gentle
-            gentle_prior * 1.5
-        } else if error_score > HYSTERESIS_UPPER {
-            // High error favors aggressive
-            aggressive_prior * 1.5
+        let structure_score = output.input_structure_score;
+        let ambiguity_count = output.ambiguity_register.len() as f32;
+        let constraint_density = if output.input_token_count > 0 {
+            output.constraint_locks.len() as f32 / output.input_token_count as f32
         } else {
-            // In hysteresis band, use session depth as tiebreaker
-            if session_depth < 3 {
-                // New sessions favor aggressive
-                aggressive_prior * 1.5
-            } else {
-                // Established sessions favor gentle
-                gentle_prior * 1.5
-            }
+            0.0
         };
 
-        // Normalize the adjusted factors
-        let adjusted_gentle = if error_factor == gentle_prior * 1.5 {
-            error_factor
-        } else {
-            gentle_prior
-        };
-        let adjusted_aggressive = if error_factor == aggressive_prior * 1.5 {
-            error_factor
-        } else {
-            aggressive_prior
-        };
-
-        let gentle_prob = adjusted_gentle / (adjusted_gentle + adjusted_aggressive);
-
-        if gentle_prob > 0.5 {
-            Mode::Gentle
-        } else {
-            Mode::Aggressive
+        // v2 Mode Differentiation Matrix
+        if constraint_density > 0.2 {
+            return Mode::Aggressive;
         }
+
+        if ambiguity_count > 2.0 {
+            return Mode::Gentle;
+        }
+
+        if structure_score < 0.3 {
+            return Mode::Balanced;
+        }
+
+        if session_depth > 3 {
+            return Mode::Gentle;
+        }
+
+        Mode::Balanced
     }
 }
 
@@ -189,6 +175,7 @@ pub struct SessionTurn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{PromptTopology};
     use crate::types::{ScoredToken, TokenSource};
 
     fn make_tokens(words: &[&str]) -> Vec<ScoredToken> {
@@ -212,7 +199,8 @@ mod tests {
                 .to_vec(),
         );
         let tokens = make_tokens(&["what", "is", "python"]);
-        let result = pc.compute_error(&tokens, &[], PromptTopology::Linear);
+        let output = crate::types::AlgorithmOutput::default();
+        let result = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
         assert_eq!(result.mode, Mode::Gentle);
     }
 
@@ -228,7 +216,14 @@ mod tests {
             "PKCE",
             "10M-TPS",
         ]);
-        let result = pc.compute_error(&tokens, &[], PromptTopology::Linear);
+        let mut output = crate::types::AlgorithmOutput::default();
+        output.input_token_count = 10;
+        output.constraint_locks = vec![
+            crate::types::ConstraintToken { text: "fintech".to_string(), weight: 1.0 },
+            crate::types::ConstraintToken { text: "hsm".to_string(), weight: 1.0 },
+            crate::types::ConstraintToken { text: "10m".to_string(), weight: 1.0 },
+        ];
+        let result = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
         assert_eq!(result.mode, Mode::Aggressive);
     }
 
@@ -237,9 +232,10 @@ mod tests {
         let pc = PredictiveCoding::new(Arc::new(DashMap::new()));
         let tokens = make_tokens(&["OAuth2", "PKCE", "fintech"]);
 
-        let first = pc.compute_error(&tokens, &[], PromptTopology::Linear);
+        let output = crate::types::AlgorithmOutput::default();
+        let first = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
         pc.update_schema(&first.delta_tokens);
-        let second = pc.compute_error(&tokens, &[], PromptTopology::Linear);
+        let second = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
 
         assert!(
             second.error_score < first.error_score,

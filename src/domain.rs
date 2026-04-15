@@ -6,17 +6,18 @@ use uuid::Uuid;
 
 use crate::{
     data::Repository,
-    engine::pipeline::{self, PipelineInput},
+    engine::evaluation,
     errors::AppError,
     models::{
         feedback_signal::ExplicitFeedback,
         token_history::TokenHistory,
         user::{LoginRequest, LoginResponse, RegisterRequest, User},
     },
+    session::SessionHistory,
     AppState,
 };
 
-const ENGINE_VERSION: &str = "1.0.0";
+const ENGINE_VERSION: &str = "2.0.0";
 const JWT_SECRET: &str = "change_this_in_production";
 
 // ── JWT ────────────────────────────────────────────────────────────────────
@@ -85,7 +86,13 @@ pub async fn login_user(pool: &DbPool, req: LoginRequest) -> Result<LoginRespons
     })
 }
 
-// ── Compression ────────────────────────────────────────────────────────────
+// ── Compression (7-stage pipeline) ─────────────────────────────────────────
+
+/// Simple word-based token estimation (matches engine/pipeline.rs convention)
+fn estimate_tokens(text: &str) -> usize {
+    let words = text.split_whitespace().count();
+    (words as f64 * 1.3).ceil() as usize
+}
 
 pub async fn compress_new(
     state: &AppState,
@@ -122,58 +129,80 @@ pub async fn compress_new(
         req.raw_text.clone()
     };
 
-    // 3. Run existing CRISP pipeline
-    let use_case = req.use_case.unwrap_or_else(|| "auto".into());
-    let mode = req.mode.unwrap_or_else(|| "balanced".into());
-    let model = req.model.unwrap_or_else(|| "Claude".into());
-    let max_tokens = req.max_tokens.unwrap_or(800);
-    // Use the explicit task if provided, otherwise leave it empty for the engine to auto-infer
-    let task = req.task.unwrap_or_default();
+    // 3. Run the 7-stage pipeline (0A → 6B)
+    //    SessionHistory is per-request for now (future: persist across user sessions)
+    let mut session = SessionHistory::new(10);
 
-    let deliverables = req.deliverables.unwrap_or_default();
-    let constraints = req.constraints.unwrap_or_default();
-    let reproducibility = req.reproducibility.unwrap_or_default();
+    let compression_response = state
+        .pipeline
+        .process(&enriched_prompt, &mut session)
+        .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
 
-    let output = pipeline::run(&PipelineInput {
-        raw_text: enriched_prompt.clone(),
-        task,
-        deliverables,
-        constraints,
-        reproducibility,
-        model,
-        use_case: use_case.clone(),
-        mode: mode.clone(),
-        max_tokens,
-        engine_version: ENGINE_VERSION.to_string(),
-        protected_entities: vec![], // Learning engine handles patterns now
-    })
-    .map_err(|e| AppError::Engine(e.to_string()))?;
+    // 4. Compute token counts
+    let token_original = estimate_tokens(&enriched_prompt);
+    let token_final = estimate_tokens(&compression_response.response);
+    let token_saved = token_original.saturating_sub(token_final);
 
-    // 4. Persist to DB
+    // 5. Run evaluation metrics (lexical overlap, semantic similarity, fact recall)
+    let eval = evaluation::evaluate(&enriched_prompt, &compression_response.response);
+
+    // 6. Persist to DB
     let history_id = Uuid::new_v4().to_string();
     let mut verbose = crate::models::verbose::SqlxVerbose::default();
-    Repository::insert_history_verbose(
+    Repository::insert_history_from_compression(
         &state.pool,
         &history_id,
         user_id_str,
         &enriched_prompt,
-        &output,
+        &compression_response,
+        token_original,
+        token_final,
+        token_saved,
+        ENGINE_VERSION,
         &mut verbose,
     )
     .await
     .map_err(AppError::Database)?;
 
+    // 7. Build response — backward compatible fields + new pipeline fields
     Ok(serde_json::json!({
+        // Backward-compatible fields (consumed by app.js)
         "id":               history_id,
-        "optimized_prompt": output.optimized_prompt,
-        "token_original":   output.token_original,
-        "token_final":      output.token_final,
-        "token_saved":      output.token_saved,
-        "warnings":         output.warnings,
-        "evaluation":       output.evaluation,
+        "optimized_prompt":  compression_response.response,
+        "token_original":   token_original,
+        "token_final":      token_final,
+        "token_saved":      token_saved,
+        "warnings":         compression_response.field_issues.iter()
+                                .map(|i| format!("{}: {}", i.field_name, i.description))
+                                .collect::<Vec<String>>(),
+        "evaluation":       eval,
         "engine_version":   ENGINE_VERSION,
         "cluster_id":       engine_result.cluster_id,
         "is_new_domain":    engine_result.is_new_domain,
+
+        // New 7-stage pipeline fields
+        "mode":             compression_response.mode,
+        "error_score":      compression_response.error_score,
+        "fidelity":         compression_response.fidelity,
+        "dual_score":       {
+            "tes": compression_response.scoring_result.tes,
+            "sfs": compression_response.scoring_result.sfs,
+            "scs": compression_response.scoring_result.scs,
+            "overall": (compression_response.scoring_result.tes + compression_response.scoring_result.sfs + compression_response.scoring_result.scs) / 3.0
+        },
+        "topology":         format!("{:?}", compression_response.topology),
+        "normalization":    compression_response.normalization,
+        "field_issues":     compression_response.field_issues,
+        "scope_injections": compression_response.scope_injections,
+        "correction_cycle": compression_response.correction_cycle,
+        "task":             compression_response.schema.task,
+        "deliverable":      compression_response.schema.output.iter().map(|d| d.name.clone()).collect::<Vec<_>>().join(", "),
+        "context":          compression_response.schema.context,
+        "constraints":      compression_response.schema.constraints.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", "),
+        "null_fields":      compression_response.null_fields,
+        "wm_slots_used":    compression_response.wm_slots_used,
+        "clusters":         compression_response.clusters,
+        "delta_tokens":     compression_response.delta_tokens,
     }))
 }
 

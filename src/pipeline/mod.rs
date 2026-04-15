@@ -2,7 +2,7 @@ use crate::{
     algorithms::{
         field_validator::FieldTypeValidator,
         lexical::LexicalCompression,
-        predictive_coding::{PredictiveCoding, SessionTurn},
+        predictive_coding::PredictiveCoding,
         schema_filling::SchemaFilling,
         semantic_clustering::SemanticClustering,
         sparse_coding::SparseCoding,
@@ -64,7 +64,7 @@ impl TokenCompressionPipeline {
 
         // New: Sparse Coding — receives clean_tokens
         // Use aggressive ratio at stage 1 (mode unknown; be generous)
-        let scored = self.sparse.apply(&out.clean_tokens, 0.60);
+        let scored = self.sparse.apply(&out.clean_tokens, 0.60, &out.constraint_locks);
         out.salience_map = scored
             .iter()
             .map(|t| (t.text.clone(), t.salience))
@@ -80,6 +80,7 @@ impl TokenCompressionPipeline {
             &out.sparse_tokens,
             &session.turns,
             out.topology.clone().unwrap_or_default(),
+            out,
         );
         out.error_score = result.error_score;
         out.delta_tokens = result.delta_tokens;
@@ -93,7 +94,7 @@ impl TokenCompressionPipeline {
         let mode = out.mode.as_ref().unwrap_or(&Mode::Gentle);
 
         match mode {
-            Mode::Gentle | Mode::Ambiguous => {
+            Mode::Gentle | Mode::Ambiguous | Mode::Balanced => {
                 // Gentle: load sparse tokens directly into 3-slot WM
                 let mut wm = WorkingMemory::new(mode);
                 let items: Vec<WmSlot> = out
@@ -103,6 +104,7 @@ impl TokenCompressionPipeline {
                         content: t.text.clone(),
                         salience: t.salience,
                         source: SlotSource::Delta,
+                        is_protected: false,
                     })
                     .collect();
                 wm.load(items);
@@ -125,6 +127,7 @@ impl TokenCompressionPipeline {
                         content: label.clone(),
                         salience: 0.70 + (i as f32 * 0.03),
                         source: SlotSource::Cluster,
+                        is_protected: false,
                     })
                     .collect();
                 wm.load(items);
@@ -140,7 +143,7 @@ impl TokenCompressionPipeline {
         let mode = out.mode.as_ref().unwrap_or(&Mode::Gentle);
 
         let layers = match mode {
-            Mode::Gentle | Mode::Ambiguous => 1,
+            Mode::Gentle | Mode::Ambiguous | Mode::Balanced => 1,
             Mode::Aggressive => 3,
         };
 
@@ -153,9 +156,14 @@ impl TokenCompressionPipeline {
             .schema
             .fill(&wm_slots, layers, &delta_tokens, &clusters, Some(out));
 
-        out.resolved_task = result.task.clone();
-        out.resolved_deliverable = result.deliverable.clone();
-        out.resolved_context = result.context.clone();
+        out.resolved_schema = crate::types::CompressionSchema {
+            role: result.role.clone(),
+            context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
+            task: result.task.clone(),
+            constraints: result.constraints.as_ref().map(|c| vec![crate::types::Constraint { name: c.clone() }]).unwrap_or_default(),
+            output: result.deliverable.as_ref().map(|d| vec![crate::types::Deliverable { name: d.clone() }]).unwrap_or_default(),
+        };
+
         out.null_fields = result.null_fields;
         out.task_inferred = result.task_inferred;
         out.deliverable_inferred = result.deliverable_inferred;
@@ -165,20 +173,10 @@ impl TokenCompressionPipeline {
     /// Validates the resolved fields (task, deliverable, constraints, context) for type and content issues.
     /// Always runs after schema filling, regardless of mode.
     pub fn stage4_field_validation(&self, out: &mut AlgorithmOutput) {
-        // Extract resolved fields from AlgorithmOutput
-        let task = &out.resolved_task;
-        let deliverable = &out.resolved_deliverable;
-        let constraints = if out.resolved_context.is_empty() {
-            &None
-        } else {
-            &Some(out.resolved_context.join(", "))
-        };
-        let context = &out.resolved_context;
-
         // Run field validation
         let issues = self
             .field_validator
-            .validate(task, deliverable, constraints, context);
+            .validate(&out.resolved_schema);
         out.field_issues = issues;
     }
 

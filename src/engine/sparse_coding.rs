@@ -76,3 +76,33 @@ pub fn run(text: &str, mode: &str) -> PrincipleResult {
         duration_ms: start.elapsed().as_millis() as u64,
     }
 }
+
+/// GAP-06: Reconstruction loss certificate for sparse coding output
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QualityCert {
+    Pass,
+    Warn,
+    Fail,
+}
+
+#[derive(Debug, Clone)]
+pub struct SparseCodeOutput {
+    pub sparse_text: String,
+    pub reconstruction_loss: f32,
+    pub sparsity_ratio: f32,
+    pub quality_certificate: QualityCert,
+}
+
+impl SparseCodeOutput {
+    pub fn validate(&self, loss_threshold: f32) -> Result<(), String> {
+        if self.reconstruction_loss > loss_threshold {
+            Err(format!(
+                "Reconstruction loss {:.4} exceeds threshold {}",
+                self.reconstruction_loss, loss_threshold
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+

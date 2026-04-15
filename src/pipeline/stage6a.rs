@@ -34,17 +34,17 @@ impl Stage6a {
             // Last resort: generate from resolved fields
             let mut parts = Vec::new();
 
-            if let Some(task) = &schema_filled.resolved_task {
+            if let Some(task) = &schema_filled.resolved_schema.task {
                 parts.push(format!("task: {}", task));
             }
 
-            if let Some(deliverable) = &schema_filled.resolved_deliverable {
-                parts.push(format!("deliverable: {}", deliverable));
+            if !schema_filled.resolved_schema.output.is_empty() {
+                let out_str = schema_filled.resolved_schema.output.iter().map(|d| d.name.as_str()).collect::<Vec<_>>().join(", ");
+                parts.push(format!("deliverable: {}", out_str));
             }
 
-            if !schema_filled.resolved_context.is_empty() {
-                let context_str = schema_filled.resolved_context.join(", ");
-                parts.push(format!("context: {}", context_str));
+            if let Some(context) = &schema_filled.resolved_schema.context {
+                parts.push(format!("context: {}", context));
             }
 
             if parts.is_empty() {

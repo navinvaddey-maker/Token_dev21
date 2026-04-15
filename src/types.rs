@@ -2,6 +2,62 @@ use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReconstructedInput {
+    pub clusters: HashMap<SlotType, Vec<WeightedToken>>,
+    pub constraint_locks: Vec<ConstraintToken>,
+    pub ambiguity_register: Vec<AmbiguityFlag>,
+    pub input_structure_score: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum SlotType {
+    Role,
+    Context,
+    Task,
+    Constraint,
+    Output,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CompressionSchema {
+    pub role: Option<String>,
+    pub context: Option<String>,
+    pub task: Option<String>,
+    pub constraints: Vec<Constraint>,
+    pub output: Vec<Deliverable>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeightedToken {
+    pub text: String,
+    pub weight: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstraintToken {
+    pub text: String,
+    pub weight: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmbiguityFlag {
+    pub text: String,
+    pub reason: String,
+    pub resolved_as: Option<String>,
+    pub confidence: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Constraint {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Deliverable {
+    pub name: String,
+}
+
 /// Every token carries its text and salience score through the pipeline.
 /// Zero-copy: we store indices into the original prompt string, not clones.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +80,7 @@ pub enum TokenSource {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Mode {
     Gentle,
+    Balanced,
     Aggressive,
     Ambiguous, // 0.45–0.55 hysteresis band — resolved by session depth
 }
@@ -35,6 +92,7 @@ pub struct WmSlot {
     pub content: String,
     pub salience: f32,
     pub source: SlotSource,
+    pub is_protected: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +116,11 @@ pub type AggressiveWm = ArrayVec<WmSlot, AGGRESSIVE_WM_CAPACITY>;
 /// Passed by &mut through the pipeline — no cloning between stages.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct AlgorithmOutput {
+    // Stage -1 — Token Reconstruction
+    pub constraint_locks: Vec<ConstraintToken>,
+    pub ambiguity_register: Vec<AmbiguityFlag>,
+    pub input_structure_score: f32,
+
     // Stage 1 — Signal Reduction
     pub clean_tokens: Vec<String>,
     pub compression_ratio: f32,
@@ -80,11 +143,7 @@ pub struct AlgorithmOutput {
     pub fidelity_estimate: f32,
 
     // Stage 4 — Schema
-    pub resolved_task: Option<String>,
-    pub resolved_deliverable: Option<String>,
-    pub resolved_role: Option<String>,
-    pub resolved_context: Vec<String>,
-    pub resolved_constraints: Option<String>,
+    pub resolved_schema: CompressionSchema,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
     pub deliverable_inferred: bool,
@@ -95,7 +154,7 @@ pub struct AlgorithmOutput {
     pub ordinal_sequence: Option<OrdinalSequence>,
     pub field_issues: Vec<FieldValidationIssue>,
     pub scope_injections: Vec<String>,
-    pub dual_score: Option<DualScore>,
+    pub scoring_result: Option<ScoringResult>,
     pub correction_cycle: Option<CorrectionCycle>,
 }
 
@@ -105,10 +164,7 @@ pub struct CompressionResponse {
     pub mode: String,
     pub error_score: f32,
     pub fidelity: f32,
-    pub task: Option<String>,
-    pub deliverable: Option<String>,
-    pub context: Vec<String>,
-    pub constraints: Option<String>,
+    pub schema: CompressionSchema,
     pub wm_slots_used: usize,
     pub null_fields: Vec<String>,
     pub response: String,
@@ -123,7 +179,7 @@ pub struct CompressionResponse {
     pub delta_tokens: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_chain: Option<Vec<String>>,
-    pub dual_score: DualScore,
+    pub scoring_result: ScoringResult,
     pub correction_cycle: CorrectionCycle,
 }
 
@@ -205,16 +261,21 @@ pub struct FieldValidationIssue {
     pub severity: String, // e.g., "error", "warning", "info"
 }
 
-/// Dual scoring result: Token-Efficiency Score (TES) + Semantic Fidelity Score (SFS).
-/// Both values are in the 0.0–10.0 range. Overall uses weighted blend: TES*0.45 + SFS*0.55.
+/// ScoringResult: TES + SFS + SCS
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DualScore {
-    /// @returns Token-Efficiency Score, 0.0–10.0
-    pub tes: f32,
-    /// @returns Semantic Fidelity Score, 0.0–10.0
-    pub sfs: f32,
-    /// @returns Weighted overall: tes*0.45 + sfs*0.55, clamped 0.0–10.0
-    pub overall: f32,
+pub struct ScoringResult {
+    pub tes: f32,  // 0.0–10.0
+    pub sfs: f32,  // 0.0–10.0
+    pub scs: f32,  // 0.0–10.0 (NEW)
+    pub correction_needed: bool,
+    pub correction_axis: Option<ScoreAxis>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ScoreAxis {
+    TaskEssential,
+    SchemaFidelity,
+    SemanticCompleteness,
 }
 
 /// Issue encountered during scoring process.
@@ -249,10 +310,10 @@ impl CorrectionCycle {
         &self,
         compressed_output: &str,
         field_issues: &[FieldValidationIssue],
-        dual_score: &DualScore,
+        scoring_result: &ScoringResult,
     ) -> Self {
         let corrections = Self::analyze_corrections(compressed_output, field_issues);
-        let improvement = Self::calculate_improvement(dual_score);
+        let improvement = Self::calculate_improvement(scoring_result);
 
         Self {
             cycle_number: self.cycle_number + 1,
@@ -263,7 +324,7 @@ impl CorrectionCycle {
 
     /// Analyze the compressed output and field issues to determine needed corrections.
     fn analyze_corrections(
-        compressed_output: &str,
+        _compressed_output: &str,
         field_issues: &[FieldValidationIssue],
     ) -> Vec<TextCorrection> {
         let mut corrections = Vec::new();
@@ -282,8 +343,9 @@ impl CorrectionCycle {
         corrections
     }
 
-    /// Calculate improvement based on dual score (placeholder logic).
-    fn calculate_improvement(dual_score: &DualScore) -> f32 {
-        dual_score.overall * 0.1 // placeholder — proportional to overall quality
+    /// Calculate improvement based on scoring result.
+    fn calculate_improvement(scoring: &ScoringResult) -> f32 {
+        let overall = (scoring.tes + scoring.sfs + scoring.scs) / 3.0;
+        overall * 0.1 // placeholder — proportional to overall quality
     }
 }

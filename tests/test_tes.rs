@@ -8,8 +8,8 @@ fn test_tes_no_issues() {
         output_token_count: 50,
         ..Default::default()
     };
-    let score = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 0.5); // 50/100 = 0.5 compression ratio, no penalty
+    let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+    assert_eq!(score, 5.0); // 50/100 = 0.5 compression ratio scaled to 5.0
 }
 
 #[test]
@@ -33,9 +33,9 @@ fn test_tes_with_issues() {
             severity: "error".to_string(),
         },
     ];
-    let score = TokenEfficiencyScorer::score(&output, &field_issues);
-    // Should be less than 0.5 due to penalty from issues
-    assert!(score < 0.5);
+    let (score, _) = TokenEfficiencyScorer::score(&output, &field_issues);
+    // Should be less than 5.0 due to penalty from issues
+    assert!(score < 5.0);
     // Should still be positive
     assert!(score > 0.0);
 }
@@ -47,8 +47,8 @@ fn test_tes_perfect_compression() {
         output_token_count: 100,
         ..Default::default()
     };
-    let score = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 1.0); // 100/100 = 1.0, no penalty
+    let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+    assert_eq!(score, 10.0); // 100/100 = 1.0 -> 10.0
 }
 
 #[test]
@@ -58,9 +58,8 @@ fn test_tes_expansion() {
         output_token_count: 150,
         ..Default::default()
     };
-    let score = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 1.5); // 150/100 = 1.5, but we expect this to be clamped in practice
-                            // Note: In practice, TES might be clamped, but the basic calculation allows expansion
+    let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
+    assert_eq!(score, 10.0); // Clamped at 10.0
 }
 
 #[test]
@@ -70,6 +69,6 @@ fn test_tes_zero_input() {
         output_token_count: 50,
         ..Default::default()
     };
-    let score = TokenEfficiencyScorer::score(&output, &[]);
+    let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
     assert_eq!(score, 0.0); // Handle division by zero
 }

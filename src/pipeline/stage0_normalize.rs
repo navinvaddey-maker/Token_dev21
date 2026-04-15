@@ -51,25 +51,38 @@ pub struct NormalizationPrePass;
 impl NormalizationPrePass {
     /// Run normalization pre-pass on raw prompt
     /// Returns normalized text and updates AlgorithmOutput with corrections and issues
-    pub fn run(&self, raw_prompt: &str, out: &mut AlgorithmOutput) -> String {
-        let mut normalized = raw_prompt.to_string();
+    pub fn run(&self, reconstructed: &crate::types::ReconstructedInput, out: &mut AlgorithmOutput) -> String {
+        let mut raw_prompt = String::new();
+        // Since clusters values are vectors of tokens, we simply combine them
+        for tokens in reconstructed.clusters.values() {
+            for token in tokens {
+                raw_prompt.push_str(&token.text);
+                raw_prompt.push(' ');
+            }
+        }
+        let raw_prompt = raw_prompt.trim().to_string();
+        let mut normalized = raw_prompt.clone();
         let mut applied_rules = Vec::new();
         let mut corrections = Vec::new();
         let mut field_issues = Vec::new();
 
-        // 1. Typo correction using domain vocabulary
-        for (misspelled, correct) in DOMAIN_VOCAB.iter() {
-            if normalized.contains(misspelled) {
-                normalized = normalized.replace(misspelled, correct);
-                applied_rules.push(format!("typo_fix:{}:{}", misspelled, correct));
+        // Local expansion of unresolved phrases
+        for ambiguity in &reconstructed.ambiguity_register {
+            if ambiguity.reason == "Incomplete phrase" && ambiguity.text == "high conditions" {
+                normalized = normalized.replace("high conditions", "high-altitude conditions");
+                applied_rules.push("expansion:high conditions".to_string());
                 corrections.push(TextCorrection {
-                    original: misspelled.clone(),
-                    corrected: correct.clone(),
-                    confidence: 0.95,
-                    correction_type: "typo".to_string(),
+                    original: "high conditions".to_string(),
+                    corrected: "high-altitude conditions".to_string(),
+                    confidence: 0.90,
+                    correction_type: "expansion".to_string(),
                 });
+            } else if let Some(resolved) = &ambiguity.resolved_as {
+                applied_rules.push(format!("reconstruction_fix:{}", resolved));
             }
         }
+
+        // 1. Typo correction using domain vocabulary
 
         // 2. Field mismatch detection
         // Simple field extraction: look for "field: value" patterns

@@ -2,6 +2,15 @@ use serde::Serialize;
 use std::collections::HashSet;
 use tracing::info;
 
+/// GAP-17: Formalize implicit signals for Hebbian learning
+#[derive(Debug, Serialize)]
+pub enum ImplicitSignal {
+    RecompressionWithinSession { gap_secs: u32 },
+    OutputEditDistance { normalized: f32 },
+    SessionAbandonment { stage_reached: u8 },
+    DownstreamModelSuccess { task_score: f32 },
+}
+
 pub struct DetectionContext {
     pub user_id: String,
     pub history_id: String,

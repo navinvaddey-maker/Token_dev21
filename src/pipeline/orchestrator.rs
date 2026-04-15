@@ -1,12 +1,12 @@
+use dashmap::DashMap;
+use std::sync::Arc;
+
 use crate::{
     algorithms::{
         field_validator::FieldTypeValidator,
-        predictive_coding::{PredictiveCoding, SessionTurn},
-        schema_filling::SchemaFilling,
-        sparse_coding::SparseCoding,
-        working_memory::{ContextFrame, WorkingMemory},
+        predictive_coding::PredictiveCoding,
     },
-    correction::cycle, // for the impl of CorrectionCycle
+    engine::reconstruction::TokenReconstructor,
     pipeline::{
         stage0_normalize::NormalizationPrePass, stage0b_topology::TopologyClassifier,
         stage1::Stage1, stage2::Stage2, stage3::Stage3, stage4::Stage4, stage5::Stage5,
@@ -16,13 +16,14 @@ use crate::{
     scoring::tes::TokenEfficiencyScorer,
     session::SessionHistory,
     types::{
-        AlgorithmOutput, CompressionResponse, CorrectionCycle, DualScore, FieldValidationIssue,
+        AlgorithmOutput, CompressionResponse, CorrectionCycle, FieldValidationIssue,
         NormalizationResult, OrdinalSequence, PromptTopology,
     },
 };
 
 /// Orchestrates the token compression pipeline stages as specified in the refinements guide.
 pub struct PipelineOrchestrator {
+    reconstructor: TokenReconstructor,
     normalization_pre_pass: NormalizationPrePass,
     topology_classifier: TopologyClassifier,
     stage1: Stage1,
@@ -31,8 +32,8 @@ pub struct PipelineOrchestrator {
     stage4: Stage4,
     stage5: Stage5,
     field_validator: FieldTypeValidator,
-    token_efficiency_scorer: TokenEfficiencyScorer,
-    semantic_fidelity_scorer: SemanticFidelityScorer,
+    _token_efficiency_scorer: TokenEfficiencyScorer,
+    _semantic_fidelity_scorer: SemanticFidelityScorer,
     stage6a: Stage6a,
     correction_cycle: CorrectionCycle,
 }
@@ -40,6 +41,7 @@ pub struct PipelineOrchestrator {
 impl PipelineOrchestrator {
     /// Creates a new pipeline orchestrator with all required stages.
     pub fn new(
+        reconstructor: TokenReconstructor,
         normalization_pre_pass: NormalizationPrePass,
         topology_classifier: TopologyClassifier,
         stage1: Stage1,
@@ -54,6 +56,7 @@ impl PipelineOrchestrator {
         correction_cycle: CorrectionCycle,
     ) -> Self {
         Self {
+            reconstructor,
             normalization_pre_pass,
             topology_classifier,
             stage1,
@@ -62,10 +65,31 @@ impl PipelineOrchestrator {
             stage4,
             stage5,
             field_validator,
-            token_efficiency_scorer,
-            semantic_fidelity_scorer,
+            _token_efficiency_scorer: token_efficiency_scorer,
+            _semantic_fidelity_scorer: semantic_fidelity_scorer,
             stage6a,
             correction_cycle,
+        }
+    }
+
+    /// Build orchestrator from shared schema priors — convenience factory.
+    /// All 12 stage components are constructed internally with defaults.
+    pub fn build(schema_priors: Arc<DashMap<String, u32>>) -> Self {
+        let predictive = PredictiveCoding::new(schema_priors);
+        Self {
+            reconstructor: TokenReconstructor::new(),
+            normalization_pre_pass: NormalizationPrePass::new(),
+            topology_classifier: TopologyClassifier::new(),
+            stage1: Stage1::new(),
+            stage2: Stage2::new(predictive),
+            stage3: Stage3::new(),
+            stage4: Stage4::new(),
+            stage5: Stage5::new(),
+            field_validator: FieldTypeValidator::new(),
+            _token_efficiency_scorer: TokenEfficiencyScorer::new(),
+            _semantic_fidelity_scorer: SemanticFidelityScorer::new(),
+            stage6a: Stage6a::new(),
+            correction_cycle: CorrectionCycle::new(0),
         }
     }
 
@@ -78,11 +102,24 @@ impl PipelineOrchestrator {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
 
+        // Stage -1: Token Reconstruction
+        let reconstructed = self.reconstructor.run(input);
+        output.constraint_locks = reconstructed.constraint_locks.clone();
+        output.ambiguity_register = reconstructed.ambiguity_register.clone();
+        output.input_structure_score = reconstructed.input_structure_score;
+        
+        output.clusters = reconstructed.clusters.values()
+            .map(|tokens| tokens.iter().map(|t| t.text.clone()).collect())
+            .collect();
+        output.cluster_labels = reconstructed.clusters.keys()
+            .map(|k| format!("{:?}", k))
+            .collect();
+
         // Stage 0A: Normalization pre-pass
-        let normalized = self.normalization_pre_pass.run(input, &mut output);
+        let normalized = self.normalization_pre_pass.run(&reconstructed, &mut output);
 
         // Stage 0B: Topology classification
-        let topology = self.topology_classifier.classify(&normalized, &mut output);
+        let _topology = self.topology_classifier.classify(&normalized, &mut output);
 
         // Stage 1: Signal Reduction (Lexical Compression → Sparse Coding)
         self.stage1.run(&normalized, &mut output);
@@ -101,28 +138,25 @@ impl PipelineOrchestrator {
 
         // Stage 4B: Field validation
         let field_issues = self.field_validator.validate(
-            &output.resolved_task,
-            &output.resolved_deliverable,
-            &output.resolved_constraints,
-            &output.resolved_context,
+            &output.resolved_schema
         );
 
         // Update output with field issues
         output.field_issues = field_issues.clone();
 
         // Scoring stages
-        let dual_score = crate::scoring::compute_dual_score(&output, &field_issues);
+        let scoring_result = crate::scoring::compute_scoring_result(&output, &field_issues);
 
         // Update output with scores
-        output.dual_score = Some(dual_score.clone());
+        output.scoring_result = Some(scoring_result.clone());
 
         // Stage 6A: Output generation
         let stage6a_output = self.stage6a.run(&output)?;
 
         // Stage 6B: Correction cycle (conditionally triggers on low scores)
-        let correction_cycle = if dual_score.tes < 6.0 || dual_score.sfs < 6.0 {
+        let correction_cycle = if scoring_result.tes < 6.0 || scoring_result.sfs < 6.0 || scoring_result.scs < 6.0 {
             self.correction_cycle
-                .new_cycle(&stage6a_output, &field_issues, &dual_score)
+                .new_cycle(&stage6a_output, &field_issues, &scoring_result)
         } else {
             // Keep empty default cycle if scores are good
             crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number)
@@ -143,7 +177,7 @@ impl PipelineOrchestrator {
             output.normalization.clone().unwrap_or_default(),
             output.ordinal_sequence.clone(),
             field_issues,
-            dual_score,
+            scoring_result,
             correction_cycle,
             &output,
         )
@@ -155,9 +189,9 @@ impl PipelineOrchestrator {
         compressed_prompt: String,
         topology: PromptTopology,
         normalization: NormalizationResult,
-        ordinal_sequence: Option<OrdinalSequence>,
+        _ordinal_sequence: Option<OrdinalSequence>,
         field_issues: Vec<FieldValidationIssue>,
-        dual_score: DualScore,
+        scoring_result: crate::types::ScoringResult,
         correction_cycle: CorrectionCycle,
         algorithm_output: &AlgorithmOutput,
     ) -> Result<CompressionResponse, Box<dyn std::error::Error>> {
@@ -169,10 +203,7 @@ impl PipelineOrchestrator {
                 .unwrap_or_else(|| "unknown".to_string()),
             error_score: algorithm_output.error_score,
             fidelity: algorithm_output.fidelity_estimate,
-            task: algorithm_output.resolved_task.clone(),
-            deliverable: algorithm_output.resolved_deliverable.clone(),
-            context: algorithm_output.resolved_context.clone(),
-            constraints: algorithm_output.resolved_constraints.clone(),
+            schema: algorithm_output.resolved_schema.clone(),
             wm_slots_used: algorithm_output.wm_slots.len(),
             null_fields: algorithm_output.null_fields.clone(),
             response: compressed_prompt,
@@ -194,7 +225,7 @@ impl PipelineOrchestrator {
                 None
             },
             reasoning_chain: None,
-            dual_score,
+            scoring_result,
             correction_cycle,
         })
     }

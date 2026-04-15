@@ -6,7 +6,7 @@ use crate::{
 /// Handles Stage 5: Scope Injection
 pub struct Stage5 {
     clustering: SemanticClustering,
-    sparse: SparseCoding,
+    _sparse: SparseCoding,
 }
 
 impl Stage5 {
@@ -14,7 +14,7 @@ impl Stage5 {
     pub fn new() -> Self {
         Self {
             clustering: SemanticClustering::default(),
-            sparse: SparseCoding::default(),
+            _sparse: SparseCoding::default(),
         }
     }
 
@@ -24,7 +24,7 @@ impl Stage5 {
         let mode = out.mode.as_ref().unwrap_or(&Mode::Gentle);
 
         match mode {
-            Mode::Gentle | Mode::Ambiguous => {
+            Mode::Gentle | Mode::Ambiguous | Mode::Balanced => {
                 // Gentle: no scope injection
                 out.scope_injections = vec![];
             }

@@ -1,4 +1,5 @@
 use crate::engine::pipeline::PipelineOutput;
+use crate::types::CompressionResponse;
 use crate::models::{
     feedback_signal::FeedbackSignal,
     token_history::TokenHistory,
@@ -127,6 +128,77 @@ impl Repository {
             duration_ms,
             row_count: Some(result.rows_affected() as i64),
             sql: Some("token_history.insert".into()),
+        });
+
+        Ok(())
+    }
+
+    /// Insert compression history from the new 7-stage pipeline response.
+    /// Maps CompressionResponse fields to the existing token_history schema.
+    pub async fn insert_history_from_compression(
+        pool: &DbPool,
+        id: &str,
+        user_id: &str,
+        original_prompt: &str,
+        response: &CompressionResponse,
+        token_original: usize,
+        token_final: usize,
+        token_saved: usize,
+        engine_version: &str,
+        verbose: &mut SqlxVerbose,
+    ) -> Result<(), sqlx::Error> {
+        let sql = "INSERT INTO token_history (id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, principle_logs, warnings)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
+
+        // Store pipeline diagnostics as principle_logs JSON
+        let pipeline_diagnostics = serde_json::json!({
+            "pipeline_version": "7-stage",
+            "topology": format!("{:?}", response.topology),
+            "mode": &response.mode,
+            "error_score": response.error_score,
+            "fidelity": response.fidelity,
+            "dual_score": {
+                "tes": response.scoring_result.tes,
+                "sfs": response.scoring_result.sfs,
+                "overall": (response.scoring_result.tes + response.scoring_result.sfs + response.scoring_result.scs) / 3.0
+            },
+            "wm_slots_used": response.wm_slots_used,
+            "null_fields": &response.null_fields,
+            "field_issues_count": response.field_issues.len(),
+            "scope_injections_count": response.scope_injections.len(),
+            "correction_cycle": response.correction_cycle.cycle_number,
+        });
+
+        // Store field issues as warnings
+        let warnings: Vec<String> = response
+            .field_issues
+            .iter()
+            .map(|issue| format!("{}: {}", issue.field_name, issue.description))
+            .collect();
+
+        let start = Instant::now();
+        let result = sqlx::query(sql)
+            .bind(id)
+            .bind(user_id)
+            .bind(original_prompt)
+            .bind(&response.response)
+            .bind(token_saved as i64)
+            .bind(token_original as i64)
+            .bind(token_final as i64)
+            .bind("auto") // use_case — new pipeline auto-detects
+            .bind(&response.mode)
+            .bind(engine_version)
+            .bind(pipeline_diagnostics)
+            .bind(serde_json::json!(warnings))
+            .execute(pool)
+            .await?;
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        verbose.push(SqlxEvent {
+            operation: "insert_history_compression".into(),
+            duration_ms,
+            row_count: Some(result.rows_affected() as i64),
+            sql: Some("token_history.insert_compression".into()),
         });
 
         Ok(())

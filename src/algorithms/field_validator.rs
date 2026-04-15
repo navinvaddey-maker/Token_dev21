@@ -21,25 +21,28 @@ impl FieldTypeValidator {
     /// A vector of field validation issues found during validation
     pub fn validate(
         &self,
-        task: &Option<String>,
-        deliverable: &Option<String>,
-        constraints: &Option<String>,
-        context: &Vec<String>,
+        schema: &crate::types::CompressionSchema,
     ) -> Vec<FieldValidationIssue> {
         let mut issues = Vec::new();
 
-        // Validate task field
-        issues.extend(self.check_task(task));
+        issues.extend(self.check_task(&schema.task));
 
-        // Validate deliverable field
-        issues.extend(self.check_deliverable(deliverable));
+        let deliverable = if schema.output.is_empty() {
+            None
+        } else {
+            Some(schema.output.iter().map(|d| d.name.clone()).collect::<Vec<_>>().join(", "))
+        };
+        issues.extend(self.check_deliverable(&deliverable));
 
-        // Validate constraints field
-        issues.extend(self.check_constraints(constraints));
+        let constraints = if schema.constraints.is_empty() {
+            None
+        } else {
+            Some(schema.constraints.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", "))
+        };
+        issues.extend(self.check_constraints(&constraints));
 
-        // Validate context fields
-        for (index, ctx) in context.iter().enumerate() {
-            let context_issues = self.check_context(ctx, index);
+        if let Some(ctx) = &schema.context {
+            let context_issues = self.check_context(ctx, 0);
             issues.extend(context_issues);
         }
 
@@ -202,12 +205,14 @@ mod tests {
     #[test]
     fn test_validate_empty_task() {
         let validator = FieldTypeValidator::new();
-        let issues = validator.validate(
-            &Some("   ".to_string()),
-            &Some("valid deliverable".to_string()),
-            &Some("valid constraints".to_string()),
-            &vec!["valid context".to_string()],
-        );
+        let schema = crate::types::CompressionSchema {
+            task: Some("   ".to_string()),
+            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
+            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
+            context: Some("valid context".to_string()),
+            role: None,
+        };
+        let issues = validator.validate(&schema);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].field_name, "task");
@@ -218,12 +223,14 @@ mod tests {
     #[test]
     fn test_validate_missing_deliverable() {
         let validator = FieldTypeValidator::new();
-        let issues = validator.validate(
-            &Some("valid task".to_string()),
-            &None,
-            &Some("valid constraints".to_string()),
-            &vec!["valid context".to_string()],
-        );
+        let schema = crate::types::CompressionSchema {
+            task: Some("valid task".to_string()),
+            output: vec![],
+            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
+            context: Some("valid context".to_string()),
+            role: None,
+        };
+        let issues = validator.validate(&schema);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].field_name, "deliverable");
@@ -234,12 +241,14 @@ mod tests {
     #[test]
     fn test_validate_context_empty() {
         let validator = FieldTypeValidator::new();
-        let issues = validator.validate(
-            &Some("valid task".to_string()),
-            &Some("valid deliverable".to_string()),
-            &Some("valid constraints".to_string()),
-            &vec!["   ".to_string(), "valid".to_string()],
-        );
+        let schema = crate::types::CompressionSchema {
+            task: Some("valid task".to_string()),
+            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
+            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
+            context: Some("   ".to_string()),
+            role: None,
+        };
+        let issues = validator.validate(&schema);
 
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].field_name, "context[0]");
@@ -249,12 +258,14 @@ mod tests {
     #[test]
     fn test_validate_valid_fields() {
         let validator = FieldTypeValidator::new();
-        let issues = validator.validate(
-            &Some("valid task".to_string()),
-            &Some("valid deliverable".to_string()),
-            &Some("valid constraints".to_string()),
-            &vec!["valid context".to_string()],
-        );
+        let schema = crate::types::CompressionSchema {
+            task: Some("valid task".to_string()),
+            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
+            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
+            context: Some("valid context".to_string()),
+            role: None,
+        };
+        let issues = validator.validate(&schema);
 
         assert_eq!(issues.len(), 0);
     }

@@ -1,5 +1,5 @@
 use crate::types::{
-    AggressiveWm, GentleWm, Mode, SlotSource, WmSlot, AGGRESSIVE_WM_CAPACITY, GENTLE_WM_CAPACITY,
+    AggressiveWm, GentleWm, Mode, WmSlot, AGGRESSIVE_WM_CAPACITY, GENTLE_WM_CAPACITY,
 };
 use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ pub struct ContextFrame {
 impl WorkingMemory {
     pub fn new(mode: &Mode) -> Self {
         match mode {
-            Mode::Gentle | Mode::Ambiguous => Self::Gentle(ArrayVec::new()),
+            Mode::Gentle | Mode::Ambiguous | Mode::Balanced => Self::Gentle(ArrayVec::new()),
             Mode::Aggressive => Self::Aggressive(ArrayVec::new()),
         }
     }
@@ -111,10 +111,11 @@ impl WorkingMemory {
         if let Some(min_idx) = slots
             .iter()
             .enumerate()
+            .filter(|(_, s)| !s.is_protected)
             .min_by(|(_, a), (_, b)| a.salience.partial_cmp(&b.salience).unwrap())
             .map(|(i, _)| i)
         {
-            if slots[min_idx].salience < candidate.salience {
+            if slots[min_idx].salience < candidate.salience || candidate.is_protected {
                 slots.remove(min_idx);
                 let _ = slots.try_push(candidate);
             }
@@ -125,10 +126,11 @@ impl WorkingMemory {
         if let Some(min_idx) = slots
             .iter()
             .enumerate()
+            .filter(|(_, s)| !s.is_protected)
             .min_by(|(_, a), (_, b)| a.salience.partial_cmp(&b.salience).unwrap())
             .map(|(i, _)| i)
         {
-            if slots[min_idx].salience < candidate.salience {
+            if slots[min_idx].salience < candidate.salience || candidate.is_protected {
                 slots.remove(min_idx);
                 let _ = slots.try_push(candidate);
             }
@@ -141,12 +143,14 @@ impl WorkingMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SlotSource;
 
     fn make_slot(content: &str, salience: f32) -> WmSlot {
         WmSlot {
             content: content.into(),
             salience,
             source: SlotSource::Delta,
+            is_protected: false,
         }
     }
 

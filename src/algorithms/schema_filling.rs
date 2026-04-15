@@ -189,11 +189,25 @@ impl SchemaFilling {
         // Flatten all sources
         let all_sources: Vec<String> = sources.into_iter().flatten().collect();
 
-        // Simple heuristic: try to infer task, deliverable, context, role from available text
         let task = self.infer_task(&wm_texts, &all_sources);
-        let deliverable = self.infer_deliverable(&wm_texts, &all_sources);
+        let mut deliverable = self.infer_deliverable(&wm_texts, &all_sources);
         let role = self.infer_role(&wm_texts, &all_sources);
         let context = self.infer_context(&wm_texts, &all_sources, &cluster_texts);
+        let constraints = self.infer_constraints(&wm_texts, &all_sources);
+
+        // Implicit deliverable inference (Balanced/Aggressive mode only, layered >= 2)
+        if layers >= 2 {
+            if let (Some(t), Some(c)) = (&task, &constraints) {
+                let lt = t.to_lowercase();
+                let lc = c.to_lowercase();
+                if lt.contains("plan") || lt.contains("meal") {
+                    if lc.contains("dairy") || lc.contains("fiber") || lc.contains("nightshades") {
+                        let existing = deliverable.unwrap_or_else(|| "Meal Plan Structure".to_string());
+                        deliverable = Some(format!("{}, Shopping List, Substitution Guide", existing));
+                    }
+                }
+            }
+        }
 
         // Determine what was inferred vs what was NULL
         let null_fields = self.detect_null_fields(&task, &deliverable, &context);
@@ -221,7 +235,7 @@ impl SchemaFilling {
             deliverable,
             role,
             context,
-            constraints: self.infer_constraints(&wm_texts, &all_sources),
+            constraints,
             null_fields,
             task_inferred,
             deliverable_inferred,
@@ -425,9 +439,10 @@ mod tests {
 
     fn make_slot(content: &str, salience: f32) -> WmSlot {
         WmSlot {
-            content: content.into(),
-            salience,
+            token: content.to_string(),
+            salience_score: salience,
             source: crate::types::SlotSource::Delta,
+            is_protected: false,
         }
     }
 

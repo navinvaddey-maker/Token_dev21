@@ -31,7 +31,7 @@ impl Stage1 {
         // New: Sparse Coding — receives clean_tokens
         // Use aggressive ratio at stage 1 (mode unknown; be generous)
         // Increased threshold for more aggressive compression
-        let scored = self.sparse.apply(&out.clean_tokens, 0.65);
+        let scored = self.sparse.apply(&out.clean_tokens, 0.65, &out.constraint_locks);
         out.salience_map = scored
             .iter()
             .map(|t| (t.text.clone(), t.salience))
