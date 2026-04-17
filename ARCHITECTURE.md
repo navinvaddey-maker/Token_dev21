@@ -159,6 +159,27 @@ The administrative dashboard provides real-time visibility into:
 - Admin credentials set via `ADMIN_PASSWORD`
 - Logging configured with `tracing` and `tracing-subscriber`
 
+## Updated Gap Registry
+
+| Gap ID | Description | Status | Introduced |
+|---|---|---|---|
+| GAP-15 | SQLite ceiling at 100K concurrent sessions → PostgreSQL + cache | Open | v1 |
+| GAP-16 | Stage 2 mode routing dead code for unstructured inputs | Fixed in v2 | v1 |
+| GAP-17 | No pre-pipeline reconstruction layer for token-soup inputs | Fixed in v2 | v1 |
+| GAP-18 | Constraint tokens had no immunity from lexical compression | Fixed in v2 | v1 |
+| GAP-19 | `deliverables[]` not a first-class schema field | Fixed in v2 | v1 |
+| GAP-20 | No implicit deliverable inference pass | Fixed in v2 | v1 |
+| GAP-21 | Incomplete phrases passed Stage 0A silently | Fixed in v2 | v1 |
+| GAP-22 | No semantic completeness axis in scoring | Fixed in v2 | v1 |
+| GAP-23 | WM slots seeded from frequency, not schema clusters | Fixed in v2 | v1 |
+| GAP-24 | Correction cycle regenerated full output regardless of axis | Fixed in v2 | v1 |
+| GAP-25 | No semantic embedding module in codebase (`semantic.rs`) | Fixed (Implemented) | NPAE |
+| GAP-26 | No standalone hallucination validation endpoint | Fixed (Implemented) | NPAE |
+| GAP-27 | Ambiguity scoring not exposed as a scored signal outside pipeline | Fixed (Implemented) | NPAE |
+| GAP-28 | No information-gain ranking for ambiguity resolution questions | Fixed (Implemented) | NPAE |
+| GAP-29 | Tri-layer conflict resolution policy not defined | Fixed (Implemented) | NPAE |
+| GAP-30 | NPAE routes share SQLite write path — at 100K sessions, subject to GAP-15 ceiling | Open — blocked on GAP-15 | NPAE |
+
 ## Change Log (Architectural Changes)
 
 ```
@@ -171,4 +192,9 @@ Impact       : Establishes baseline for tracking future architectural decisions
 What changed : Updated to 7-stage pipeline architecture (Stages 0A-6B), added Mermaid diagrams, and documented the Dual-Scoring (TES/SFS) and Admin Monitoring systems.
 Why          : Reflect the major architectural refactoring and modernization of the engine to meet the high-fidelity refinement specs.
 Impact       : ARCHITECTURE.md now serve as a ground-truth document for the current high-complexity state of the engine.
+
+[2026-04-17] [Model: Antigravity] [File: ARCHITECTURE.md]
+What changed : Refined NPAE Structurer logic to support dynamic domain detection (e.g., Sports Nutrition), heuristic constraint extraction (high carb, low fiber, exclusions), and enhanced PromptContext schema with a `description` field.
+Why          : Fix the issue where optimized prompts were displaying raw input text and resolve hard-coded domain limitations.
+Impact       : Enables the CRISP UI to display specialized expert roles and summarizes inferred intent correctly.
 ```

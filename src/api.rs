@@ -68,10 +68,18 @@ pub fn router(state: AppState) -> Router {
             auth_middleware,
         ));
 
+    let npae_routes = Router::new()
+        .route("/api/v1/compress", post(npae_compress))
+        .route("/api/v1/aggressive", post(npae_aggressive))
+        .route("/api/v1/hallucination-check", post(npae_hallucination_check))
+        .route("/api/v1/schema", get(npae_schema))
+        .route("/api/v1/health", get(npae_health));
+
     Router::new()
         .merge(public)
         .merge(protected)
         .merge(admin)
+        .merge(npae_routes)
         .with_state(state)
 }
 
@@ -115,6 +123,27 @@ async fn compress(
     axum::Extension(user_id): axum::Extension<String>,
     Json(req): Json<CompressRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    // Dispatch to NPAE Aggressive Engine if requested
+    if req.mode.as_deref() == Some("aggressive") {
+        let npae_cfg = crate::npae::schema::types::NpaeConfig {
+            ambiguity_threshold: Some(0.65),
+            max_questions: Some(3),
+            confidence_threshold: Some(0.75),
+            skip_stage: None,
+        };
+
+        // Run the parallel pipeline for the initial compression representation
+        let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.raw_text)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+
+        // Execute the aggressive orchestration
+        let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.raw_text, &repr, &npae_cfg)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+
+        return Ok((StatusCode::OK, Json(resp)).into_response());
+    }
+
+    // Fallback to legacy v2 engine for other modes
     let resp = domain::compress_new(&state, &user_id, req).await?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
@@ -283,4 +312,62 @@ async fn auth_middleware(
     let user_id = crate::domain::verify_jwt(token)?;
     req.extensions_mut().insert(user_id);
     Ok(next.run(req).await)
+}
+
+// ── NPAE Handlers ─────────────────────────────────────────────────────────
+use crate::npae::schema::types::{AggressiveRequest, HallucinationCheckRequest};
+
+async fn npae_compress(
+    State(_state): State<AppState>,
+    Json(req): Json<AggressiveRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let result = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok((StatusCode::OK, Json(result)).into_response())
+}
+
+async fn npae_aggressive(
+    State(_state): State<AppState>,
+    Json(req): Json<AggressiveRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let empty_cfg = crate::npae::schema::types::NpaeConfig { ambiguity_threshold: None, max_questions: None, confidence_threshold: None, skip_stage: None };
+    let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
+    let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok((StatusCode::OK, Json(resp)).into_response())
+}
+
+async fn npae_hallucination_check(
+    State(_state): State<AppState>,
+    Json(req): Json<HallucinationCheckRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let default_cfg = crate::npae::schema::types::HallucinationGuardConfig {
+        self_critique_enabled: true,
+        confidence_threshold: 0.75,
+        contradiction_check: true,
+        claim_verification_rules: vec![],
+        uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
+    };
+    let cfg = req.guard_config.as_ref().unwrap_or(&default_cfg);
+    let report = crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok((StatusCode::OK, Json(report)).into_response())
+}
+
+async fn npae_schema() -> Result<axum::response::Response, AppError> {
+    // Phase 7.4
+    let schema_json = serde_json::json!({ "version": "1.0", "message": "Schema endpoint stub" });
+    Ok((StatusCode::OK, Json(schema_json)).into_response())
+}
+
+async fn npae_health() -> Result<axum::response::Response, AppError> {
+    // Phase 7.5
+    let health_json = serde_json::json!({
+        "status": "ok",
+        "version": "npae-1.0.0",
+        "uptime_ms": 0,
+    });
+    Ok((StatusCode::OK, Json(health_json)).into_response())
 }

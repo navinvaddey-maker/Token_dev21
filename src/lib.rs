@@ -7,6 +7,7 @@ pub mod domain;
 pub mod engine;
 pub mod errors;
 pub mod models;
+pub mod npae;
 pub mod pipeline;
 pub mod scoring;
 pub mod session;
