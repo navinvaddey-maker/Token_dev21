@@ -1,0 +1,68 @@
+{
+  "domain_taxonomy": [
+    {
+      "domain": "pharma",
+      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound"],
+      "boost": 3
+    },
+    {
+      "domain": "nutrition",
+      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs"],
+      "boost": 2
+    },
+    {
+      "domain": "software",
+      "keywords": ["code", "rust", "python", "bug", "api", "database"],
+      "boost": 2
+    }
+  ],
+  "roles": [
+    {
+      "priority": 6,
+      "domain": "pharma",
+      "base_title": "Pharmacologist",
+      "verbs": [
+        { "word": "pharmacokinetics", "weight": 10 },
+        { "word": "dosage",           "weight": 9  },
+        { "word": "bioavailability",  "weight": 10 },
+        { "word": "receptor",         "weight": 9  }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "software",
+      "base_title": "Systems Architect",
+      "verbs": [
+        { "word": "design",           "weight": 8 },
+        { "word": "architecture",     "weight": 10 },
+        { "word": "scalability",      "weight": 9 },
+        { "word": "distributed",      "weight": 9 }
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "id": "no_gluten",
+      "domain": "nutrition",
+      "priority": 3,
+      "is_forbidden": true,
+      "description": "Gluten containing grains",
+      "trigger": [
+        [{ "word": "avoid",  "weight": 6 }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "no",     "weight": 5 }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "gluten", "weight": 8 }, { "word": "free",   "weight": 6  }]
+      ]
+    },
+    {
+      "id": "high_carb",
+      "domain": "nutrition",
+      "priority": 3,
+      "is_forbidden": false,
+      "description": "High carbohydrate loading protocol",
+      "trigger": [
+        [{ "word": "high",   "weight": 7 }, { "word": "carb", "weight": 9 }],
+        [{ "word": "loading", "weight": 8 }, { "word": "carbohydrate", "weight": 10 }]
+      ]
+    }
+  ]
+}

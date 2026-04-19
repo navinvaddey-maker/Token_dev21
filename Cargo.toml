@@ -71,8 +71,9 @@ time      = { version = "0.3", features = ["serde"] }
 
 # NEW: Token compression engine dependencies
 arrayvec   = "0.7"          # stack-allocated fixed-capacity arrays (WM slots)
-dashmap    = "5"            # concurrent HashMap for schema priors
+dashmap    = { version = "5",  features = ["serde"] }            # concurrent HashMap for schema priors
 rayon      = "1"            # parallel salience scoring (sparse coding)
+ndarray    = "0.15"         # NPAE semantic phase embedding + clustering
 lazy_static = "1.4"
 phf        = { version = "0.8", features = ["macros"] }          # perfect hash maps for domain phrase lookup
 
