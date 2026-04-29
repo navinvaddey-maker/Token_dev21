@@ -190,40 +190,22 @@ impl SchemaFilling {
         let all_sources: Vec<String> = sources.into_iter().flatten().collect();
 
         let task = self.infer_task(&wm_texts, &all_sources);
-        let mut deliverable = self.infer_deliverable(&wm_texts, &all_sources);
         let role = self.infer_role(&wm_texts, &all_sources);
         let context = self.infer_context(&wm_texts, &all_sources, &cluster_texts);
-        let constraints = self.infer_constraints(&wm_texts, &all_sources);
-
-        // Implicit deliverable inference (Balanced/Aggressive mode only, layered >= 2)
-        if layers >= 2 {
-            if let (Some(t), Some(c)) = (&task, &constraints) {
-                let lt = t.to_lowercase();
-                let lc = c.to_lowercase();
-                if lt.contains("plan") || lt.contains("meal") {
-                    if lc.contains("dairy") || lc.contains("fiber") || lc.contains("nightshades") {
-                        let existing = deliverable.unwrap_or_else(|| "Meal Plan Structure".to_string());
-                        deliverable = Some(format!("{}, Shopping List, Substitution Guide", existing));
-                    }
-                }
-            }
-        }
 
         // Determine what was inferred vs what was NULL
-        let null_fields = self.detect_null_fields(&task, &deliverable, &context);
+        let null_fields = self.detect_null_fields(&task, &context);
         let task_inferred = task.is_some();
-        let deliverable_inferred = deliverable.is_some();
 
         // If layers == 3 (Aggressive) and output is provided, compute and attach scope injections
         if layers == 3 {
             if let Some(out) = output {
                 // Clone the values needed for scope injection to avoid moving them
                 let task_clone = task.clone();
-                let deliverable_clone = deliverable.clone();
                 let context_clone = context.clone();
                 let injections = DeterminismScopeInjector::inject(
                     &task_clone,
-                    &deliverable_clone,
+                    &None,
                     &context_clone,
                 );
                 out.scope_injections = injections;
@@ -232,13 +214,10 @@ impl SchemaFilling {
 
         FillResult {
             task,
-            deliverable,
             role,
             context,
-            constraints,
             null_fields,
             task_inferred,
-            deliverable_inferred,
         }
     }
 
@@ -320,32 +299,6 @@ impl SchemaFilling {
         Some("Domain Expert".to_string())
     }
 
-    fn infer_deliverable(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
-        // Look for output-oriented keywords
-        let deliverable_keywords = [
-            "report",
-            "document",
-            "summary",
-            "analysis",
-            "plan",
-            "specification",
-        ];
-        for keyword in deliverable_keywords {
-            if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword)) {
-                return Some(format!("Generated {}", keyword));
-            }
-        }
-        // If all texts are vague, don't fall back to defaults
-        if self.all_texts_vague(wm_texts) {
-            return None;
-        }
-        // Fallback to second WM slot or domain knowledge
-        wm_texts
-            .get(1)
-            .cloned()
-            .or_else(|| self.domain_knowledge.get("deliverable").cloned())
-    }
-
     fn infer_context(
         &self,
         wm_texts: &[String],
@@ -358,15 +311,13 @@ impl SchemaFilling {
         // Define words that are too vague to be considered context
         let vague_words = vec!["unknown", "thing", "something", "anything", "etc"];
 
-        // Add WM texts that aren't task or deliverable, have sufficient length, and are not vague
+        // Add WM texts that aren't task, have sufficient length, and are not vague
         for text in wm_texts {
             let lower = text.to_lowercase();
             if text.len() >= 3
                 && !vague_words.contains(&lower.as_str())
                 && !lower.contains("build")
                 && !lower.contains("create")
-                && !lower.contains("report")
-                && !lower.contains("document")
             {
                 context.push(text.clone());
             }
@@ -380,38 +331,14 @@ impl SchemaFilling {
         context
     }
 
-    fn infer_constraints(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
-        // Look for constraint-related keywords
-        let constraint_keywords = [
-            "must",
-            "should",
-            "cannot",
-            "required",
-            "limit",
-            "deadline",
-            "budget",
-            "constraint",
-        ];
-        for keyword in constraint_keywords {
-            if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword)) {
-                return Some(format!("Includes {} requirement", keyword));
-            }
-        }
-        None
-    }
-
     fn detect_null_fields(
         &self,
         task: &Option<String>,
-        deliverable: &Option<String>,
         context: &[String],
     ) -> Vec<String> {
         let mut null_fields = Vec::new();
         if task.is_none() {
             null_fields.push("task".to_string());
-        }
-        if deliverable.is_none() {
-            null_fields.push("deliverable".to_string());
         }
         if context.is_empty() {
             null_fields.push("context".to_string());
@@ -423,13 +350,10 @@ impl SchemaFilling {
 #[derive(Debug, Default)]
 pub struct FillResult {
     pub task: Option<String>,
-    pub deliverable: Option<String>,
     pub role: Option<String>,
     pub context: Vec<String>,
-    pub constraints: Option<String>,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
-    pub deliverable_inferred: bool,
 }
 
 #[cfg(test)]

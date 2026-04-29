@@ -19,11 +19,13 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::pipeline::orchestrator::PipelineOrchestrator;
+use crate::npae::aggressive::config::ConfigHandle;
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: DbPool,
     pub engine: Arc<Mutex<LearningEngine>>,
     pub pipeline: Arc<PipelineOrchestrator>,
+    pub npae_config: Arc<ConfigHandle>,
 }
 

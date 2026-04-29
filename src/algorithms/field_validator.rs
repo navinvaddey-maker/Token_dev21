@@ -27,20 +27,6 @@ impl FieldTypeValidator {
 
         issues.extend(self.check_task(&schema.task));
 
-        let deliverable = if schema.output.is_empty() {
-            None
-        } else {
-            Some(schema.output.iter().map(|d| d.name.clone()).collect::<Vec<_>>().join(", "))
-        };
-        issues.extend(self.check_deliverable(&deliverable));
-
-        let constraints = if schema.constraints.is_empty() {
-            None
-        } else {
-            Some(schema.constraints.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", "))
-        };
-        issues.extend(self.check_constraints(&constraints));
-
         if let Some(ctx) = &schema.context {
             let context_issues = self.check_context(ctx, 0);
             issues.extend(context_issues);
@@ -84,75 +70,6 @@ impl FieldTypeValidator {
         issues
     }
 
-    /// Validates the deliverable field for type and content issues.
-    fn check_deliverable(&self, deliverable: &Option<String>) -> Vec<FieldValidationIssue> {
-        let mut issues = Vec::new();
-
-        match deliverable {
-            Some(d) => {
-                if d.trim().is_empty() {
-                    issues.push(FieldValidationIssue {
-                        field_name: "deliverable".to_string(),
-                        issue_type: "empty".to_string(),
-                        description: "Deliverable field is empty or contains only whitespace"
-                            .to_string(),
-                        severity: "error".to_string(),
-                    });
-                } else if !Self::is_valid_text_content(d) {
-                    issues.push(FieldValidationIssue {
-                        field_name: "deliverable".to_string(),
-                        issue_type: "invalid_content".to_string(),
-                        description: "Deliverable field contains invalid characters or format"
-                            .to_string(),
-                        severity: "warning".to_string(),
-                    });
-                }
-            }
-            None => {
-                issues.push(FieldValidationIssue {
-                    field_name: "deliverable".to_string(),
-                    issue_type: "missing".to_string(),
-                    description: "Deliverable field is missing".to_string(),
-                    severity: "error".to_string(),
-                });
-            }
-        }
-
-        issues
-    }
-
-    /// Validates the constraints field for type and content issues.
-    fn check_constraints(&self, constraints: &Option<String>) -> Vec<FieldValidationIssue> {
-        let mut issues = Vec::new();
-
-        match constraints {
-            Some(c) => {
-                if c.trim().is_empty() {
-                    issues.push(FieldValidationIssue {
-                        field_name: "constraints".to_string(),
-                        issue_type: "empty".to_string(),
-                        description: "Constraints field is empty or contains only whitespace"
-                            .to_string(),
-                        severity: "error".to_string(),
-                    });
-                } else if !Self::is_valid_text_content(c) {
-                    issues.push(FieldValidationIssue {
-                        field_name: "constraints".to_string(),
-                        issue_type: "invalid_content".to_string(),
-                        description: "Constraints field contains invalid characters or format"
-                            .to_string(),
-                        severity: "warning".to_string(),
-                    });
-                }
-            }
-            None => {
-                // Constraints might be optional, so we don't add an issue for missing constraints
-                // But if present, it should be valid
-            }
-        }
-
-        issues
-    }
 
     /// Validates a single context field for type and content issues.
     fn check_context(&self, context: &String, index: usize) -> Vec<FieldValidationIssue> {
@@ -207,8 +124,6 @@ mod tests {
         let validator = FieldTypeValidator::new();
         let schema = crate::types::CompressionSchema {
             task: Some("   ".to_string()),
-            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
-            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
             context: Some("valid context".to_string()),
             role: None,
         };
@@ -220,31 +135,12 @@ mod tests {
         assert_eq!(issues[0].severity, "error");
     }
 
-    #[test]
-    fn test_validate_missing_deliverable() {
-        let validator = FieldTypeValidator::new();
-        let schema = crate::types::CompressionSchema {
-            task: Some("valid task".to_string()),
-            output: vec![],
-            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
-            context: Some("valid context".to_string()),
-            role: None,
-        };
-        let issues = validator.validate(&schema);
-
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].field_name, "deliverable");
-        assert_eq!(issues[0].issue_type, "missing");
-        assert_eq!(issues[0].severity, "error");
-    }
 
     #[test]
     fn test_validate_context_empty() {
         let validator = FieldTypeValidator::new();
         let schema = crate::types::CompressionSchema {
             task: Some("valid task".to_string()),
-            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
-            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
             context: Some("   ".to_string()),
             role: None,
         };
@@ -260,8 +156,6 @@ mod tests {
         let validator = FieldTypeValidator::new();
         let schema = crate::types::CompressionSchema {
             task: Some("valid task".to_string()),
-            output: vec![crate::types::Deliverable { name: "valid".to_string() }],
-            constraints: vec![crate::types::Constraint { name: "valid".to_string() }],
             context: Some("valid context".to_string()),
             role: None,
         };

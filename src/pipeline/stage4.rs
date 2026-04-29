@@ -36,12 +36,11 @@ impl Stage4 {
             role: result.role.clone(),
             context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
             task: result.task.clone(),
-            constraints: result.constraints.as_ref().map(|c| vec![crate::types::Constraint { name: c.clone() }]).unwrap_or_default(),
-            output: result.deliverable.as_ref().map(|d| vec![crate::types::Deliverable { name: d.clone() }]).unwrap_or_default(),
         };
+
 
         out.null_fields = result.null_fields;
         out.task_inferred = result.task_inferred;
-        out.deliverable_inferred = result.deliverable_inferred;
+
     }
 }

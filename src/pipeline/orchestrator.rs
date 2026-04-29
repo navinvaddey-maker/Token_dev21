@@ -17,8 +17,9 @@ use crate::{
     session::SessionHistory,
     types::{
         AlgorithmOutput, CompressionResponse, CorrectionCycle, FieldValidationIssue,
-        NormalizationResult, OrdinalSequence, PromptTopology,
+        NormalizationResult, OrdinalSequence, PromptTopology, OrchestratorResponse, Mode,
     },
+    npae::aggressive::config::ConfigHandle,
 };
 
 /// Orchestrates the token compression pipeline stages as specified in the refinements guide.
@@ -36,6 +37,7 @@ pub struct PipelineOrchestrator {
     _semantic_fidelity_scorer: SemanticFidelityScorer,
     stage6a: Stage6a,
     correction_cycle: CorrectionCycle,
+    npae_config_handle: Arc<ConfigHandle>,
 }
 
 impl PipelineOrchestrator {
@@ -69,12 +71,17 @@ impl PipelineOrchestrator {
             _semantic_fidelity_scorer: semantic_fidelity_scorer,
             stage6a,
             correction_cycle,
+            npae_config_handle: Arc::new(ConfigHandle::new(crate::npae::aggressive::config::UnifiedConfig {
+                domain_taxonomy: vec![],
+                roles: vec![],
+                constraints: vec![],
+            })), // Fallback if not injected properly, though we will inject via build
         }
     }
 
     /// Build orchestrator from shared schema priors — convenience factory.
     /// All 12 stage components are constructed internally with defaults.
-    pub fn build(schema_priors: Arc<DashMap<String, u32>>) -> Self {
+    pub fn build(schema_priors: Arc<DashMap<String, u32>>, npae_config_handle: Arc<ConfigHandle>) -> Self {
         let predictive = PredictiveCoding::new(schema_priors);
         Self {
             reconstructor: TokenReconstructor::new(),
@@ -90,6 +97,7 @@ impl PipelineOrchestrator {
             _semantic_fidelity_scorer: SemanticFidelityScorer::new(),
             stage6a: Stage6a::new(),
             correction_cycle: CorrectionCycle::new(0),
+            npae_config_handle,
         }
     }
 
@@ -98,7 +106,8 @@ impl PipelineOrchestrator {
         &self,
         input: &str,
         session: &mut SessionHistory,
-    ) -> Result<CompressionResponse, Box<dyn std::error::Error>> {
+        forced_mode: Option<&str>,
+    ) -> Result<OrchestratorResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
 
@@ -125,8 +134,54 @@ impl PipelineOrchestrator {
         self.stage1.run(&normalized, &mut output);
 
         // Stage 2: Boundary Detection (Predictive Coding → mode decision)
-        self.stage2.run(session, &mut output);
+        if let Some(fm) = forced_mode {
+            let m = match fm.to_lowercase().as_str() {
+                "aggressive" => Mode::Aggressive,
+                "gentle" => Mode::Gentle,
+                "balanced" => Mode::Balanced,
+                _ => Mode::Balanced,
+            };
+            output.mode = Some(m);
+        } else {
+            self.stage2.run(session, &mut output);
+        }
 
+        let is_aggressive = output.mode.as_ref() == Some(&Mode::Aggressive);
+
+        if is_aggressive {
+            // -- Aggressive Routing (NPAE) --
+            let npae_cfg = crate::npae::schema::types::NpaeConfig {
+                ambiguity_threshold: Some(0.65),
+                max_questions: Some(3),
+                confidence_threshold: Some(0.75),
+                skip_stage: None,
+            };
+
+            let repr = crate::npae::compression::pipeline::run_parallel_pipeline(input)
+                .map_err(|e| e.to_string())?;
+
+            let structurer = crate::npae::aggressive::structurer::HttpStructurer {
+                route: "/api/compress".to_string(),
+                remote_addr: "127.0.0.1".to_string(), // In real app, pass actual address
+                body: input.to_string(),
+            };
+
+            let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
+                input, 
+                &repr, 
+                &npae_cfg, 
+                self.npae_config_handle.clone(), 
+                &structurer
+            ).map_err(|e| e.to_string())?;
+
+            // Push to session history for tracking
+            session.push(input, &output);
+            
+            return Ok(OrchestratorResponse::Aggressive(resp));
+        }
+
+        // -- Legacy Routing (Balanced/Gentle) --
+        
         // Stage 3: Context Management
         self.stage3.run(&mut output);
 
@@ -180,7 +235,7 @@ impl PipelineOrchestrator {
             scoring_result,
             correction_cycle,
             &output,
-        )
+        ).map(OrchestratorResponse::Legacy)
     }
 
     /// Packages the pipeline output into a CompressionResponse with all new fields.

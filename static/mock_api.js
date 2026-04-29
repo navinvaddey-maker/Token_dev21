@@ -1,6 +1,6 @@
 // static/mock_api.js — Development fallback + API wrapper
 const MockAPI = {
-    compress({ raw_text, task, deliverables, constraints, reproducibility }) {
+    compress({ raw_text, task }) {
         const words   = raw_text.split(/\s+/);
         const filler  = /\b(just|basically|actually|please|really|very)\b/gi;
         const cleaned = raw_text.replace(filler, '').replace(/\s{2,}/g, ' ').trim();

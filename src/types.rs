@@ -24,9 +24,8 @@ pub struct CompressionSchema {
     pub role: Option<String>,
     pub context: Option<String>,
     pub task: Option<String>,
-    pub constraints: Vec<Constraint>,
-    pub output: Vec<Deliverable>,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeightedToken {
@@ -146,7 +145,7 @@ pub struct AlgorithmOutput {
     pub resolved_schema: CompressionSchema,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
-    pub deliverable_inferred: bool,
+
 
     // New fields from refinements guide
     pub topology: Option<PromptTopology>,
@@ -158,7 +157,15 @@ pub struct AlgorithmOutput {
     pub correction_cycle: Option<CorrectionCycle>,
 }
 
-/// Final packaged response sent to the caller / UI.
+/// Unified response enum for the PipelineOrchestrator
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OrchestratorResponse {
+    Legacy(CompressionResponse),
+    Aggressive(crate::npae::schema::types::StructuredPromptResponse),
+}
+
+/// Final packaged response sent to the caller / UI (Legacy Mode).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompressionResponse {
     pub mode: String,

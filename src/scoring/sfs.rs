@@ -46,9 +46,9 @@ mod tests {
                 severity: "error".to_string(),
             },
             FieldValidationIssue {
-                field_name: "deliverable".to_string(),
+                field_name: "context".to_string(),
                 issue_type: "missing_required".to_string(),
-                description: "Deliverable field is required but missing".to_string(),
+                description: "Context field is required but missing".to_string(),
                 severity: "error".to_string(),
             },
         ];
@@ -69,15 +69,9 @@ mod tests {
                 severity: "error".to_string(),
             },
             FieldValidationIssue {
-                field_name: "deliverable".to_string(),
-                issue_type: "missing_required".to_string(),
-                description: "Deliverable field is required but missing".to_string(),
-                severity: "error".to_string(),
-            },
-            FieldValidationIssue {
-                field_name: "constraints".to_string(),
+                field_name: "context".to_string(),
                 issue_type: "invalid_value".to_string(),
-                description: "Constraints field contains invalid JSON".to_string(),
+                description: "Context field contains invalid format".to_string(),
                 severity: "error".to_string(),
             },
             FieldValidationIssue {

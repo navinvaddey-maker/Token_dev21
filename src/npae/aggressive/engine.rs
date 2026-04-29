@@ -9,24 +9,31 @@ impl AggressiveEngine {
         raw: &str,
         repr: &CompressedRepr,
         cfg: &NpaeConfig,
+        config_handle: std::sync::Arc<super::config::ConfigHandle>,
+        structurer_impl: &dyn super::structurer::Structurer,
     ) -> Result<StructuredPromptResponse, String> {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
 
-        // 1. Extract intent
+        // 1. Extract intent (now with dynamic domain, output_preference, temporal_scope)
         let profile = super::intent::extract(repr, raw)?;
 
-        // 2. Build structured prompt
-        let structured = super::structurer::build(&profile, raw)?;
+        // 1.5. Dispatch via StructurerRouter
+        let resolver = super::resolver::PromptResolver::new(config_handle);
+        let mut router = super::resolver::StructurerRouter::new(resolver);
+        let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
+
+        // 2. Build structured prompt (now with execution phases, validation, constraints_meta)
+        let structured = super::structurer::build(&profile, raw, &resolved_prompt)?;
 
         // 3. Score ambiguity
         let amb = super::ambiguity::score(repr, raw)?;
         let threshold = cfg.ambiguity_threshold.unwrap_or(0.65);
 
-        // 4. Generate questions if threshold exceeded
+        // 4. Generate domain-aware questions if threshold exceeded
         let questions = if amb.score > threshold {
             let max_q = cfg.max_questions.unwrap_or(3).min(3);
-            super::questions::generate(repr, &amb, max_q)?
+            super::questions::generate_with_domain(repr, &amb, max_q, &profile.domain)?
         } else {
             vec![]
         };
@@ -41,14 +48,29 @@ impl AggressiveEngine {
         let token_final = optimized_prompt.split_whitespace().count() as u32;
         let token_saved = token_original.saturating_sub(token_final);
 
+        // Calculate scoring for aggressive mode
+        let tes_score = if token_original > 0 {
+            let ratio = token_final as f32 / token_original as f32;
+            (ratio * 10.0).clamp(0.0, 10.0)
+        } else {
+            0.0
+        };
+        let scoring_result = crate::types::ScoringResult {
+            tes: tes_score,
+            sfs: 10.0, // NPAE structurally enforces these fields
+            scs: 10.0,
+            correction_needed: false,
+            correction_axis: None,
+        };
+
         Ok(StructuredPromptResponse {
-            schema_version: "1.0.0".into(),
+            schema_version: "2.0.0".into(),
             request_id,
             optimized_prompt,
             token_original,
             token_final,
             token_saved,
-            compression: CompressionMeta::from(repr),
+            compression: CompressionMeta::from_repr(repr, token_original),
             structured_prompt: structured,
             ambiguity_analysis: amb,
             clarifying_questions: questions,
@@ -56,8 +78,9 @@ impl AggressiveEngine {
             processing_metadata: ProcessingMeta {
                 pipeline_duration_ms: repr.stage_metrics.total_ms(),
                 aggressive_mode_ms: aggressive_ms,
-                model_version: "npae-1.0.0".into(),
+                model_version: "npae-2.0.0".into(),
             },
+            scoring_result,
         })
     }
 }

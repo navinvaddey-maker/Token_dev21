@@ -2,17 +2,97 @@
   "domain_taxonomy": [
     {
       "domain": "pharma",
-      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound"],
+      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech"],
       "boost": 3
     },
     {
       "domain": "nutrition",
-      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs"],
+      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician", "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic", "vegetarian"],
       "boost": 2
     },
     {
       "domain": "software",
-      "keywords": ["code", "rust", "python", "bug", "api", "database"],
+      "keywords": ["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker", "kubernetes"],
+      "boost": 2
+    },
+    {
+      "domain": "business",
+      "keywords": ["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale", "venture", "customer", "monetize"],
+      "boost": 2
+    },
+    {
+      "domain": "data-science",
+      "keywords": ["data", "ml", "machine-learning", "model", "dataset", "neural", "prediction", "classification", "pandas", "tensorflow"],
+      "boost": 2
+    },
+    {
+      "domain": "education",
+      "keywords": ["teach", "learn", "curriculum", "course", "student", "lecture", "training", "certification", "assessment"],
+      "boost": 1
+    },
+    {
+      "domain": "creative",
+      "keywords": ["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue", "writing"],
+      "boost": 1
+    },
+    {
+      "domain": "health-fitness",
+      "keywords": ["workout", "exercise", "cardio", "strength", "weight", "health", "wellness", "recovery", "sleep", "training"],
+      "boost": 2
+    },
+    {
+      "domain": "legal",
+      "keywords": ["contract", "legal", "compliance", "regulation", "patent", "trademark", "liability", "attorney"],
+      "boost": 3
+    },
+    {
+      "domain": "marketing",
+      "keywords": ["marketing", "brand", "campaign", "seo", "content", "social-media", "conversion", "funnel", "audience", "ads"],
+      "boost": 2
+    },
+    {
+      "domain": "finance",
+      "keywords": ["investment", "portfolio", "stock", "crypto", "trading", "banking", "loan", "interest", "dividend", "accounting", "audit", "tax", "ledger", "fintech", "quantitative", "derivatives"],
+      "boost": 3
+    },
+    {
+      "domain": "devops",
+      "keywords": ["ci-cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "cloud", "aws", "gcp", "azure"],
+      "boost": 2
+    },
+    {
+      "domain": "ai-ml",
+      "keywords": ["alignment", "safety", "llm", "transformer", "neural", "agi", "general intelligence", "machine learning", "rlhf", "inference", "real-world implications"],
+      "boost": 3
+    },
+    {
+      "domain": "medical",
+      "keywords": ["medical", "patient", "doctor", "hospital", "surgery", "healthcare", "diagnosis", "treatment", "anatomy", "physiology", "pathology", "radiology"],
+      "boost": 3
+    },
+    {
+      "domain": "scientific-research",
+      "keywords": ["research", "experiment", "laboratory", "hypothesis", "data analysis", "publication", "peer-review", "methodology", "citation", "abstract"],
+      "boost": 2
+    },
+    {
+      "domain": "cybersecurity",
+      "keywords": ["security", "hacking", "firewall", "encryption", "vulnerability", "pentest", "soc", "malware", "threat", "zero-day", "endpoint"],
+      "boost": 2
+    },
+    {
+      "domain": "ecommerce",
+      "keywords": ["store", "shopping", "cart", "checkout", "inventory", "warehouse", "logistics", "marketplace", "shipping", "fulfillment"],
+      "boost": 2
+    },
+    {
+      "domain": "real-estate",
+      "keywords": ["property", "house", "apartment", "mortgage", "realtor", "appraisal", "listing", "commercial", "residential", "lease", "equity"],
+      "boost": 2
+    },
+    {
+      "domain": "workplace-productivity",
+      "keywords": ["remote", "wfh", "productivity", "culture", "collaboration", "engagement", "performance", "output", "burnout", "hybrid", "distributed team", "work-from-home", "async", "synchronous", "meeting"],
       "boost": 2
     }
   ],
@@ -38,6 +118,239 @@
         { "word": "scalability",      "weight": 9 },
         { "word": "distributed",      "weight": 9 }
       ]
+    },
+    {
+      "priority": 5,
+      "domain": "software",
+      "base_title": "Full Stack Developer",
+      "verbs": [
+        { "word": "build",            "weight": 7 },
+        { "word": "implement",        "weight": 8 },
+        { "word": "frontend",         "weight": 9 },
+        { "word": "backend",          "weight": 9 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "business",
+      "base_title": "Business Strategist",
+      "verbs": [
+        { "word": "business",         "weight": 8 },
+        { "word": "startup",          "weight": 9 },
+        { "word": "revenue",          "weight": 9 },
+        { "word": "growth",           "weight": 8 },
+        { "word": "market",           "weight": 7 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "business",
+      "base_title": "Product Manager",
+      "verbs": [
+        { "word": "product",          "weight": 9 },
+        { "word": "roadmap",          "weight": 10 },
+        { "word": "feature",          "weight": 7 },
+        { "word": "user",             "weight": 6 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "data-science",
+      "base_title": "Data Scientist",
+      "verbs": [
+        { "word": "model",            "weight": 8 },
+        { "word": "prediction",       "weight": 9 },
+        { "word": "classification",   "weight": 9 },
+        { "word": "dataset",          "weight": 8 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "marketing",
+      "base_title": "Growth Strategist",
+      "verbs": [
+        { "word": "campaign",         "weight": 9 },
+        { "word": "conversion",       "weight": 9 },
+        { "word": "funnel",           "weight": 8 },
+        { "word": "audience",         "weight": 7 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "finance",
+      "base_title": "Financial Analyst",
+      "verbs": [
+        { "word": "investment",       "weight": 9 },
+        { "word": "portfolio",        "weight": 9 },
+        { "word": "valuation",        "weight": 10 },
+        { "word": "risk",             "weight": 8 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "nutrition",
+      "base_title": "Registered Dietician",
+      "verbs": [
+        { "word": "dietician",        "weight": 10 },
+        { "word": "dietitian",        "weight": 10 },
+        { "word": "clinical",         "weight": 8 },
+        { "word": "metabolic",        "weight": 9 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "nutrition",
+      "base_title": "Clinical Nutritionist",
+      "verbs": [
+        { "word": "nutrition",        "weight": 8 },
+        { "word": "supplements",      "weight": 9 },
+        { "word": "probiotic",        "weight": 8 },
+        { "word": "deficiency",       "weight": 7 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "nutrition",
+      "base_title": "Sports Nutritionist",
+      "verbs": [
+        { "word": "nutritionist",     "weight": 10 },
+        { "word": "meal",             "weight": 8 },
+        { "word": "diet",             "weight": 8 },
+        { "word": "macro",            "weight": 9 },
+        { "word": "training",         "weight": 7 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "education",
+      "base_title": "Curriculum Designer",
+      "verbs": [
+        { "word": "curriculum",       "weight": 10 },
+        { "word": "course",           "weight": 9 },
+        { "word": "teach",            "weight": 8 },
+        { "word": "assessment",       "weight": 8 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "legal",
+      "base_title": "Legal Strategist",
+      "verbs": [
+        { "word": "contract",         "weight": 9 },
+        { "word": "compliance",       "weight": 9 },
+        { "word": "regulation",       "weight": 8 },
+        { "word": "liability",        "weight": 8 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "devops",
+      "base_title": "Platform Engineer",
+      "verbs": [
+        { "word": "infrastructure",   "weight": 9 },
+        { "word": "terraform",        "weight": 9 },
+        { "word": "monitoring",       "weight": 8 },
+        { "word": "cloud",            "weight": 7 }
+      ]
+    },
+    {
+      "priority": 6,
+      "domain": "ai-ml",
+      "base_title": "AI Researcher",
+      "verbs": [
+        { "word": "alignment",        "weight": 10 },
+        { "word": "safety",           "weight": 9 },
+        { "word": "agi",              "weight": 10 },
+        { "word": "intelligence",     "weight": 8 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "ai-ml",
+      "base_title": "LLM Engineer",
+      "verbs": [
+        { "word": "llm",              "weight": 10 },
+        { "word": "transformer",      "weight": 9 },
+        { "word": "inference",        "weight": 8 },
+        { "word": "rlhf",             "weight": 9 }
+      ]
+    },
+    {
+      "priority": 6,
+      "domain": "medical",
+      "base_title": "Physician",
+      "verbs": [
+        { "word": "diagnosis",        "weight": 10 },
+        { "word": "treatment",        "weight": 9 },
+        { "word": "patient",          "weight": 8 },
+        { "word": "clinical",         "weight": 7 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "scientific-research",
+      "base_title": "Research Scientist",
+      "verbs": [
+        { "word": "hypothesis",       "weight": 10 },
+        { "word": "experiment",       "weight": 9 },
+        { "word": "analysis",         "weight": 8 },
+        { "word": "publication",      "weight": 7 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "cybersecurity",
+      "base_title": "Security Analyst",
+      "verbs": [
+        { "word": "vulnerability",    "weight": 10 },
+        { "word": "threat",           "weight": 9 },
+        { "word": "firewall",         "weight": 8 },
+        { "word": "encryption",       "weight": 9 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "ecommerce",
+      "base_title": "E-commerce Manager",
+      "verbs": [
+        { "word": "inventory",        "weight": 9 },
+        { "word": "conversion",       "weight": 8 },
+        { "word": "logistics",        "weight": 7 },
+        { "word": "marketplace",      "weight": 7 }
+      ]
+    },
+    {
+      "priority": 4,
+      "domain": "real-estate",
+      "base_title": "Real Estate Agent",
+      "verbs": [
+        { "word": "property",         "weight": 9 },
+        { "word": "listing",          "weight": 8 },
+        { "word": "mortgage",         "weight": 9 },
+        { "word": "valuation",        "weight": 8 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "workplace-productivity",
+      "base_title": "Workplace Strategist",
+      "verbs": [
+        { "word": "culture",          "weight": 10 },
+        { "word": "productivity",     "weight": 10 },
+        { "word": "remote",           "weight": 9 },
+        { "word": "collaboration",    "weight": 8 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "workplace-productivity",
+      "base_title": "Organizational Analyst",
+      "verbs": [
+        { "word": "performance",      "weight": 9 },
+        { "word": "engagement",       "weight": 10 },
+        { "word": "burnout",          "weight": 9 },
+        { "word": "metrics",          "weight": 8 }
+      ]
     }
   ],
   "constraints": [
@@ -62,6 +375,96 @@
       "trigger": [
         [{ "word": "high",   "weight": 7 }, { "word": "carb", "weight": 9 }],
         [{ "word": "loading", "weight": 8 }, { "word": "carbohydrate", "weight": 10 }]
+      ]
+    },
+    {
+      "id": "no_dairy",
+      "domain": "nutrition",
+      "priority": 3,
+      "is_forbidden": true,
+      "description": "All dairy products",
+      "trigger": [
+        [{ "word": "no",     "weight": 5 }, { "word": "dairy",  "weight": 10 }],
+        [{ "word": "avoid",  "weight": 6 }, { "word": "dairy",  "weight": 10 }],
+        [{ "word": "dairy",  "weight": 8 }, { "word": "free",   "weight": 6  }],
+        [{ "word": "lactose", "weight": 8 }, { "word": "free",  "weight": 6  }]
+      ]
+    },
+    {
+      "id": "low_fiber",
+      "domain": "nutrition",
+      "priority": 3,
+      "is_forbidden": false,
+      "description": "Low fiber dietary approach",
+      "trigger": [
+        [{ "word": "low",    "weight": 7 }, { "word": "fiber",  "weight": 9 }]
+      ]
+    },
+    {
+      "id": "no_nightshades",
+      "domain": "nutrition",
+      "priority": 3,
+      "is_forbidden": true,
+      "description": "Nightshade vegetables (tomatoes, peppers, eggplant, potatoes)",
+      "trigger": [
+        [{ "word": "no",     "weight": 5 }, { "word": "nightshades", "weight": 10 }],
+        [{ "word": "avoid",  "weight": 6 }, { "word": "nightshades", "weight": 10 }]
+      ]
+    },
+    {
+      "id": "low_budget",
+      "domain": "business",
+      "priority": 3,
+      "is_forbidden": false,
+      "description": "Budget-constrained approach",
+      "trigger": [
+        [{ "word": "low",    "weight": 6 }, { "word": "budget",   "weight": 9 }],
+        [{ "word": "bootstrap", "weight": 10 }],
+        [{ "word": "minimal", "weight": 7 }, { "word": "investment", "weight": 8 }]
+      ]
+    },
+    {
+      "id": "saas_model",
+      "domain": "business",
+      "priority": 3,
+      "is_forbidden": false,
+      "description": "SaaS business model focus",
+      "trigger": [
+        [{ "word": "saas",   "weight": 10 }],
+        [{ "word": "subscription", "weight": 9 }, { "word": "model", "weight": 7 }]
+      ]
+    },
+    {
+      "id": "production_ready",
+      "domain": "software",
+      "priority": 4,
+      "is_forbidden": false,
+      "description": "Production-grade code quality required",
+      "trigger": [
+        [{ "word": "production", "weight": 9 }, { "word": "ready", "weight": 8 }],
+        [{ "word": "production", "weight": 9 }, { "word": "grade", "weight": 8 }]
+      ]
+    },
+    {
+      "id": "no_external_deps",
+      "domain": "software",
+      "priority": 3,
+      "is_forbidden": true,
+      "description": "No external API dependencies",
+      "trigger": [
+        [{ "word": "no",     "weight": 5 }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
+        [{ "word": "no",     "weight": 5 }, { "word": "dependencies", "weight": 9 }]
+      ]
+    },
+    {
+      "id": "gdpr_compliant",
+      "domain": "legal",
+      "priority": 5,
+      "is_forbidden": false,
+      "description": "GDPR compliance required",
+      "trigger": [
+        [{ "word": "gdpr",   "weight": 10 }],
+        [{ "word": "data",   "weight": 6 }, { "word": "privacy", "weight": 9 }]
       ]
     }
   ]

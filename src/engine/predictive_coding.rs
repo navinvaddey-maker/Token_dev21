@@ -167,9 +167,6 @@ fn rewrite_verbs(task: &str) -> String {
 pub fn run(
     chunks: &[String],
     task: &str,
-    deliverables: &str,
-    constraints: &str,
-    reproducibility: &str,
     use_case: &str,
     model: &str,
 ) -> PrincipleResult {
@@ -200,16 +197,6 @@ pub fn run(
     }
 
     output_parts.push(format!("Task: {}", optimized_task));
-
-    if !deliverables.is_empty() {
-        output_parts.push(format!("Deliverable: {}", deliverables));
-    }
-    if !constraints.is_empty() {
-        output_parts.push(format!("Constraints: {}", constraints));
-    }
-    if !reproducibility.is_empty() {
-        output_parts.push(format!("Reproducibility: {}", reproducibility));
-    }
 
     output_parts.push("---".to_string());
     output_parts.push(combined_text);

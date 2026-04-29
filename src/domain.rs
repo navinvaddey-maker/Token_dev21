@@ -133,10 +133,18 @@ pub async fn compress_new(
     //    SessionHistory is per-request for now (future: persist across user sessions)
     let mut session = SessionHistory::new(10);
 
-    let compression_response = state
+    let orchestrator_response = state
         .pipeline
-        .process(&enriched_prompt, &mut session)
+        .process(&enriched_prompt, &mut session, req.mode.as_deref())
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+
+    let compression_response = match orchestrator_response {
+        crate::types::OrchestratorResponse::Legacy(resp) => resp,
+        crate::types::OrchestratorResponse::Aggressive(resp) => {
+            // For now, bypass DB history logging for Aggressive mode to match existing behavior
+            return Ok(serde_json::to_value(resp).unwrap());
+        }
+    };
 
     // 4. Compute token counts
     let token_original = estimate_tokens(&enriched_prompt);
@@ -196,10 +204,9 @@ pub async fn compress_new(
         "scope_injections": compression_response.scope_injections,
         "correction_cycle": compression_response.correction_cycle,
         "task":             compression_response.schema.task,
-        "deliverable":      compression_response.schema.output.iter().map(|d| d.name.clone()).collect::<Vec<_>>().join(", "),
         "context":          compression_response.schema.context,
-        "constraints":      compression_response.schema.constraints.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", "),
         "null_fields":      compression_response.null_fields,
+
         "wm_slots_used":    compression_response.wm_slots_used,
         "clusters":         compression_response.clusters,
         "delta_tokens":     compression_response.delta_tokens,

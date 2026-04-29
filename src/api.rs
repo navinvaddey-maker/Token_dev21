@@ -107,9 +107,7 @@ async fn login(
 pub struct CompressRequest {
     pub raw_text: String,
     pub task: Option<String>,
-    pub deliverables: Option<String>,
-    pub constraints: Option<String>,
-    pub reproducibility: Option<String>,
+
     pub model: Option<String>,
     pub use_case: Option<String>,
     pub mode: Option<String>,
@@ -123,27 +121,8 @@ async fn compress(
     axum::Extension(user_id): axum::Extension<String>,
     Json(req): Json<CompressRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    // Dispatch to NPAE Aggressive Engine if requested
-    if req.mode.as_deref() == Some("aggressive") {
-        let npae_cfg = crate::npae::schema::types::NpaeConfig {
-            ambiguity_threshold: Some(0.65),
-            max_questions: Some(3),
-            confidence_threshold: Some(0.75),
-            skip_stage: None,
-        };
-
-        // Run the parallel pipeline for the initial compression representation
-        let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.raw_text)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-
-        // Execute the aggressive orchestration
-        let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.raw_text, &repr, &npae_cfg)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-
-        return Ok((StatusCode::OK, Json(resp)).into_response());
-    }
-
-    // Fallback to legacy v2 engine for other modes
+    // Process universally through domain::compress_new, which uses PipelineOrchestrator
+    // The mode differentiation is now strictly handled by PipelineOrchestrator::process
     let resp = domain::compress_new(&state, &user_id, req).await?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
@@ -327,14 +306,21 @@ async fn npae_compress(
 }
 
 async fn npae_aggressive(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<AggressiveRequest>,
 ) -> Result<axum::response::Response, AppError> {
     let empty_cfg = crate::npae::schema::types::NpaeConfig { ambiguity_threshold: None, max_questions: None, confidence_threshold: None, skip_stage: None };
     let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
     let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg)
+        
+    let structurer = crate::npae::aggressive::structurer::HttpStructurer {
+        route: "/api/v1/aggressive".to_string(),
+        remote_addr: "127.0.0.1".to_string(),
+        body: req.prompt.clone(),
+    };
+    
+    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg, state.npae_config.clone(), &structurer)
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }

@@ -26,16 +26,57 @@ async fn main() -> anyhow::Result<()> {
 
     let engine = Arc::new(Mutex::new(LearningEngine::new(pool.clone())));
 
+    // Load NPAE unified config once at startup for high-performance memory access
+    let npae_config_data = token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json")
+        .unwrap_or_else(|e| panic!("Failed to load unified config: {}", e));
+    let npae_config = Arc::new(token_compress_engine::npae::aggressive::config::ConfigHandle::new(npae_config_data));
+
     // Build the 7-stage pipeline orchestrator with shared schema priors.
     // The DashMap is shared across all requests — enables cross-request schema learning
     // (prediction error drops 20–35% over 10 turns on familiar topics).
     let schema_priors: Arc<DashMap<String, u32>> = Arc::new(DashMap::new());
-    let pipeline = Arc::new(PipelineOrchestrator::build(schema_priors));
+    let pipeline = Arc::new(PipelineOrchestrator::build(schema_priors, npae_config.clone()));
+
+    // Spawn FileWatcher background task
+    let watcher_config_handle = npae_config.clone();
+    tokio::task::spawn_blocking(move || {
+        if let Ok(mut watcher) = token_compress_engine::npae::aggressive::watcher::FileWatcher::new("config/unified.json") {
+            loop {
+                if watcher.wait_for_change(2000).is_ok() {
+                    if let Ok(new_config) = token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json") {
+                        watcher_config_handle.swap(new_config);
+                        tracing::info!("Hot-reloaded unified.json into memory");
+                    }
+                }
+            }
+        }
+    });
+
+    // Spawn ConfigEnricher background task
+    let enricher_config_handle = npae_config.clone();
+    tokio::task::spawn_blocking(move || {
+        let enricher = token_compress_engine::npae::aggressive::enricher::ConfigEnricher::new(
+            token_compress_engine::npae::aggressive::enricher::ReviewMode::AutoMerge
+        );
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            if let Ok(mut store) = token_compress_engine::npae::aggressive::feedback::FeedbackStore::load("config/feedback.json") {
+                let mut current_config = enricher_config_handle.read();
+                if let Ok(true) = enricher.process(&mut current_config, &mut store, 5) {
+                    enricher_config_handle.swap(current_config.clone());
+                    let _ = store.save();
+                    let _ = token_compress_engine::npae::aggressive::config::ConfigLoader::save("config/unified.json", &current_config);
+                    tracing::info!("ConfigEnricher promoted matched feedback to unified.json");
+                }
+            }
+        }
+    });
 
     let state = AppState {
         pool: pool.clone(),
         engine,
         pipeline,
+        npae_config,
     };
 
     let api_router = token_compress_engine::api::router(state);

@@ -29,6 +29,7 @@ pub struct StructuredPromptResponse {
     pub clarifying_questions: Vec<ClarifyingQuestion>,
     pub confidence_score:    f32,
     pub processing_metadata: ProcessingMeta,
+    pub scoring_result:      crate::types::ScoringResult,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,10 +40,10 @@ pub struct CompressionMeta {
     pub stage_metrics: crate::npae::compression::types::StageMetrics,
 }
 
-impl From<&CompressedRepr> for CompressionMeta {
-    fn from(repr: &CompressedRepr) -> Self {
+impl CompressionMeta {
+    pub fn from_repr(repr: &CompressedRepr, original_token_count: u32) -> Self {
         Self {
-            original_tokens: 0, // placeholder, compute actual in repr if possible
+            original_tokens: original_token_count,
             compressed_tokens: repr.token_ids.len() as u32,
             compression_ratio: repr.compression_ratio,
             stage_metrics: repr.stage_metrics.clone(),
@@ -56,6 +57,16 @@ pub struct StructuredPrompt {
     pub context:            PromptContext,
     pub constraints:        PromptConstraints,
     pub hallucination_guard: HallucinationGuardConfig,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub execution_phases:   Vec<ExecutionPhase>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_steps:   Vec<ValidationStep>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub success_criteria:   Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constraints_meta:   Option<ConstraintsMeta>,
+    #[serde(default)]
+    pub dynamic_instruction: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -63,6 +74,8 @@ pub struct PromptRole {
     pub primary: String,
     pub expertise_domains: Vec<String>,
     pub persona_constraints: Vec<String>,
+    #[serde(default)]
+    pub persona_anchor: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -119,6 +132,39 @@ pub struct ClarifyingQuestion {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Priority { High, Medium, Low }
+
+// --- Execution Roadmap Types ---
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExecutionPhase {
+    pub phase_number: u8,
+    pub name: String,
+    pub description: String,
+    pub estimated_duration: String,
+    pub deliverables: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ValidationStep {
+    pub step_number: u8,
+    pub name: String,
+    pub criteria: String,
+    pub validation_method: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConstraintsMeta {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geography: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub risk_tolerance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub business_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revenue_expectations: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team_composition: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProcessingMeta {

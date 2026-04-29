@@ -10,9 +10,7 @@ use tracing::info;
 pub struct PipelineInput {
     pub raw_text: String,
     pub task: String,
-    pub deliverables: String,
-    pub constraints: String,
-    pub reproducibility: String,
+
     pub model: String,
     pub use_case: String,
     pub mode: String,
@@ -120,9 +118,6 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     let s4 = predictive_coding::run(
         &s3.chunks,
         &input.task,
-        &input.deliverables,
-        &input.constraints,
-        &input.reproducibility,
         &input.use_case,
         &input.model,
     );

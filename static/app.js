@@ -166,9 +166,6 @@ function switchTab(tab) {
 async function compress() {
     const raw     = document.getElementById('prompt-input').value.trim();
     const task    = document.getElementById('task-input').value.trim();
-    const deliverables = document.getElementById('deliverables-input').value.trim();
-    const constraints  = document.getElementById('constraints-input').value.trim();
-    const reproducibility = document.getElementById('reproducibility-input').value.trim();
     const useCase = document.getElementById('use-case').value;
     const model   = document.getElementById('model-select').value;
     const mode    = document.getElementById('mode').value;
@@ -176,7 +173,7 @@ async function compress() {
     if (!raw) return showToast('Raw Prompt is required', 'error');
 
     // detect use_case from DevEngine if not manually set
-    const detectedUseCase = useCase || DevEngine.detectUseCase(raw);
+    const detectedUseCase = useCase || (typeof DevEngine !== 'undefined' ? DevEngine.detectUseCase(raw) : useCase);
 
     const btn = document.getElementById('compress-btn');
     btn.innerHTML = '<span class="spinner"></span> Compressing...';
@@ -186,13 +183,11 @@ async function compress() {
         const result = await API.compress({
             raw_text:  raw,
             task:      task || 'Optimize prompt',
-            deliverables: deliverables,
-            constraints:  constraints,
-            reproducibility: reproducibility,
             use_case:  detectedUseCase,
             model:     model,
             mode:      mode,
         });
+
         State.lastResult = result;
         State.lastTs     = Date.now();
         renderResult(result);

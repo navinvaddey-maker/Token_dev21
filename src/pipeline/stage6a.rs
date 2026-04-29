@@ -38,10 +38,6 @@ impl Stage6a {
                 parts.push(format!("task: {}", task));
             }
 
-            if !schema_filled.resolved_schema.output.is_empty() {
-                let out_str = schema_filled.resolved_schema.output.iter().map(|d| d.name.as_str()).collect::<Vec<_>>().join(", ");
-                parts.push(format!("deliverable: {}", out_str));
-            }
 
             if let Some(context) = &schema_filled.resolved_schema.context {
                 parts.push(format!("context: {}", context));
