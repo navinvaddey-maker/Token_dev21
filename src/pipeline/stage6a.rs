@@ -15,12 +15,35 @@ impl Stage6a {
         &self,
         schema_filled: &AlgorithmOutput,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // Use the compressed tokens from sparse coding if available (these have gone through salience filtering)
-        // Otherwise fall back to lexical compression tokens
-        // Otherwise generate from resolved fields as last resort
+        // Primary: Generate professional, structured output from the resolved schema
+        let mut parts = Vec::new();
 
-        let compressed_tokens = if !schema_filled.sparse_tokens.is_empty() {
-            // Use sparse coding tokens (these have salience scores and represent the most important concepts)
+        if let Some(role) = &schema_filled.resolved_schema.role {
+            parts.push(format!("**Role:** {}", role));
+        }
+
+        if let Some(task) = &schema_filled.resolved_schema.task {
+            parts.push(format!("**Task:** {}", task));
+        }
+
+        if let Some(norm) = &schema_filled.normalization {
+            parts.push(format!("**Context:** {}", norm.normalized_text));
+        } else if let Some(context) = &schema_filled.resolved_schema.context {
+            // Only add context if it's not a generic placeholder
+            if context.len() > 3 {
+                parts.push(format!("**Context:** {}", context));
+            }
+        }
+
+        if !schema_filled.scope_injections.is_empty() {
+            let scopes = schema_filled.scope_injections.join(", ");
+            parts.push(format!("**Directives:** {}", scopes));
+        }
+
+        let compressed_tokens = if !parts.is_empty() {
+            parts.join("\n")
+        } else if !schema_filled.sparse_tokens.is_empty() {
+            // Fall back to sparse coding tokens if schema failed to populate
             schema_filled
                 .sparse_tokens
                 .iter()
@@ -28,26 +51,10 @@ impl Stage6a {
                 .collect::<Vec<String>>()
                 .join(" ")
         } else if !schema_filled.clean_tokens.is_empty() {
-            // Fall back to lexical compression tokens (basic stopword removal and normalization)
+            // Fall back to lexical compression tokens
             schema_filled.clean_tokens.join(" ")
         } else {
-            // Last resort: generate from resolved fields
-            let mut parts = Vec::new();
-
-            if let Some(task) = &schema_filled.resolved_schema.task {
-                parts.push(format!("task: {}", task));
-            }
-
-
-            if let Some(context) = &schema_filled.resolved_schema.context {
-                parts.push(format!("context: {}", context));
-            }
-
-            if parts.is_empty() {
-                "compressed prompt".to_string()
-            } else {
-                parts.join("\n")
-            }
+            "Please clarify your request.".to_string()
         };
 
         Ok(compressed_tokens)

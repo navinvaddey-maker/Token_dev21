@@ -15,8 +15,19 @@ impl AggressiveEngine {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
 
-        // 1. Extract intent (now with dynamic domain, output_preference, temporal_scope)
-        let profile = super::intent::extract(repr, raw)?;
+        // 1. Ory Engine: Meta-Orchestration and Deep Learning
+        let mut ory_engine = crate::npae::ory::OryEngine::new();
+        let config_guard = config_handle.read();
+        let ory_result = ory_engine.process(raw, &config_guard).map_err(|e| e.to_string())?;
+        drop(config_guard); // Release lock
+        
+        let mut profile = super::intent::extract(repr, raw)?;
+        
+        // Enhance Aggressive intent with Ory's deep learning
+        if ory_result.intent.confidence_score > profile.confidence {
+            profile.domain = ory_result.intent.inferred_domain.clone();
+            profile.confidence = ory_result.intent.confidence_score;
+        }
 
         // 1.5. Dispatch via StructurerRouter
         let resolver = super::resolver::PromptResolver::new(config_handle);
@@ -62,6 +73,11 @@ impl AggressiveEngine {
             correction_needed: false,
             correction_axis: None,
         };
+
+        // 6. Record Outcome to Ory Engine Memory
+        if let Some(blueprint) = &ory_result.blueprint {
+            let _ = ory_engine.record_outcome(&ory_result.intent, blueprint, &scoring_result);
+        }
 
         Ok(StructuredPromptResponse {
             schema_version: "2.0.0".into(),

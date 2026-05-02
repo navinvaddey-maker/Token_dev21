@@ -51,16 +51,8 @@ pub struct NormalizationPrePass;
 impl NormalizationPrePass {
     /// Run normalization pre-pass on raw prompt
     /// Returns normalized text and updates AlgorithmOutput with corrections and issues
-    pub fn run(&self, reconstructed: &crate::types::ReconstructedInput, out: &mut AlgorithmOutput) -> String {
-        let mut raw_prompt = String::new();
-        // Since clusters values are vectors of tokens, we simply combine them
-        for tokens in reconstructed.clusters.values() {
-            for token in tokens {
-                raw_prompt.push_str(&token.text);
-                raw_prompt.push(' ');
-            }
-        }
-        let raw_prompt = raw_prompt.trim().to_string();
+    pub fn run(&self, raw_input: &str, reconstructed: &crate::types::ReconstructedInput, out: &mut AlgorithmOutput) -> String {
+        let raw_prompt = raw_input.trim().to_string();
         let mut normalized = raw_prompt.clone();
         let mut applied_rules = Vec::new();
         let mut corrections = Vec::new();

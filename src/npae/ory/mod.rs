@@ -1,35 +1,109 @@
+//! Ory Engine v2 — Meta-Orchestrator for learning and dynamic flow design
+//!
+//! The Ory Engine is the self-evolving intelligence layer of NPAE. It:
+//! 1. Performs deep semantic analysis of raw prompts
+//! 2. Audits existing engine capabilities against the prompt's needs
+//! 3. Dynamically architects new processing flows when gaps are found
+//! 4. Remembers successful patterns for reuse
+//! 5. Evaluates outcomes to continuously improve
+
 pub mod types;
+pub mod semantic;
 pub mod learner;
+pub mod domain_mapper;
 pub mod registry;
 pub mod architect;
+pub mod memory;
+pub mod evaluator;
 
-use crate::npae::ory::types::{DynamicBlueprint, LearnedIntent, FlowAudit, AuditRecommendation};
+use crate::npae::ory::types::{
+    OryResult, LearnedIntent, DynamicBlueprint, AuditRecommendation,
+};
 use crate::npae::aggressive::config::UnifiedConfig;
+use crate::types::ScoringResult;
 use anyhow::Result;
 
 /// Ory Engine: The Meta-Orchestrator for learning and dynamic flow design.
-pub struct OryEngine;
+pub struct OryEngine {
+    memory: memory::PatternMemory,
+}
 
 impl OryEngine {
-    /// Process a raw prompt through the Ory learning cycle.
-    /// 
-    /// Returns:
-    /// - `LearnedIntent`: The deep semantic analysis of the prompt.
-    /// - `FlowAudit`: Assessment of existing engine capabilities for this intent.
-    /// - `Option<DynamicBlueprint>`: A generated architecture blueprint if a custom flow is needed.
-    pub fn process(raw: &str, config: &UnifiedConfig) -> Result<(LearnedIntent, FlowAudit, Option<DynamicBlueprint>)> {
-        // 1. Deep Learning: Extract intent, signals, and hidden dependencies
-        let intent = learner::OryLearner::learn(raw)?;
-        
-        // 2. Audit: Check if existing flows (in unified.json) can handle this
-        let audit = registry::FlowRegistry::audit(&intent, config)?;
-        
-        // 3. Design: If the audit reveals gaps or novel domains, architect a new flow
-        let mut blueprint = None;
-        if audit.recommendation != AuditRecommendation::UseExistingFlow {
-            blueprint = Some(architect::OryArchitect::design(&intent, &audit)?);
+    /// Create a new Ory engine instance with empty memory
+    pub fn new() -> Self {
+        Self {
+            memory: memory::PatternMemory::new(),
         }
-        
-        Ok((intent, audit, blueprint))
     }
+
+    /// Process a raw prompt through the Ory intelligence cycle.
+    ///
+    /// Returns an `OryResult` containing:
+    /// - `LearnedIntent`: Deep semantic analysis
+    /// - `FlowAudit`: Assessment of existing capabilities
+    /// - `Option<DynamicBlueprint>`: Generated architecture if needed
+    pub fn process(&self, raw: &str, config: &UnifiedConfig) -> Result<OryResult> {
+        // 1. Deep semantic learning
+        let intent = learner::OryLearner::learn(raw)?;
+
+        // 2. Check pattern memory — have we seen this before?
+        if let Some(cached) = self.memory.find_match(&intent) {
+            let blueprint: Option<DynamicBlueprint> = serde_json::from_str(&cached.blueprint_json).ok();
+            let audit = registry::FlowRegistry::audit(&intent, config)?;
+            return Ok(OryResult {
+                intent,
+                audit,
+                blueprint,
+                from_cache: true,
+                cached_pattern_id: Some(cached.pattern_id.clone()),
+            });
+        }
+
+        // 3. Deep audit against existing flows
+        let audit = registry::FlowRegistry::audit(&intent, config)?;
+
+        // 4. Design blueprint if needed
+        let blueprint = if audit.recommendation != AuditRecommendation::UseExistingFlow {
+            Some(architect::OryArchitect::design(&intent, &audit)?)
+        } else {
+            None
+        };
+
+        Ok(OryResult {
+            intent,
+            audit,
+            blueprint,
+            from_cache: false,
+            cached_pattern_id: None,
+        })
+    }
+
+    /// Record outcome after NPAE generates output — closes the learning loop
+    pub fn record_outcome(
+        &mut self,
+        intent: &LearnedIntent,
+        blueprint: &DynamicBlueprint,
+        scores: &ScoringResult,
+    ) -> Result<()> {
+        let outcome = evaluator::OutcomeEvaluator::evaluate(intent, blueprint, scores);
+        self.memory.record(intent, blueprint, &outcome)?;
+        Ok(())
+    }
+
+    /// Get the number of learned patterns
+    pub fn pattern_count(&self) -> usize {
+        self.memory.len()
+    }
+
+    /// Prune low-quality patterns from memory
+    pub fn prune_memory(&mut self) {
+        self.memory.prune();
+    }
+}
+
+/// Static convenience method for backward compatibility
+/// (processes without memory — stateless mode)
+pub fn process_stateless(raw: &str, config: &UnifiedConfig) -> Result<OryResult> {
+    let engine = OryEngine::new();
+    engine.process(raw, config)
 }

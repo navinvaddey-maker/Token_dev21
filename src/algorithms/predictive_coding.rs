@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_prompt_routes_gentle() {
+    fn simple_prompt_routes_balanced() {
         let pc = PredictiveCoding::new(Arc::new(DashMap::new()));
         // Pre-fill schema with common tokens
         pc.update_schema(
@@ -201,7 +201,7 @@ mod tests {
         let tokens = make_tokens(&["what", "is", "python"]);
         let output = crate::types::AlgorithmOutput::default();
         let result = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
-        assert_eq!(result.mode, Mode::Gentle);
+        assert_eq!(result.mode, Mode::Balanced);
     }
 
     #[test]

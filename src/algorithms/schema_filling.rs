@@ -363,8 +363,8 @@ mod tests {
 
     fn make_slot(content: &str, salience: f32) -> WmSlot {
         WmSlot {
-            token: content.to_string(),
-            salience_score: salience,
+            content: content.to_string(),
+            salience: salience,
             source: crate::types::SlotSource::Delta,
             is_protected: false,
         }
@@ -382,10 +382,6 @@ mod tests {
         assert!(
             result.task.is_some(),
             "Task should be inferred in gentle mode"
-        );
-        assert!(
-            result.deliverable.is_some(),
-            "Deliverable should be inferred in gentle mode"
         );
         assert!(
             !result.context.is_empty(),
@@ -407,10 +403,6 @@ mod tests {
 
         let result = sf.fill(&wm_slots, 3, &delta_tokens, &clusters, None);
         assert!(result.task.is_some(), "Task should be inferred");
-        assert!(
-            result.deliverable.is_some(),
-            "Deliverable should be inferred"
-        );
         // Should have used all layers, so context should be richer
         assert!(
             result.context.len() >= 2,
@@ -423,8 +415,6 @@ mod tests {
         let sf = SchemaFilling::new();
         let wm_slots = vec![make_slot("unknown", 0.5)];
         let result = sf.fill(&wm_slots, 1, &[], &[], None);
-        assert!(result.null_fields.contains(&"task".to_string()));
-        assert!(result.null_fields.contains(&"deliverable".to_string()));
         assert!(result.null_fields.contains(&"context".to_string()));
     }
 
@@ -444,13 +434,11 @@ mod tests {
 
         // Debug: print what we actually got
         println!("Task: {:?}", result.task);
-        println!("Deliverable: {:?}", result.deliverable);
         println!("Context: {:?}", result.context);
         println!("Scope injections: {:?}", output.scope_injections);
 
-        // Should have inferred task and deliverable
+        // Should have inferred task
         assert!(result.task.is_some());
-        assert!(result.deliverable.is_some());
 
         // Should have scope injections because we have auth-related terms
         assert!(

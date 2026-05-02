@@ -678,14 +678,16 @@ fn infer_success_criteria(profile: &IntentProfile, _raw: &str) -> Vec<String> {
             criteria.push("Progress can be tracked through objective mastery checks".into());
         }
         (super::intent::IntentClass::Build, _) => {
-            criteria.push("High-quality, professional deliverable produced".into());
-            criteria.push("Meets all stated requirements with precision".into());
+            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "deliverable".into());
+            criteria.push(format!("Functional, high-quality {} is produced with modular design.", subject).into());
+            criteria.push("Strict adherence to specified requirements and best practices.".into());
         }
 
         // EXPLAIN Intent (Domain-Agnostic but pedagogical)
         (super::intent::IntentClass::Explain, _) => {
-            criteria.push("Conceptually clear and technically accurate at the target user level".into());
-            criteria.push("Uses intuitive analogies or examples to bridge knowledge gaps".into());
+            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "concept".into());
+            criteria.push(format!("Conceptually clear explanation of {} at the target audience level.", subject).into());
+            criteria.push("Balances technical depth with intuitive clarity.".into());
             criteria.push("Covers all major dimensions (capabilities, risks, and implications)".into());
         }
 
@@ -698,8 +700,9 @@ fn infer_success_criteria(profile: &IntentProfile, _raw: &str) -> Vec<String> {
 
         // ANALYZE Intent
         (super::intent::IntentClass::Analyze, _) => {
-            criteria.push("Actionable insights and hidden patterns are extracted from the data".into());
-            criteria.push("Reasoning chain is clear, logical, and evidence-based".into());
+            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "data".into());
+            criteria.push(format!("Deep insights and actionable patterns are extracted for {}.", subject).into());
+            criteria.push("Reasoning is clear, logical, and supported by evidence.".into());
             criteria.push("Conclusions are prioritized by impact and feasibility".into());
         }
 
@@ -708,28 +711,6 @@ fn infer_success_criteria(profile: &IntentProfile, _raw: &str) -> Vec<String> {
             criteria.push("Successful transformation with 100% data/logic integrity".into());
             criteria.push("Output format strictly adheres to the requested specification".into());
             criteria.push("Redundancy is eliminated while preserving essential context".into());
-        }
-
-        // GENERALIZED Intent-Based Fallbacks (using dynamic subject)
-        (_, _) => {
-            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "requested task".into());
-            match profile.primary_intent {
-                super::intent::IntentClass::Analyze => {
-                    criteria.push(format!("Deep insights and actionable patterns are extracted for {}.", subject).into());
-                    criteria.push("Reasoning is clear, logical, and supported by evidence.".into());
-                }
-                super::intent::IntentClass::Build => {
-                    criteria.push(format!("Functional, high-quality {} is produced with modular design.", subject).into());
-                    criteria.push("Strict adherence to specified requirements and best practices.".into());
-                }
-                super::intent::IntentClass::Explain => {
-                    criteria.push(format!("Conceptually clear explanation of {} at the target audience level.", subject).into());
-                    criteria.push("Balances technical depth with intuitive clarity.".into());
-                }
-                _ => {
-                    criteria.push(format!("{} is completed with precision and accuracy.", subject).into());
-                }
-            }
         }
     }
 

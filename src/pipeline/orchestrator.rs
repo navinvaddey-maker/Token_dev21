@@ -125,7 +125,7 @@ impl PipelineOrchestrator {
             .collect();
 
         // Stage 0A: Normalization pre-pass
-        let normalized = self.normalization_pre_pass.run(&reconstructed, &mut output);
+        let normalized = self.normalization_pre_pass.run(input, &reconstructed, &mut output);
 
         // Stage 0B: Topology classification
         let _topology = self.topology_classifier.classify(&normalized, &mut output);
