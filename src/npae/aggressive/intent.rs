@@ -101,58 +101,57 @@ pub fn extract(repr: &CompressedRepr, raw: &str) -> Result<IntentProfile, String
     })
 }
 
-/// Dynamic domain detection — 10+ domains, keyword clusters with weighted scoring
+use crate::npae::ory::math::cosine_similarity;
+use crate::npae::ory::embeddings::embed_text;
+
+/// Dynamic domain detection — Uses Vector Space Modeling (VSM) and Cosine Similarity
+/// Replaces heuristic keyword matching with semantic centroid comparison.
 fn detect_domain(raw: &str) -> String {
-    let lower = raw.to_lowercase();
-
-    struct DomainScore {
-        domain: &'static str,
-        keywords: &'static [&'static str],
-    }
-
+    let prompt_vec = embed_text(raw);
+    
+    // Centroids for each domain. In a production system, these are pre-calculated
+    // embeddings of high-quality domain descriptions.
     let domains = [
-        DomainScore { domain: "sports-nutrition", keywords: &["nutritionist", "dietician", "dietitian", "runner", "athletes", "meal", "diet", "macro", "carb", "protein", "fiber", "training", "marathon", "supplements", "keto", "vegan", "paleo", "fasting"] },
-        DomainScore { domain: "software-engineering", keywords: &["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "microservice", "kubernetes", "docker"] },
-        DomainScore { domain: "technical-writing", keywords: &["article", "blog", "writing", "documentation", "tutorial", "readme", "guide", "manual"] },
-        DomainScore { domain: "business-strategy", keywords: &["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "b2b", "b2c", "growth", "scale", "venture", "bootstrap", "monetize", "customer"] },
-        DomainScore { domain: "data-science", keywords: &["data", "ml", "machine learning", "model", "dataset", "neural", "prediction", "classification", "regression", "pandas", "tensorflow", "pytorch"] },
-        DomainScore { domain: "education", keywords: &["teach", "learn", "learning", "faster", "curriculum", "course", "student", "lecture", "training program", "certification", "assessment", "memorize", "retention", "pedagogy", "study", "skill"] },
-        DomainScore { domain: "creative-writing", keywords: &["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue"] },
-        DomainScore { domain: "health-fitness", keywords: &["workout", "exercise", "cardio", "strength", "weight loss", "body", "health", "wellness", "recovery", "sleep"] },
-        DomainScore { domain: "legal", keywords: &["contract", "legal", "compliance", "regulation", "patent", "trademark", "liability", "attorney", "lawsuit"] },
-        DomainScore { domain: "marketing", keywords: &["marketing", "brand", "campaign", "seo", "content", "social media", "conversion", "funnel", "audience", "engagement", "ads"] },
-        DomainScore { domain: "finance", keywords: &["investment", "portfolio", "stock", "crypto", "trading", "banking", "loan", "interest", "dividend", "hedge"] },
-        DomainScore { domain: "devops-infra", keywords: &["ci/cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "logging", "alerting", "cloud", "aws", "gcp", "azure"] },
-        DomainScore { domain: "ai-ml", keywords: &["alignment", "safety", "llm", "transformer", "neural", "agi", "general intelligence", "machine learning", "rlhf", "inference", "deep learning", "alignment"] },
-        DomainScore { domain: "medical", keywords: &["medical", "patient", "doctor", "hospital", "surgery", "healthcare", "diagnosis", "treatment", "anatomy", "physiology"] },
-        DomainScore { domain: "scientific-research", keywords: &["research", "experiment", "laboratory", "hypothesis", "data analysis", "publication", "peer-review", "methodology"] },
-        DomainScore { domain: "cybersecurity", keywords: &["security", "hacking", "firewall", "encryption", "vulnerability", "pentest", "soc", "malware", "threat"] },
-        DomainScore { domain: "ecommerce", keywords: &["store", "shopping", "cart", "checkout", "inventory", "warehouse", "logistics", "marketplace"] },
-        DomainScore { domain: "real-estate", keywords: &["property", "house", "apartment", "mortgage", "realtor", "appraisal", "listing"] },
-        DomainScore { domain: "workplace-productivity", keywords: &["remote", "wfh", "productivity", "culture", "collaboration", "engagement", "performance", "output", "burnout", "hybrid", "distributed team", "work-from-home"] },
+        ("sports-nutrition", vec!["nutritionist", "diet", "macro", "protein", "training"]),
+        ("software-engineering", vec!["code", "rust", "api", "backend", "software"]),
+        ("technical-writing", vec!["article", "documentation", "tutorial", "guide"]),
+        ("business-strategy", vec!["business", "startup", "revenue", "market", "strategy"]),
+        ("data-science", vec!["data", "ml", "model", "prediction", "analysis"]),
+        ("education", vec!["teach", "learn", "curriculum", "course", "pedagogy"]),
+        ("creative-writing", vec!["story", "novel", "plot", "fiction", "narrative"]),
+        ("health-fitness", vec!["workout", "exercise", "health", "wellness", "fitness"]),
+        ("legal", vec!["contract", "legal", "compliance", "law", "attorney"]),
+        ("marketing", vec!["marketing", "brand", "campaign", "seo", "audience"]),
+        ("finance", vec!["investment", "stock", "portfolio", "banking", "finance"]),
+        ("devops-infra", vec!["pipeline", "infrastructure", "cloud", "aws", "devops"]),
+        ("ai-ml", vec!["llm", "neural", "transformer", "alignment", "ai"]),
+        ("medical", vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
+        ("cybersecurity", vec!["security", "hacking", "firewall", "encryption", "threat"]),
+        ("workplace-productivity", vec!["productivity", "culture", "collaboration", "burnout"]),
     ];
 
     let mut best_domain = "general";
-    let mut best_score = 0usize;
+    let mut best_score = 0.35f32; // Minimum threshold for domain matching
 
-    for ds in &domains {
-        let score = ds.keywords.iter()
-            .filter(|&&kw| lower.contains(kw))
-            .count();
-        if score > best_score {
-            best_score = score;
-            best_domain = ds.domain;
+    for (name, keywords) in domains {
+        // Simple centroid: average of keyword embeddings
+        let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
+        for kw in keywords {
+            let kw_vec = embed_text(kw);
+            for i in 0..centroid.len() {
+                centroid[i] += kw_vec[i];
+            }
+        }
+        crate::npae::ory::math::l2_normalize(&mut centroid);
+
+        let similarity = cosine_similarity(&prompt_vec, &centroid);
+        if similarity > best_score {
+            best_score = similarity;
+            best_domain = name;
         }
     }
 
-    // Require at least 2 keyword hits for a confident domain match
-    if best_score >= 2 {
-        best_domain.to_string()
-    } else if best_score == 1 {
-        best_domain.to_string() // single hit — still better than "general"
-    } else {
-        "general".to_string()
-    }
+    best_domain.to_string()
 }
 
 /// Simple subject extraction for dynamic domains — extracts the most likely focus noun

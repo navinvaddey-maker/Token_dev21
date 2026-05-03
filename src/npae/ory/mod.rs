@@ -15,6 +15,8 @@ pub mod registry;
 pub mod architect;
 pub mod memory;
 pub mod evaluator;
+pub mod math;
+pub mod embeddings;
 
 use crate::npae::ory::types::{
     OryResult, LearnedIntent, DynamicBlueprint, AuditRecommendation,
