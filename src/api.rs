@@ -12,11 +12,30 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
+use axum::error_handling::HandleErrorLayer;
+use tower::ServiceBuilder;
 
 pub fn router(state: AppState) -> Router {
-    let public = Router::new()
+    let auth = Router::new()
         .route("/api/register", post(register))
-        .route("/api/login", post(login));
+        .route("/api/login", post(login))
+        // Limit to 5 requests per second for auth routes to prevent brute force
+        // HandleErrorLayer + Buffer are required to make RateLimit cloneable for Axum
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|err: tower::BoxError| async move {
+                    (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        format!("Rate limit exceeded: {}", err),
+                    )
+                }))
+                .buffer(100)
+                .rate_limit(5, std::time::Duration::from_secs(1))
+        );
+
+    let public = Router::new()
+        .route("/api/health", get(health_check))
+        .merge(auth);
 
     let protected = Router::new()
         .route("/api/compress", post(compress))
@@ -89,6 +108,20 @@ async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    // Input validation (GAP-029)
+    if req.username.len() < 3 || req.username.len() > 50 {
+        return Err(AppError::Validation("Username must be 3-50 characters".into()));
+    }
+    if !req.username.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        return Err(AppError::Validation("Username must contain only alphanumeric characters, underscores, or hyphens".into()));
+    }
+    if req.password.len() < 8 {
+        return Err(AppError::Validation("Password must be at least 8 characters".into()));
+    }
+    if !req.email.contains('@') || !req.email.contains('.') {
+        return Err(AppError::Validation("Invalid email format".into()));
+    }
+
     let user = domain::register_user(&state.pool, req).await?;
     Ok((StatusCode::CREATED, Json(user)).into_response())
 }
@@ -99,6 +132,16 @@ async fn login(
 ) -> Result<axum::response::Response, AppError> {
     let resp = domain::login_user(&state.pool, req).await?;
     Ok((StatusCode::OK, Json(resp)).into_response())
+}
+
+// ── Health check ───────────────────────────────────────────────────────────
+
+async fn health_check() -> Result<axum::response::Response, AppError> {
+    Ok((StatusCode::OK, Json(serde_json::json!({
+        "status": "healthy",
+        "engine_version": "2.0.0",
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    }))).into_response())
 }
 
 // ── Compression endpoint ───────────────────────────────────────────────────
@@ -140,11 +183,20 @@ async fn decompress(
         .into_response())
 }
 
+#[derive(serde::Deserialize)]
+struct PaginationParams {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
 async fn history(
     State(state): State<AppState>,
     axum::Extension(user_id): axum::Extension<String>,
+    Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
-    let records = domain::list_history(&state.pool, &user_id).await?;
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
+    let records = domain::list_history(&state.pool, &user_id, limit, offset).await?;
     Ok((StatusCode::OK, Json(records)).into_response())
 }
 
@@ -153,7 +205,7 @@ async fn feedback(
     axum::Extension(user_id): axum::Extension<String>,
     Json(req): Json<crate::models::feedback_signal::ExplicitFeedback>,
 ) -> Result<axum::response::Response, AppError> {
-    domain::record_explicit_feedback(&state.pool, &user_id, req).await?;
+    domain::record_explicit_feedback(&state, &user_id, req).await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -177,8 +229,13 @@ async fn admin_stats(State(state): State<AppState>) -> Result<axum::response::Re
     Ok((StatusCode::OK, Json(s)).into_response())
 }
 
-async fn admin_users(State(state): State<AppState>) -> Result<axum::response::Response, AppError> {
-    let users = domain::admin_list_users(&state.pool).await?;
+async fn admin_users(
+    State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
+) -> Result<axum::response::Response, AppError> {
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
+    let users = domain::admin_list_users(&state.pool, limit, offset).await?;
     Ok((StatusCode::OK, Json(users)).into_response())
 }
 
@@ -206,8 +263,11 @@ async fn admin_delete_user(
 
 async fn admin_history(
     State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
-    let records = domain::admin_list_history(&state.pool).await?;
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
+    let records = domain::admin_list_history(&state.pool, limit, offset).await?;
     Ok((StatusCode::OK, Json(records)).into_response())
 }
 
@@ -320,7 +380,8 @@ async fn npae_aggressive(
         body: req.prompt.clone(),
     };
     
-    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg, state.npae_config.clone(), &structurer)
+    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg, state.npae_config.clone(), state.ory_engine.clone(), &structurer)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }

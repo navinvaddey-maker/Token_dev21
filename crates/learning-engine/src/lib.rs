@@ -61,11 +61,7 @@ impl LearningEngine {
         // ── 5. Persist via SQLx ────────────────────────────────────────
         save_prompt(&self.pool, user_id, prompt, &schema).await?;
 
-        let top_pairs = self.hebbian.top_associations(50);
-        upsert_learned_context(&self.pool, user_id, &top_pairs).await?;
-
-        let snapshots = self.competitive.snapshot();
-        upsert_domain_profile(&self.pool, user_id, &snapshots).await?;
+        self.persist_state(user_id).await?;
 
         Ok(ProcessResult {
             cluster_id: cluster.winner_id,
@@ -73,5 +69,33 @@ impl LearningEngine {
             cluster_vocab,
             blocked: activation.blocked,
         })
+    }
+
+    /// Process explicit feedback (thumbs up/down).
+    pub async fn apply_feedback(
+        &mut self,
+        user_id: Uuid,
+        prompt: &str,
+        value: f32,
+    ) -> Result<(), sqlx::Error> {
+        // 1. Re-generate activation for the prompt
+        let activation = self.extractor.activate(prompt, &self.constraints);
+
+        // 2. Apply feedback to both networks
+        self.hebbian.apply_feedback(&activation, value);
+        self.competitive.apply_feedback(&activation, value);
+
+        // 3. Persist updated state
+        self.persist_state(user_id).await
+    }
+
+    async fn persist_state(&self, user_id: Uuid) -> Result<(), sqlx::Error> {
+        let top_pairs = self.hebbian.top_associations(50);
+        upsert_learned_context(&self.pool, user_id, &top_pairs).await?;
+
+        let snapshots = self.competitive.snapshot();
+        upsert_domain_profile(&self.pool, user_id, &snapshots).await?;
+
+        Ok(())
     }
 }

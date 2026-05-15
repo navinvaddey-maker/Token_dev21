@@ -216,6 +216,8 @@ impl SchemaFilling {
             task,
             role,
             context,
+            constraints: Vec::new(),
+            output: Vec::new(),
             null_fields,
             task_inferred,
         }
@@ -352,6 +354,8 @@ pub struct FillResult {
     pub task: Option<String>,
     pub role: Option<String>,
     pub context: Vec<String>,
+    pub constraints: Vec<crate::types::Constraint>,
+    pub output: Vec<crate::types::Deliverable>,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
 }
@@ -367,6 +371,7 @@ mod tests {
             salience: salience,
             source: crate::types::SlotSource::Delta,
             is_protected: false,
+            last_accessed: std::time::Instant::now(),
         }
     }
 

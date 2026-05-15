@@ -11,19 +11,75 @@ use std::collections::HashMap;
 
 pub struct PatternMemory {
     patterns: HashMap<String, LearnedPattern>,
+    dirty: bool,
 }
 
 impl PatternMemory {
     /// Create empty in-memory store
     pub fn new() -> Self {
-        Self { patterns: HashMap::new() }
+        Self { 
+            patterns: HashMap::new(),
+            dirty: false,
+        }
     }
 
-    /// Load patterns from SQLite (via JSON column for now)
-    pub fn load_from_db(_pool: &sqlx::SqlitePool) -> Self {
-        // For initial implementation, start with in-memory
-        // SQLite integration will be added when db schema is migrated
-        Self::new()
+    /// Load patterns from SQLite
+    pub async fn load_from_db(pool: &sqlx::SqlitePool) -> Result<Self> {
+        let rows = sqlx::query_as::<_, LearnedPattern>(
+            "SELECT * FROM learned_patterns"
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let mut patterns = HashMap::new();
+        for p in rows {
+            patterns.insert(p.intent_fingerprint.clone(), p);
+        }
+
+        Ok(Self {
+            patterns,
+            dirty: false,
+        })
+    }
+
+    /// Persist patterns to SQLite if dirty
+    pub async fn persist(&mut self, pool: &sqlx::SqlitePool) -> Result<()> {
+        if !self.dirty {
+            return Ok(());
+        }
+
+        for pattern in self.patterns.values() {
+            sqlx::query(
+                r#"
+                INSERT INTO learned_patterns 
+                (pattern_id, domain_fingerprint, intent_fingerprint, blueprint_json, usage_count, success_rate, last_used, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT(pattern_id) DO UPDATE SET
+                    usage_count = EXCLUDED.usage_count,
+                    success_rate = EXCLUDED.success_rate,
+                    last_used = EXCLUDED.last_used,
+                    blueprint_json = EXCLUDED.blueprint_json
+                "#
+            )
+            .bind(&pattern.pattern_id)
+            .bind(&pattern.domain_fingerprint)
+            .bind(&pattern.intent_fingerprint)
+            .bind(&pattern.blueprint_json)
+            .bind(pattern.usage_count as i64)
+            .bind(pattern.success_rate as f64)
+            .bind(pattern.last_used)
+            .bind(pattern.created_at)
+            .execute(pool)
+            .await?;
+        }
+
+        self.dirty = false;
+        Ok(())
+    }
+
+    /// Check if memory needs persistence
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
     }
 
     /// Find a matching pattern by intent fingerprint
@@ -80,6 +136,7 @@ impl PatternMemory {
         let success_val = if outcome.success { 1.0 } else { 0.0 };
         entry.success_rate = ((entry.success_rate * (n - 1.0)) + success_val) / n;
 
+        self.dirty = true;
         Ok(())
     }
 
@@ -95,8 +152,12 @@ impl PatternMemory {
 
     /// Prune low-quality patterns (success_rate < 0.3 and usage > 5)
     pub fn prune(&mut self) {
+        let old_len = self.patterns.len();
         self.patterns.retain(|_, p| {
             !(p.usage_count > 5 && p.success_rate < 0.3)
         });
+        if self.patterns.len() < old_len {
+            self.dirty = true;
+        }
     }
 }

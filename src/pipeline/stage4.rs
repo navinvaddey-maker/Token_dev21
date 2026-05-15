@@ -36,6 +36,8 @@ impl Stage4 {
             role: result.role.clone(),
             context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
             task: result.task.clone(),
+            constraints: result.constraints,
+            output: result.output,
         };
 
 

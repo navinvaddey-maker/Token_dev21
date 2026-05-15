@@ -126,6 +126,8 @@ mod tests {
             task: Some("   ".to_string()),
             context: Some("valid context".to_string()),
             role: None,
+            constraints: Vec::new(),
+            output: Vec::new(),
         };
         let issues = validator.validate(&schema);
 
@@ -143,6 +145,8 @@ mod tests {
             task: Some("valid task".to_string()),
             context: Some("   ".to_string()),
             role: None,
+            constraints: Vec::new(),
+            output: Vec::new(),
         };
         let issues = validator.validate(&schema);
 
@@ -158,6 +162,8 @@ mod tests {
             task: Some("valid task".to_string()),
             context: Some("valid context".to_string()),
             role: None,
+            constraints: Vec::new(),
+            output: Vec::new(),
         };
         let issues = validator.validate(&schema);
 

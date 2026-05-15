@@ -58,6 +58,12 @@ impl Centroid {
         self.hits += 1;
         drift
     }
+
+    /// Anti-Hebbian update: move away from the input vector
+    pub fn penalize(&mut self, tokens: &[String], learning_rate: f32) -> f32 {
+        // We reuse the update logic but with a negative learning rate to "push" away
+        self.update(tokens, -learning_rate)
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -104,4 +104,23 @@ impl CompetitiveNet {
             is_new_cluster: false,
         }
     }
+
+    /// Explicit feedback: strengthen or weaken cluster associations.
+    pub fn apply_feedback(&mut self, activation: &TokenActivation, value: f32) {
+        if activation.blocked || activation.tokens.is_empty() {
+            return;
+        }
+
+        let tokens = &activation.tokens;
+        let (winner_idx, _) = self.find_winner(tokens);
+
+        let lr = self.learning_rate * activation.weight_hint;
+        if value >= 0.0 {
+            // Thumbs up: move winner closer
+            self.centroids[winner_idx].update(tokens, lr * value);
+        } else {
+            // Thumbs down: move winner further away
+            self.centroids[winner_idx].penalize(tokens, lr * value.abs());
+        }
+    }
 }

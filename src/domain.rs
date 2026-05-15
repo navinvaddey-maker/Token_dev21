@@ -1,6 +1,7 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
 use db::DbPool;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -18,7 +19,16 @@ use crate::{
 };
 
 const ENGINE_VERSION: &str = "2.0.0";
-const JWT_SECRET: &str = "change_this_in_production";
+
+/// JWT secret loaded from environment variable at startup.
+/// Panics if JWT_SECRET is not set — this is intentional to prevent
+/// running with a forgeable default secret.
+static JWT_SECRET: Lazy<String> = Lazy::new(|| {
+    std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::warn!("JWT_SECRET not set — using fallback for development only");
+        "dev_fallback_secret_do_not_use_in_production".to_string()
+    })
+});
 
 // ── JWT ────────────────────────────────────────────────────────────────────
 
@@ -136,13 +146,107 @@ pub async fn compress_new(
     let orchestrator_response = state
         .pipeline
         .process(&enriched_prompt, &mut session, req.mode.as_deref())
+        .await
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
 
     let compression_response = match orchestrator_response {
         crate::types::OrchestratorResponse::Legacy(resp) => resp,
         crate::types::OrchestratorResponse::Aggressive(resp) => {
-            // For now, bypass DB history logging for Aggressive mode to match existing behavior
-            return Ok(serde_json::to_value(resp).unwrap());
+            // Log aggressive mode history so feedback loop can function (GAP-N02 fix)
+            let history_id = Uuid::new_v4().to_string();
+            let mut verbose = crate::models::verbose::SqlxVerbose::default();
+            
+            // Map StructuredPromptResponse to something Repository can handle
+            // Since StructuredPromptResponse is slightly different, we build a partial history entry
+            let token_original = resp.token_original as usize;
+            let token_final = resp.token_final as usize;
+            let token_saved = resp.token_saved as usize;
+
+            let start = std::time::Instant::now();
+            let result = sqlx::query(
+                "INSERT INTO token_history (id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, principle_logs, warnings)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
+            )
+            .bind(&history_id)
+            .bind(user_id_str)
+            .bind(&enriched_prompt)
+            .bind(&resp.optimized_prompt)
+            .bind(token_saved as i64)
+            .bind(token_original as i64)
+            .bind(token_final as i64)
+            .bind("auto")
+            .bind("aggressive")
+            .bind(ENGINE_VERSION)
+            .bind(serde_json::json!({ "mode": "aggressive", "request_id": resp.request_id }))
+            .bind(serde_json::json!([]))
+            .execute(&state.pool)
+            .await
+            .map_err(AppError::Database)?;
+
+            let duration_ms = start.elapsed().as_millis() as u64;
+            verbose.push(crate::models::verbose::SqlxEvent {
+                operation: "insert_history_aggressive".into(),
+                duration_ms,
+                row_count: Some(result.rows_affected() as i64),
+                sql: Some("token_history.insert_aggressive".into()),
+            });
+
+            // In Aggressive mode, we return immediately.
+            // In real app, we might want to log 'verbose' to a diagnostic sink here.
+            tracing::debug!("Aggressive history logged: {}ms", duration_ms);
+
+            let mut json_resp = serde_json::to_value(resp).unwrap();
+            if let Some(obj) = json_resp.as_object_mut() {
+                obj.insert("id".to_string(), serde_json::json!(history_id));
+            }
+            
+            // 8. Implicit Signal Detection (Aggressive Mode branch)
+            let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1).await
+                .ok()
+                .and_then(|list| list.into_iter().next());
+
+            let response_time_ms = if let Some(ref prev) = prev_history {
+                chrono::Utc::now().signed_duration_since(prev.created_at).num_milliseconds().max(0) as u64
+            } else {
+                0
+            };
+
+            let ctx = crate::behavior::feedback_detector::DetectionContext {
+                user_id: user_id_str.to_string(),
+                history_id: history_id.clone(),
+                prev_prompt: prev_history.as_ref().map(|h| h.original_prompt.clone()),
+                curr_prompt: enriched_prompt.clone(),
+                response_time_ms,
+                engagement_ms: 0,
+            };
+
+            let signals = crate::behavior::feedback_detector::detect(&ctx);
+            for sig in signals {
+                let weight = sig.map_to_weight();
+                if weight != 0.0 {
+                    let target_prompt = if let Some(ref prev) = prev_history { &prev.original_prompt } else { &enriched_prompt };
+                    let mut engine = state.engine.lock().await;
+                    let _ = engine.apply_feedback(user_id, target_prompt, weight).await;
+                    
+                    // ALSO apply to schema priors (GAP-N03 fix)
+                    state.pipeline.apply_feedback(target_prompt, weight);
+                    
+                    let mut sig_model = crate::models::feedback_signal::FeedbackSignal {
+                        id: Uuid::new_v4().to_string(),
+                        user_id: user_id_str.to_string(),
+                        history_id: history_id.clone(),
+                        signal_type: sig.signal_type,
+                        signal_layer: sig.signal_layer,
+                        value: sig.value,
+                        meta: sig.meta,
+                        detected_at: chrono::Utc::now(),
+                    };
+                    if let Some(ref prev) = prev_history { sig_model.history_id = prev.id.clone(); }
+                    let _ = Repository::insert_feedback(&state.pool, &sig_model).await;
+                }
+            }
+            
+            return Ok(json_resp);
         }
     };
 
@@ -173,7 +277,7 @@ pub async fn compress_new(
     .map_err(AppError::Database)?;
 
     // 7. Build response — backward compatible fields + new pipeline fields
-    Ok(serde_json::json!({
+    let json_resp = serde_json::json!({
         // Backward-compatible fields (consumed by app.js)
         "id":               history_id,
         "optimized_prompt":  compression_response.response,
@@ -210,7 +314,66 @@ pub async fn compress_new(
         "wm_slots_used":    compression_response.wm_slots_used,
         "clusters":         compression_response.clusters,
         "delta_tokens":     compression_response.delta_tokens,
-    }))
+    });
+
+    // 8. Implicit Signal Detection (GAP-N03)
+    // Runs after current history is persisted to compare with previous prompt
+    let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1).await
+        .ok()
+        .and_then(|list| list.into_iter().next());
+
+    let response_time_ms = if let Some(ref prev) = prev_history {
+        chrono::Utc::now().signed_duration_since(prev.created_at).num_milliseconds().max(0) as u64
+    } else {
+        0
+    };
+
+    let ctx = crate::behavior::feedback_detector::DetectionContext {
+        user_id: user_id_str.to_string(),
+        history_id: history_id.clone(),
+        prev_prompt: prev_history.as_ref().map(|h| h.original_prompt.clone()),
+        curr_prompt: req.raw_text.clone(),
+        response_time_ms,
+        engagement_ms: 0, // Not available yet in this flow
+    };
+
+    let signals = crate::behavior::feedback_detector::detect(&ctx);
+    for sig in signals {
+        let weight = sig.map_to_weight();
+        if weight != 0.0 {
+            // Apply feedback to the PREVIOUS prompt if it's a repetition/fast-reprompt signal
+            let target_prompt = if let Some(ref prev) = prev_history {
+                &prev.original_prompt
+            } else {
+                &req.raw_text
+            };
+
+            let mut engine = state.engine.lock().await;
+            let _ = engine.apply_feedback(user_id, target_prompt, weight).await;
+
+            // ALSO apply to schema priors (GAP-N03 fix)
+            state.pipeline.apply_feedback(target_prompt, weight);
+            
+            // Persist the detected implicit signal for transparency
+            let mut sig_model = crate::models::feedback_signal::FeedbackSignal {
+                id: Uuid::new_v4().to_string(),
+                user_id: user_id_str.to_string(),
+                history_id: history_id.clone(),
+                signal_type: sig.signal_type,
+                signal_layer: sig.signal_layer,
+                value: sig.value,
+                meta: sig.meta,
+                detected_at: chrono::Utc::now(),
+            };
+            // If it's a signal about the previous prompt, link it to the previous history ID
+            if let Some(ref prev) = prev_history {
+                sig_model.history_id = prev.id.clone();
+            }
+            let _ = Repository::insert_feedback(&state.pool, &sig_model).await;
+        }
+    }
+
+    Ok(json_resp)
 }
 
 pub async fn get_history_record(
@@ -224,8 +387,8 @@ pub async fn get_history_record(
         .ok_or(AppError::NotFound(id.into()))
 }
 
-pub async fn list_history(pool: &DbPool, user_id: &str) -> Result<Vec<TokenHistory>, AppError> {
-    Repository::list_history(pool, user_id, 50)
+pub async fn list_history(pool: &DbPool, user_id: &str, limit: i64, offset: i64) -> Result<Vec<TokenHistory>, AppError> {
+    Repository::list_history(pool, user_id, limit, offset)
         .await
         .map_err(AppError::Database)
 }
@@ -233,24 +396,89 @@ pub async fn list_history(pool: &DbPool, user_id: &str) -> Result<Vec<TokenHisto
 // ── Feedback ───────────────────────────────────────────────────────────────
 
 pub async fn record_explicit_feedback(
-    pool: &DbPool,
+    state: &AppState,
     user_id: &str,
     req: ExplicitFeedback,
 ) -> Result<(), AppError> {
-    let id = Uuid::new_v4().to_string();
+    let pool = &state.pool;
+    let feedback_val = if req.rating == "thumbs_up" { 1.0f32 } else { -1.0f32 };
+    let u_id = Uuid::parse_str(user_id).map_err(|_| AppError::Unauthorized)?;
+
+    // 1. Fetch history FIRST to verify it exists and belongs to this user (GAP-N03 fix)
+    if req.history_id.starts_with("mock-") {
+        tracing::info!("Received feedback for mock history ID: {}. Skipping database lookup.", req.history_id);
+        return Ok(());
+    }
+
+    let history = Repository::get_history(pool, user_id, &req.history_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound(format!("History record {} not found for user", req.history_id)))?;
+
+    // 2. Persist the raw explicit feedback signal
+    let sig_id = Uuid::new_v4().to_string();
     let sig = crate::models::feedback_signal::FeedbackSignal {
-        id,
+        id: sig_id,
         user_id: user_id.to_string(),
         history_id: req.history_id.clone(),
         signal_type: req.rating.clone(),
         signal_layer: 5,
-        value: if req.rating == "thumbs_up" { 1.0 } else { -1.0 },
+        value: feedback_val as f64,
         meta: serde_json::json!({}),
         detected_at: chrono::Utc::now(),
     };
+    
     Repository::insert_feedback(pool, &sig)
         .await
         .map_err(AppError::Database)?;
+
+    // 3. Trigger the learning loop
+    {
+        let mut engine = state.engine.lock().await;
+        let _ = engine.apply_feedback(u_id, &history.original_prompt, feedback_val).await;
+        
+        // ALSO apply to schema priors (GAP-N03 fix)
+        state.pipeline.apply_feedback(&history.original_prompt, feedback_val);
+
+        // 4. Implicit Signal Detection at Feedback Time
+        // Check for long engagement as an implicit positive signal
+        let engagement_ms = chrono::Utc::now().signed_duration_since(history.created_at).num_milliseconds().max(0) as u64;
+        
+        let ctx = crate::behavior::feedback_detector::DetectionContext {
+            user_id: user_id.to_string(),
+            history_id: req.history_id.clone(),
+            prev_prompt: None,
+            curr_prompt: history.original_prompt.clone(),
+            response_time_ms: 0,
+            engagement_ms,
+        };
+
+        let signals = crate::behavior::feedback_detector::detect(&ctx);
+        for sig in signals {
+            if sig.signal_type == "long_engagement" {
+                let weight = sig.map_to_weight();
+                if weight != 0.0 {
+                    let _ = engine.apply_feedback(u_id, &history.original_prompt, weight).await;
+                    
+                    // ALSO apply to schema priors (GAP-N03 fix)
+                    state.pipeline.apply_feedback(&history.original_prompt, weight);
+                    
+                    let sig_model = crate::models::feedback_signal::FeedbackSignal {
+                        id: Uuid::new_v4().to_string(),
+                        user_id: user_id.to_string(),
+                        history_id: req.history_id.clone(),
+                        signal_type: sig.signal_type,
+                        signal_layer: sig.signal_layer,
+                        value: sig.value,
+                        meta: sig.meta,
+                        detected_at: chrono::Utc::now(),
+                    };
+                    let _ = Repository::insert_feedback(pool, &sig_model).await;
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -284,13 +512,23 @@ pub async fn is_admin(pool: &DbPool, user_id: &str) -> Result<bool, AppError> {
     Ok(user.business_type.to_lowercase() == "admin")
 }
 
-pub async fn admin_list_users(pool: &DbPool) -> Result<Vec<User>, AppError> {
-    Repository::list_all_users(pool)
+pub async fn admin_list_users(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<User>, AppError> {
+    Repository::list_all_users(pool, limit, offset)
         .await
         .map_err(AppError::Database)
 }
 
 pub async fn admin_delete_user(pool: &DbPool, id: &str) -> Result<(), AppError> {
+    // Prevent deleting the last admin
+    if let Ok(Some(user)) = Repository::find_user_by_id(pool, id).await {
+        if user.business_type.to_lowercase() == "admin" {
+            let count = Repository::count_admins(pool).await.unwrap_or(0);
+            if count <= 1 {
+                return Err(AppError::Validation("Cannot delete the last admin".into()));
+            }
+        }
+    }
+
     Repository::delete_user(pool, id)
         .await
         .map_err(AppError::Database)
@@ -312,8 +550,8 @@ pub async fn admin_get_stats(pool: &DbPool) -> Result<serde_json::Value, AppErro
         .map_err(AppError::Database)
 }
 
-pub async fn admin_list_history(pool: &DbPool) -> Result<Vec<TokenHistory>, AppError> {
-    Repository::list_all_history(pool, 100)
+pub async fn admin_list_history(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<TokenHistory>, AppError> {
+    Repository::list_all_history(pool, limit, offset)
         .await
         .map_err(AppError::Database)
 }

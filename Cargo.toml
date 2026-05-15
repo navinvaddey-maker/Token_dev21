@@ -38,7 +38,7 @@ learning-engine  = { path = "crates/learning-engine" }
 # web framework
 axum        = { version = "0.7", features = ["macros"] }
 tokio       = { version = "1",   features = ["full"] }
-tower       = { version = "0.4", features = ["util"] }
+tower       = { version = "0.4", features = ["util", "limit", "buffer"] }
 tower-http  = { version = "0.5", features = ["trace", "cors", "fs"] }
 
 # database — SQLite (transitioning to Postgres via db crate, but keeping here for current compilation)

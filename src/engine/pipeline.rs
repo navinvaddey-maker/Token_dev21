@@ -55,9 +55,12 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     if input.raw_text.trim().is_empty() {
         return Err("raw_text must not be empty".into());
     }
-    if input.task.trim().is_empty() {
-        return Err("task must not be empty".into());
-    }
+    // Task is optional from the API, so we don't return an error if it's empty.
+    let task_safe = if input.task.trim().is_empty() {
+        "Auto-optimize prompt".to_string()
+    } else {
+        input.task.clone()
+    };
 
     let word_count = input.raw_text.split_whitespace().count();
     if word_count > 8000 {
@@ -93,7 +96,7 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     // ── Stage 3: Selective attention — keep relevant chunks ───────────────
     let s3 = selective_attention::run(
         &s2.chunks,
-        &input.task,
+        &task_safe,
         &input.mode,
         &input.protected_entities,
     );
@@ -117,7 +120,7 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     // ── Stage 4: Predictive coding — prepend role frame ───────────────────
     let s4 = predictive_coding::run(
         &s3.chunks,
-        &input.task,
+        &task_safe,
         &input.use_case,
         &input.model,
     );

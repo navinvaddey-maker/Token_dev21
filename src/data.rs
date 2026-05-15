@@ -223,13 +223,15 @@ impl Repository {
         pool: &DbPool,
         user_id: &str,
         limit: i64,
+        offset: i64,
     ) -> Result<Vec<TokenHistory>, sqlx::Error> {
         sqlx::query_as::<_, TokenHistory>(
             "SELECT id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, principle_logs, warnings, created_at
-             FROM token_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2"
+             FROM token_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
         )
         .bind(user_id)
         .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     }
@@ -302,13 +304,22 @@ impl Repository {
 
     // ── Admin ──────────────────────────────────────────────────────────────
 
-    pub async fn list_all_users(pool: &DbPool) -> Result<Vec<User>, sqlx::Error> {
+    pub async fn list_all_users(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
             "SELECT id, username, password_hash, email, business_type, license, created_at, updated_at
-             FROM users ORDER BY created_at DESC"
+             FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
+    }
+
+    pub async fn count_admins(pool: &DbPool) -> Result<i64, sqlx::Error> {
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE LOWER(business_type) = 'admin'")
+            .fetch_one(pool)
+            .await?;
+        Ok(count.0)
     }
 
     pub async fn delete_user(pool: &DbPool, id: &str) -> Result<(), sqlx::Error> {
@@ -358,12 +369,14 @@ impl Repository {
     pub async fn list_all_history(
         pool: &DbPool,
         limit: i64,
+        offset: i64,
     ) -> Result<Vec<TokenHistory>, sqlx::Error> {
         sqlx::query_as::<_, TokenHistory>(
              "SELECT id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, principle_logs, warnings, created_at
-              FROM token_history ORDER BY created_at DESC LIMIT $1"
+              FROM token_history ORDER BY created_at DESC LIMIT $1 OFFSET $2"
          )
          .bind(limit)
+         .bind(offset)
          .fetch_all(pool)
          .await
     }

@@ -104,6 +104,27 @@ impl PredictiveCoding {
         }
     }
 
+    /// Apply feedback to schema priors based on user/implicit signals.
+    /// Positive weight reinforces tokens (making them less "novel").
+    /// Negative weight penalizes tokens (making them more "novel" for future requests).
+    pub fn apply_feedback(&self, tokens: &[String], weight: f32) {
+        for token in tokens {
+            let key = token.to_lowercase();
+            if weight > 0.0 {
+                self.schema_priors
+                    .entry(key)
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
+            } else if weight < 0.0 {
+                // If negative feedback, we "un-learn" these tokens so they trigger 
+                // deeper processing (Aggressive mode) next time.
+                self.schema_priors.entry(key).and_modify(|count| {
+                    *count = count.saturating_sub(1);
+                });
+            }
+        }
+    }
+
     fn in_schema(&self, token: &str) -> bool {
         self.schema_priors.contains_key(&token.to_lowercase())
     }
@@ -241,5 +262,27 @@ mod tests {
             second.error_score < first.error_score,
             "Error score must drop after schema update"
         );
+    }
+
+    #[test]
+    fn apply_feedback_modifies_error_score() {
+        let pc = PredictiveCoding::new(Arc::new(DashMap::new()));
+        let tokens = make_tokens(&["OAuth2", "PKCE", "fintech"]);
+        let token_strings = vec!["OAuth2".to_string(), "PKCE".to_string(), "fintech".to_string()];
+
+        let output = crate::types::AlgorithmOutput::default();
+        
+        // Initial error (high)
+        let first = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
+        
+        // Positive feedback -> error should drop
+        pc.apply_feedback(&token_strings, 1.0);
+        let second = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
+        assert!(second.error_score < first.error_score);
+
+        // Negative feedback -> error should increase (novelty increases)
+        pc.apply_feedback(&token_strings, -1.0);
+        let third = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
+        assert!(third.error_score > second.error_score);
     }
 }

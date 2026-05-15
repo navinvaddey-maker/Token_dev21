@@ -237,7 +237,7 @@ pub enum ScopeClass {
 // ============================================================================
 
 /// A learned pattern stored in memory for reuse
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct LearnedPattern {
     pub pattern_id: String,
     pub domain_fingerprint: String,

@@ -36,6 +36,7 @@ impl Stage3 {
                 salience: 1.0,
                 source: SlotSource::Cluster,
                 is_protected: true,
+                last_accessed: std::time::Instant::now(),
             });
         }
 
@@ -49,6 +50,7 @@ impl Stage3 {
                         salience: t.salience,
                         source: SlotSource::Delta,
                         is_protected: false,
+                        last_accessed: std::time::Instant::now(),
                     });
                 }
             }
@@ -64,6 +66,7 @@ impl Stage3 {
                         salience: 0.70 + (i as f32 * 0.03),
                         source: SlotSource::Cluster,
                         is_protected: false,
+                        last_accessed: std::time::Instant::now(),
                     });
                 }
             }

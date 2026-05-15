@@ -38,6 +38,22 @@ impl OryEngine {
         }
     }
 
+    /// Load Ory engine with patterns from database
+    pub async fn load_from_db(pool: &sqlx::SqlitePool) -> Result<Self> {
+        let memory = memory::PatternMemory::load_from_db(pool).await?;
+        Ok(Self { memory })
+    }
+
+    /// Persist Ory engine memory to database
+    pub async fn save_to_db(&mut self, pool: &sqlx::SqlitePool) -> Result<()> {
+        self.memory.persist(pool).await
+    }
+
+    /// Check if Ory engine memory needs persistence
+    pub fn is_dirty(&self) -> bool {
+        self.memory.is_dirty()
+    }
+
     /// Process a raw prompt through the Ory intelligence cycle.
     ///
     /// Returns an `OryResult` containing:

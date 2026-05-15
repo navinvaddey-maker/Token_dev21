@@ -44,15 +44,10 @@ const API = {
     },
 
     async compress(req) {
-        try {
-            return await this.call('/api/compress', {
-                method: 'POST',
-                body: JSON.stringify(req),
-            });
-        } catch (e) {
-            console.warn('Backend error — using MockAPI fallback:', e.message);
-            return MockAPI.compress(req);
-        }
+        return await this.call('/api/compress', {
+            method: 'POST',
+            body: JSON.stringify(req),
+        });
     },
 
     async feedback(req) {

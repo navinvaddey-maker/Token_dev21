@@ -58,6 +58,25 @@ impl HebbianNet {
         pairs.truncate(n);
         pairs
     }
+
+    /// Explicit feedback: strengthen or weaken associations.
+    pub fn apply_feedback(&mut self, activation: &TokenActivation, value: f32) {
+        if activation.blocked {
+            return;
+        }
+
+        let eta = self.learning_rate * activation.weight_hint * value;
+        let tokens = &activation.tokens;
+
+        for i in 0..tokens.len() {
+            for j in (i + 1)..tokens.len() {
+                let key = ordered_pair(&tokens[i], &tokens[j]);
+                let w = self.weights.entry(key).or_insert(0.0);
+                *w += eta;
+                *w = w.clamp(-1.0, 1.0);
+            }
+        }
+    }
 }
 
 fn ordered_pair(a: &str, b: &str) -> (String, String) {

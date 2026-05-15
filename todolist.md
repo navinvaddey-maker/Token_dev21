@@ -69,7 +69,7 @@
 - [ ] **[GAP-017]** FeedbackDetector signals are never consumed by the learning loop `Effort: M` `[Backend]`
   > `src/behavior/feedback_detector.rs` defines `detect()` which returns `Vec<DetectedSignal>`, but this function is never called anywhere in the codebase. Implicit signals (repetition, fast-reprompt, forgot) are defined but never wired into the Hebbian/Competitive learning engines.
 
-- [ ] **[GAP-018]** Fix TES scoring inversion — higher compression gives LOWER score `Effort: S` `[Backend]`
+- [x] **[GAP-018]** Fix TES scoring inversion — higher compression gives LOWER score `Effort: S` `[Backend]`
   > `src/scoring/tes.rs:40-44` — `compression_ratio = output / input`. A 50% compression (50/100 = 0.5) scores 5.0. But 0% compression (100/100 = 1.0) scores 10.0. This means NO compression = perfect score. The metric is inverted — it should reward savings, not penalize them.
 
 ---

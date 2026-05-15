@@ -105,6 +105,7 @@ impl TokenCompressionPipeline {
                         salience: t.salience,
                         source: SlotSource::Delta,
                         is_protected: false,
+                        last_accessed: std::time::Instant::now(),
                     })
                     .collect();
                 wm.load(items);
@@ -128,6 +129,7 @@ impl TokenCompressionPipeline {
                         salience: 0.70 + (i as f32 * 0.03),
                         source: SlotSource::Cluster,
                         is_protected: false,
+                        last_accessed: std::time::Instant::now(),
                     })
                     .collect();
                 wm.load(items);
@@ -160,6 +162,8 @@ impl TokenCompressionPipeline {
             role: result.role.clone(),
             context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
             task: result.task.clone(),
+            constraints: result.constraints,
+            output: result.output,
         };
 
         out.null_fields = result.null_fields;

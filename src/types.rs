@@ -24,6 +24,8 @@ pub struct CompressionSchema {
     pub role: Option<String>,
     pub context: Option<String>,
     pub task: Option<String>,
+    pub constraints: Vec<Constraint>,
+    pub output: Vec<Deliverable>,
 }
 
 
@@ -92,6 +94,8 @@ pub struct WmSlot {
     pub salience: f32,
     pub source: SlotSource,
     pub is_protected: bool,
+    #[serde(skip, default = "std::time::Instant::now")]
+    pub last_accessed: std::time::Instant,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +122,7 @@ pub struct AlgorithmOutput {
     // Stage -1 — Token Reconstruction
     pub constraint_locks: Vec<ConstraintToken>,
     pub ambiguity_register: Vec<AmbiguityFlag>,
+    pub expected_deliverables: Vec<String>,
     pub input_structure_score: f32,
 
     // Stage 1 — Signal Reduction
@@ -331,17 +336,41 @@ impl CorrectionCycle {
 
     /// Analyze the compressed output and field issues to determine needed corrections.
     fn analyze_corrections(
-        _compressed_output: &str,
+        compressed_output: &str,
         field_issues: &[FieldValidationIssue],
     ) -> Vec<TextCorrection> {
         let mut corrections = Vec::new();
 
         for issue in field_issues {
-            if issue.severity == "error" {
+            if issue.severity == "error" || issue.severity == "warning" {
+                // Extract the problematic content from the compressed output if identifiable
+                let original = if !issue.field_name.is_empty() {
+                    // Try to find the field content in the output
+                    compressed_output.lines()
+                        .find(|line| line.to_lowercase().contains(&issue.field_name.to_lowercase()))
+                        .unwrap_or("")
+                        .to_string()
+                } else {
+                    String::new()
+                };
+
+                let corrected = match issue.issue_type.as_str() {
+                    "missing_required" => format!("[NEEDS: {}]", issue.field_name),
+                    "type_mismatch" => format!("[FIX TYPE: {} — {}]", issue.field_name, issue.description),
+                    "empty_field" => format!("[FILL: {}]", issue.field_name),
+                    _ => format!("[REVIEW: {} — {}]", issue.field_name, issue.description),
+                };
+
+                let confidence = match issue.severity.as_str() {
+                    "error" => 0.9,
+                    "warning" => 0.7,
+                    _ => 0.5,
+                };
+
                 corrections.push(TextCorrection {
-                    original: "".to_string(),  // Placeholder, would need more context
-                    corrected: "".to_string(), // Placeholder
-                    confidence: 0.8,
+                    original,
+                    corrected,
+                    confidence,
                     correction_type: issue.issue_type.clone(),
                 });
             }
@@ -350,9 +379,13 @@ impl CorrectionCycle {
         corrections
     }
 
-    /// Calculate improvement based on scoring result.
+    /// Calculate expected improvement per correction cycle.
+    /// Uses the gap between current scores and the target (10.0) to estimate
+    /// how much improvement each correction should provide.
     fn calculate_improvement(scoring: &ScoringResult) -> f32 {
         let overall = (scoring.tes + scoring.sfs + scoring.scs) / 3.0;
-        overall * 0.1 // placeholder — proportional to overall quality
+        let gap = (10.0 - overall).max(0.0);
+        // Each correction cycle is expected to close ~30% of the gap
+        gap * 0.3
     }
 }

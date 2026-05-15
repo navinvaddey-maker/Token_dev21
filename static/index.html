@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Token Compress Engine — CRISP framework powered token optimization">
-    <title>TokenSqueeze</title>
+    <title>Oryx Intelligence</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     
     <style>
-        :root {
-            /* Variables mapping the color palette */
+    <style>
+        /* Base / Morning Theme */
+        :root, body.theme-morning {
             --page-bg: #f0f0ec;
             --glass-bg: rgba(255, 255, 255, 0.62);
             --glass-border: rgba(255, 255, 255, 0.82);
@@ -34,6 +35,64 @@
             --success: #2a9d8f;
         }
 
+        /* Afternoon Theme */
+        body.theme-afternoon {
+            --page-bg: #e6f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.70);
+            --glass-border: rgba(255, 255, 255, 0.90);
+            --btn-grad: linear-gradient(135deg, #4facfe, #00f2fe);
+            --btn-text: #003a55;
+            --accent-text: #007bb5;
+            --head-text: #0f172a;
+            --body-text: #475569;
+            --stat-pos: #0284c7;
+            --inp-border: rgba(0, 150, 255, 0.28);
+            --inp-focus: rgba(0, 150, 255, 0.60);
+            --inp-ring: rgba(0, 150, 255, 0.12);
+            --prog-fill: linear-gradient(90deg, #4facfe, #00f2fe);
+            --prog-track: rgba(0, 150, 255, 0.15);
+            --tag-bg: rgba(0, 150, 255, 0.15);
+            --tag-text: #0284c7;
+            --divider: rgba(0, 150, 255, 0.15);
+            --copy-bg: rgba(0, 150, 255, 0.10);
+            --copy-border: rgba(0, 150, 255, 0.25);
+        }
+
+        /* Night Theme */
+        body.theme-night {
+            --page-bg: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --btn-grad: linear-gradient(135deg, #818cf8, #c084fc);
+            --btn-text: #ffffff;
+            --accent-text: #a78bfa;
+            --head-text: #f8fafc;
+            --body-text: #cbd5e1;
+            --stat-pos: #34d399;
+            --inp-border: rgba(255, 255, 255, 0.15);
+            --inp-focus: rgba(167, 139, 250, 0.60);
+            --inp-ring: rgba(167, 139, 250, 0.15);
+            --prog-fill: linear-gradient(90deg, #818cf8, #c084fc);
+            --prog-track: rgba(255, 255, 255, 0.05);
+            --tag-bg: rgba(167, 139, 250, 0.15);
+            --tag-text: #ddd6fe;
+            --divider: rgba(255, 255, 255, 0.1);
+            --copy-bg: rgba(255, 255, 255, 0.05);
+            --copy-border: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Climate Modifiers */
+        body.theme-rain {
+            --page-bg: #1e293b;
+            --glass-bg: rgba(15, 23, 42, 0.85);
+            --body-text: #94a3b8;
+        }
+
+        body.theme-snow {
+            --page-bg: #f8fafc;
+            --glass-bg: rgba(255, 255, 255, 0.90);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -42,6 +101,7 @@
             color: var(--body-text);
             min-height: 100vh;
             overflow-x: hidden;
+            transition: background 1s ease, color 1s ease;
         }
 
         /* ── Page Layout ──────────────────────── */
@@ -130,13 +190,15 @@
         }
         .tc-logo-text {
             font-family: 'Syne', sans-serif;
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 700;
-            color: #1a1a1a;
+            color: var(--head-text);
             letter-spacing: -0.3px;
+            transition: color 1s ease;
         }
         .tc-logo-text span {
-            color: #c88000;
+            color: var(--accent-text);
+            transition: color 1s ease;
         }
 
         /* ── Typography ───────────────────────── */
@@ -605,18 +667,87 @@
         /* Loading */
         .loading { opacity: 0.7; pointer-events: none; }
         
-        /* ── Responsive ───────────────────────── */
-        @media (max-width: 640px) {
-            .glass-card { padding: 30px 20px; border-radius: 20px; }
-            .tc-root { padding: 24px 16px 40px; }
-            .stats-row { grid-template-columns: 1fr; }
-            .form-grid { grid-template-columns: 1fr; }
-            .tc-headline { font-size: 24px; }
+        /* ── Neuro Progress ──────────────────── */
+        #neuro-progress-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(15px);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-family: 'Syne', sans-serif;
+        }
+        .brain-loader {
+            width: 140px;
+            height: 140px;
+            position: relative;
+            margin-bottom: 40px;
+        }
+        .brain-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-text) 0%, transparent 70%);
+            animation: neuro-pulse 2.5s infinite ease-in-out;
+            opacity: 0.5;
+        }
+        @keyframes neuro-pulse {
+            0% { transform: scale(0.8); opacity: 0.2; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(0.8); opacity: 0.2; }
+        }
+        .neural-lines {
+            position: absolute;
+            width: 100%; height: 100%;
+            border: 2px dashed var(--accent-text);
+            border-radius: 50%;
+            animation: neuro-rotate 15s linear infinite;
+            opacity: 0.4;
+        }
+        @keyframes neuro-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        #progress-status {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            text-align: center;
+            max-width: 500px;
+            background: linear-gradient(90deg, #fff, var(--accent-text), #fff);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: text-shine 3s linear infinite;
+        }
+        @keyframes text-shine {
+            to { background-position: 200% center; }
+        }
+        .progress-subtext {
+            margin-top: 15px;
+            font-size: 1rem;
+            color: rgba(255,255,255,0.5);
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+        }
+        #neuron-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
         }
     </style>
 </head>
-<body>
-
+<body class="morning">
 <div class="tc-root">
     <!-- Decorative background elements -->
     <div class="bubble bubble-1"></div>
@@ -625,11 +756,38 @@
     <div class="glass-card">
         
         <!-- Header -->
-        <div class="tc-logo">
-            <div class="tc-logo-icon">✨</div>
-            <div class="tc-logo-text">Token<span>Squeeze</span></div>
+        <div class="tc-logo" style="margin-bottom: 20px;">
+            <div class="tc-logo-icon" style="background: transparent; box-shadow: none; width: 44px; height: 44px;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 12px rgba(0,242,254,0.15));">
+                    <defs>
+                        <linearGradient id="bodyGrad" x1="4" y1="2" x2="20" y2="22">
+                            <stop offset="0%" stop-color="#075985" />
+                            <stop offset="50%" stop-color="#0284c7" />
+                            <stop offset="100%" stop-color="#00f2fe" />
+                        </linearGradient>
+                        <filter id="eyeGlow">
+                            <feGaussianBlur stdDeviation="1.5" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                    </defs>
+                    <!-- Body -->
+                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" fill="url(#bodyGrad)" fill-opacity="0.9" />
+                    <!-- Geometric segments -->
+                    <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="white" fill-opacity="0.1" />
+                    <path d="M4 6V12L12 10V2L4 6Z" fill="black" fill-opacity="0.1" />
+                    <!-- Eyes -->
+                    <circle cx="8.5" cy="11" r="2.2" fill="#00f2fe" filter="url(#eyeGlow)" />
+                    <circle cx="15.5" cy="11" r="2.2" fill="#00f2fe" filter="url(#eyeGlow)" />
+                    <!-- Beak -->
+                    <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="#fbbf24" />
+                    <!-- Ears/Tufts -->
+                    <path d="M4 6L2 3L7 5" stroke="#00f2fe" stroke-width="1.2" stroke-linecap="round" />
+                    <path d="M20 6L22 3L17 5" stroke="#00f2fe" stroke-width="1.2" stroke-linecap="round" />
+                </svg>
+            </div>
+            <div class="tc-logo-text" style="font-size: 24px;">Oryx<span>Intel</span></div>
         </div>
-        <h1 class="tc-headline">Token Compress Engine</h1>
+        <h1 class="tc-headline">Oryx Intelligence Engine</h1>
         <p class="tc-sub">CRISP framework · Six neuroscience principles · Feedback learning</p>
 
         <!-- ── Auth Section ──────────────────────────────── -->
@@ -697,6 +855,7 @@
                 <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Compress</button>
                 <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
                 <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
+                <button class="nav-tab" id="btn-custom-skin" style="margin-left: auto;">🎨 Customize</button>
             </div>
 
             <!-- ── Compress Tab ── -->
@@ -805,10 +964,54 @@
     </div> <!-- End Glass Card -->
 </div>
 
-<script src="dev_engine.js"></script>
-<script src="prompt_optimizer.js"></script>
-<script src="mock_api.js"></script>
-<script src="app.js"></script>
+<!-- ── Custom Skin Modal ── -->
+<div id="skin-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="glass-card" style="max-width: 400px; padding: 24px;">
+        <h2 class="tc-headline" style="font-size: 20px; margin-bottom: 16px;">Customize UI Skin</h2>
+        <div class="form-row">
+            <label class="section-label">Background Base</label>
+            <div class="select-wrap">
+                <select id="skin-bg-type" class="tc-select">
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
+                </select>
+                <div class="select-chevron">▼</div>
+            </div>
+        </div>
+        <div class="form-row">
+            <label class="section-label">Primary Color</label>
+            <input type="color" id="skin-primary" value="#4facfe" style="width: 100%; height: 40px; border: none; cursor: pointer; border-radius: 8px;">
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 24px;">
+            <button class="tc-compress-btn" id="skin-modal-apply" style="flex: 1; margin: 0; padding: 10px;">Apply Skin</button>
+            <button class="clear-btn" id="skin-modal-reset" style="flex: 1; margin: 0; padding: 10px;">Reset Dynamic</button>
+        </div>
+        <button class="btn-ghost" id="skin-modal-close" style="width: 100%; margin-top: 12px; border: none;">Cancel</button>
+    </div>
+</div>
 
+<script src="neuro_ambient.js?v=3"></script>
+<script src="neuron_animation.js?v=3"></script>
+<script src="dev_engine.js?v=3"></script>
+<script src="prompt_optimizer.js?v=3"></script>
+<script src="mock_api.js?v=3"></script>
+<script src="app.js?v=3"></script>
+
+    <!-- Neuro Progress Overlay -->
+    <div id="neuro-progress-overlay">
+        <canvas id="neuron-canvas"></canvas>
+        <div class="brain-loader">
+            <div class="brain-pulse"></div>
+            <div class="neural-lines"></div>
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
+                <svg width="50" height="50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="white" stroke-width="1.5" />
+                    <circle cx="12" cy="11" r="4" fill="white" fill-opacity="0.2" stroke="white" />
+                </svg>
+            </div>
+        </div>
+        <div id="progress-status">Initializing Neuro-Engine...</div>
+        <div class="progress-subtext">Mapping prompt topology based on raw input</div>
+    </div>
 </body>
 </html>

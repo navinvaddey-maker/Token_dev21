@@ -5,21 +5,21 @@ use std::time::Instant;
 pub struct AggressiveEngine;
 
 impl AggressiveEngine {
-    pub fn run(
+    pub async fn run(
         raw: &str,
         repr: &CompressedRepr,
         cfg: &NpaeConfig,
         config_handle: std::sync::Arc<super::config::ConfigHandle>,
+        ory_engine: std::sync::Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
         structurer_impl: &dyn super::structurer::Structurer,
     ) -> Result<StructuredPromptResponse, String> {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
 
         // 1. Ory Engine: Meta-Orchestration and Deep Learning
-        let mut ory_engine = crate::npae::ory::OryEngine::new();
+        let mut ory_lock = ory_engine.lock().await;
         let config_guard = config_handle.read();
-        let ory_result = ory_engine.process(raw, &config_guard).map_err(|e| e.to_string())?;
-        drop(config_guard); // Release lock
+        let ory_result = ory_lock.process(raw, &config_guard).map_err(|e| e.to_string())?;
         
         let mut profile = super::intent::extract(repr, raw)?;
         
@@ -59,24 +59,87 @@ impl AggressiveEngine {
         let token_final = optimized_prompt.split_whitespace().count() as u32;
         let token_saved = token_original.saturating_sub(token_final);
 
-        // Calculate scoring for aggressive mode
+        // Calculate scoring for aggressive mode (v2 — computed, not hardcoded)
+        // TES: Token efficiency — uses v2 savings-based formula
         let tes_score = if token_original > 0 {
-            let ratio = token_final as f32 / token_original as f32;
-            (ratio * 10.0).clamp(0.0, 10.0)
+            let savings = 1.0 - (token_final as f32 / token_original as f32);
+            let base = if savings < 0.0 {
+                (0.3 + savings * 0.4).max(0.1)
+            } else if savings <= 0.1 {
+                0.3 + savings * 2.0
+            } else if savings <= 0.6 {
+                0.5 + savings * 0.667
+            } else if savings <= 0.8 {
+                0.9 - (savings - 0.6) * 0.5
+            } else {
+                0.8 - (savings - 0.8) * 2.0
+            };
+            (base * 10.0).clamp(0.0, 10.0)
         } else {
             0.0
         };
+
+        // SFS: Schema Fidelity — evaluate structural completeness of generated prompt
+        let sfs_score = {
+            let mut sfs = 0.0_f32;
+            let total_checks = 7.0_f32;
+            // Check role presence and quality
+            if !structured.role.primary.is_empty() { sfs += 1.0; }
+            if !structured.role.persona_anchor.is_empty() { sfs += 1.0; }
+            // Check context
+            if !structured.context.description.is_empty() { sfs += 1.0; }
+            if !structured.context.background.is_empty() { sfs += 1.0; }
+            // Check constraints
+            if !structured.constraints.required_inclusions.is_empty() || !structured.constraints.forbidden_topics.is_empty() { sfs += 1.0; }
+            // Check execution phases
+            if !structured.execution_phases.is_empty() { sfs += 1.0; }
+            // Check success criteria
+            if !structured.success_criteria.is_empty() { sfs += 1.0; }
+            (sfs / total_checks * 10.0).clamp(0.0, 10.0)
+        };
+
+        // SCS: Semantic Completeness — check constraint and question coverage
+        let scs_score = {
+            let mut score = 10.0_f32;
+            // Penalize if ambiguity is high but no clarifying questions generated
+            if amb.score > 0.5 && questions.is_empty() {
+                score -= 2.0;
+            }
+            // Penalize if no success criteria could be inferred
+            if structured.success_criteria.is_empty() {
+                score -= 1.5;
+            }
+            // Penalize if dynamic instruction is generic
+            if structured.dynamic_instruction.is_empty() {
+                score -= 2.0;
+            }
+            // Reward constraint coverage
+            if structured.constraints.required_inclusions.is_empty() && structured.constraints.forbidden_topics.is_empty() {
+                score -= 1.0;
+            }
+            score.clamp(0.0, 10.0)
+        };
+
+        let avg_score = (tes_score + sfs_score + scs_score) / 3.0;
         let scoring_result = crate::types::ScoringResult {
             tes: tes_score,
-            sfs: 10.0, // NPAE structurally enforces these fields
-            scs: 10.0,
-            correction_needed: false,
-            correction_axis: None,
+            sfs: sfs_score,
+            scs: scs_score,
+            correction_needed: avg_score < 6.0,
+            correction_axis: if tes_score < 6.0 {
+                Some(crate::types::ScoreAxis::TaskEssential)
+            } else if sfs_score < 6.0 {
+                Some(crate::types::ScoreAxis::SchemaFidelity)
+            } else if scs_score < 6.0 {
+                Some(crate::types::ScoreAxis::SemanticCompleteness)
+            } else {
+                None
+            },
         };
 
         // 6. Record Outcome to Ory Engine Memory
         if let Some(blueprint) = &ory_result.blueprint {
-            let _ = ory_engine.record_outcome(&ory_result.intent, blueprint, &scoring_result);
+            let _ = ory_lock.record_outcome(&ory_result.intent, blueprint, &scoring_result);
         }
 
         Ok(StructuredPromptResponse {

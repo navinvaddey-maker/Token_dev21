@@ -27,5 +27,6 @@ pub struct AppState {
     pub engine: Arc<Mutex<LearningEngine>>,
     pub pipeline: Arc<PipelineOrchestrator>,
     pub npae_config: Arc<ConfigHandle>,
+    pub ory_engine: Arc<Mutex<crate::npae::ory::OryEngine>>,
 }
 

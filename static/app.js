@@ -164,6 +164,7 @@ function switchTab(tab) {
 // ── Compress ────────────────────────────────────────────────────────────────
 
 async function compress() {
+    console.log("Starting Neuro-Compression...");
     const raw     = document.getElementById('prompt-input').value.trim();
     const task    = document.getElementById('task-input').value.trim();
     const useCase = document.getElementById('use-case').value;
@@ -172,14 +173,54 @@ async function compress() {
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
 
+    // Show Neuro Progress Overlay
+    const overlay = document.getElementById('neuro-progress-overlay');
+    const status = document.getElementById('progress-status');
+    const subtext = document.querySelector('.progress-subtext');
+    
+    if (overlay) {
+        console.log("Displaying progress overlay");
+        overlay.style.display = 'flex';
+    } else {
+        console.error("Progress overlay element not found!");
+    }
+
+    const phases = [
+        { s: "Initializing Neuro-Engine...", sub: "Calibrating neural activation thresholds" },
+        { s: "Mapping prompt topology...", sub: "Analyzing semantic clusters and activation peaks" },
+        { s: "Deconstructing raw syntax...", sub: "Identifying high-entropy token sequences" },
+        { s: "Instantiating neuro-fields...", sub: "Applying CRISP framework constraints" },
+        { s: "Extracting fidelity markers...", sub: "Validating intent retention across layers" },
+        { s: "Optimizing token weights...", sub: "Refining fidelity coefficients via Hebbian loop" },
+        { s: "Rendering neuro-ambient result...", sub: "Injecting scope-optimized deltas" },
+        { s: "Finalizing optimization...", sub: "Encoding high-fidelity compression output" }
+    ];
+
+    let phaseIdx = 0;
+    const phaseTimer = setInterval(() => {
+        phaseIdx = (phaseIdx + 1) % phases.length;
+        if (status) status.textContent = phases[phaseIdx].s;
+        if (subtext) subtext.textContent = phases[phaseIdx].sub;
+    }, 1800);
+
     // detect use_case from DevEngine if not manually set
     const detectedUseCase = useCase || (typeof DevEngine !== 'undefined' ? DevEngine.detectUseCase(raw) : useCase);
 
     const btn = document.getElementById('compress-btn');
-    btn.innerHTML = '<span class="spinner"></span> Compressing...';
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
+
+    // Initialize Neuron Animation
+    let neuronAnim = null;
+    const canvas = document.getElementById('neuron-canvas');
+    if (canvas && typeof NeuronAnimation !== 'undefined') {
+        neuronAnim = new NeuronAnimation('neuron-canvas');
+        neuronAnim.start();
+    }
+
+    const delayPromise = new Promise(resolve => setTimeout(resolve, 15000));
 
     try {
+        console.log("Calling API.compress...");
         const result = await API.compress({
             raw_text:  raw,
             task:      task || 'Optimize prompt',
@@ -188,14 +229,25 @@ async function compress() {
             mode:      mode,
         });
 
+        // Ensure we wait AT LEAST 15 seconds for "brain attraction" regardless of API speed
+        console.log("API returned. Maintaining neuro-ambient phase until 15s mark...");
+        await delayPromise;
+
+        console.log("Compression successful");
         State.lastResult = result;
         State.lastTs     = Date.now();
         renderResult(result);
+        showToast('Neural optimization complete', 'success');
     } catch (err) {
+        console.error("Compression error:", err);
+        // Even on error, we wait for the 15s attraction phase
+        await delayPromise;
         showToast(err.message, 'error');
     } finally {
-        btn.innerHTML = '⚡ Compress Prompt';
-        btn.disabled = false;
+        clearInterval(phaseTimer);
+        if (neuronAnim) neuronAnim.stop();
+        if (overlay) overlay.style.display = 'none';
+        if (btn) btn.disabled = false;
     }
 }
 

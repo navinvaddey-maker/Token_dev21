@@ -33,4 +33,9 @@ impl Stage2 {
     pub fn update_schema(&self, delta_tokens: &[String]) {
         self.predictive.update_schema(delta_tokens);
     }
+
+    /// Exposes feedback application directly for the orchestrator.
+    pub fn apply_feedback(&self, tokens: &[String], weight: f32) {
+        self.predictive.apply_feedback(tokens, weight);
+    }
 }

@@ -21,6 +21,30 @@ async fn main() -> anyhow::Result<()> {
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = db::DbPool::connect(&db_url).await?;
 
+    // Dedicated SQLite pool for Ory Engine (GAP-N02)
+    let ory_db_url = env::var("ORY_DATABASE_URL").unwrap_or_else(|_| "sqlite:./token_compress.db?mode=rwc".into());
+    let ory_pool = sqlx::SqlitePool::connect(&ory_db_url).await?;
+    
+    // Ensure Ory table exists (standardizing on SQLite for Ory memory)
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS learned_patterns (
+            pattern_id         TEXT PRIMARY KEY,
+            domain_fingerprint TEXT NOT NULL,
+            intent_fingerprint TEXT NOT NULL,
+            blueprint_json     TEXT NOT NULL,
+            usage_count        INTEGER NOT NULL,
+            success_rate       REAL NOT NULL,
+            last_used          TIMESTAMP NOT NULL,
+            created_at         TIMESTAMP NOT NULL
+        )
+        "#
+    )
+    .execute(&ory_pool)
+    .await?;
+
+    let ory_engine = Arc::new(Mutex::new(token_compress_engine::npae::ory::OryEngine::load_from_db(&ory_pool).await?));
+
     // Run migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -35,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     // The DashMap is shared across all requests — enables cross-request schema learning
     // (prediction error drops 20–35% over 10 turns on familiar topics).
     let schema_priors: Arc<DashMap<String, u32>> = Arc::new(DashMap::new());
-    let pipeline = Arc::new(PipelineOrchestrator::build(schema_priors, npae_config.clone()));
+    let pipeline = Arc::new(PipelineOrchestrator::build(schema_priors, npae_config.clone(), ory_engine.clone()));
 
     // Spawn FileWatcher background task
     let watcher_config_handle = npae_config.clone();
@@ -72,11 +96,30 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    // Spawn Ory Pattern Memory background persistence task (GAP-N02)
+    let ory_persistence_engine = ory_engine.clone();
+    let ory_persistence_pool = ory_pool.clone();
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // every 5 mins
+        loop {
+            interval.tick().await;
+            let mut engine = ory_persistence_engine.lock().await;
+            if engine.is_dirty() {
+                if let Err(e) = engine.save_to_db(&ory_persistence_pool).await {
+                    tracing::error!("Failed to persist Ory memory: {:?}", e);
+                } else {
+                    tracing::info!("Ory Pattern Memory persisted to SQLite");
+                }
+            }
+        }
+    });
+
     let state = AppState {
         pool: pool.clone(),
         engine,
         pipeline,
         npae_config,
+        ory_engine: ory_engine.clone(),
     };
 
     let api_router = token_compress_engine::api::router(state);
@@ -85,7 +128,10 @@ async fn main() -> anyhow::Result<()> {
     match token_compress_engine::data::Repository::find_user_by_username(&pool, "navin").await {
         Ok(None) => {
             tracing::info!("Seeding admin user: navin");
-            let admin_password = env::var("ADMIN_PASSWORD").expect("ADMIN_PASSWORD must be set for admin user seeding");
+            let admin_password = env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
+                tracing::warn!("⚠️  ADMIN_PASSWORD not set — using generated fallback. Set ADMIN_PASSWORD env var for production!");
+                format!("admin_fallback_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("0000"))
+            });
             let req = token_compress_engine::models::user::RegisterRequest {
                 username: "navin".to_string(),
                 password: admin_password,
@@ -124,6 +170,24 @@ async fn main() -> anyhow::Result<()> {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8081").await?;
     tracing::info!("TokenCompress Engine listening on 0.0.0.0:8081");
-    axum::serve(listener, app).await?;
+
+    // Graceful shutdown with Ory memory persistence
+    let final_ory_engine = ory_engine.clone();
+    let final_ory_pool = ory_pool.clone();
+    
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("failed to install CTRL+C handler");
+            tracing::info!("Shutdown signal received. Persisting Ory memory...");
+            let mut engine = final_ory_engine.lock().await;
+            if let Err(e) = engine.save_to_db(&final_ory_pool).await {
+                tracing::error!("Final Ory persistence failed: {:?}", e);
+            } else {
+                tracing::info!("Ory memory safely persisted. Goodbye!");
+            }
+        })
+        .await?;
     Ok(())
 }

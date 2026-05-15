@@ -3,7 +3,7 @@ use std::future::Future;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
-use crate::types::{AlgorithmOutput, CompressionResponse, ScoringResult, PromptTopology, NormalizationResult};
+use crate::types::{AlgorithmOutput, CompressionResponse, ScoringResult};
 use super::context::PipelineContext;
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -85,24 +85,24 @@ impl PipelineOrchestrator {
         Ok(self.package_response(output, scoring_result))
     }
 
-    pub fn package_response(&self, _output: &AlgorithmOutput, scoring_result: ScoringResult) -> CompressionResponse {
+    pub fn package_response(&self, output: &AlgorithmOutput, scoring_result: ScoringResult) -> CompressionResponse {
         CompressionResponse {
-            mode: "Gentle".into(),
-            error_score: 0.0,
-            fidelity: 0.0,
-            schema: crate::types::CompressionSchema::default(),
-            wm_slots_used: 0,
-            null_fields: vec![],
-            response: "".into(),
-            normalization: NormalizationResult::default(),
-            field_issues: vec![],
-            topology: PromptTopology::default(),
-            scope_injections: vec![],
-            clusters: None,
-            delta_tokens: None,
-            reasoning_chain: None,
+            mode: output.mode.as_ref().map(|m| format!("{:?}", m)).unwrap_or_else(|| "Gentle".into()),
+            error_score: output.error_score,
+            fidelity: output.fidelity_estimate,
+            schema: output.resolved_schema.clone(),
+            wm_slots_used: output.wm_slots.len(),
+            null_fields: output.null_fields.clone(),
+            response: output.clean_tokens.join(" "),
+            normalization: output.normalization.clone().unwrap_or_default(),
+            field_issues: output.field_issues.clone(),
+            topology: output.topology.clone().unwrap_or_default(),
+            scope_injections: output.scope_injections.clone(),
+            clusters: Some(output.cluster_labels.clone()),
+            delta_tokens: Some(output.delta_tokens.clone()),
+            reasoning_chain: None, // Can be populated if reasoning exists
             scoring_result,
-            correction_cycle: crate::types::CorrectionCycle::default(),
+            correction_cycle: output.correction_cycle.clone().unwrap_or_default(),
         }
     }
 }

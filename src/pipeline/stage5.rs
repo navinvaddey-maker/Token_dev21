@@ -1,11 +1,10 @@
 use crate::{
-    algorithms::{semantic_clustering::SemanticClustering, sparse_coding::SparseCoding},
+    algorithms::sparse_coding::SparseCoding,
     types::{AlgorithmOutput, Mode},
 };
 
 /// Handles Stage 5: Scope Injection
 pub struct Stage5 {
-    clustering: SemanticClustering,
     _sparse: SparseCoding,
 }
 
@@ -13,7 +12,6 @@ impl Stage5 {
     /// Creates a new Stage5 instance
     pub fn new() -> Self {
         Self {
-            clustering: SemanticClustering::default(),
             _sparse: SparseCoding::default(),
         }
     }
@@ -29,11 +27,9 @@ impl Stage5 {
                 out.scope_injections = vec![];
             }
             Mode::Aggressive => {
-                // Aggressive: generate scope injections from delta tokens using clustering
-                if !out.delta_tokens.is_empty() {
-                    let cluster_result = self.clustering.cluster(&out.delta_tokens);
-                    out.scope_injections = cluster_result
-                        .labels
+                // Aggressive: generate scope injections from labels generated in Stage 3
+                if !out.cluster_labels.is_empty() {
+                    out.scope_injections = out.cluster_labels
                         .iter()
                         .map(|label| format!("Consider {}", label))
                         .collect();

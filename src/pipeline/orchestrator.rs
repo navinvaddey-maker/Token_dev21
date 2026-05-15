@@ -38,6 +38,7 @@ pub struct PipelineOrchestrator {
     stage6a: Stage6a,
     correction_cycle: CorrectionCycle,
     npae_config_handle: Arc<ConfigHandle>,
+    ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
 }
 
 impl PipelineOrchestrator {
@@ -56,6 +57,7 @@ impl PipelineOrchestrator {
         semantic_fidelity_scorer: SemanticFidelityScorer,
         stage6a: Stage6a,
         correction_cycle: CorrectionCycle,
+        ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
     ) -> Self {
         Self {
             reconstructor,
@@ -76,12 +78,13 @@ impl PipelineOrchestrator {
                 roles: vec![],
                 constraints: vec![],
             })), // Fallback if not injected properly, though we will inject via build
+            ory_engine,
         }
     }
 
     /// Build orchestrator from shared schema priors — convenience factory.
     /// All 12 stage components are constructed internally with defaults.
-    pub fn build(schema_priors: Arc<DashMap<String, u32>>, npae_config_handle: Arc<ConfigHandle>) -> Self {
+    pub fn build(schema_priors: Arc<DashMap<String, u32>>, npae_config_handle: Arc<ConfigHandle>, ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>) -> Self {
         let predictive = PredictiveCoding::new(schema_priors);
         Self {
             reconstructor: TokenReconstructor::new(),
@@ -98,11 +101,12 @@ impl PipelineOrchestrator {
             stage6a: Stage6a::new(),
             correction_cycle: CorrectionCycle::new(0),
             npae_config_handle,
+            ory_engine,
         }
     }
 
     /// Processes the input through all pipeline stages (0A through 6B) and returns a compression response.
-    pub fn process(
+    pub async fn process(
         &self,
         input: &str,
         session: &mut SessionHistory,
@@ -123,6 +127,13 @@ impl PipelineOrchestrator {
         output.cluster_labels = reconstructed.clusters.keys()
             .map(|k| format!("{:?}", k))
             .collect();
+        
+        // Extract expected deliverables (SlotType::Output)
+        if let Some(deliverable_tokens) = reconstructed.clusters.get(&crate::types::SlotType::Output) {
+            output.expected_deliverables = deliverable_tokens.iter()
+                .map(|t| t.text.clone())
+                .collect();
+        }
 
         // Stage 0A: Normalization pre-pass
         let normalized = self.normalization_pre_pass.run(input, &reconstructed, &mut output);
@@ -171,8 +182,9 @@ impl PipelineOrchestrator {
                 &repr, 
                 &npae_cfg, 
                 self.npae_config_handle.clone(), 
+                self.ory_engine.clone(),
                 &structurer
-            ).map_err(|e| e.to_string())?;
+            ).await.map_err(|e| e.to_string())?;
 
             // Push to session history for tracking
             session.push(input, &output);
@@ -238,6 +250,12 @@ impl PipelineOrchestrator {
         ).map(OrchestratorResponse::Legacy)
     }
 
+    pub fn apply_feedback(&self, prompt: &str, weight: f32) {
+        // Simple tokenization for feedback application
+        let tokens: Vec<String> = prompt.split_whitespace().map(|s| s.to_string()).collect();
+        self.stage2.apply_feedback(&tokens, weight);
+    }
+
     /// Packages the pipeline output into a CompressionResponse with all new fields.
     fn package_response(
         &self,
@@ -266,16 +284,22 @@ impl PipelineOrchestrator {
             field_issues,
             topology,
             scope_injections: algorithm_output.scope_injections.clone(),
-            // Aggressive only
             clusters: if !algorithm_output.clusters.is_empty() {
-                // This is a placeholder - in a real implementation we'd return the actual clusters
-                Some(vec!["cluster1".to_string(), "cluster2".to_string()])
+                Some(algorithm_output.clusters.iter()
+                    .enumerate()
+                    .flat_map(|(i, cluster)| {
+                        let label = algorithm_output.cluster_labels.get(i)
+                            .cloned()
+                            .unwrap_or_else(|| format!("cluster_{}", i));
+                        std::iter::once(format!("[{}]", label))
+                            .chain(cluster.iter().cloned())
+                    })
+                    .collect())
             } else {
                 None
             },
             delta_tokens: if !algorithm_output.delta_tokens.is_empty() {
-                // This is a placeholder - in a real implementation we'd return the actual delta tokens
-                Some(vec!["delta1".to_string(), "delta2".to_string()])
+                Some(algorithm_output.delta_tokens.clone())
             } else {
                 None
             },

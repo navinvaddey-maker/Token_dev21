@@ -31,6 +31,9 @@ pub enum AppError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -46,6 +49,7 @@ impl AppError {
             AppError::NotFound(_) => (StatusCode::NOT_FOUND, "E004"),
             AppError::Engine(_) => (StatusCode::BAD_REQUEST, "E005"),
             AppError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "E006"),
+            AppError::Validation(_) => (StatusCode::BAD_REQUEST, "E007"),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "E099"),
         }
     }
