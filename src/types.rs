@@ -193,6 +193,8 @@ pub struct CompressionResponse {
     pub reasoning_chain: Option<Vec<String>>,
     pub scoring_result: ScoringResult,
     pub correction_cycle: CorrectionCycle,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hallucination_report: Option<crate::npae::hallucination::guard::HallucinationReport>,
 }
 
 /// Topology of the prompt structure.

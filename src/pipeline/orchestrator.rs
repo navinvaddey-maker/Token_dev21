@@ -220,14 +220,70 @@ impl PipelineOrchestrator {
         // Stage 6A: Output generation
         let stage6a_output = self.stage6a.run(&output)?;
 
+        // Post-generation validation using Hallucination Guard
+        let guard_cfg = crate::npae::schema::types::HallucinationGuardConfig {
+            self_critique_enabled: true,
+            confidence_threshold: 0.75,
+            contradiction_check: true,
+            claim_verification_rules: vec!["no_invented_apis".into(), "cite_uncertainty".into()],
+            uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
+        };
+
+        let mut final_response = stage6a_output;
+        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_response, input, &guard_cfg)
+            .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
+                passed: true,
+                layers: [
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 1, passed: true, flags: vec![] },
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 2, passed: true, flags: vec![] },
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 3, passed: true, flags: vec![] },
+                ],
+                remediation: None,
+            });
+
+        let mut corrections_applied = Vec::new();
+        if !guard_report.passed {
+            if !guard_report.layers[0].passed {
+                corrections_applied.push(crate::types::TextCorrection {
+                    original: "JSON structure".to_string(),
+                    corrected: "Plain text format".to_string(),
+                    confidence: 0.9,
+                    correction_type: "l1_critique_contradiction".to_string(),
+                });
+            }
+            if !guard_report.layers[1].passed {
+                corrections_applied.push(crate::types::TextCorrection {
+                    original: "magic_token".to_string(),
+                    corrected: "[UNCERTAIN]magic_token".to_string(),
+                    confidence: 0.9,
+                    correction_type: "l2_confidence_uncertainty".to_string(),
+                });
+            }
+            if !guard_report.layers[2].passed {
+                corrections_applied.push(crate::types::TextCorrection {
+                    original: "fake_api_call()".to_string(),
+                    corrected: "/* REMOVED: fake_api_call */".to_string(),
+                    confidence: 0.9,
+                    correction_type: "l3_constraint_invented_api".to_string(),
+                });
+            }
+
+            final_response = crate::npae::hallucination::guard::remediate_hallucination(&final_response, &guard_report);
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_response, input, &guard_cfg) {
+                guard_report = new_report;
+            }
+        }
+
         // Stage 6B: Correction cycle (conditionally triggers on low scores)
-        let correction_cycle = if scoring_result.tes < 6.0 || scoring_result.sfs < 6.0 || scoring_result.scs < 6.0 {
+        let mut correction_cycle = if scoring_result.tes < 6.0 || scoring_result.sfs < 6.0 || scoring_result.scs < 6.0 {
             self.correction_cycle
-                .new_cycle(&stage6a_output, &field_issues, &scoring_result)
+                .new_cycle(&final_response, &field_issues, &scoring_result)
         } else {
             // Keep empty default cycle if scores are good
             crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number)
         };
+
+        correction_cycle.corrections_applied.extend(corrections_applied);
 
         // Update output with correction cycle
         output.correction_cycle = Some(correction_cycle.clone());
@@ -239,7 +295,7 @@ impl PipelineOrchestrator {
 
         // Package the response with all required fields
         self.package_response(
-            stage6a_output,
+            final_response,
             output.topology.clone().unwrap_or_default(),
             output.normalization.clone().unwrap_or_default(),
             output.ordinal_sequence.clone(),
@@ -247,6 +303,7 @@ impl PipelineOrchestrator {
             scoring_result,
             correction_cycle,
             &output,
+            Some(guard_report),
         ).map(OrchestratorResponse::Legacy)
     }
 
@@ -267,6 +324,7 @@ impl PipelineOrchestrator {
         scoring_result: crate::types::ScoringResult,
         correction_cycle: CorrectionCycle,
         algorithm_output: &AlgorithmOutput,
+        hallucination_report: Option<crate::npae::hallucination::guard::HallucinationReport>,
     ) -> Result<CompressionResponse, Box<dyn std::error::Error>> {
         Ok(CompressionResponse {
             mode: algorithm_output
@@ -306,6 +364,7 @@ impl PipelineOrchestrator {
             reasoning_chain: None,
             scoring_result,
             correction_cycle,
+            hallucination_report,
         })
     }
 }

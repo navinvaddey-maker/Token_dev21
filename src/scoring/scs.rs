@@ -101,7 +101,7 @@ impl SemanticCompletenessScorer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AlgorithmOutput, ConstraintToken, AmbiguityFlag, CompressionSchema};
+    use crate::types::{AlgorithmOutput, ConstraintToken, AmbiguityFlag, CompressionSchema, Deliverable};
 
     #[test]
     fn test_scs_perfect_no_constraints() {

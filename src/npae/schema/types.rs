@@ -30,6 +30,8 @@ pub struct StructuredPromptResponse {
     pub confidence_score:    f32,
     pub processing_metadata: ProcessingMeta,
     pub scoring_result:      crate::types::ScoringResult,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hallucination_report: Option<crate::npae::hallucination::guard::HallucinationReport>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

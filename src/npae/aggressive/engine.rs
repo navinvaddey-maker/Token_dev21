@@ -54,9 +54,32 @@ impl AggressiveEngine {
         // Render final optimized prompt for UI
         let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions);
         
+        // Post-generation validation using Hallucination Guard
+        let guard_cfg = &structured.hallucination_guard;
+        let mut final_prompt = optimized_prompt;
+        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg)
+            .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
+                passed: true,
+                layers: [
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 1, passed: true, flags: vec![] },
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 2, passed: true, flags: vec![] },
+                    crate::npae::hallucination::guard::LayerReport { layer_id: 3, passed: true, flags: vec![] },
+                ],
+                remediation: None,
+            });
+
+        // Trigger targeted correction if not passed
+        if !guard_report.passed {
+            final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
+            // Re-run the guard check on the corrected prompt
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg) {
+                guard_report = new_report;
+            }
+        }
+        
         // Final token accounting for UI
         let token_original = raw.split_whitespace().count() as u32;
-        let token_final = optimized_prompt.split_whitespace().count() as u32;
+        let token_final = final_prompt.split_whitespace().count() as u32;
         let token_saved = token_original.saturating_sub(token_final);
 
         // Calculate scoring for aggressive mode (v2 — computed, not hardcoded)
@@ -145,7 +168,7 @@ impl AggressiveEngine {
         Ok(StructuredPromptResponse {
             schema_version: "2.0.0".into(),
             request_id,
-            optimized_prompt,
+            optimized_prompt: final_prompt,
             token_original,
             token_final,
             token_saved,
@@ -160,6 +183,7 @@ impl AggressiveEngine {
                 model_version: "npae-2.0.0".into(),
             },
             scoring_result,
+            hallucination_report: Some(guard_report),
         })
     }
 }

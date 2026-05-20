@@ -103,6 +103,7 @@ impl PipelineOrchestrator {
             reasoning_chain: None, // Can be populated if reasoning exists
             scoring_result,
             correction_cycle: output.correction_cycle.clone().unwrap_or_default(),
+            hallucination_report: None,
         }
     }
 }
