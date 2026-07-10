@@ -19,6 +19,7 @@
             <li data-section="users"><a href="#">User Management</a></li>
             <li data-section="history"><a href="#">Global History</a></li>
             <li data-section="feedback"><a href="#">Feedback Signals</a></li>
+            <li data-section="rag"><a href="#">📚 RAG Knowledge Base</a></li>
         </ul>
         <div class="sidebar-footer">
             <button id="logout-btn">Logout</button>
@@ -101,6 +102,87 @@
                 </table>
             </div>
         </section>
+
+        <!-- ── RAG Knowledge Base Section ─────────────────────────────── -->
+        <section id="rag-section">
+
+            <!-- Upload Panel -->
+            <div class="rag-upload-panel glass">
+                <div class="rag-panel-header">
+                    <div>
+                        <h2>Upload PDF Document</h2>
+                        <p class="rag-subtitle">Ingested documents are chunked &amp; embedded into the RAG vector store for all users.</p>
+                    </div>
+                    <div class="rag-badge">Admin Only</div>
+                </div>
+
+                <div class="rag-target-row">
+                    <label for="rag-target-user">Target User ID <span class="opt">(optional — leave blank to scope to your account)</span></label>
+                    <input type="text" id="rag-target-user" placeholder="Paste a user UUID here…">
+                </div>
+
+                <!-- Drop Zone -->
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone-inner">
+                        <div class="drop-icon">📄</div>
+                        <p class="drop-title">Drag &amp; drop your PDF here</p>
+                        <p class="drop-hint">or click to browse — max 50 MB, 500 pages</p>
+                        <input type="file" id="pdf-file-input" accept=".pdf" hidden>
+                        <button class="btn-upload" id="browse-btn" type="button">Choose File</button>
+                    </div>
+                    <!-- Selected file chip -->
+                    <div class="file-chip hidden" id="file-chip">
+                        <span class="chip-icon">📎</span>
+                        <span id="chip-name">filename.pdf</span>
+                        <button class="chip-remove" id="chip-remove" title="Remove">✕</button>
+                    </div>
+                </div>
+
+                <!-- Upload progress -->
+                <div class="rag-progress hidden" id="rag-progress">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="progress-fill"></div>
+                    </div>
+                    <p id="progress-label">Uploading…</p>
+                </div>
+
+                <div class="upload-actions">
+                    <button class="btn-primary" id="upload-btn" disabled>
+                        <span class="btn-icon">⬆</span> Upload &amp; Ingest
+                    </button>
+                    <p class="upload-note">Processing runs in the background. Status updates below.</p>
+                </div>
+
+                <!-- Toast -->
+                <div class="rag-toast hidden" id="rag-toast"></div>
+            </div>
+
+            <!-- Documents Table Panel -->
+            <div class="table-container glass" style="margin-top: 2rem;">
+                <div class="table-header">
+                    <h2>All RAG Documents</h2>
+                    <button class="btn-refresh" id="rag-refresh-btn">↻ Refresh</button>
+                </div>
+                <table id="rag-docs-table">
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Owner User ID</th>
+                            <th>Domain</th>
+                            <th>Pages</th>
+                            <th>Chunks</th>
+                            <th>Status</th>
+                            <th>Uploaded</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rag-docs-tbody">
+                        <tr><td colspan="8" class="empty-row">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
     </main>
 
     <!-- Modals -->

@@ -3,17 +3,6 @@ name    = "token_compress_engine"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "debug_full_pipeline"
-path = "src/bin/debug_full_pipeline.rs"
-
-[[bin]]
-name = "debug_comparison"
-path = "src/bin/debug_comparison.rs"
-
-[[bin]]
-name = "debug_sparse"
-path = "src/bin/debug_sparse.rs"
 
 [workspace]
 members = [
@@ -36,13 +25,13 @@ db               = { path = "crates/db" }
 learning-engine  = { path = "crates/learning-engine" }
 
 # web framework
-axum        = { version = "0.7", features = ["macros"] }
+axum        = { version = "0.7", features = ["macros", "multipart"] }
 tokio       = { version = "1",   features = ["full"] }
 tower       = { version = "0.4", features = ["util", "limit", "buffer"] }
 tower-http  = { version = "0.5", features = ["trace", "cors", "fs"] }
 
 # database — SQLite (transitioning to Postgres via db crate, but keeping here for current compilation)
-sqlx        = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "uuid", "chrono", "macros", "json"] }
+sqlx        = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "uuid", "chrono", "macros", "json"] }
 
 # auth
 bcrypt      = "0.15"
@@ -75,6 +64,10 @@ dashmap    = { version = "5",  features = ["serde"] }            # concurrent Ha
 rayon      = "1"            # parallel salience scoring (sparse coding)
 lazy_static = "1.4"
 phf        = { version = "0.8", features = ["macros"] }          # perfect hash maps for domain phrase lookup
+
+# RAG dependencies
+pdf-extract = "0.7"
+sha2 = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

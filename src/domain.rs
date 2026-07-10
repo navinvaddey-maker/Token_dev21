@@ -133,11 +133,49 @@ pub async fn compress_new(
         .collect::<Vec<_>>()
         .join(", ");
 
-    let enriched_prompt = if !context_prefix.is_empty() {
+    let history_id = Uuid::new_v4().to_string();
+
+    let mut enriched_prompt = if !context_prefix.is_empty() {
         format!("Context: [{}]\n\n{}", context_prefix, req.raw_text)
     } else {
         req.raw_text.clone()
     };
+
+    if req.rag_enabled.unwrap_or(false) {
+        let query = crate::rag::types::RetrievalQuery {
+            query_text: req.raw_text.clone(),
+            user_id: user_id_str.to_string(),
+            document_ids: req.rag_document_ids.clone(),
+            top_k: req.rag_top_k.unwrap_or(5),
+            min_similarity: 0.25,
+        };
+        let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
+        if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
+            if !retrieved_chunks.is_empty() {
+                let mut rag_section = String::new();
+                rag_section.push_str("\n--- Retrieved Knowledge ---\n");
+                for res in retrieved_chunks {
+                    let page_str = res.chunk.metadata.as_ref()
+                        .and_then(|m| m.page_number)
+                        .map(|p| format!(", Page {}", p))
+                        .unwrap_or_default();
+                    rag_section.push_str(&format!(
+                        "[Source: {}{}]\n{}\n\n",
+                        res.document_filename,
+                        page_str,
+                        res.chunk.content
+                    ));
+                }
+                rag_section.push_str("--- End Retrieved Knowledge ---\n");
+                
+                if !context_prefix.is_empty() {
+                    enriched_prompt = format!("Context: [{}]\n\n{}{}", context_prefix, rag_section, req.raw_text);
+                } else {
+                    enriched_prompt = format!("{}{}", rag_section, req.raw_text);
+                }
+            }
+        }
+    }
 
     // 3. Run the 7-stage pipeline (0A → 6B)
     //    SessionHistory is per-request for now (future: persist across user sessions)
@@ -153,7 +191,6 @@ pub async fn compress_new(
         crate::types::OrchestratorResponse::Legacy(resp) => resp,
         crate::types::OrchestratorResponse::Aggressive(resp) => {
             // Log aggressive mode history so feedback loop can function (GAP-N02 fix)
-            let history_id = Uuid::new_v4().to_string();
             let mut verbose = crate::models::verbose::SqlxVerbose::default();
             
             // Map StructuredPromptResponse to something Repository can handle
@@ -259,7 +296,6 @@ pub async fn compress_new(
     let eval = evaluation::evaluate(&enriched_prompt, &compression_response.response);
 
     // 6. Persist to DB
-    let history_id = Uuid::new_v4().to_string();
     let mut verbose = crate::models::verbose::SqlxVerbose::default();
     Repository::insert_history_from_compression(
         &state.pool,

@@ -282,14 +282,14 @@ impl Repository {
             .await?;
 
         let saved: (i64,) = sqlx::query_as(
-            "SELECT COALESCE(SUM(tokens_saved)::BIGINT, 0) FROM token_history WHERE user_id = $1",
+            "SELECT COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0) FROM token_history WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_one(pool)
         .await?;
 
         let avg_saved: (f64,) = sqlx::query_as(
-            "SELECT COALESCE(AVG(tokens_saved)::FLOAT8, 0.0) FROM token_history WHERE user_id = $1",
+            "SELECT COALESCE(CAST(AVG(tokens_saved) AS REAL), 0.0) FROM token_history WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_one(pool)
@@ -345,6 +345,21 @@ impl Repository {
         Ok(())
     }
 
+    pub async fn update_user_password(
+        pool: &DbPool,
+        id: &str,
+        password_hash: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
+        )
+        .bind(password_hash)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn get_global_stats(pool: &DbPool) -> Result<serde_json::Value, sqlx::Error> {
         let users: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
             .fetch_one(pool)
@@ -355,7 +370,7 @@ impl Repository {
             .await?;
 
         let saved: (i64,) =
-            sqlx::query_as("SELECT COALESCE(SUM(tokens_saved)::BIGINT, 0) FROM token_history")
+            sqlx::query_as("SELECT COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0) FROM token_history")
                 .fetch_one(pool)
                 .await?;
 
@@ -387,10 +402,10 @@ impl Repository {
         // Get recent average response time and throughput metrics
         let recent_compressions: (Option<f64>, i64) = sqlx::query_as(
             "SELECT 
-                  AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) AS avg_processing_time,
+                  AVG((julianday(updated_at) - julianday(created_at)) * 86400.0) AS avg_processing_time,
                   COUNT(*) AS compression_count
                FROM token_history 
-               WHERE created_at > NOW() - INTERVAL '1 hour'",
+               WHERE created_at > datetime('now', '-1 hour')",
         )
         .fetch_one(pool)
         .await?;
@@ -399,7 +414,7 @@ impl Repository {
         let active_users: (i64,) = sqlx::query_as(
             "SELECT COUNT(DISTINCT user_id) 
                FROM token_history 
-               WHERE created_at > NOW() - INTERVAL '1 hour'",
+               WHERE created_at > datetime('now', '-1 hour')",
         )
         .fetch_one(pool)
         .await?;
@@ -417,8 +432,8 @@ impl Repository {
             "SELECT 
                    udp.cluster_label,
                    COUNT(*) as user_count,
-                   AVG(udp.hits) as avg_hits,
-                    SUM(udp.hits)::BIGINT as total_hits
+                    AVG(udp.hits) as avg_hits,
+                    CAST(SUM(udp.hits) AS INTEGER) as total_hits
                 FROM user_domain_profile udp
                 GROUP BY udp.cluster_label
                 ORDER BY total_hits DESC",
@@ -455,9 +470,9 @@ impl Repository {
     ) -> Result<Value, sqlx::Error> {
         // Build time window condition
         let time_condition = match time_window.as_deref() {
-            Some("24h") => "WHERE created_at > NOW() - INTERVAL '24 hours'",
-            Some("7d") => "WHERE created_at > NOW() - INTERVAL '7 days'",
-            Some("30d") => "WHERE created_at > NOW() - INTERVAL '30 days'",
+            Some("24h") => "WHERE created_at > datetime('now', '-24 hours')",
+            Some("7d") => "WHERE created_at > datetime('now', '-7 days')",
+            Some("30d") => "WHERE created_at > datetime('now', '-30 days')",
             _ => "", // Default to all time
         };
 
@@ -469,7 +484,7 @@ impl Repository {
                        mode,
                        COUNT(*) as compression_count,
                        AVG(tokens_saved) as avg_tokens_saved,
-                       AVG((tokens_saved::FLOAT / NULLIF(token_original, 0)) * 100) as avg_savings_percent
+                       AVG((CAST(tokens_saved AS REAL) / NULLIF(token_original, 0)) * 100) as avg_savings_percent
                    FROM token_history 
                    {}
                    GROUP BY use_case, mode
@@ -485,7 +500,7 @@ impl Repository {
               &format!(
                   "SELECT 
                        AVG(tokens_saved) as avg_tokens_saved,
-                       AVG((tokens_saved::FLOAT / NULLIF(token_original, 0)) * 100) as avg_savings_percent,
+                       AVG((CAST(tokens_saved AS REAL) / NULLIF(token_original, 0)) * 100) as avg_savings_percent,
                        COUNT(*) as total_compressions
                    FROM token_history 
                    {}",
@@ -634,7 +649,7 @@ impl Repository {
                    COUNT(CASE WHEN warnings != '[]' THEN 1 END) as warnings_count,
                    AVG(CASE WHEN tokens_saved < 0 THEN 1 ELSE 0 END) * 100 as negative_savings_pct
                 FROM token_history 
-                WHERE created_at > NOW() - INTERVAL '24 hours'",
+                WHERE created_at > datetime('now', '-24 hours')",
         )
         .fetch_one(pool)
         .await?;

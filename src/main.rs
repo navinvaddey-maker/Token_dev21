@@ -20,10 +20,6 @@ async fn main() -> anyhow::Result<()> {
 
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = db::DbPool::connect(&db_url).await?;
-
-    // Dedicated SQLite pool for Ory Engine (GAP-N02)
-    let ory_db_url = env::var("ORY_DATABASE_URL").unwrap_or_else(|_| "sqlite:./token_compress.db?mode=rwc".into());
-    let ory_pool = sqlx::SqlitePool::connect(&ory_db_url).await?;
     
     // Ensure Ory table exists (standardizing on SQLite for Ory memory)
     sqlx::query(
@@ -40,10 +36,10 @@ async fn main() -> anyhow::Result<()> {
         )
         "#
     )
-    .execute(&ory_pool)
+    .execute(&pool)
     .await?;
 
-    let ory_engine = Arc::new(Mutex::new(token_compress_engine::npae::ory::OryEngine::load_from_db(&ory_pool).await?));
+    let ory_engine = Arc::new(Mutex::new(token_compress_engine::npae::ory::OryEngine::load_from_db(&pool).await?));
 
     // Run migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
@@ -98,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Spawn Ory Pattern Memory background persistence task (GAP-N02)
     let ory_persistence_engine = ory_engine.clone();
-    let ory_persistence_pool = ory_pool.clone();
+    let ory_persistence_pool = pool.clone();
     tokio::task::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // every 5 mins
         loop {
@@ -114,12 +110,15 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let rag_store = std::sync::Arc::new(token_compress_engine::rag::store::RagStore::new(pool.clone()));
+
     let state = AppState {
         pool: pool.clone(),
         engine,
         pipeline,
         npae_config,
         ory_engine: ory_engine.clone(),
+        rag_store,
     };
 
     let api_router = token_compress_engine::api::router(state);
@@ -145,6 +144,20 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Ok(Some(user)) => {
+            if let Ok(admin_password) = env::var("ADMIN_PASSWORD") {
+                tracing::info!("ADMIN_PASSWORD is set, updating admin user 'navin' password");
+                let pw_hash = bcrypt::hash(&admin_password, bcrypt::DEFAULT_COST).unwrap();
+                if let Err(e) = token_compress_engine::data::Repository::update_user_password(
+                    &pool, &user.id, &pw_hash,
+                )
+                .await
+                {
+                    tracing::error!("Failed to update password for user 'navin': {:?}", e);
+                } else {
+                    tracing::info!("Updated password for user 'navin'.");
+                }
+            }
+
             if user.business_type.to_lowercase() != "admin" {
                 tracing::info!("Updating existing user 'navin' to have business_type 'admin'");
                 if let Err(e) = token_compress_engine::data::Repository::update_user_business_type(
@@ -173,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Graceful shutdown with Ory memory persistence
     let final_ory_engine = ory_engine.clone();
-    let final_ory_pool = ory_pool.clone();
+    let final_ory_pool = pool.clone();
     
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {

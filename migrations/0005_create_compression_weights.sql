@@ -5,7 +5,7 @@ CREATE TABLE compression_weights (
     entity     TEXT NOT NULL,
     weight     DOUBLE PRECISION NOT NULL DEFAULT 1.0,
     use_case   TEXT NOT NULL DEFAULT 'generic',
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, entity, use_case)
 );
 

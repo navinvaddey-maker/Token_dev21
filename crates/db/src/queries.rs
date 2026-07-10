@@ -1,11 +1,11 @@
 use competitive_core::centroid::CentroidSnapshot;
 use hebbian_core::WeightDelta;
 use schema_engine::types::PromptSchema;
-use sqlx::{PgPool, Row};
+use sqlx::{SqlitePool, Row};
 use uuid::Uuid;
 
 pub async fn save_prompt(
-    pool: &PgPool,
+    pool: &SqlitePool,
     user_id: Uuid,
     raw: &str,
     schema: &PromptSchema,
@@ -19,8 +19,8 @@ pub async fn save_prompt(
         VALUES ($1, $2, $3, $4, $5)
         "#,
     )
-    .bind(id)
-    .bind(user_id)
+    .bind(id.to_string())
+    .bind(user_id.to_string())
     .bind(raw)
     .bind(schema_json)
     .bind(schema.token_count as i32)
@@ -31,7 +31,7 @@ pub async fn save_prompt(
 }
 
 pub async fn upsert_learned_context(
-    pool: &PgPool,
+    pool: &SqlitePool,
     user_id: Uuid,
     deltas: &[WeightDelta],
 ) -> Result<(), sqlx::Error> {
@@ -40,13 +40,13 @@ pub async fn upsert_learned_context(
     sqlx::query(
         r#"
         INSERT INTO learned_context (id, user_id, top_pairs)
-        VALUES (gen_random_uuid(), $1, $2)
+        VALUES (lower(hex(randomblob(16))), $1, $2)
         ON CONFLICT (user_id) DO UPDATE SET
             top_pairs  = EXCLUDED.top_pairs,
-            updated_at = NOW()
+            updated_at = CURRENT_TIMESTAMP
         "#,
     )
-    .bind(user_id)
+    .bind(user_id.to_string())
     .bind(pairs)
     .execute(pool)
     .await?;
@@ -55,7 +55,7 @@ pub async fn upsert_learned_context(
 }
 
 pub async fn upsert_domain_profile(
-    pool: &PgPool,
+    pool: &SqlitePool,
     user_id: Uuid,
     snapshots: &[CentroidSnapshot],
 ) -> Result<(), sqlx::Error> {
@@ -66,15 +66,15 @@ pub async fn upsert_domain_profile(
             r#"
             INSERT INTO user_domain_profile
                 (id, user_id, cluster_id, cluster_label, top_tokens, hits)
-            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)
+            VALUES (lower(hex(randomblob(16))), $1, $2, $3, $4, $5)
             ON CONFLICT (user_id, cluster_id) DO UPDATE SET
                 cluster_label = EXCLUDED.cluster_label,
                 top_tokens    = EXCLUDED.top_tokens,
                 hits          = EXCLUDED.hits,
-                updated_at    = NOW()
+                updated_at    = CURRENT_TIMESTAMP
             "#,
         )
-        .bind(user_id)
+        .bind(user_id.to_string())
         .bind(snap.id as i32)
         .bind(&snap.label)
         .bind(top_tokens)
@@ -86,7 +86,7 @@ pub async fn upsert_domain_profile(
 }
 
 pub async fn load_cluster_vocab(
-    pool: &PgPool,
+    pool: &SqlitePool,
     user_id: Uuid,
     cluster_id: i32,
 ) -> Result<Vec<(String, f32)>, sqlx::Error> {
@@ -97,7 +97,7 @@ pub async fn load_cluster_vocab(
         WHERE  user_id = $1 AND cluster_id = $2
         "#,
     )
-    .bind(user_id)
+    .bind(user_id.to_string())
     .bind(cluster_id)
     .fetch_optional(pool)
     .await?;

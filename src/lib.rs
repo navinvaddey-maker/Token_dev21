@@ -9,6 +9,7 @@ pub mod errors;
 pub mod models;
 pub mod npae;
 pub mod pipeline;
+pub mod rag;
 pub mod scoring;
 pub mod session;
 pub mod types;
@@ -28,5 +29,6 @@ pub struct AppState {
     pub pipeline: Arc<PipelineOrchestrator>,
     pub npae_config: Arc<ConfigHandle>,
     pub ory_engine: Arc<Mutex<crate::npae::ory::OryEngine>>,
+    pub rag_store: Arc<crate::rag::store::RagStore>,
 }
 

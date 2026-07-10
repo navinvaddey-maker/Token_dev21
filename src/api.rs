@@ -35,6 +35,7 @@ pub fn router(state: AppState) -> Router {
 
     let public = Router::new()
         .route("/api/health", get(health_check))
+        .route("/api/rag/health", get(rag_health))
         .merge(auth);
 
     let protected = Router::new()
@@ -44,6 +45,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/feedback", post(feedback))
         .route("/api/dev/config", get(dev_config))
         .route("/api/stats", get(stats))
+        .route("/api/rag/upload", post(rag_upload))
+        .route("/api/rag/documents", get(rag_list_documents))
+        .route("/api/rag/documents/:id", get(rag_get_document).delete(rag_delete_document))
+        .route("/api/rag/search", get(rag_search))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -78,6 +83,9 @@ pub fn router(state: AppState) -> Router {
             get(admin_get_feedback_analysis),
         )
         .route("/api/admin/error-metrics", get(admin_get_error_metrics))
+        .route("/api/admin/rag/upload", post(admin_rag_upload))
+        .route("/api/admin/rag/documents", get(admin_rag_list_documents))
+        .route("/api/admin/rag/documents/:id", axum::routing::delete(admin_rag_delete_document))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             admin_middleware,
@@ -157,6 +165,9 @@ pub struct CompressRequest {
     pub max_tokens: Option<usize>,
     // When enabled, the response will include extra SQLx/engine diagnostics.
     pub verbose: Option<bool>,
+    pub rag_enabled: Option<bool>,
+    pub rag_document_ids: Option<Vec<String>>,
+    pub rag_top_k: Option<usize>,
 }
 
 async fn compress(
@@ -337,7 +348,7 @@ async fn admin_middleware(
 }
 
 async fn auth_middleware(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     mut req: axum::http::Request<axum::body::Body>,
     next: middleware::Next,
 ) -> Result<axum::response::Response, AppError> {
@@ -349,6 +360,16 @@ async fn auth_middleware(
         .ok_or(AppError::Unauthorized)?;
 
     let user_id = crate::domain::verify_jwt(token)?;
+    
+    let user_exists = crate::data::Repository::find_user_by_id(&state.pool, &user_id)
+        .await
+        .map_err(|_| AppError::Internal("Database error".into()))?
+        .is_some();
+        
+    if !user_exists {
+        return Err(AppError::Unauthorized);
+    }
+
     req.extensions_mut().insert(user_id);
     Ok(next.run(req).await)
 }
@@ -417,4 +438,283 @@ async fn npae_health() -> Result<axum::response::Response, AppError> {
         "uptime_ms": 0,
     });
     Ok((StatusCode::OK, Json(health_json)).into_response())
+}
+
+// ── RAG Handlers ─────────────────────────────────────────────────────────────
+
+async fn rag_health(State(state): State<AppState>) -> Result<axum::response::Response, AppError> {
+    let db_healthy = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": if db_healthy { "healthy" } else { "unhealthy" },
+            "subsystem": "rag",
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        })),
+    ).into_response())
+}
+
+async fn rag_upload(
+    State(state): State<AppState>,
+    axum::Extension(user_id): axum::Extension<String>,
+    mut multipart: axum::extract::Multipart,
+) -> Result<axum::response::Response, AppError> {
+    let mut filename = "unknown.pdf".to_string();
+    let mut file_bytes = Vec::new();
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::Validation(e.to_string()))? {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "file" {
+            filename = field.file_name().unwrap_or("unknown.pdf").to_string();
+            file_bytes = field.bytes().await.map_err(|e| AppError::Validation(e.to_string()))?.to_vec();
+            break;
+        }
+    }
+
+    if file_bytes.is_empty() {
+        return Err(AppError::Validation("No file uploaded or file is empty".into()));
+    }
+
+    let ingester = crate::rag::ingest::DocumentIngester::new(state.pool.clone());
+    let config = crate::rag::types::ChunkingConfig::default();
+
+    let user_id_clone = user_id.clone();
+    let filename_clone = filename.clone();
+    
+    tokio::spawn(async move {
+        if let Err(e) = ingester.ingest_pdf(&user_id_clone, &filename_clone, &file_bytes, &config).await {
+            tracing::error!("Background RAG PDF ingestion failed for user {}: {}", user_id_clone, e);
+        }
+    });
+
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "status": "processing",
+            "filename": filename,
+            "message": "File upload accepted. Processing started in the background."
+        })),
+    ).into_response())
+}
+
+async fn rag_list_documents(
+    State(state): State<AppState>,
+    axum::Extension(user_id): axum::Extension<String>,
+    Query(params): Query<PaginationParams>,
+) -> Result<axum::response::Response, AppError> {
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
+
+    let docs = state.rag_store.list_documents(&user_id, limit, offset).await
+        .map_err(AppError::Database)?;
+
+    Ok((StatusCode::OK, Json(docs)).into_response())
+}
+
+async fn rag_get_document(
+    State(state): State<AppState>,
+    axum::Extension(user_id): axum::Extension<String>,
+    Path(id): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    let doc = state.rag_store.get_document(&user_id, &id).await
+        .map_err(AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("Document not found".into()))?;
+
+    let chunk_count = state.rag_store.get_chunk_count(&id).await
+        .map_err(AppError::Database)?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "document": doc,
+            "chunk_count": chunk_count,
+        })),
+    ).into_response())
+}
+
+async fn rag_delete_document(
+    State(state): State<AppState>,
+    axum::Extension(user_id): axum::Extension<String>,
+    Path(id): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    let deleted = state.rag_store.delete_document(&user_id, &id).await
+        .map_err(AppError::Database)?;
+
+    if !deleted {
+        return Err(AppError::NotFound("Document not found or access denied".into()));
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "success",
+            "message": "Document and all related chunks deleted"
+        })),
+    ).into_response())
+}
+
+async fn rag_search(
+    State(state): State<AppState>,
+    axum::Extension(user_id): axum::Extension<String>,
+    Query(params): Query<crate::rag::types::RagSearchQuery>,
+) -> Result<axum::response::Response, AppError> {
+    let doc_ids: Option<Vec<String>> = params.document_ids.map(|s| {
+        s.split(',').map(|id| id.trim().to_string()).filter(|id| !id.is_empty()).collect()
+    });
+
+    let query_vector = crate::rag::embeddings::EmbeddingEngine::new().embed(&params.query);
+    
+    let results = state.rag_store.search(
+        &query_vector,
+        &user_id,
+        doc_ids.as_deref(),
+        params.top_k.unwrap_or(5),
+        0.25,
+    ).await
+    .map_err(AppError::Database)?;
+
+    Ok((StatusCode::OK, Json(results)).into_response())
+}
+
+// ── Admin RAG Handlers ─────────────────────────────────────────────────────
+
+/// Query params for admin RAG upload — allows targeting a specific user's doc store.
+#[derive(serde::Deserialize)]
+struct AdminRagUploadParams {
+    /// Optional user_id to scope the document to. Defaults to the admin's own id.
+    target_user_id: Option<String>,
+}
+
+/// POST /api/admin/rag/upload
+///
+/// Admin-only multipart upload. Ingests the PDF and associates it with
+/// `target_user_id` (query param) or the admin's own id if omitted.
+async fn admin_rag_upload(
+    State(state): State<AppState>,
+    axum::Extension(admin_id): axum::Extension<String>,
+    Query(params): Query<AdminRagUploadParams>,
+    mut multipart: axum::extract::Multipart,
+) -> Result<axum::response::Response, AppError> {
+    // Determine which user the document belongs to
+    let owner_id = params.target_user_id.unwrap_or_else(|| admin_id.clone());
+
+    let mut filename = "unknown.pdf".to_string();
+    let mut file_bytes: Vec<u8> = Vec::new();
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?
+    {
+        let field_name = field.name().unwrap_or_default().to_string();
+        if field_name == "file" {
+            filename = field.file_name().unwrap_or("unknown.pdf").to_string();
+            file_bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::Validation(e.to_string()))?
+                .to_vec();
+            break;
+        }
+    }
+
+    if file_bytes.is_empty() {
+        return Err(AppError::Validation("No file field found or file is empty".into()));
+    }
+
+    if !filename.to_lowercase().ends_with(".pdf") {
+        return Err(AppError::Validation("Only PDF files are supported".into()));
+    }
+
+    let ingester = crate::rag::ingest::DocumentIngester::new(state.pool.clone());
+    let config = crate::rag::types::ChunkingConfig::default();
+
+    let owner_id_clone = owner_id.clone();
+    let filename_clone = filename.clone();
+    let admin_id_clone = admin_id.clone();
+
+    // Run ingestion asynchronously — returns 202 immediately
+    tokio::spawn(async move {
+        match ingester
+            .ingest_pdf(&owner_id_clone, &filename_clone, &file_bytes, &config)
+            .await
+        {
+            Ok(result) => {
+                tracing::info!(
+                    admin_id = %admin_id_clone,
+                    owner_id = %owner_id_clone,
+                    document_id = %result.document_id,
+                    chunks = result.chunks_created,
+                    domain = ?result.detected_domain,
+                    "Admin RAG upload complete"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    admin_id = %admin_id_clone,
+                    owner_id = %owner_id_clone,
+                    error = %e,
+                    "Admin RAG upload failed"
+                );
+            }
+        }
+    });
+
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({
+            "status": "processing",
+            "filename": filename,
+            "owner_user_id": owner_id,
+            "uploaded_by": admin_id,
+            "message": "PDF accepted. Text extraction and embedding running in the background."
+        })),
+    )
+        .into_response())
+}
+
+/// GET /api/admin/rag/documents?limit=50&offset=0
+///
+/// List ALL documents across ALL users for admin oversight.
+async fn admin_rag_list_documents(
+    State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
+) -> Result<axum::response::Response, AppError> {
+    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+    let offset = params.offset.unwrap_or(0).max(0);
+
+    let docs = state
+        .rag_store
+        .list_all_documents(limit, offset)
+        .await
+        .map_err(AppError::Database)?;
+
+    Ok((StatusCode::OK, Json(docs)).into_response())
+}
+
+/// DELETE /api/admin/rag/documents/:id
+///
+/// Force-delete any document (ignores owner check).
+async fn admin_rag_delete_document(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<axum::response::Response, AppError> {
+    let deleted = state
+        .rag_store
+        .admin_delete_document(&id)
+        .await
+        .map_err(AppError::Database)?;
+
+    if !deleted {
+        return Err(AppError::NotFound("Document not found".into()));
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "deleted",
+            "document_id": id
+        })),
+    )
+        .into_response())
 }
