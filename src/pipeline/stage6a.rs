@@ -22,16 +22,31 @@ impl Stage6a {
             parts.push(format!("**Role:** {}", role));
         }
 
-        if let Some(task) = &schema_filled.resolved_schema.task {
-            parts.push(format!("**Task:** {}", task));
-        }
-
         if let Some(norm) = &schema_filled.normalization {
-            parts.push(format!("**Context:** {}", norm.normalized_text));
-        } else if let Some(context) = &schema_filled.resolved_schema.context {
-            // Only add context if it's not a generic placeholder
-            if context.len() > 3 {
-                parts.push(format!("**Context:** {}", context));
+            let (ctx_opt, rag_opt, user_prompt) = crate::npae::aggressive::structurer::split_raw_input(&norm.normalized_text);
+            
+            parts.push(format!("**Task:** {}", user_prompt));
+
+            if let Some(ctx) = ctx_opt {
+                parts.push(format!("**Semantic Context:** {}", ctx));
+            }
+            if let Some(rag) = rag_opt {
+                parts.push(format!("**Source Knowledge:**\n{}", rag));
+            }
+
+            if let Some(context) = &schema_filled.resolved_schema.context {
+                if context.len() > 3 {
+                    parts.push(format!("**Inferred Context:** {}", context));
+                }
+            }
+        } else {
+            if let Some(task) = &schema_filled.resolved_schema.task {
+                parts.push(format!("**Task:** {}", task));
+            }
+            if let Some(context) = &schema_filled.resolved_schema.context {
+                if context.len() > 3 {
+                    parts.push(format!("**Context:** {}", context));
+                }
             }
         }
 

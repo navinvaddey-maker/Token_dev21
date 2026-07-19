@@ -88,6 +88,8 @@ pub struct PromptContext {
     pub user_knowledge_level: String,
     pub temporal_scope: String,
     pub intent_vector: Vec<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assumptions: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

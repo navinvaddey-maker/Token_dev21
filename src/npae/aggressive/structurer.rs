@@ -138,7 +138,30 @@ impl Structurer for HttpStructurer {
 
 // --- CRISP Prompt Renderer (v2 — token waste eliminated) ---
 
-pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQuestion]) -> String {
+pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
+    let mut context = None;
+    let mut rag = None;
+    let mut user_prompt = raw.trim().to_string();
+
+    if user_prompt.starts_with("Context: [") {
+        if let Some(end_idx) = user_prompt.find("]\n\n") {
+            context = Some(user_prompt[10..end_idx].to_string());
+            user_prompt = user_prompt[end_idx + 3..].trim().to_string();
+        }
+    }
+
+    if let Some(start_idx) = user_prompt.find("--- Retrieved Knowledge ---") {
+        if let Some(end_idx) = user_prompt.find("--- End Retrieved Knowledge ---\n") {
+            rag = Some(user_prompt[start_idx + "--- Retrieved Knowledge ---\n".len()..end_idx].trim().to_string());
+            user_prompt = user_prompt[end_idx + "--- End Retrieved Knowledge ---\n".len()..].trim().to_string();
+        }
+    }
+
+    (context, rag, user_prompt)
+}
+
+pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQuestion], raw_input: &str) -> String {
+    let (context_opt, rag_opt, user_prompt) = split_raw_input(raw_input);
     let mut out = String::new();    // ROLE — High-resolution persona
     out.push_str(&format!("# ROLE: {}\n", prompt.role.primary.to_uppercase()));
     if !prompt.role.persona_anchor.is_empty() {
@@ -163,7 +186,19 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     if !prompt.context.background.is_empty() && prompt.context.background != prompt.context.description {
         out.push_str(&format!("Details: {}\n", prompt.context.background));
     }
+    if !prompt.context.assumptions.is_empty() {
+        out.push_str(&format!("Assumptions: {}\n", prompt.context.assumptions.join("; ")));
+    }
+    if let Some(ctx) = context_opt {
+        out.push_str(&format!("Semantic Context: {}\n", ctx));
+    }
     out.push('\n');
+
+    if let Some(rag) = rag_opt {
+        out.push_str("# SOURCE KNOWLEDGE:\n");
+        out.push_str(&rag);
+        out.push_str("\n\n");
+    }
 
     // CONSTRAINTS — only non-empty sections
     if !prompt.constraints.required_inclusions.is_empty() || !prompt.constraints.forbidden_topics.is_empty() {
@@ -240,7 +275,9 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     }
 
     // FINAL INSTRUCTION — adaptive based on intent
-    out.push_str("# INSTRUCTION:\n");
+    out.push_str("# TASK / INSTRUCTION:\n");
+    out.push_str(&user_prompt);
+    out.push_str("\n\n---\n");
     out.push_str(&prompt.dynamic_instruction);
     if !questions.is_empty() {
         out.push_str(" Address CLARIFYING QUESTIONS in your response.");
@@ -300,6 +337,9 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Infer success criteria (Intent-driven)
     let success_criteria = infer_success_criteria(profile, raw);
 
+    // Infer implicit assumptions based on context/domain
+    let assumptions = infer_assumptions(profile, raw);
+
     // Build dynamic instruction
     let dynamic_instruction = derive_dynamic_instruction(profile);
 
@@ -329,6 +369,7 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
             user_knowledge_level: user_level_str,
             temporal_scope: profile.temporal_scope.clone(),
             intent_vector: vec![profile.confidence],
+            assumptions,
         },
         constraints: PromptConstraints {
             output_format: profile.output_preference.clone(),
@@ -357,12 +398,12 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
 
 /// Extract a meaningful task description — summary based, not raw snippet
 fn extract_task_description(raw: &str, intent_type: &str) -> String {
-    let raw_clean = raw.trim();
+    let (_, _, user_prompt) = split_raw_input(raw);
     
     // Attempt to extract a short summary (first 10 words or first sentence)
-    let summary = raw_clean.split(|c: char| c == '.' || c == '\n')
+    let summary = user_prompt.split(|c: char| c == '.' || c == '\n')
         .next()
-        .unwrap_or(raw_clean)
+        .unwrap_or(&user_prompt)
         .split_whitespace()
         .take(12)
         .collect::<Vec<_>>()
@@ -758,21 +799,61 @@ fn derive_tone(profile: &IntentProfile) -> String {
 
 /// Vagueness Resolution: Unpacks generic requests into structured roadmaps
 fn unpack_context(profile: &IntentProfile) -> Option<String> {
+    let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "the core topic".into());
     match profile.domain.as_str() {
-        "ai-ml" => Some("Cover definition, how it differs from current AI, how it might work, key challenges, risks, and real-world implications.".into()),
-        "finance" => Some("Cover key concepts, market trends, regulatory environment, and strategic recommendations.".into()),
-        "medical" => Some("Cover etiology, clinical presentation, diagnostic criteria, treatment options, and prognosis.".into()),
-        "scientific-research" => Some("Cover methodology, data analysis, ethical considerations, and potential impact.".into()),
-        "workplace-productivity" => Some("Analyze objective output vs subjective perception, remote/hybrid dynamics, and cultural impact.".into()),
-        "education" => Some("Cover pedagogical foundations, cognitive load optimization, retention strategies, and application milestones.".into()),
-        _ => {
-            if let Some(ref subject) = profile.dynamic_subject {
-                Some(format!("Break down {} into fundamental components, current state, key challenges, and future implications.", subject))
-            } else {
-                Some("Break down into fundamental components, current state, key challenges, and future implications.".into())
-            }
-        }
+        "ai-ml" => Some(format!("Cover definition of {}, how it differs from current AI, how it might work, key challenges, risks, and real-world implications.", subject)),
+        "finance" => Some(format!("Cover key concepts of {}, market trends, regulatory environment, and strategic recommendations.", subject)),
+        "medical" => Some(format!("Cover etiology of {}, clinical presentation, diagnostic criteria, treatment options, and prognosis.", subject)),
+        "scientific-research" => Some(format!("Cover methodology for {}, data analysis, ethical considerations, and potential impact.", subject)),
+        "workplace-productivity" => Some(format!("Analyze objective output vs subjective perception for {}, remote/hybrid dynamics, and cultural impact.", subject)),
+        "education" => Some(format!("Cover pedagogical foundations of {}, cognitive load optimization, retention strategies, and application milestones.", subject)),
+        "software-engineering" | "devops-infra" => Some(format!("Cover system architecture for {}, deployment strategy, scalability bottlenecks, and security considerations.", subject)),
+        _ => Some(format!("Break down {} into fundamental components, current state, key challenges, and future implications.", subject)),
     }
+}
+
+/// Infer missing assumptions to anchor the LLM
+fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
+    let mut assumptions = Vec::new();
+    let lower = raw.to_lowercase();
+    
+    // Domain assumptions
+    match profile.domain.as_str() {
+        "software-engineering" | "devops-infra" => {
+            if !lower.contains("legacy") && !lower.contains("old") {
+                assumptions.push("Assume modern, idiomatic technology stack and best practices".into());
+            }
+            assumptions.push("Assume production-grade requirements (security, logging, error handling)".into());
+        },
+        "business-strategy" => {
+            assumptions.push("Assume resource constraints (time/budget) typical of the specified team size".into());
+            assumptions.push("Assume focus on ROI and measurable business outcomes".into());
+        },
+        "data-science" | "ai-ml" => {
+            assumptions.push("Assume data is imperfect and requires preprocessing/cleaning".into());
+            assumptions.push("Assume model scalability and ethical considerations are paramount".into());
+        },
+        "medical" | "pharma" => {
+            assumptions.push("Assume strict regulatory compliance (e.g. HIPAA, FDA guidelines) is required".into());
+        }
+        _ => {}
+    }
+    
+    // Intent-based assumptions
+    match profile.primary_intent {
+        super::intent::IntentClass::Build => {
+            assumptions.push("Assume output should be immediately actionable and structured".into());
+        },
+        super::intent::IntentClass::Explain => {
+            assumptions.push("Assume the audience needs foundational concepts clarified before deep dives".into());
+        },
+        super::intent::IntentClass::Debug => {
+            assumptions.push("Assume underlying systems are standard unless otherwise specified".into());
+        },
+        _ => {}
+    }
+    
+    assumptions
 }
 
 /// Derive dynamic final instruction based on intent

@@ -16,12 +16,15 @@ impl AggressiveEngine {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
 
-        // 1. Ory Engine: Meta-Orchestration and Deep Learning
+        // Isolate the actual user request from the RAG chunks and semantic context
+        let (_, _, user_prompt) = super::structurer::split_raw_input(raw);
+
+        // 1. Ory Engine: Meta-Orchestration and Deep Learning (using isolated prompt)
         let mut ory_lock = ory_engine.lock().await;
         let config_guard = config_handle.read();
-        let ory_result = ory_lock.process(raw, &config_guard).map_err(|e| e.to_string())?;
+        let ory_result = ory_lock.process(&user_prompt, &config_guard).map_err(|e| e.to_string())?;
         
-        let mut profile = super::intent::extract(repr, raw)?;
+        let mut profile = super::intent::extract(repr, &user_prompt)?;
         
         // Enhance Aggressive intent with Ory's deep learning
         if ory_result.intent.confidence_score > profile.confidence {
@@ -34,11 +37,11 @@ impl AggressiveEngine {
         let mut router = super::resolver::StructurerRouter::new(resolver);
         let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
 
-        // 2. Build structured prompt (now with execution phases, validation, constraints_meta)
-        let structured = super::structurer::build(&profile, raw, &resolved_prompt)?;
+        // 2. Build structured prompt (using isolated prompt so inference isn't confused by RAG chunks)
+        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt)?;
 
         // 3. Score ambiguity
-        let amb = super::ambiguity::score(repr, raw)?;
+        let amb = super::ambiguity::score(repr, &user_prompt)?;
         let threshold = cfg.ambiguity_threshold.unwrap_or(0.65);
 
         // 4. Generate domain-aware questions if threshold exceeded
@@ -52,7 +55,7 @@ impl AggressiveEngine {
         let aggressive_ms = t_start.elapsed().as_millis() as u64;
 
         // Render final optimized prompt for UI
-        let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions);
+        let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions, raw);
         
         // Post-generation validation using Hallucination Guard
         let guard_cfg = &structured.hallucination_guard;
