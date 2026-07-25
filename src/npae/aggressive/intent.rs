@@ -26,14 +26,18 @@ pub struct IntentProfile {
 }
 
 pub fn extract(repr: &CompressedRepr, raw: &str) -> Result<IntentProfile, String> {
+    extract_with_config(repr, raw, None)
+}
+
+pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&super::config::UnifiedConfig>) -> Result<IntentProfile, String> {
     if repr.intent_vec.is_empty() {
         return Err("intent_vec is empty".into());
     }
 
     let lower = raw.to_lowercase();
 
-    // Dynamic domain detection (10+ domains)
-    let domain = detect_domain(raw);
+    // Dynamic domain detection (10+ domains or loaded config)
+    let domain = detect_domain(raw, config);
 
     // Simplistic mapping: locate max in intent_vec
     let (max_idx, max_val) = repr.intent_vec.iter().enumerate()
@@ -106,11 +110,33 @@ use crate::npae::ory::embeddings::embed_text;
 
 /// Dynamic domain detection — Uses Vector Space Modeling (VSM) and Cosine Similarity
 /// Replaces heuristic keyword matching with semantic centroid comparison.
-fn detect_domain(raw: &str) -> String {
+fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> String {
     let prompt_vec = embed_text(raw);
-    
-    // Centroids for each domain. In a production system, these are pre-calculated
-    // embeddings of high-quality domain descriptions.
+    let mut best_domain = "general";
+    let mut best_score = 0.35f32; // Minimum threshold for domain matching
+
+    if let Some(cfg) = config {
+        for tax in &cfg.domain_taxonomy {
+            if tax.keywords.is_empty() { continue; }
+            let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
+            for kw in &tax.keywords {
+                let kw_vec = embed_text(kw);
+                for i in 0..centroid.len() {
+                    centroid[i] += kw_vec[i];
+                }
+            }
+            crate::npae::ory::math::l2_normalize(&mut centroid);
+
+            let similarity = cosine_similarity(&prompt_vec, &centroid);
+            if similarity > best_score {
+                best_score = similarity;
+                best_domain = &tax.domain;
+            }
+        }
+        return best_domain.to_string();
+    }
+
+    // Centroids for each domain fallback
     let domains = [
         ("sports-nutrition", vec!["nutritionist", "diet", "macro", "protein", "training"]),
         ("software-engineering", vec!["code", "rust", "api", "backend", "software"]),
@@ -127,11 +153,9 @@ fn detect_domain(raw: &str) -> String {
         ("ai-ml", vec!["llm", "neural", "transformer", "alignment", "ai"]),
         ("medical", vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
         ("cybersecurity", vec!["security", "hacking", "firewall", "encryption", "threat"]),
+        ("real-estate", vec!["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
         ("workplace-productivity", vec!["productivity", "culture", "collaboration", "burnout"]),
     ];
-
-    let mut best_domain = "general";
-    let mut best_score = 0.35f32; // Minimum threshold for domain matching
 
     for (name, keywords) in domains {
         // Simple centroid: average of keyword embeddings

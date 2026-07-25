@@ -303,7 +303,7 @@ impl std::fmt::Display for crate::npae::schema::types::Priority {
     }
 }
 
-pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::ResolvedPrompt) -> std::result::Result<StructuredPrompt, String> {
+pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::ResolvedPrompt, config: Option<&super::config::UnifiedConfig>) -> std::result::Result<StructuredPrompt, String> {
     let role_primary = resolved.role.clone();
     let inclusions = resolved.inclusions.clone();
     let forbidden = resolved.forbidden.clone();
@@ -328,8 +328,8 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Build a non-redundant background — only adds new info beyond the description
     let background = build_background(profile, &user_level_str);
 
-    // Infer execution phases based on temporal scope and intent
-    let execution_phases = infer_execution_phases(profile, raw);
+    // Infer execution phases based on temporal scope, domain templates, and intent
+    let execution_phases = infer_execution_phases(profile, raw, config);
 
     // Infer validation steps if validation signals detected
     let validation_steps = infer_validation_steps(profile, raw);
@@ -350,7 +350,7 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     let tone = derive_tone(profile);
 
     // Derive high-resolution persona anchor
-    let persona_anchor = derive_persona_anchor(&profile.domain, &role_primary);
+    let persona_anchor = derive_persona_anchor(&profile.domain, &role_primary, config);
 
     Ok(StructuredPrompt {
         role: PromptRole {
@@ -442,13 +442,32 @@ fn build_background(profile: &IntentProfile, user_level: &str) -> String {
     parts.join(". ")
 }
 
-/// Infer execution phases from temporal scope and raw prompt
-fn infer_execution_phases(profile: &IntentProfile, raw: &str) -> Vec<ExecutionPhase> {
+/// Infer execution phases from temporal scope, config templates, and raw prompt
+fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&super::config::UnifiedConfig>) -> Vec<ExecutionPhase> {
     if !profile.has_phases && !profile.has_timeline {
         // No temporal signals — check if this is a build/planning task
         if profile.primary_intent != super::intent::IntentClass::Build 
             && profile.primary_intent != super::intent::IntentClass::Transform {
             return vec![];
+        }
+    }
+
+    // 1. Generic dynamic lookup from config.domain_taxonomy.phase_templates
+    let intent_key = match profile.primary_intent {
+        super::intent::IntentClass::Build => "build",
+        super::intent::IntentClass::Analyze => "analyze",
+        super::intent::IntentClass::Explain => "explain",
+        super::intent::IntentClass::Debug => "debug",
+        super::intent::IntentClass::Transform => "transform",
+    };
+
+    if let Some(cfg) = config {
+        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == profile.domain) {
+            if let Some(ref templates) = tax.phase_templates {
+                if let Some(phases) = templates.get(intent_key) {
+                    return phases.clone();
+                }
+            }
         }
     }
 
@@ -479,6 +498,29 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str) -> Vec<ExecutionPh
                 description: "Implementation, go-to-market, initial customer acquisition".into(),
                 estimated_duration: "2-4 weeks".into(),
                 deliverables: vec!["Launch plan".into(), "First 30-day action items".into()],
+            });
+        }
+        "real-estate" | "real estate" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "Licensing & Pre-Registration".into(),
+                description: "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.".into(),
+                estimated_duration: "1-3 months".into(),
+                deliverables: vec!["Real Estate License".into(), "Broker Sponsorship Agreement".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Business Setup & GTM Strategy".into(),
+                description: "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.".into(),
+                estimated_duration: "2-4 weeks".into(),
+                deliverables: vec!["Business Entity (LLC)".into(), "Lead Generation & CRM Setup".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Client Acquisition & Expansion".into(),
+                description: "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.".into(),
+                estimated_duration: "Ongoing".into(),
+                deliverables: vec!["First Closed Transactions".into(), "Client Referral Pipeline".into()],
             });
         }
         "software-engineering" | "devops-infra" => {
@@ -604,27 +646,57 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str) -> Vec<ExecutionPh
                     });
                 }
                 super::intent::IntentClass::Build => {
-                    phases.push(ExecutionPhase {
-                        phase_number: 1,
-                        name: "Architecture & Design".into(),
-                        description: format!("Define structural requirements and design for {}.", subject).into(),
-                        estimated_duration: "Design Phase".into(),
-                        deliverables: vec![format!("{} blueprint", subject).into()],
-                    });
-                    phases.push(ExecutionPhase {
-                        phase_number: 2,
-                        name: "Core Implementation".into(),
-                        description: format!("Construct the functional components of {}.", subject).into(),
-                        estimated_duration: "Build Phase".into(),
-                        deliverables: vec![format!("Functional {} prototype", subject).into()],
-                    });
-                    phases.push(ExecutionPhase {
-                        phase_number: 3,
-                        name: "Validation & Polish".into(),
-                        description: format!("Test, refine, and finalize {} for production.", subject).into(),
-                        estimated_duration: "Final Phase".into(),
-                        deliverables: vec![format!("Optimized {}", subject).into()],
-                    });
+                    let is_software_like = profile.domain == "software-engineering" 
+                        || profile.domain == "software" 
+                        || profile.domain == "devops-infra" 
+                        || profile.domain == "devops" 
+                        || profile.domain == "ai-ml";
+
+                    if is_software_like {
+                        phases.push(ExecutionPhase {
+                            phase_number: 1,
+                            name: "Architecture & Design".into(),
+                            description: format!("Define structural requirements and design for {}.", subject).into(),
+                            estimated_duration: "Design Phase".into(),
+                            deliverables: vec![format!("{} blueprint", subject).into()],
+                        });
+                        phases.push(ExecutionPhase {
+                            phase_number: 2,
+                            name: "Core Implementation".into(),
+                            description: format!("Construct the functional components of {}.", subject).into(),
+                            estimated_duration: "Build Phase".into(),
+                            deliverables: vec![format!("Functional {} prototype", subject).into()],
+                        });
+                        phases.push(ExecutionPhase {
+                            phase_number: 3,
+                            name: "Validation & Polish".into(),
+                            description: format!("Test, refine, and finalize {} for production.", subject).into(),
+                            estimated_duration: "Final Phase".into(),
+                            deliverables: vec![format!("Optimized {}", subject).into()],
+                        });
+                    } else {
+                        phases.push(ExecutionPhase {
+                            phase_number: 1,
+                            name: "Planning & Strategy".into(),
+                            description: format!("Define goals, foundational requirements, and operational roadmap for {}.", subject).into(),
+                            estimated_duration: "Phase 1".into(),
+                            deliverables: vec![format!("{} strategy roadmap", subject).into()],
+                        });
+                        phases.push(ExecutionPhase {
+                            phase_number: 2,
+                            name: "Execution & Setup".into(),
+                            description: format!("Establish core operational assets, compliance, and systems for {}.", subject).into(),
+                            estimated_duration: "Phase 2".into(),
+                            deliverables: vec![format!("Functional {} setup", subject).into()],
+                        });
+                        phases.push(ExecutionPhase {
+                            phase_number: 3,
+                            name: "Launch & Optimization".into(),
+                            description: format!("Deploy, monitor initial outcomes, and optimize performance for {}.", subject).into(),
+                            estimated_duration: "Phase 3".into(),
+                            deliverables: vec![format!("Launched {}", subject).into()],
+                        });
+                    }
                 }
                 _ => {
                     // Minimal fallback for other intents
@@ -874,9 +946,18 @@ fn derive_dynamic_instruction(profile: &IntentProfile) -> String {
 }
 
 /// Derive a high-resolution persona anchor for the role
-fn derive_persona_anchor(domain: &str, role: &str) -> String {
+fn derive_persona_anchor(domain: &str, role: &str, config: Option<&super::config::UnifiedConfig>) -> String {
+    if let Some(cfg) = config {
+        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == domain) {
+            if let Some(ref template) = tax.persona_template {
+                return template.replace("{role}", role);
+            }
+        }
+    }
+
     match domain {
         "business-strategy" => format!("Senior {} with specialization in market scaling, resource optimization, and strategic growth.", role),
+        "real-estate" => format!("Experienced {} specializing in licensing compliance, property marketing, client acquisition, and agency operations.", role),
         "software-engineering" => format!("Expert {} focused on scalable architecture, clean code principles, and performance optimization.", role),
         "ai-ml" => format!("Senior {} specializing in large-scale model alignment, safety protocols, and LLM architecture.", role),
         "medical" => format!("Specialized {} with clinical expertise, diagnostic precision, and evidence-based practice.", role),

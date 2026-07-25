@@ -107,11 +107,19 @@ fn extract_focus_topics(raw: &str, taxonomy: &[DomainTaxonomy], domain: &str) ->
         }
     }
 
-    // Sort by length DESC to prefer specific phrases over generic words, then dedup
+    // Sort by length DESC to prefer specific phrases over generic words
     topics.sort_by(|a, b| b.len().cmp(&a.len()));
     topics.dedup();
     
-    topics.into_iter().take(3).collect()
+    // Filter out topics that are substrings of longer selected topics
+    let mut filtered_topics: Vec<String> = Vec::new();
+    for topic in topics {
+        if !filtered_topics.iter().any(|existing| existing.to_lowercase().contains(&topic.to_lowercase())) {
+            filtered_topics.push(topic);
+        }
+    }
+
+    filtered_topics.into_iter().take(3).collect()
 }
 
 /// Domain-anchored fallback roles — produces specific titles, never "Expert Builder"

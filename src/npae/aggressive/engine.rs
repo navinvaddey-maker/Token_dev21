@@ -24,7 +24,7 @@ impl AggressiveEngine {
         let config_guard = config_handle.read();
         let ory_result = ory_lock.process(&user_prompt, &config_guard).map_err(|e| e.to_string())?;
         
-        let mut profile = super::intent::extract(repr, &user_prompt)?;
+        let mut profile = super::intent::extract_with_config(repr, &user_prompt, Some(&config_guard))?;
         
         // Enhance Aggressive intent with Ory's deep learning
         if ory_result.intent.confidence_score > profile.confidence {
@@ -38,7 +38,7 @@ impl AggressiveEngine {
         let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
 
         // 2. Build structured prompt (using isolated prompt so inference isn't confused by RAG chunks)
-        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt)?;
+        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt, Some(&config_guard))?;
 
         // 3. Score ambiguity
         let amb = super::ambiguity::score(repr, &user_prompt)?;

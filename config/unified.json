@@ -2,97 +2,143 @@
   "domain_taxonomy": [
     {
       "domain": "pharma",
-      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech"],
+      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech", "pharmacokinetics", "pharmacodynamics", "formulation", "clinical-trial"],
       "boost": 3
     },
     {
       "domain": "nutrition",
-      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician", "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic", "vegetarian"],
+      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician", "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic", "vegetarian", "micronutrients", "caloric-deficit"],
       "boost": 2
     },
     {
       "domain": "software",
-      "keywords": ["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker", "kubernetes"],
+      "keywords": ["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker", "kubernetes", "typescript", "javascript", "refactoring", "git", "ci", "microservices", "compiler", "framework", "sdk"],
       "boost": 2
     },
     {
       "domain": "business",
-      "keywords": ["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale", "venture", "customer", "monetize"],
+      "keywords": ["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale", "venture", "customer", "monetize", "b2b", "b2c", "churn", "arr", "mrr", "valuation", "business-plan"],
       "boost": 2
     },
     {
       "domain": "data-science",
-      "keywords": ["data", "ml", "machine-learning", "model", "dataset", "neural", "prediction", "classification", "pandas", "tensorflow"],
+      "keywords": ["data", "ml", "machine-learning", "model", "dataset", "neural", "prediction", "classification", "pandas", "tensorflow", "pytorch", "scikit-learn", "data-pipeline", "feature-engineering", "deep-learning", "nlp", "computer-vision"],
       "boost": 2
     },
     {
       "domain": "education",
-      "keywords": ["teach", "learn", "curriculum", "course", "student", "lecture", "training", "certification", "assessment"],
+      "keywords": ["teach", "learn", "curriculum", "course", "student", "lecture", "training", "certification", "assessment", "pedagogy", "syllabus", "e-learning", "tutor", "instructor", "academic"],
       "boost": 1
     },
     {
       "domain": "creative",
-      "keywords": ["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue", "writing"],
+      "keywords": ["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue", "writing", "copywriting", "worldbuilding", "prose", "scriptwriting", "illustration"],
       "boost": 1
     },
     {
       "domain": "health-fitness",
-      "keywords": ["workout", "exercise", "cardio", "strength", "weight", "health", "wellness", "recovery", "sleep", "training"],
+      "keywords": ["workout", "exercise", "cardio", "strength", "weight", "health", "wellness", "recovery", "sleep", "training", "hypertrophy", "calisthenics", "endurance", "fitness", "physiotherapy"],
       "boost": 2
     },
     {
       "domain": "legal",
-      "keywords": ["contract", "legal", "compliance", "regulation", "patent", "trademark", "liability", "attorney"],
+      "keywords": ["contract", "legal", "compliance", "regulation", "patent", "trademark", "liability", "attorney", "litigation", "clause", "ip", "intellectual-property", "jurisdiction", "statute", "gdpr"],
       "boost": 3
     },
     {
       "domain": "marketing",
-      "keywords": ["marketing", "brand", "campaign", "seo", "content", "social-media", "conversion", "funnel", "audience", "ads"],
+      "keywords": ["marketing", "brand", "campaign", "seo", "content", "social-media", "conversion", "funnel", "audience", "ads", "copywriting", "ppc", "ctr", "email-marketing", "influencer", "lead-gen"],
       "boost": 2
     },
     {
       "domain": "finance",
-      "keywords": ["investment", "portfolio", "stock", "crypto", "trading", "banking", "loan", "interest", "dividend", "accounting", "audit", "tax", "ledger", "fintech", "quantitative", "derivatives"],
+      "keywords": ["investment", "portfolio", "stock", "crypto", "trading", "banking", "loan", "interest", "dividend", "accounting", "audit", "tax", "ledger", "fintech", "quantitative", "derivatives", "hedge-fund", "valuation", "asset", "equity"],
       "boost": 3
     },
     {
       "domain": "devops",
-      "keywords": ["ci-cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "cloud", "aws", "gcp", "azure"],
+      "keywords": ["ci-cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "cloud", "aws", "gcp", "azure", "kubernetes", "docker", "helm", "gitops", "observability", "prometheus", "grafana", "sre"],
       "boost": 2
     },
     {
       "domain": "ai-ml",
-      "keywords": ["alignment", "safety", "llm", "transformer", "neural", "agi", "general intelligence", "machine learning", "rlhf", "inference", "real-world implications"],
+      "keywords": ["alignment", "safety", "llm", "transformer", "neural", "agi", "general intelligence", "machine learning", "rlhf", "inference", "real-world implications", "prompt", "token", "fine-tuning", "embeddings", "rag", "vector-database", "agent"],
       "boost": 3
     },
     {
       "domain": "medical",
-      "keywords": ["medical", "patient", "doctor", "hospital", "surgery", "healthcare", "diagnosis", "treatment", "anatomy", "physiology", "pathology", "radiology"],
+      "keywords": ["medical", "patient", "doctor", "hospital", "surgery", "healthcare", "diagnosis", "treatment", "anatomy", "physiology", "pathology", "radiology", "clinical", "oncology", "cardiology", "neurology", "symptoms"],
       "boost": 3
     },
     {
       "domain": "scientific-research",
-      "keywords": ["research", "experiment", "laboratory", "hypothesis", "data analysis", "publication", "peer-review", "methodology", "citation", "abstract"],
+      "keywords": ["research", "experiment", "laboratory", "hypothesis", "data analysis", "publication", "peer-review", "methodology", "citation", "abstract", "paper", "journal", "academic", "statistical-significance"],
       "boost": 2
     },
     {
       "domain": "cybersecurity",
-      "keywords": ["security", "hacking", "firewall", "encryption", "vulnerability", "pentest", "soc", "malware", "threat", "zero-day", "endpoint"],
+      "keywords": ["security", "hacking", "firewall", "encryption", "vulnerability", "pentest", "soc", "malware", "threat", "zero-day", "endpoint", "siem", "zero-trust", "authentication", "authorization", "xss", "csrf"],
       "boost": 2
     },
     {
       "domain": "ecommerce",
-      "keywords": ["store", "shopping", "cart", "checkout", "inventory", "warehouse", "logistics", "marketplace", "shipping", "fulfillment"],
+      "keywords": ["store", "shopping", "cart", "checkout", "inventory", "warehouse", "logistics", "marketplace", "shipping", "fulfillment", "shopify", "woocommerce", "sku", "payment-gateway", "dropshipping"],
       "boost": 2
     },
     {
       "domain": "real-estate",
-      "keywords": ["property", "house", "apartment", "mortgage", "realtor", "appraisal", "listing", "commercial", "residential", "lease", "equity"],
-      "boost": 2
+      "keywords": ["property", "house", "apartment", "mortgage", "realtor", "appraisal", "listing", "commercial", "residential", "lease", "equity", "real estate", "estate agent", "real estate agent", "brokerage", "home", "tenant", "landlord", "zoning", "escrow"],
+      "boost": 4,
+      "persona_template": "Experienced {role} specializing in licensing compliance, property marketing, client acquisition, and agency operations.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Licensing & Pre-Registration",
+            "description": "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.",
+            "estimated_duration": "1-3 months",
+            "deliverables": ["Real Estate License", "Broker Sponsorship Agreement"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Business Setup & GTM Strategy",
+            "description": "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": ["Business Entity (LLC)", "Lead Generation & CRM Setup"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Client Acquisition & Expansion",
+            "description": "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.",
+            "estimated_duration": "Ongoing",
+            "deliverables": ["First Closed Transactions", "Client Referral Pipeline"]
+          }
+        ]
+      }
     },
     {
       "domain": "workplace-productivity",
-      "keywords": ["remote", "wfh", "productivity", "culture", "collaboration", "engagement", "performance", "output", "burnout", "hybrid", "distributed team", "work-from-home", "async", "synchronous", "meeting"],
+      "keywords": ["remote", "wfh", "productivity", "culture", "collaboration", "engagement", "performance", "output", "burnout", "hybrid", "distributed team", "work-from-home", "async", "synchronous", "meeting", "workflow", "time-management", "notion", "jira", "slack"],
+      "boost": 2
+    },
+    {
+      "domain": "gaming",
+      "keywords": ["game", "gaming", "unreal", "unity", "gameplay", "graphics", "fps", "rpg", "multiplayer", "esports", "shader", "rendering", "level-design", "gamedev"],
+      "boost": 2
+    },
+    {
+      "domain": "hardware",
+      "keywords": ["hardware", "circuit", "pcb", "microcontroller", "embedded", "firmware", "fpga", "semiconductor", "arm", "risc-v", "soldering", "iot", "sensor"],
+      "boost": 2
+    },
+    {
+      "domain": "supply-chain",
+      "keywords": ["supply-chain", "logistics", "freight", "procurement", "inventory", "vendor", "distribution", "supplier", "customs", "fulfillment", "lead-time"],
+      "boost": 2
+    },
+    {
+      "domain": "customer-support",
+      "keywords": ["support", "ticket", "customer-service", "helpdesk", "zendesk", "sla", "satisfaction", "csat", "onboarding", "churn-prevention", "resolution"],
       "boost": 2
     }
   ],
@@ -320,13 +366,17 @@
       ]
     },
     {
-      "priority": 4,
+      "priority": 6,
       "domain": "real-estate",
       "base_title": "Real Estate Agent",
       "verbs": [
+        { "word": "agent",            "weight": 10 },
+        { "word": "realtor",          "weight": 10 },
+        { "word": "estate",           "weight": 9 },
         { "word": "property",         "weight": 9 },
+        { "word": "brokerage",        "weight": 9 },
         { "word": "listing",          "weight": 8 },
-        { "word": "mortgage",         "weight": 9 },
+        { "word": "mortgage",         "weight": 8 },
         { "word": "valuation",        "weight": 8 }
       ]
     },

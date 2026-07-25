@@ -3,6 +3,9 @@ use std::sync::{Arc, RwLock};
 use anyhow::{Result, Context};
 use std::path::Path;
 
+use std::collections::HashMap;
+use crate::npae::schema::types::ExecutionPhase;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UnifiedConfig {
     pub domain_taxonomy: Vec<DomainTaxonomy>,
@@ -15,6 +18,10 @@ pub struct DomainTaxonomy {
     pub domain: String,
     pub keywords: Vec<String>,
     pub boost: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona_template: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_templates: Option<HashMap<String, Vec<ExecutionPhase>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
