@@ -18,10 +18,27 @@ pub struct DomainTaxonomy {
     pub domain: String,
     pub keywords: Vec<String>,
     pub boost: u32,
+    /// Alternate names (e.g. legacy hardcoded strings) that canonicalize to `domain`.
+    #[serde(default)]
+    pub aliases: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persona_template: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phase_templates: Option<HashMap<String, Vec<ExecutionPhase>>>,
+}
+
+/// Maps any alias or legacy domain name to the canonical name defined in `unified.json`.
+/// Returns `name` unchanged if no alias match is found.
+pub fn normalize_domain<'a>(name: &'a str, taxonomy: &'a [DomainTaxonomy]) -> &'a str {
+    for tax in taxonomy {
+        if tax.domain == name {
+            return name;
+        }
+        if tax.aliases.iter().any(|a| a.as_str() == name) {
+            return tax.domain.as_str();
+        }
+    }
+    name
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -16,6 +16,8 @@ pub fn generate_role(
     domain_taxonomy: &[DomainTaxonomy],
     roles: &[RoleRule]
 ) -> String {
+    // Resolve any alias → canonical domain name so all downstream lookups are consistent.
+    let canonical_domain = super::config::normalize_domain(&profile.domain, domain_taxonomy);
     let lower = raw.to_lowercase();
     let word_set: HashSet<&str> = lower.split(|c: char| !c.is_alphanumeric() && c != '-')
         .filter(|s| !s.is_empty())
@@ -60,10 +62,10 @@ pub fn generate_role(
     // Step 4: Determine winner — domain-anchored fallbacks, NOT generic "Expert Builder"
     let base_title = scored.first()
         .map(|s| s.rule.base_title.as_str())
-        .unwrap_or_else(|| domain_anchored_fallback(&profile.domain, &profile.primary_intent));
+        .unwrap_or_else(|| domain_anchored_fallback(canonical_domain, &profile.primary_intent));
 
     let domain_name = if profile.domain != "general" {
-        to_title_case(&profile.domain)
+        to_title_case(canonical_domain)
     } else if let Some(ref subject) = profile.dynamic_subject {
         subject.clone()
     } else {
@@ -77,7 +79,7 @@ pub fn generate_role(
     };
 
     // Step 5: Focus extraction
-    let mut topics = extract_focus_topics(raw, domain_taxonomy, &profile.domain);
+    let mut topics = extract_focus_topics(raw, domain_taxonomy, canonical_domain);
     if topics.is_empty() {
         base_role
     } else {
@@ -125,29 +127,29 @@ fn extract_focus_topics(raw: &str, taxonomy: &[DomainTaxonomy], domain: &str) ->
 /// Domain-anchored fallback roles — produces specific titles, never "Expert Builder"
 fn domain_anchored_fallback(domain: &str, intent: &IntentClass) -> &'static str {
     match (domain, intent) {
-        // Business
-        ("business-strategy", IntentClass::Build) => "Business Strategist",
-        ("business-strategy", IntentClass::Analyze) => "Business Analyst",
-        ("business-strategy", IntentClass::Explain) => "Business Consultant",
-        ("business-strategy", _) => "Business Advisor",
+        // Business  (was "business-strategy")
+        ("business", IntentClass::Build)   => "Business Strategist",
+        ("business", IntentClass::Analyze) => "Business Analyst",
+        ("business", IntentClass::Explain) => "Business Consultant",
+        ("business", _)                    => "Business Advisor",
         
-        // Software
-        ("software-engineering", IntentClass::Build) => "Software Architect",
-        ("software-engineering", IntentClass::Debug) => "Systems Debugger",
-        ("software-engineering", IntentClass::Analyze) => "Code Analyst",
-        ("software-engineering", IntentClass::Transform) => "Refactoring Specialist",
-        ("software-engineering", _) => "Software Engineer",
+        // Software  (was "software-engineering")
+        ("software", IntentClass::Build)     => "Software Architect",
+        ("software", IntentClass::Debug)     => "Systems Debugger",
+        ("software", IntentClass::Analyze)   => "Code Analyst",
+        ("software", IntentClass::Transform) => "Refactoring Specialist",
+        ("software", _)                      => "Software Engineer",
         
-        // DevOps
-        ("devops-infra", IntentClass::Build) => "Infrastructure Architect",
-        ("devops-infra", IntentClass::Debug) => "Site Reliability Engineer",
-        ("devops-infra", _) => "DevOps Engineer",
+        // DevOps  (was "devops-infra")
+        ("devops", IntentClass::Build) => "Infrastructure Architect",
+        ("devops", IntentClass::Debug) => "Site Reliability Engineer",
+        ("devops", _)                  => "DevOps Engineer",
         
-        // Nutrition
-        ("sports-nutrition", IntentClass::Build) => "Registered Dietician",
-        ("sports-nutrition", IntentClass::Analyze) => "Clinical Nutritionist",
-        ("sports-nutrition", IntentClass::Explain) => "Nutrition Educator",
-        ("sports-nutrition", _) => "Nutrition Specialist",
+        // Nutrition  (was "sports-nutrition")
+        ("nutrition", IntentClass::Build)   => "Registered Dietician",
+        ("nutrition", IntentClass::Analyze) => "Clinical Nutritionist",
+        ("nutrition", IntentClass::Explain) => "Nutrition Educator",
+        ("nutrition", _)                    => "Nutrition Specialist",
         
         // Health
         ("health-fitness", IntentClass::Build) => "Fitness Program Designer",
@@ -164,10 +166,10 @@ fn domain_anchored_fallback(domain: &str, intent: &IntentClass) -> &'static str 
         ("education", IntentClass::Explain) => "Technical Instructor",
         ("education", _) => "Education Specialist",
         
-        // Creative
-        ("creative-writing", IntentClass::Build) => "Creative Writer",
-        ("creative-writing", IntentClass::Transform) => "Content Editor",
-        ("creative-writing", _) => "Writing Specialist",
+        // Creative  (was "creative-writing")
+        ("creative", IntentClass::Build)     => "Creative Writer",
+        ("creative", IntentClass::Transform) => "Content Editor",
+        ("creative", _)                      => "Writing Specialist",
         
         // Legal
         ("legal", IntentClass::Analyze) => "Legal Analyst",

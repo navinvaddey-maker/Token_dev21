@@ -7,21 +7,25 @@
     },
     {
       "domain": "nutrition",
+      "aliases": ["sports-nutrition", "clinical-nutrition", "dietetics"],
       "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician", "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic", "vegetarian", "micronutrients", "caloric-deficit"],
       "boost": 2
     },
     {
       "domain": "software",
+      "aliases": ["software-engineering", "technical-writing"],
       "keywords": ["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker", "kubernetes", "typescript", "javascript", "refactoring", "git", "ci", "microservices", "compiler", "framework", "sdk"],
       "boost": 2
     },
     {
       "domain": "business",
+      "aliases": ["business-strategy"],
       "keywords": ["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale", "venture", "customer", "monetize", "b2b", "b2c", "churn", "arr", "mrr", "valuation", "business-plan"],
       "boost": 2
     },
     {
       "domain": "data-science",
+      "aliases": ["data-analytics", "machine-learning"],
       "keywords": ["data", "ml", "machine-learning", "model", "dataset", "neural", "prediction", "classification", "pandas", "tensorflow", "pytorch", "scikit-learn", "data-pipeline", "feature-engineering", "deep-learning", "nlp", "computer-vision"],
       "boost": 2
     },
@@ -32,6 +36,7 @@
     },
     {
       "domain": "creative",
+      "aliases": ["creative-writing", "content-writing"],
       "keywords": ["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue", "writing", "copywriting", "worldbuilding", "prose", "scriptwriting", "illustration"],
       "boost": 1
     },
@@ -57,6 +62,7 @@
     },
     {
       "domain": "devops",
+      "aliases": ["devops-infra", "platform-engineering"],
       "keywords": ["ci-cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "cloud", "aws", "gcp", "azure", "kubernetes", "docker", "helm", "gitops", "observability", "prometheus", "grafana", "sre"],
       "boost": 2
     },

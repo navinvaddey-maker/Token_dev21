@@ -170,7 +170,7 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         && prompt.role.primary.to_lowercase() != "none"
         && prompt.role.primary.to_lowercase() != "default";
 
-    let guardrails: Vec<_> = prompt.role.persona_constraints.iter().filter(|&c| c != "no_external_api_calls" && c != "production_grade_only").cloned().collect();
+    let guardrails: &Vec<String> = &prompt.role.persona_constraints;
 
     if is_role_valid || !prompt.role.persona_anchor.is_empty() || !guardrails.is_empty() {
         if is_role_valid {
@@ -398,14 +398,44 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Derive high-resolution persona anchor
     let persona_anchor = derive_persona_anchor(&profile.domain, &role_primary, config);
 
+    // GAP-13: Derive length bounds from input complexity and intent
+    let word_count = raw.split_whitespace().count();
+    let length_bound = match (&profile.primary_intent, word_count) {
+        (super::intent::IntentClass::Explain, 0..=15) => LengthBound { min: 100, max: 500 },
+        (super::intent::IntentClass::Explain, _)      => LengthBound { min: 200, max: 1000 },
+        (super::intent::IntentClass::Build,   0..=30) => LengthBound { min: 300, max: 1500 },
+        (super::intent::IntentClass::Build,   _)      => LengthBound { min: 500, max: 3000 },
+        (super::intent::IntentClass::Debug,   _)      => LengthBound { min: 150, max: 800 },
+        (super::intent::IntentClass::Analyze, _)      => LengthBound { min: 300, max: 2000 },
+        (super::intent::IntentClass::Transform, _)    => LengthBound { min: 100, max: 1000 },
+    };
+
     Ok(StructuredPrompt {
         role: PromptRole {
             primary: role_primary,
             expertise_domains: vec![profile.domain.clone()],
-            persona_constraints: vec![
-                "no_external_api_calls".into(),
-                "production_grade_only".into(),
-            ],
+            persona_constraints: match profile.domain.as_str() {
+                "software-engineering" | "devops-infra" => vec![
+                    "production_grade_only".into(),
+                    "no_placeholder_code".into(),
+                ],
+                "medical" | "pharma" => vec![
+                    "evidence_based_only".into(),
+                    "cite_sources_required".into(),
+                    "no_medical_advice_disclaimer".into(),
+                ],
+                "legal" => vec![
+                    "jurisdiction_aware".into(),
+                    "cite_statutes".into(),
+                ],
+                "creative" => vec![
+                    "maintain_narrative_voice".into(),
+                    "show_dont_tell".into(),
+                ],
+                _ => vec![
+                    "accurate_and_thorough".into(),
+                ],
+            },
             persona_anchor,
         },
         objective: None,
@@ -421,10 +451,7 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
         },
         constraints: PromptConstraints {
             output_format: profile.output_preference.clone(),
-            length_bound: LengthBound {
-                min: 200,
-                max: 2000,
-            },
+            length_bound,
             forbidden_topics: forbidden,
             required_inclusions: inclusions,
             tone,
@@ -511,7 +538,9 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
     };
 
     if let Some(cfg) = config {
-        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == profile.domain) {
+        // Resolve any alias → canonical domain name before lookup.
+        let canonical = super::config::normalize_domain(&profile.domain, &cfg.domain_taxonomy);
+        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == canonical) {
             if let Some(ref templates) = tax.phase_templates {
                 if let Some(phases) = templates.get(intent_key) {
                     return phases.clone();
@@ -523,10 +552,16 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
     let lower = raw.to_lowercase();
     let mut phases = Vec::new();
 
-    // If the user explicitly mentions phases, we create a generic phased structure
-    // If the domain gives us clues, we can be more specific
-    match profile.domain.as_str() {
-        "business-strategy" => {
+    // Resolve domain alias → canonical name for consistent matching.
+    // Falls back to profile.domain if no config is available.
+    let resolved_domain = if let Some(cfg) = config {
+        super::config::normalize_domain(&profile.domain, &cfg.domain_taxonomy).to_owned()
+    } else {
+        profile.domain.clone()
+    };
+
+    match resolved_domain.as_str() {
+        "business" => {
             phases.push(ExecutionPhase {
                 phase_number: 1,
                 name: "Research & Validation".into(),
@@ -572,7 +607,7 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                 deliverables: vec!["First Closed Transactions".into(), "Client Referral Pipeline".into()],
             });
         }
-        "software-engineering" | "devops-infra" => {
+        "software" | "devops" => {
             phases.push(ExecutionPhase {
                 phase_number: 1,
                 name: "Design & Architecture".into(),
@@ -595,7 +630,7 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                 deliverables: vec!["Deployed service".into(), "Monitoring setup".into()],
             });
         }
-        "sports-nutrition" | "health-fitness" => {
+        "nutrition" | "health-fitness" => {
             if lower.contains("week") || lower.contains("day") || lower.contains("plan") {
                 phases.push(ExecutionPhase {
                     phase_number: 1,
@@ -695,11 +730,8 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                     });
                 }
                 super::intent::IntentClass::Build => {
-                    let is_software_like = profile.domain == "software-engineering" 
-                        || profile.domain == "software" 
-                        || profile.domain == "devops-infra" 
-                        || profile.domain == "devops" 
-                        || profile.domain == "ai-ml";
+                    let is_software_like = matches!(resolved_domain.as_str(),
+                        "software" | "devops" | "ai-ml");
 
                     if is_software_like {
                         phases.push(ExecutionPhase {

@@ -140,24 +140,25 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
         return best_domain.to_string();
     }
 
-    // Centroids for each domain fallback
+    // Centroids for each domain fallback — names MUST match unified.json canonical domain names.
+    // Use config::normalize_domain() at call-sites to resolve any legacy alias → canonical.
     let domains = [
-        ("sports-nutrition", vec!["nutritionist", "diet", "macro", "protein", "training"]),
-        ("software-engineering", vec!["code", "rust", "api", "backend", "software"]),
-        ("technical-writing", vec!["article", "documentation", "tutorial", "guide"]),
-        ("business-strategy", vec!["business", "startup", "revenue", "market", "strategy"]),
-        ("data-science", vec!["data", "ml", "model", "prediction", "analysis"]),
-        ("education", vec!["teach", "learn", "curriculum", "course", "pedagogy"]),
-        ("creative-writing", vec!["story", "novel", "plot", "fiction", "narrative"]),
-        ("health-fitness", vec!["workout", "exercise", "health", "wellness", "fitness"]),
-        ("legal", vec!["contract", "legal", "compliance", "law", "attorney"]),
-        ("marketing", vec!["marketing", "brand", "campaign", "seo", "audience"]),
-        ("finance", vec!["investment", "stock", "portfolio", "banking", "finance"]),
-        ("devops-infra", vec!["pipeline", "infrastructure", "cloud", "aws", "devops"]),
-        ("ai-ml", vec!["llm", "neural", "transformer", "alignment", "ai"]),
-        ("medical", vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
-        ("cybersecurity", vec!["security", "hacking", "firewall", "encryption", "threat"]),
-        ("real-estate", vec!["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
+        ("nutrition",              vec!["nutritionist", "diet", "macro", "protein", "training"]),
+        ("software",               vec!["code", "rust", "api", "backend", "software"]),
+        ("software",               vec!["article", "documentation", "tutorial", "guide"]),
+        ("business",               vec!["business", "startup", "revenue", "market", "strategy"]),
+        ("data-science",           vec!["data", "ml", "model", "prediction", "analysis"]),
+        ("education",              vec!["teach", "learn", "curriculum", "course", "pedagogy"]),
+        ("creative",               vec!["story", "novel", "plot", "fiction", "narrative"]),
+        ("health-fitness",         vec!["workout", "exercise", "health", "wellness", "fitness"]),
+        ("legal",                  vec!["contract", "legal", "compliance", "law", "attorney"]),
+        ("marketing",              vec!["marketing", "brand", "campaign", "seo", "audience"]),
+        ("finance",                vec!["investment", "stock", "portfolio", "banking", "finance"]),
+        ("devops",                 vec!["pipeline", "infrastructure", "cloud", "aws", "devops"]),
+        ("ai-ml",                  vec!["llm", "neural", "transformer", "alignment", "ai"]),
+        ("medical",                vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
+        ("cybersecurity",          vec!["security", "hacking", "firewall", "encryption", "threat"]),
+        ("real-estate",            vec!["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
         ("workplace-productivity", vec!["productivity", "culture", "collaboration", "burnout"]),
     ];
 

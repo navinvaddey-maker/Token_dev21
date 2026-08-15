@@ -98,6 +98,7 @@ mod tests {
                 domain: "nutrition".to_string(),
                 keywords: vec!["diet".to_string(), "meal".to_string()],
                 boost: 2,
+                aliases: vec![],
                 persona_template: None,
                 phase_templates: None,
             }

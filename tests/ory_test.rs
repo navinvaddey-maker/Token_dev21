@@ -6,8 +6,8 @@ use anyhow::Result;
 fn test_ory_novel_domain_flow() -> Result<()> {
     let mock_config = UnifiedConfig {
         domain_taxonomy: vec![
-            DomainTaxonomy { domain: "nutrition".to_string(), keywords: vec![], boost: 1, persona_template: None, phase_templates: None },
-            DomainTaxonomy { domain: "software".to_string(), keywords: vec![], boost: 1, persona_template: None, phase_templates: None },
+            DomainTaxonomy { domain: "nutrition".to_string(), keywords: vec![], boost: 1, aliases: vec![], persona_template: None, phase_templates: None },
+            DomainTaxonomy { domain: "software".to_string(), keywords: vec![], boost: 1, aliases: vec![], persona_template: None, phase_templates: None },
         ],
         roles: vec![],
         constraints: vec![],
@@ -50,7 +50,7 @@ fn test_ory_novel_domain_flow() -> Result<()> {
 fn test_ory_existing_domain_with_novel_signals() -> Result<()> {
     let mock_config = UnifiedConfig {
         domain_taxonomy: vec![
-            DomainTaxonomy { domain: "nutrition".to_string(), keywords: vec![], boost: 1, persona_template: None, phase_templates: None },
+            DomainTaxonomy { domain: "nutrition".to_string(), keywords: vec![], boost: 1, aliases: vec![], persona_template: None, phase_templates: None },
         ],
         roles: vec![],
         constraints: vec![],
