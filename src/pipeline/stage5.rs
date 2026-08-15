@@ -1,5 +1,8 @@
 use crate::{
-    algorithms::sparse_coding::SparseCoding,
+    algorithms::{
+        schema_filling::DeterminismScopeInjector,
+        sparse_coding::SparseCoding,
+    },
     types::{AlgorithmOutput, Mode},
 };
 
@@ -27,16 +30,79 @@ impl Stage5 {
                 out.scope_injections = vec![];
             }
             Mode::Aggressive => {
-                // Aggressive: generate scope injections from labels generated in Stage 3
-                if !out.cluster_labels.is_empty() {
-                    out.scope_injections = out.cluster_labels
+                // Use domain-aware scope injection from the schema filling module
+                let injections = DeterminismScopeInjector::inject(
+                    &out.resolved_schema.task,
+                    &None, // deliverable
+                    &out.resolved_schema.context.iter().cloned().collect::<Vec<_>>(),
+                );
+                out.scope_injections = if injections.is_empty() {
+                    // Fallback to cluster-derived, but filter non-semantic labels
+                    out.cluster_labels
                         .iter()
+                        .filter(|l| l.len() > 4 && !l.to_lowercase().starts_with("cluster_"))
                         .map(|label| format!("Consider {}", label))
-                        .collect();
+                        .collect()
                 } else {
-                    out.scope_injections = vec![];
-                }
+                    injections
+                };
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::CompressionSchema;
+
+    #[test]
+    fn test_gentle_mode_no_injections() {
+        let stage5 = Stage5::new();
+        let mut out = AlgorithmOutput {
+            mode: Some(Mode::Gentle),
+            cluster_labels: vec!["authentication".to_string()],
+            ..Default::default()
+        };
+        stage5.run(&mut out);
+        assert!(out.scope_injections.is_empty());
+    }
+
+    #[test]
+    fn test_aggressive_mode_domain_aware_injections() {
+        let stage5 = Stage5::new();
+        let mut out = AlgorithmOutput {
+            mode: Some(Mode::Aggressive),
+            resolved_schema: CompressionSchema {
+                task: Some("Build authentication microservice".to_string()),
+                ..Default::default()
+            },
+            cluster_labels: vec!["Cluster_0".to_string(), "Delta".to_string()],
+            ..Default::default()
+        };
+        stage5.run(&mut out);
+        assert!(!out.scope_injections.is_empty());
+        assert!(out.scope_injections.iter().any(|s| s.contains("OAuth 2.0")));
+    }
+
+    #[test]
+    fn test_aggressive_mode_fallback_filters_cluster_labels() {
+        let stage5 = Stage5::new();
+        let mut out = AlgorithmOutput {
+            mode: Some(Mode::Aggressive),
+            resolved_schema: CompressionSchema {
+                task: Some("Generic unmapped task".to_string()),
+                ..Default::default()
+            },
+            cluster_labels: vec![
+                "Cluster_0".to_string(),
+                "cluster_1".to_string(),
+                "foo".to_string(), // len <= 4
+                "optimization".to_string(),
+            ],
+            ..Default::default()
+        };
+        stage5.run(&mut out);
+        assert_eq!(out.scope_injections, vec!["Consider optimization".to_string()]);
     }
 }

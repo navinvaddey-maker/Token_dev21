@@ -5,9 +5,6 @@ async fn test_duplication() {
     let input = PipelineInput {
         raw_text: "Actually, here is basically a very whole bunch of text about something which is quite extremely important. We just really need to save a large number of tokens because it is literally necessary to do so. In order to achieve this, we should perhaps explore and discuss the following options below.".into(),
         task: "Compress this".into(),
-        deliverables: "".into(),
-        constraints: "".into(),
-        reproducibility: "".into(),
         model: "Claude".into(),
         use_case: "generic".into(),
         mode: "aggressive".into(),

@@ -13,7 +13,7 @@ fn test_sparse_coding_basic() {
         "fox".to_string(),
         "authentication".to_string(),
     ];
-    let result = sc.apply(&tokens, 0.4); // Keep 40%
+    let result = sc.apply(&tokens, 0.4, &[]); // Keep 40%
 
     // Should have fewer tokens than input
     assert!(result.len() < tokens.len());
@@ -73,7 +73,7 @@ fn test_sparse_coding_preserves_order() {
         "fourth".to_string(),
         "fifth".to_string(),
     ];
-    let result = sc.apply(&tokens, 0.6); // Keep 60%
+    let result = sc.apply(&tokens, 0.6, &[]); // Keep 60%
 
     // Extract just the text to check order preservation
     let result_texts: Vec<String> = result.iter().map(|t| t.text.clone()).collect();

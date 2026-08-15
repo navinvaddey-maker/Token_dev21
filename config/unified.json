@@ -412,7 +412,7 @@
       "description": "Gluten containing grains",
       "trigger": [
         [{ "word": "avoid",  "weight": 6 }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "no",     "weight": 5 }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
         [{ "word": "gluten", "weight": 8 }, { "word": "free",   "weight": 6  }]
       ]
     },
@@ -434,7 +434,7 @@
       "is_forbidden": true,
       "description": "All dairy products",
       "trigger": [
-        [{ "word": "no",     "weight": 5 }, { "word": "dairy",  "weight": 10 }],
+        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from", "lactose-free"] }, { "word": "dairy",  "weight": 10 }],
         [{ "word": "avoid",  "weight": 6 }, { "word": "dairy",  "weight": 10 }],
         [{ "word": "dairy",  "weight": 8 }, { "word": "free",   "weight": 6  }],
         [{ "word": "lactose", "weight": 8 }, { "word": "free",  "weight": 6  }]
@@ -457,7 +457,7 @@
       "is_forbidden": true,
       "description": "Nightshade vegetables (tomatoes, peppers, eggplant, potatoes)",
       "trigger": [
-        [{ "word": "no",     "weight": 5 }, { "word": "nightshades", "weight": 10 }],
+        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "nightshades", "weight": 10 }],
         [{ "word": "avoid",  "weight": 6 }, { "word": "nightshades", "weight": 10 }]
       ]
     },
@@ -502,8 +502,8 @@
       "is_forbidden": true,
       "description": "No external API dependencies",
       "trigger": [
-        [{ "word": "no",     "weight": 5 }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
-        [{ "word": "no",     "weight": 5 }, { "word": "dependencies", "weight": 9 }]
+        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
+        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "dependencies", "weight": 9 }]
       ]
     },
     {

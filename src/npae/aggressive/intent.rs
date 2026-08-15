@@ -1,4 +1,5 @@
 use crate::npae::compression::types::CompressedRepr;
+use crate::npae::schema::types::DeliverableType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntentClass { Build, Explain, Debug, Analyze, Transform }
@@ -9,6 +10,7 @@ pub enum KnowledgeLevel { Novice, Intermediate, Expert }
 #[derive(Debug, Clone)]
 pub struct IntentProfile {
     pub primary_intent:    IntentClass,
+    pub deliverable_type:  DeliverableType,
     pub domain:            String,
     pub user_knowledge:    KnowledgeLevel,
     pub temporal_scope:    String,
@@ -85,10 +87,12 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
     let detected_risk = detect_risk_tolerance(&lower);
     let detected_biz_type = detect_business_type(&lower);
     let detected_team = detect_team_composition(&lower);
-    let dynamic_subject = if domain == "general" { extract_subject(raw) } else { None };
+    let dynamic_subject = extract_subject(raw);
+    let deliverable_type = detect_deliverable_type(&lower, &primary_intent, &domain);
 
     Ok(IntentProfile {
         primary_intent,
+        deliverable_type,
         domain,
         user_knowledge,
         temporal_scope,
@@ -178,24 +182,101 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
     best_domain.to_string()
 }
 
-/// Simple subject extraction for dynamic domains — extracts the most likely focus noun
+/// Multi-word noun-phrase extraction — extracts the most specific subject from ANY domain.
+/// Examples:
+///   "Build a Kubernetes autoscaler" → "Kubernetes Autoscaler"
+///   "I want to become a real estate agent" → "Real Estate Agent"
+///   "Design a meal plan for marathon training" → "Meal Plan"
 fn extract_subject(raw: &str) -> Option<String> {
     let stop_words: std::collections::HashSet<&str> = [
-        "is", "are", "was", "were", "the", "a", "an", "this", "that", "it", "how", "why", "what", "actually", "just", "more", "or", "to", "for"
+        "i", "me", "my", "we", "our", "you", "your", "he", "she", "it", "they",
+        "is", "are", "was", "were", "be", "been", "being", "am",
+        "the", "a", "an", "this", "that", "these", "those",
+        "how", "why", "what", "when", "where", "which", "who",
+        "do", "does", "did", "will", "would", "could", "should", "can", "may", "might",
+        "have", "has", "had", "to", "for", "of", "in", "on", "at", "by", "with", "from",
+        "and", "or", "but", "not", "if", "so", "just", "also", "more", "most", "very",
+        "about", "into", "some", "want", "need", "like", "actually", "really",
     ].iter().copied().collect();
 
-    let words: Vec<&str> = raw.split(|c: char| !c.is_alphanumeric())
-        .filter(|s| !s.is_empty() && s.len() > 3)
-        .collect();
+    // Action verbs to skip when looking for the subject (the subject follows these)
+    let action_verbs: std::collections::HashSet<&str> = [
+        "build", "create", "make", "design", "develop", "implement", "write",
+        "analyze", "explain", "debug", "fix", "deploy", "optimize", "plan",
+        "compare", "evaluate", "generate", "set", "start", "become", "get",
+        "help", "give", "provide", "show", "tell", "find", "list", "identify",
+    ].iter().copied().collect();
 
-    for word in words {
-        let l = word.to_lowercase();
-        if !stop_words.contains(l.as_str()) {
-            // Return first significant noun-like word as the subject
-            return Some(l.chars().next().unwrap().to_uppercase().collect::<String>() + &l[1..]);
+    // Isolate the user's actual prompt (strip Context/RAG prefixes)
+    let (_, _, user_prompt) = super::structurer::split_raw_input(raw);
+    let words: Vec<&str> = user_prompt.split_whitespace().collect();
+
+    if words.is_empty() {
+        return None;
+    }
+
+    // Strategy: find the first contiguous run of non-stop, non-verb words
+    // that represents the noun phrase (the "what" of the prompt).
+    let mut best_phrase: Vec<String> = Vec::new();
+    let mut current_phrase: Vec<String> = Vec::new();
+    let mut past_first_verb = false;
+
+    for word in &words {
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+        if clean.is_empty() { continue; }
+        let lower = clean.to_lowercase();
+
+        // Skip stop words and action verbs — they precede the subject
+        if stop_words.contains(lower.as_str()) {
+            // If we were building a phrase, save it as candidate
+            if current_phrase.len() > best_phrase.len() {
+                best_phrase = current_phrase.clone();
+            }
+            current_phrase.clear();
+            continue;
+        }
+
+        if action_verbs.contains(lower.as_str()) {
+            past_first_verb = true;
+            if current_phrase.len() > best_phrase.len() {
+                best_phrase = current_phrase.clone();
+            }
+            current_phrase.clear();
+            continue;
+        }
+
+        // After an action verb, accumulate noun-phrase words
+        if past_first_verb || current_phrase.is_empty() {
+            // Title-case the word
+            let titled = title_case_word(clean);
+            current_phrase.push(titled);
         }
     }
-    None
+
+    // Final flush
+    if current_phrase.len() > best_phrase.len() {
+        best_phrase = current_phrase;
+    }
+
+    // Cap at 4 words to keep subject concise
+    if best_phrase.is_empty() {
+        return None;
+    }
+    let result: Vec<String> = best_phrase.into_iter().take(4).collect();
+    Some(result.join(" "))
+}
+
+/// Title-cases a single word: "kubernetes" → "Kubernetes", "API" stays "API"
+fn title_case_word(word: &str) -> String {
+    // If it's already all-caps (acronym), keep it
+    if word.len() <= 4 && word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
+        return word.to_string();
+    }
+    let mut chars = word.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+    }
 }
 
 /// Derive output preference from the raw input — replaces hardcoded "json"
@@ -367,5 +448,68 @@ fn detect_team_composition(lower: &str) -> Option<String> {
         Some("team".to_string())
     } else {
         None
+    }
+}
+
+/// Classify the type of deliverable the user expects — prevents intent mixing.
+/// Content (email, article) should NOT get roadmaps; Strategy (plan, roadmap) should NOT get content-style formatting.
+fn detect_deliverable_type(lower: &str, intent: &IntentClass, domain: &str) -> DeliverableType {
+    // Content signals: the user wants a written piece, not a plan
+    let content_signals = ["write", "draft", "compose", "email", "article", "essay",
+        "blog post", "copy", "caption", "script", "speech", "letter", "message",
+        "description", "summary", "abstract", "headline", "tagline", "slogan"];
+    let content_hits = content_signals.iter().filter(|&&s| lower.contains(s)).count();
+
+    // Strategy signals: the user wants a plan, roadmap, or strategic framework
+    let strategy_signals = ["plan", "roadmap", "strategy", "business model", "go-to-market",
+        "framework", "phases", "milestones", "timeline", "action items", "initiative",
+        "proposal", "blueprint", "playbook", "campaign strategy"];
+    let strategy_hits = strategy_signals.iter().filter(|&&s| lower.contains(s)).count();
+
+    // Artifact signals: the user wants a concrete technical artifact
+    let artifact_signals = ["implement", "build", "code", "api", "schema", "config",
+        "function", "class", "module", "script", "endpoint", "database", "query",
+        "migration", "deploy", "dockerfile", "pipeline"];
+    let artifact_hits = artifact_signals.iter().filter(|&&s| lower.contains(s)).count();
+
+    // Analysis signals: the user wants evaluation, comparison, or investigation
+    let analysis_signals = ["analyze", "compare", "evaluate", "review", "assess",
+        "investigate", "benchmark", "audit", "pros and cons", "trade-off",
+        "feasibility", "gap analysis", "root cause"];
+    let analysis_hits = analysis_signals.iter().filter(|&&s| lower.contains(s)).count();
+
+    // If both content AND strategy signals are strong, it's Hybrid
+    if content_hits >= 1 && strategy_hits >= 1 {
+        return DeliverableType::Hybrid;
+    }
+
+    // Highest signal wins
+    let max_hits = content_hits.max(strategy_hits).max(artifact_hits).max(analysis_hits);
+
+    if max_hits == 0 {
+        // Fallback: use intent + domain to infer
+        return match intent {
+            IntentClass::Build => {
+                if domain == "software-engineering" || domain == "devops-infra" || domain == "ai-ml" {
+                    DeliverableType::Artifact
+                } else {
+                    DeliverableType::Strategy
+                }
+            }
+            IntentClass::Explain => DeliverableType::Content,
+            IntentClass::Debug => DeliverableType::Artifact,
+            IntentClass::Analyze => DeliverableType::Analysis,
+            IntentClass::Transform => DeliverableType::Artifact,
+        };
+    }
+
+    if content_hits == max_hits {
+        DeliverableType::Content
+    } else if strategy_hits == max_hits {
+        DeliverableType::Strategy
+    } else if artifact_hits == max_hits {
+        DeliverableType::Artifact
+    } else {
+        DeliverableType::Analysis
     }
 }

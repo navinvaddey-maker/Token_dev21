@@ -8,6 +8,8 @@ fn make_slot(content: &str, salience: f32) -> WmSlot {
         content: content.into(),
         salience,
         source: SlotSource::Delta,
+        is_protected: false,
+        last_accessed: std::time::Instant::now(),
     }
 }
 

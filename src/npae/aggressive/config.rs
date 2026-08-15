@@ -46,6 +46,8 @@ pub struct ConstraintRule {
 pub struct WeightedWord {
     pub word: String,
     pub weight: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synonyms: Option<Vec<String>>,
 }
 
 /// Thread-safe config handle — uses RwLock for zero-dependency implementation

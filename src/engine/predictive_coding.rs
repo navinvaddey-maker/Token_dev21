@@ -220,7 +220,7 @@ pub fn run(
         .collect::<Vec<_>>()
         .join("\n");
 
-    let final_tokens = (bound.split_whitespace().count() as f64 * 1.3).ceil() as usize;
+    let final_tokens = crate::utils::tokens::estimate_tokens(&bound);
 
     PrincipleResult {
         text:          bound.clone(),

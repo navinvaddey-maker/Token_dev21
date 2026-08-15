@@ -13,6 +13,7 @@ pub mod rag;
 pub mod scoring;
 pub mod session;
 pub mod types;
+pub mod utils;
 
 use db::DbPool;
 use learning_engine::LearningEngine;
@@ -30,5 +31,6 @@ pub struct AppState {
     pub npae_config: Arc<ConfigHandle>,
     pub ory_engine: Arc<Mutex<crate::npae::ory::OryEngine>>,
     pub rag_store: Arc<crate::rag::store::RagStore>,
+    pub sessions: Arc<dashmap::DashMap<String, crate::session::SessionHistory>>,
 }
 

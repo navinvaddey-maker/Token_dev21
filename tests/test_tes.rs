@@ -9,7 +9,7 @@ fn test_tes_no_issues() {
         ..Default::default()
     };
     let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 5.0); // 50/100 = 0.5 compression ratio scaled to 5.0
+    assert!((score - 8.0).abs() < 0.1); // 50% savings -> ~8.0 in v2
 }
 
 #[test]
@@ -34,8 +34,8 @@ fn test_tes_with_issues() {
         },
     ];
     let (score, _) = TokenEfficiencyScorer::score(&output, &field_issues);
-    // Should be less than 5.0 due to penalty from issues
-    assert!(score < 5.0);
+    // Should be less than 8.0 due to penalty from issues
+    assert!(score < 8.0);
     // Should still be positive
     assert!(score > 0.0);
 }
@@ -48,7 +48,7 @@ fn test_tes_perfect_compression() {
         ..Default::default()
     };
     let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 10.0); // 100/100 = 1.0 -> 10.0
+    assert_eq!(score, 0.0); // 0% savings -> 0.0
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_tes_expansion() {
         ..Default::default()
     };
     let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
-    assert_eq!(score, 10.0); // Clamped at 10.0
+    assert_eq!(score, 0.0); // Expansion -> 0.0
 }
 
 #[test]

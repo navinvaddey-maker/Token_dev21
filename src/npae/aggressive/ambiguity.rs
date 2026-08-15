@@ -14,6 +14,14 @@ pub fn score(repr: &CompressedRepr, raw: &str) -> Result<AmbiguityAnalysis, Stri
         gap_zones.push("vague_language_detected".into());
     }
 
+    let word_count = raw.split_whitespace().count();
+    if word_count < 10 {
+        score += 0.2;
+        gap_zones.push("prompt_too_short".into());
+    } else if word_count > 40 {
+        score -= 0.15;
+    }
+
     if repr.compression_ratio < 0.8 {
         score += 0.2;
         gap_zones.push("output_format_ambiguous".into());
@@ -30,6 +38,8 @@ pub fn score(repr: &CompressedRepr, raw: &str) -> Result<AmbiguityAnalysis, Stri
             gap_zones.push("intent_unclear".into());
         }
     }
+
+    score = score.max(0.0);
 
     Ok(AmbiguityAnalysis {
         score,

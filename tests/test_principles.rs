@@ -159,7 +159,7 @@ mod predictive_coding_tests {
     #[test]
     fn includes_role_frame_details_and_task() {
         let chunks = vec!["Content about payment overdue invoices.".to_string()];
-        let r = predictive_coding::run(&chunks, "summarize", "", "", "", "generic", "Claude");
+        let r = predictive_coding::run(&chunks, "summarize", "generic", "Claude");
 
         assert!(r.text.contains("Role:"));
         assert!(r.text.contains("Audience:"));
@@ -180,9 +180,6 @@ mod predictive_coding_tests {
         let r = predictive_coding::run(
             &vec!["Content.".to_string()],
             "Compare and contrast the two frameworks",
-            "",
-            "",
-            "",
             "generic",
             "Claude",
         );

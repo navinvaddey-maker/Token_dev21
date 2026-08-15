@@ -154,8 +154,8 @@ mod tests {
         let ctx = DetectionContext {
             user_id: "user1".into(),
             history_id: "hist1".into(),
-            prev_prompt: Some("what is python programming".into()),
-            curr_prompt: "what is python coding and how to use it".into(),
+            prev_prompt: Some("what is python".into()),
+            curr_prompt: "what is python for web".into(),
             response_time_ms: 20000,
             engagement_ms: 0,
         };

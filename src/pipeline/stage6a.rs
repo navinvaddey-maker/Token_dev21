@@ -55,6 +55,33 @@ impl Stage6a {
             parts.push(format!("**Directives:** {}", scopes));
         }
 
+        if !schema_filled.resolved_schema.constraints.is_empty() {
+            let constraints = schema_filled
+                .resolved_schema
+                .constraints
+                .iter()
+                .map(|c| c.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
+            parts.push(format!("**Constraints:** {}", constraints));
+        }
+
+        if !schema_filled.resolved_schema.output.is_empty() {
+            let deliverables = schema_filled
+                .resolved_schema
+                .output
+                .iter()
+                .map(|d| d.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
+            parts.push(format!("**Deliverables:** {}", deliverables));
+        }
+
+        if !schema_filled.null_fields.is_empty() {
+            let warnings = schema_filled.null_fields.join(", ");
+            parts.push(format!("**Warnings:** Missing fields: {}", warnings));
+        }
+
         let compressed_tokens = if !parts.is_empty() {
             parts.join("\n")
         } else if !schema_filled.sparse_tokens.is_empty() {

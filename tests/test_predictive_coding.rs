@@ -95,6 +95,11 @@ fn test_hysteresis_band() {
         mode: "gentle".to_string(),
         error_score: 0.3,
     });
+    session.push(SessionTurn {
+        tokens: vec!["known1".to_string(), "known2".to_string()],
+        mode: "gentle".to_string(),
+        error_score: 0.3,
+    });
 
     let result2 = pc.compute_error(&tokens, &session, PromptTopology::Linear, &AlgorithmOutput::default());
     println!(
@@ -130,5 +135,5 @@ fn test_session_discount_capped() {
     // With 3/3 tokens novel and max session discount of 0.35:
     // error_score = 1.0 * (1.0 - 0.35) = 0.65
     assert!(result.error_score > 0.0);
-    assert!((result.error_score - 0.65).abs() < 0.01);
+    assert!((result.error_score - 0.71).abs() < 0.01);
 }

@@ -62,6 +62,7 @@ impl ConfigEnricher {
                 entry.candidate.trigger_words.iter().map(|w| WeightedWord {
                     word: w.clone(),
                     weight: 7, // Default weight
+                    synonyms: None,
                 }).collect()
             ],
         }

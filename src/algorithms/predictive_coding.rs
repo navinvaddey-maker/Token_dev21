@@ -81,7 +81,7 @@ impl PredictiveCoding {
         let is_ambiguous = (error_score - BOUNDARY_THRESHOLD).abs()
             < (HYSTERESIS_UPPER - BOUNDARY_THRESHOLD) / 2.0;
 
-        let mode = self.decide_mode(output, session_history.len());
+        let mode = self.decide_mode(output, session_history.len(), error_score);
 
         PredictionResult {
             error_score,
@@ -126,7 +126,11 @@ impl PredictiveCoding {
     }
 
     fn in_schema(&self, token: &str) -> bool {
-        self.schema_priors.contains_key(&token.to_lowercase())
+        if let Some(count) = self.schema_priors.get(&token.to_lowercase()) {
+            *count > 0
+        } else {
+            false
+        }
     }
 
     fn session_discount(
@@ -155,6 +159,7 @@ impl PredictiveCoding {
         &self,
         output: &crate::types::AlgorithmOutput,
         session_depth: usize,
+        error_score: f32,
     ) -> Mode {
         let structure_score = output.input_structure_score;
         let ambiguity_count = output.ambiguity_register.len() as f32;
@@ -168,17 +173,24 @@ impl PredictiveCoding {
         if constraint_density > 0.2 {
             return Mode::Aggressive;
         }
-
         if ambiguity_count > 2.0 {
+            return Mode::Gentle;
+        }
+
+        // Error score thresholds
+        if error_score > HYSTERESIS_UPPER {
+            return Mode::Aggressive;
+        }
+        if error_score < BOUNDARY_THRESHOLD {
+            return Mode::Gentle;
+        }
+
+        if session_depth > 3 {
             return Mode::Gentle;
         }
 
         if structure_score < 0.3 {
             return Mode::Balanced;
-        }
-
-        if session_depth > 3 {
-            return Mode::Gentle;
         }
 
         Mode::Balanced
@@ -211,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_prompt_routes_balanced() {
+    fn simple_prompt_routes_gentle() {
         let pc = PredictiveCoding::new(Arc::new(DashMap::new()));
         // Pre-fill schema with common tokens
         pc.update_schema(
@@ -222,7 +234,7 @@ mod tests {
         let tokens = make_tokens(&["what", "is", "python"]);
         let output = crate::types::AlgorithmOutput::default();
         let result = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
-        assert_eq!(result.mode, Mode::Balanced);
+        assert_eq!(result.mode, Mode::Gentle);
     }
 
     #[test]

@@ -3,6 +3,7 @@ use super::{
     evaluation::{self, EvaluationMetrics},
     predictive_coding, selective_attention, sparse_coding, working_memory,
 };
+use crate::utils::tokens::estimate_tokens;
 use serde::Serialize;
 use tracing::info;
 
@@ -41,12 +42,6 @@ pub struct PrincipleLog {
     pub duration_ms: u64,
 }
 
-/// Simple word-based token estimation (word_count * 1.3)
-fn estimate_tokens(text: &str) -> usize {
-    let words = text.split_whitespace().count();
-    (words as f64 * 1.3).ceil() as usize
-}
-
 pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     let mut logs: Vec<PrincipleLog> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
@@ -67,7 +62,7 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
         return Err("Input exceeds 8000 words".into());
     }
 
-    let token_original = estimate_tokens(&input.raw_text);
+    let token_original = estimate_tokens(&input.raw_text) as usize;
 
     // ── Stage 1: Sparse coding — noise removal ────────────────────────────
     let s1 = sparse_coding::run(&input.raw_text, &input.mode);
@@ -146,7 +141,7 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
         duration_ms: s5.duration_ms,
     });
 
-    let mut token_final = estimate_tokens(&s5.text);
+    let mut token_final = estimate_tokens(&s5.text) as usize;
     let mut optimized_prompt = s5.text;
 
     if token_final > token_original && input.model != "Claude" {

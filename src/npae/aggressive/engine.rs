@@ -81,8 +81,8 @@ impl AggressiveEngine {
         }
         
         // Final token accounting for UI
-        let token_original = raw.split_whitespace().count() as u32;
-        let token_final = final_prompt.split_whitespace().count() as u32;
+        let token_original = crate::utils::tokens::estimate_tokens(raw);
+        let token_final = crate::utils::tokens::estimate_tokens(&final_prompt);
         let token_saved = token_original.saturating_sub(token_final);
 
         // Calculate scoring for aggressive mode (v2 — computed, not hardcoded)

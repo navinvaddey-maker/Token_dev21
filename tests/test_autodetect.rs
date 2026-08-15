@@ -38,7 +38,7 @@ fn test_detect_generic_fallback() {
 #[test]
 fn test_run_with_auto_detect() {
     let chunks = vec!["I need to fix an api bug in my rust code.".to_string()];
-    let result = predictive_coding::run(&chunks, "optimize", "", "", "", "auto", "Claude");
+    let result = predictive_coding::run(&chunks, "optimize", "auto", "Claude");
 
     // Should detect "code" or "ticket" (code has 'rust', 'api', 'code'; ticket has 'bug')
     // Based on the code order, "ticket" comes first if "bug" is found.

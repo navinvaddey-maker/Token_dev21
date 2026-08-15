@@ -1,5 +1,6 @@
 use token_compress_engine::npae::aggressive::config::ConfigLoader;
 use token_compress_engine::npae::aggressive::intent::{IntentProfile, IntentClass, KnowledgeLevel};
+use token_compress_engine::npae::schema::types::DeliverableType;
 use token_compress_engine::npae::aggressive::role::generate_role;
 use token_compress_engine::npae::aggressive::structurer::render_crisp_prompt;
 use token_compress_engine::npae::aggressive::resolver::ResolvedPrompt;
@@ -12,6 +13,7 @@ fn test_real_estate_prompt_structuring() {
 
     let profile = IntentProfile {
         primary_intent: IntentClass::Build,
+        deliverable_type: DeliverableType::Strategy,
         domain: "real-estate".to_string(),
         confidence: 0.95,
         user_knowledge: KnowledgeLevel::Intermediate,

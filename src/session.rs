@@ -1,8 +1,16 @@
 use crate::{algorithms::predictive_coding::SessionTurn, types::AlgorithmOutput};
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionHistory {
     pub turns: Vec<SessionTurn>,
     max_turns: usize,
+}
+
+impl Default for SessionHistory {
+    fn default() -> Self {
+        Self::new(10)
+    }
 }
 
 impl SessionHistory {

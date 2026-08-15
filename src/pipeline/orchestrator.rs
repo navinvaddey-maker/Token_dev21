@@ -111,6 +111,7 @@ impl PipelineOrchestrator {
         input: &str,
         session: &mut SessionHistory,
         forced_mode: Option<&str>,
+        npae_config: Option<&crate::npae::schema::types::NpaeConfig>,
     ) -> Result<OrchestratorResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
@@ -162,10 +163,10 @@ impl PipelineOrchestrator {
         if is_aggressive {
             // -- Aggressive Routing (NPAE) --
             let npae_cfg = crate::npae::schema::types::NpaeConfig {
-                ambiguity_threshold: Some(0.65),
-                max_questions: Some(3),
-                confidence_threshold: Some(0.75),
-                skip_stage: None,
+                ambiguity_threshold: npae_config.and_then(|c| c.ambiguity_threshold).or(Some(0.65)),
+                max_questions: npae_config.and_then(|c| c.max_questions).or(Some(3)),
+                confidence_threshold: npae_config.and_then(|c| c.confidence_threshold).or(Some(0.75)),
+                skip_stage: npae_config.and_then(|c| c.skip_stage.clone()),
             };
 
             let repr = crate::npae::compression::pipeline::run_parallel_pipeline(input)

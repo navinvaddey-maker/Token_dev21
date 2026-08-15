@@ -168,6 +168,9 @@ pub struct CompressRequest {
     pub rag_enabled: Option<bool>,
     pub rag_document_ids: Option<Vec<String>>,
     pub rag_top_k: Option<usize>,
+    pub npae_ambiguity_threshold: Option<f32>,
+    pub npae_max_questions: Option<u8>,
+    pub npae_confidence_threshold: Option<f32>,
 }
 
 async fn compress(

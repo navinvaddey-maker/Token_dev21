@@ -15,6 +15,7 @@ use crate::{
         user::{LoginRequest, LoginResponse, RegisterRequest, User},
     },
     session::SessionHistory,
+    utils::tokens::estimate_tokens,
     AppState,
 };
 
@@ -98,12 +99,6 @@ pub async fn login_user(pool: &DbPool, req: LoginRequest) -> Result<LoginRespons
 
 // ── Compression (7-stage pipeline) ─────────────────────────────────────────
 
-/// Simple word-based token estimation (matches engine/pipeline.rs convention)
-fn estimate_tokens(text: &str) -> usize {
-    let words = text.split_whitespace().count();
-    (words as f64 * 1.3).ceil() as usize
-}
-
 pub async fn compress_new(
     state: &AppState,
     user_id_str: &str,
@@ -178,14 +173,28 @@ pub async fn compress_new(
     }
 
     // 3. Run the 7-stage pipeline (0A → 6B)
-    //    SessionHistory is per-request for now (future: persist across user sessions)
-    let mut session = SessionHistory::new(10);
+    // Multi-turn context carryover via persistent AppState.sessions
+    let mut session = state
+        .sessions
+        .entry(user_id_str.to_string())
+        .or_insert_with(|| SessionHistory::new(10))
+        .clone();
+
+    let npae_cfg = crate::npae::schema::types::NpaeConfig {
+        ambiguity_threshold: req.npae_ambiguity_threshold,
+        max_questions: req.npae_max_questions,
+        confidence_threshold: req.npae_confidence_threshold,
+        skip_stage: None,
+    };
 
     let orchestrator_response = state
         .pipeline
-        .process(&enriched_prompt, &mut session, req.mode.as_deref())
+        .process(&enriched_prompt, &mut session, req.mode.as_deref(), Some(&npae_cfg))
         .await
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+
+    // Persist updated multi-turn session history
+    state.sessions.insert(user_id_str.to_string(), session);
 
     let compression_response = match orchestrator_response {
         crate::types::OrchestratorResponse::Legacy(resp) => resp,
@@ -288,8 +297,8 @@ pub async fn compress_new(
     };
 
     // 4. Compute token counts
-    let token_original = estimate_tokens(&enriched_prompt);
-    let token_final = estimate_tokens(&compression_response.response);
+    let token_original = estimate_tokens(&enriched_prompt) as usize;
+    let token_final = estimate_tokens(&compression_response.response) as usize;
     let token_saved = token_original.saturating_sub(token_final);
 
     // 5. Run evaluation metrics (lexical overlap, semantic similarity, fact recall)

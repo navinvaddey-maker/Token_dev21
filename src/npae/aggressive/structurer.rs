@@ -3,9 +3,9 @@ use chrono::{DateTime, Utc};
 use anyhow::Result;
 
 use crate::npae::schema::types::{
-    ClarifyingQuestion, ConstraintsMeta, ExecutionPhase, HallucinationGuardConfig,
-    LengthBound, PromptConstraints, PromptContext, PromptRole, StructuredPrompt,
-    ValidationStep,
+    ClarifyingQuestion, ConstraintsMeta, DeliverableType, ExecutionPhase,
+    HallucinationGuardConfig, LengthBound, OutputSpec, PromptConstraints,
+    PromptContext, PromptObjective, PromptRole, StructuredPrompt, ValidationStep,
 };
 use super::intent::IntentProfile;
 
@@ -162,37 +162,75 @@ pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
 
 pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQuestion], raw_input: &str) -> String {
     let (context_opt, rag_opt, user_prompt) = split_raw_input(raw_input);
-    let mut out = String::new();    // ROLE — High-resolution persona
-    out.push_str(&format!("# ROLE: {}\n", prompt.role.primary.to_uppercase()));
-    if !prompt.role.persona_anchor.is_empty() {
-        out.push_str(&format!("Profile: {}\n", prompt.role.persona_anchor));
+    let mut out = String::new();
+    
+    // ROLE — High-resolution persona
+    let is_role_valid = !prompt.role.primary.is_empty() 
+        && prompt.role.primary.to_lowercase() != "unknown"
+        && prompt.role.primary.to_lowercase() != "none"
+        && prompt.role.primary.to_lowercase() != "default";
+
+    let guardrails: Vec<_> = prompt.role.persona_constraints.iter().filter(|&c| c != "no_external_api_calls" && c != "production_grade_only").cloned().collect();
+
+    if is_role_valid || !prompt.role.persona_anchor.is_empty() || !guardrails.is_empty() {
+        if is_role_valid {
+            out.push_str(&format!("# ROLE: {}\n", prompt.role.primary.to_uppercase()));
+        }
+        if !prompt.role.persona_anchor.is_empty() {
+            out.push_str(&format!("Profile: {}\n", prompt.role.persona_anchor));
+        }
+        if !guardrails.is_empty() {
+            out.push_str(&format!("Guardrails: {}\n", guardrails.join(", ")));
+        }
+        out.push('\n');
     }
-    if prompt.role.persona_constraints.iter().any(|c| c != "no_external_api_calls" && c != "production_grade_only") {
-        out.push_str(&format!("Guardrails: {}\n", prompt.role.persona_constraints.join(", ")));
-    }
-    out.push('\n');
  
     // CONTEXT — Dense metadata, no redundancy
-    out.push_str(&format!("# CONTEXT: {}\n", prompt.context.description));
-    let mut meta = vec![
-        format!("Expertise: {} {}", prompt.context.user_knowledge_level, prompt.context.domain)
-    ];
-    if prompt.context.temporal_scope != "unspecified" && prompt.context.temporal_scope != "immediate" {
-        meta.push(format!("Scope: {}", prompt.context.temporal_scope));
-    }
-    out.push_str(&meta.join(" | "));
-    out.push('\n');
+    let is_ctx_desc_valid = !prompt.context.description.is_empty()
+        && prompt.context.description.to_lowercase() != "unknown"
+        && prompt.context.description.to_lowercase() != "none"
+        && prompt.context.description.to_lowercase() != "default";
+
+    let has_bg = !prompt.context.background.is_empty() && prompt.context.background != prompt.context.description;
+    let has_assumptions = !prompt.context.assumptions.is_empty();
+
+    if is_ctx_desc_valid || has_bg || has_assumptions || context_opt.is_some() {
+        if is_ctx_desc_valid {
+            out.push_str(&format!("# CONTEXT: {}\n", prompt.context.description));
+        } else {
+            out.push_str("# CONTEXT:\n");
+        }
+        
+        let mut meta = Vec::new();
+        let is_knowledge_valid = !prompt.context.user_knowledge_level.is_empty() && prompt.context.user_knowledge_level.to_lowercase() != "unknown";
+        let is_domain_valid = !prompt.context.domain.is_empty() && prompt.context.domain.to_lowercase() != "unknown";
+        
+        if is_knowledge_valid || is_domain_valid {
+            let knowledge = if is_knowledge_valid { &prompt.context.user_knowledge_level } else { "" };
+            let domain = if is_domain_valid { &prompt.context.domain } else { "" };
+            meta.push(format!("Expertise: {} {}", knowledge, domain).trim().to_string());
+        }
+        
+        if prompt.context.temporal_scope != "unspecified" && prompt.context.temporal_scope != "immediate" && !prompt.context.temporal_scope.is_empty() {
+            meta.push(format!("Scope: {}", prompt.context.temporal_scope));
+        }
+        
+        if !meta.is_empty() {
+            out.push_str(&meta.join(" | "));
+            out.push('\n');
+        }
  
-    if !prompt.context.background.is_empty() && prompt.context.background != prompt.context.description {
-        out.push_str(&format!("Details: {}\n", prompt.context.background));
+        if has_bg {
+            out.push_str(&format!("Details: {}\n", prompt.context.background));
+        }
+        if has_assumptions {
+            out.push_str(&format!("Assumptions: {}\n", prompt.context.assumptions.join("; ")));
+        }
+        if let Some(ctx) = context_opt {
+            out.push_str(&format!("Semantic Context: {}\n", ctx));
+        }
+        out.push('\n');
     }
-    if !prompt.context.assumptions.is_empty() {
-        out.push_str(&format!("Assumptions: {}\n", prompt.context.assumptions.join("; ")));
-    }
-    if let Some(ctx) = context_opt {
-        out.push_str(&format!("Semantic Context: {}\n", ctx));
-    }
-    out.push('\n');
 
     if let Some(rag) = rag_opt {
         out.push_str("# SOURCE KNOWLEDGE:\n");
@@ -201,7 +239,12 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     }
 
     // CONSTRAINTS — only non-empty sections
-    if !prompt.constraints.required_inclusions.is_empty() || !prompt.constraints.forbidden_topics.is_empty() {
+    let has_inclusions = !prompt.constraints.required_inclusions.is_empty();
+    let has_exclusions = !prompt.constraints.forbidden_topics.is_empty();
+    let has_custom_format = prompt.constraints.output_format != "markdown" && !prompt.constraints.output_format.is_empty();
+    let has_custom_tone = prompt.constraints.tone.to_lowercase() != "neutral" && !prompt.constraints.tone.is_empty() && prompt.constraints.tone.to_lowercase() != "default";
+
+    if has_inclusions || has_exclusions || has_custom_format || has_custom_tone {
         out.push_str("# CONSTRAINTS:\n");
         for inc in &prompt.constraints.required_inclusions {
             out.push_str(&format!("- [STRICT] {}\n", inc));
@@ -209,13 +252,16 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         for exc in &prompt.constraints.forbidden_topics {
             out.push_str(&format!("- [AVOID]  {}\n", exc));
         }
-        // Output format: only emit if it's not the default
-        if prompt.constraints.output_format != "markdown" {
-            out.push_str(&format!("Output Format: {} | Tone: {}\n", 
-                prompt.constraints.output_format,
-                prompt.constraints.tone));
-        } else {
-            out.push_str(&format!("Tone: {}\n", prompt.constraints.tone));
+        
+        if has_custom_format || has_custom_tone {
+            let mut fmts = Vec::new();
+            if has_custom_format {
+                fmts.push(format!("Output Format: {}", prompt.constraints.output_format));
+            }
+            if has_custom_tone {
+                fmts.push(format!("Tone: {}", prompt.constraints.tone));
+            }
+            out.push_str(&format!("{}\n", fmts.join(" | ")));
         }
         out.push('\n');
     }
@@ -362,11 +408,13 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
             ],
             persona_anchor,
         },
+        objective: None,
         context: PromptContext {
             domain: profile.domain.clone(),
             description,
             background,
             user_knowledge_level: user_level_str,
+            audience: "general".to_string(),
             temporal_scope: profile.temporal_scope.clone(),
             intent_vector: vec![profile.confidence],
             assumptions,
@@ -388,6 +436,7 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
             claim_verification_rules: vec!["no_invented_apis".into(), "cite_uncertainty".into()],
             uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
         },
+        output_spec: None,
         execution_phases,
         validation_steps,
         success_criteria,

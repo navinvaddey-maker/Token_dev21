@@ -56,9 +56,13 @@ impl CompressionMeta {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StructuredPrompt {
     pub role:               PromptRole,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective:          Option<PromptObjective>,
     pub context:            PromptContext,
     pub constraints:        PromptConstraints,
     pub hallucination_guard: HallucinationGuardConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_spec:        Option<OutputSpec>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub execution_phases:   Vec<ExecutionPhase>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -86,6 +90,8 @@ pub struct PromptContext {
     pub description: String,
     pub background: String,
     pub user_knowledge_level: String,
+    #[serde(default)]
+    pub audience: String,
     pub temporal_scope: String,
     pub intent_vector: Vec<f32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -136,6 +142,45 @@ pub struct ClarifyingQuestion {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Priority { High, Medium, Low }
+
+// --- 6-Pillar Prompt Spec Types ---
+
+/// Pillar 2: Objective — one primary task only
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PromptObjective {
+    pub primary_task: String,
+    pub deliverable_type: DeliverableType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scope_boundary: Vec<String>,
+}
+
+/// Classifies what the user wants delivered — prevents intent mixing
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliverableType {
+    Content,   // email, article, code, essay — needs Requirements, NOT roadmaps
+    Strategy,  // business plan, roadmap, analysis — needs Execution Phases
+    Hybrid,    // comprehensive guide + implementation — needs both
+    Artifact,  // code, config, schema — needs Output Format + Validation
+    Analysis,  // report, comparison, review — needs Requirements
+}
+
+impl Default for DeliverableType {
+    fn default() -> Self {
+        DeliverableType::Content
+    }
+}
+
+/// Pillar 5: Output Format — structured specification
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OutputSpec {
+    pub format: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sections: Vec<String>,
+    pub word_count: LengthBound,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mandatory_elements: Vec<String>,
+}
 
 // --- Execution Roadmap Types ---
 

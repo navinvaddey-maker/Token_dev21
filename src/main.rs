@@ -111,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let rag_store = std::sync::Arc::new(token_compress_engine::rag::store::RagStore::new(pool.clone()));
+    let sessions = std::sync::Arc::new(dashmap::DashMap::new());
 
     let state = AppState {
         pool: pool.clone(),
@@ -119,6 +120,7 @@ async fn main() -> anyhow::Result<()> {
         npae_config,
         ory_engine: ory_engine.clone(),
         rag_store,
+        sessions,
     };
 
     let api_router = token_compress_engine::api::router(state);
