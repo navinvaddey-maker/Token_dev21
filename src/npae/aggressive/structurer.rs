@@ -3,9 +3,9 @@ use chrono::{DateTime, Utc};
 use anyhow::Result;
 
 use crate::npae::schema::types::{
-    ClarifyingQuestion, ConstraintsMeta, DeliverableType, ExecutionPhase,
-    HallucinationGuardConfig, LengthBound, OutputSpec, PromptConstraints,
-    PromptContext, PromptObjective, PromptRole, StructuredPrompt, ValidationStep,
+    ClarifyingQuestion, ConstraintsMeta, ExecutionPhase,
+    HallucinationGuardConfig, LengthBound, PromptConstraints,
+    PromptContext, PromptRole, StructuredPrompt, ValidationStep,
 };
 use super::intent::IntentProfile;
 
@@ -127,8 +127,19 @@ impl Structurer for HttpStructurer {
     fn source_name(&self) -> &'static str { "http" }
 
     fn pre_validate(&self, input: &RawInput) -> Result<()> {
-        if input.text.contains("<script") || input.text.contains("DROP TABLE") {
-            return Err(anyhow::anyhow!("Forbidden content detected"));
+        let lower = input.text.to_lowercase();
+        let dangerous_patterns = [
+            "<script", "javascript:", "onerror=", "onload=",
+            "drop table", "delete from", "insert into", "union select",
+            "'; --", "1=1", "or 1=1",
+        ];
+        if dangerous_patterns.iter().any(|p| lower.contains(p)) {
+            return Err(anyhow::anyhow!("Potentially dangerous content detected"));
+        }
+        // Also check URL-decoded variants
+        let decoded = urlencoding::decode(&input.text).unwrap_or_default();
+        if dangerous_patterns.iter().any(|p| decoded.to_lowercase().contains(p)) {
+            return Err(anyhow::anyhow!("Encoded dangerous content detected"));
         }
         Ok(())
     }
@@ -371,8 +382,8 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Extract a concise task description (not just raw first line)
     let description = extract_task_description(raw, intent_type);
 
-    // Build a non-redundant background — only adds new info beyond the description
-    let background = build_background(profile, &user_level_str);
+    // Build a non-redundant background — includes goal decomposition & context unpacking
+    let background = build_background(profile, &user_level_str, raw);
 
     // Infer execution phases based on temporal scope, domain templates, and intent
     let execution_phases = infer_execution_phases(profile, raw, config);
@@ -387,7 +398,7 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     let assumptions = infer_assumptions(profile, raw);
 
     // Build dynamic instruction
-    let dynamic_instruction = derive_dynamic_instruction(profile);
+    let dynamic_instruction = derive_dynamic_instruction(profile, raw);
 
     // Build constraints meta from detected signals
     let constraints_meta = build_constraints_meta(profile);
@@ -489,13 +500,13 @@ fn extract_task_description(raw: &str, intent_type: &str) -> String {
 }
 
 /// Build background that adds NEW information — includes context unpacking for vagueness resolution
-fn build_background(profile: &IntentProfile, user_level: &str) -> String {
+fn build_background(profile: &IntentProfile, user_level: &str, raw: &str) -> String {
     let mut parts = Vec::new();
     
     parts.push(format!("Domain: {} | Audience: {}", profile.domain, user_level));
     
     // Vagueness Resolution / Context Unpacking
-    if let Some(roadmap) = unpack_context(profile) {
+    if let Some(roadmap) = unpack_context(profile, raw) {
         parts.push(format!("Roadmap: {}", roadmap));
     }
 
@@ -561,6 +572,112 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
     };
 
     match resolved_domain.as_str() {
+        "finance" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "Financial & Asset Audit (30 Days)".into(),
+                description: "Evaluate current active/passive income sources, baseline burn rate, balance sheet assets/debt, and human capital monetization inventory.".into(),
+                estimated_duration: "30 days".into(),
+                deliverables: vec!["Financial Baseline & Burn Rate Audit".into(), "Human Capital & Monetization Matrix".into(), "Target Definition & Wealth Gap Calculation".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Strategy & Vehicle Selection (90 Days)".into(),
+                description: "Select and launch primary high-leverage monetization vehicles (career advancement, high-ticket services, business equity, or dividend/index investing).".into(),
+                estimated_duration: "90 days".into(),
+                deliverables: vec!["Vehicle Feasibility Matrix".into(), "Income Growth Blueprint".into(), "First Revenue Milestone Report".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Execution & Reinvestment (6-12 Months)".into(),
+                description: "Launch revenue-generating initiatives, secure initial cash flows, and configure automated compounding reinvestment.".into(),
+                estimated_duration: "6-12 months".into(),
+                deliverables: vec!["Execution Action Checklist".into(), "Cash Flow & Surplus Automation Blueprint".into(), "Diversified Asset Allocation Strategy".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 4,
+                name: "Equity & Asset Expansion (3-5 Years)".into(),
+                description: "Scale business equity, expand productive assets, and optimize capital compounding across market cycles.".into(),
+                estimated_duration: "3-5 years".into(),
+                deliverables: vec!["Equity & Portfolio Growth Model".into(), "Scenario Stress-Test Report (Conservative/Base/Aggressive)".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 5,
+                name: "Wealth Compounding & Preservation (5-10 Years)".into(),
+                description: "Maximize compound growth, achieve targeted net worth milestone, and implement estate, tax, and capital preservation structures.".into(),
+                estimated_duration: "5-10 years".into(),
+                deliverables: vec!["Target Achievement & Wealth Preservation Blueprint".into(), "Financial Freedom Audit".into()],
+            });
+        }
+        "computers" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "System Architecture & Specs".into(),
+                description: "Define hardware/software compute requirements, throughput constraints, and interface specifications.".into(),
+                estimated_duration: "3-5 days".into(),
+                deliverables: vec!["System Architecture Specification".into(), "Compute & Memory Budget".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Core System Implementation".into(),
+                description: "Develop core modules, memory management, concurrency models, and driver/OS integrations.".into(),
+                estimated_duration: "1-3 weeks".into(),
+                deliverables: vec!["Working System Implementation".into(), "Benchmark Test Suite".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Optimization & Deployment".into(),
+                description: "Profile bottlenecks, optimize cache/memory locality, and configure production telemetry.".into(),
+                estimated_duration: "3-5 days".into(),
+                deliverables: vec!["Performance Audit Report".into(), "Production Configuration".into()],
+            });
+        }
+        "science" | "scientific-research" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "Hypothesis & Experimental Design".into(),
+                description: "Formulate falsifiable hypotheses, define control variables, and design experimental protocols.".into(),
+                estimated_duration: "1-2 weeks".into(),
+                deliverables: vec!["Formal Hypothesis Document".into(), "Experimental Protocol Blueprint".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Data Acquisition & Execution".into(),
+                description: "Execute trials, collect empirical sensor/laboratory data, and ensure methodological reproducibility.".into(),
+                estimated_duration: "2-6 weeks".into(),
+                deliverables: vec!["Raw Empirical Dataset".into(), "Execution Telemetry Log".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Statistical Analysis & Validation".into(),
+                description: "Apply statistical significance testing, error analysis, and peer-review synthesis.".into(),
+                estimated_duration: "1-2 weeks".into(),
+                deliverables: vec!["Statistical Validation Report".into(), "Publication-Ready Synthesis".into()],
+            });
+        }
+        "health" | "medical" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "Health Assessment & Baseline Audit".into(),
+                description: "Evaluate patient history, baseline biomarkers, physiological symptoms, and lifestyle factors.".into(),
+                estimated_duration: "1-3 days".into(),
+                deliverables: vec!["Comprehensive Assessment Profile".into(), "Biomarker Baseline Report".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Intervention & Protocol Design".into(),
+                description: "Develop evidence-based therapeutic interventions, dosage protocols, and lifestyle adjustments.".into(),
+                estimated_duration: "3-5 days".into(),
+                deliverables: vec!["Therapeutic Protocol Specification".into(), "Risk & Safety Mitigation Plan".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Monitoring & Long-Term Adaptation".into(),
+                description: "Execute health protocol, track biomarker responses, and optimize long-term outcomes.".into(),
+                estimated_duration: "2-8 weeks".into(),
+                deliverables: vec!["Progress Tracking Log".into(), "Outcome Analysis Report".into()],
+            });
+        }
         "business" => {
             phases.push(ExecutionPhase {
                 phase_number: 1,
@@ -827,19 +944,38 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
     }
 }
 
-/// Infer success criteria from profile and raw prompt — intent-driven
-fn infer_success_criteria(profile: &IntentProfile, _raw: &str) -> Vec<String> {
+/// Infer success criteria from profile and raw prompt — intent and domain driven
+fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut criteria = Vec::new();
-    
-    // Domain-Aware Success Criteria
+    let lower = raw.to_lowercase();
+    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
+    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+
+    if is_financial && !profile.domain.starts_with("workplace") {
+        criteria.push("Target is clearly defined with explicit amount ($), currency, time horizon, and target type (Distinguish: Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth)".into());
+        criteria.push("Baseline financial and human capital inventory is fully quantified with transparent assumptions".into());
+        criteria.push("Wealth gap, required annual savings, and required CAGR are calculated with mathematical rigor".into());
+        criteria.push("Income engines and leverage vectors (skills, technology, capital, equity) are evaluated and ranked by ROI and scalability".into());
+        criteria.push("Capital allocation framework balances liquidity reserves, asset compounding, and business reinvestment".into());
+        criteria.push("Conservative, Base Case, and Aggressive scenario models are articulated with distinct assumptions".into());
+        criteria.push("Downside risks (income, market, debt, tax, concentration) have concrete mitigation strategies".into());
+        criteria.push("Execution timeline outlines 30-day, 90-day, 12-month, 3-year, and 5-10-year milestones with measurable KPIs".into());
+        criteria.push("Includes explicit Reality-Check verdict assessing mathematical feasibility against stated constraints".into());
+        return criteria;
+    }
+
+    if is_business {
+        criteria.push("Business model defines clear revenue streams, pricing tiers, and positive unit economics (LTV/CAC, gross margin)".into());
+        criteria.push("Scalability vectors (distribution channels, technology leverage, team delegation) are explicitly mapped".into());
+        criteria.push("Valuation roadmap differentiates annual revenue/EBITDA from enterprise valuation multiples".into());
+        criteria.push("Capital requirements and cash flow runway are modeled across growth phases".into());
+        criteria.push("Includes measurable revenue, customer acquisition, and retention KPIs".into());
+        return criteria;
+    }
+
+    // Domain-Aware Success Criteria for other domains
     match (profile.primary_intent.clone(), profile.domain.as_str()) {
-        // BUILD Intent
-        (super::intent::IntentClass::Build, "business-strategy") | (super::intent::IntentClass::Build, "finance") => {
-            criteria.push("Business model is viable, scalable, and grounded in market reality".into());
-            criteria.push("Resource allocation (time/budget) is realistic and optimized".into());
-            criteria.push("Strategic roadmap provides clear, actionable milestones".into());
-        }
-        (super::intent::IntentClass::Build, "software-engineering") | (super::intent::IntentClass::Build, "devops-infra") => {
+        (super::intent::IntentClass::Build, "software") | (super::intent::IntentClass::Build, "software-engineering") | (super::intent::IntentClass::Build, "devops") | (super::intent::IntentClass::Build, "devops-infra") => {
             criteria.push("Functional, bug-free implementation with optimized performance".into());
             criteria.push("Adheres to industry-standard architectural patterns and best practices".into());
             criteria.push("Includes necessary technical documentation and test coverage".into());
@@ -849,12 +985,12 @@ fn infer_success_criteria(profile: &IntentProfile, _raw: &str) -> Vec<String> {
             criteria.push("Alignment, safety, and ethical considerations are explicitly addressed".into());
             criteria.push("Data handling and inference pipelines are robust and scalable".into());
         }
-        (super::intent::IntentClass::Build, "medical") | (super::intent::IntentClass::Build, "pharma") => {
+        (super::intent::IntentClass::Build, "health") | (super::intent::IntentClass::Build, "medical") | (super::intent::IntentClass::Build, "pharma") => {
             criteria.push("Clinically accurate protocols grounded in peer-reviewed evidence".into());
             criteria.push("Strict adherence to regulatory (FDA/EMA) and ethical guidelines".into());
             criteria.push("Risk-benefit analysis is comprehensive and clearly stated".into());
         }
-        (super::intent::IntentClass::Build, "sports-nutrition") | (super::intent::IntentClass::Build, "health-fitness") => {
+        (super::intent::IntentClass::Build, "nutrition") | (super::intent::IntentClass::Build, "sports-nutrition") | (super::intent::IntentClass::Build, "health-fitness") => {
             criteria.push("Plan is physiologically sound and tailored to specific goals".into());
             criteria.push("Macros and micronutrients are balanced according to activity level".into());
             criteria.push("Includes clear instructions for tracking and adjustment".into());
@@ -939,8 +1075,8 @@ fn build_constraints_meta(profile: &IntentProfile) -> Option<ConstraintsMeta> {
 /// Derive appropriate tone from domain and knowledge level
 fn derive_tone(profile: &IntentProfile) -> String {
     match (profile.domain.as_str(), &profile.user_knowledge) {
-        ("business-strategy", _) => "strategic-actionable-direct".to_string(),
-        ("creative-writing", _) => "creative-expressive-engaging".to_string(),
+        ("business" | "business-strategy", _) => "strategic-actionable-direct".to_string(),
+        ("creative" | "creative-writing", _) => "creative-expressive-engaging".to_string(),
         ("education", super::intent::KnowledgeLevel::Novice) => "clear-supportive-step-by-step".to_string(),
         ("legal", _) => "precise-formal-referenced".to_string(),
         ("marketing", _) => "persuasive-data-driven-concise".to_string(),
@@ -951,16 +1087,33 @@ fn derive_tone(profile: &IntentProfile) -> String {
 }
 
 /// Vagueness Resolution: Unpacks generic requests into structured roadmaps
-fn unpack_context(profile: &IntentProfile) -> Option<String> {
+fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
     let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "the core topic".into());
+    let lower = raw.to_lowercase();
+    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
+    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+
+    if is_financial && !profile.domain.starts_with("workplace") {
+        return Some(format!(
+            "Target Definition (Disambiguate: Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth; quantify target amount, currency, and horizon). Current-State Baseline (Audit income, burn rate, assets, liabilities, and human capital monetization). Wealth Gap & Quantitative Modeling (Calculate Net Worth Gap, Required Annual Savings, Required Gross/Net Income, and Required CAGR). Income Engine & Leverage (Rank monetization vehicles: career, high-ticket services, equity, tech leverage by ROI). Capital Allocation & Risk Framework (Liquidity buffers, productive asset compounding, and downside mitigation across Conservative, Base, and Aggressive scenarios). Reality-Check (Quantify feasibility against constraints and identify required variable adjustments for {}).",
+            subject
+        ));
+    }
+    if is_business {
+        return Some(format!(
+            "Define target enterprise valuation and revenue milestones for {}. Validate unit economics (LTV/CAC, gross margin), business model canvas, go-to-market scalability, and capitalization roadmap across multi-year horizon.",
+            subject
+        ));
+    }
     match profile.domain.as_str() {
+        "computers" => Some(format!("Cover computing architecture for {}, low-level hardware-software interaction, memory constraints, and runtime efficiency.", subject)),
+        "science" | "scientific-research" => Some(format!("Cover empirical foundations of {}, theoretical framework, experimental methodology, and potential impact.", subject)),
+        "health" | "medical" => Some(format!("Cover physiological mechanisms of {}, clinical presentation, evidence-based interventions, and long-term outcomes.", subject)),
+        "finance" => Some(format!("Cover capital dynamics of {}, market mechanisms, risk-adjusted returns, and actionable execution strategies.", subject)),
         "ai-ml" => Some(format!("Cover definition of {}, how it differs from current AI, how it might work, key challenges, risks, and real-world implications.", subject)),
-        "finance" => Some(format!("Cover key concepts of {}, market trends, regulatory environment, and strategic recommendations.", subject)),
-        "medical" => Some(format!("Cover etiology of {}, clinical presentation, diagnostic criteria, treatment options, and prognosis.", subject)),
-        "scientific-research" => Some(format!("Cover methodology for {}, data analysis, ethical considerations, and potential impact.", subject)),
         "workplace-productivity" => Some(format!("Analyze objective output vs subjective perception for {}, remote/hybrid dynamics, and cultural impact.", subject)),
         "education" => Some(format!("Cover pedagogical foundations of {}, cognitive load optimization, retention strategies, and application milestones.", subject)),
-        "software-engineering" | "devops-infra" => Some(format!("Cover system architecture for {}, deployment strategy, scalability bottlenecks, and security considerations.", subject)),
+        "software" | "software-engineering" | "devops" | "devops-infra" => Some(format!("Cover system architecture for {}, deployment strategy, scalability bottlenecks, and security considerations.", subject)),
         _ => Some(format!("Break down {} into fundamental components, current state, key challenges, and future implications.", subject)),
     }
 }
@@ -969,27 +1122,46 @@ fn unpack_context(profile: &IntentProfile) -> Option<String> {
 fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut assumptions = Vec::new();
     let lower = raw.to_lowercase();
-    
-    // Domain assumptions
-    match profile.domain.as_str() {
-        "software-engineering" | "devops-infra" => {
-            if !lower.contains("legacy") && !lower.contains("old") {
-                assumptions.push("Assume modern, idiomatic technology stack and best practices".into());
-            }
-            assumptions.push("Assume production-grade requirements (security, logging, error handling)".into());
-        },
-        "business-strategy" => {
-            assumptions.push("Assume resource constraints (time/budget) typical of the specified team size".into());
-            assumptions.push("Assume focus on ROI and measurable business outcomes".into());
-        },
-        "data-science" | "ai-ml" => {
-            assumptions.push("Assume data is imperfect and requires preprocessing/cleaning".into());
-            assumptions.push("Assume model scalability and ethical considerations are paramount".into());
-        },
-        "medical" | "pharma" => {
-            assumptions.push("Assume strict regulatory compliance (e.g. HIPAA, FDA guidelines) is required".into());
+    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
+    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+
+    if is_financial && !profile.domain.starts_with("workplace") {
+        assumptions.push("Assume Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth".into());
+        assumptions.push("Assume unstated financial baselines (income, expenses, assets, liabilities) must be explicitly framed with transparent assumptions rather than arbitrary invention".into());
+        assumptions.push("Assume mathematical consistency: calculate required CAGR and savings rate; flag any feasibility mismatch rather than fabricating unrealistic returns".into());
+        assumptions.push("Assume primary income engine and skill/business leverage must precede passive portfolio compounding for zero-to-wealth trajectories".into());
+        assumptions.push("Assume tax efficiency (capital gains vs ordinary income) and inflation-adjusted real returns must be accounted for across all scenario projections".into());
+    } else if is_business {
+        assumptions.push("Assume business enterprise valuation is separate from personal liquid net worth and depends on revenue multiples and profit margins".into());
+        assumptions.push("Assume focus on sustainable unit economics (LTV/CAC > 3), gross margin health, and capital efficiency".into());
+        assumptions.push("Assume scalable operational infrastructure, defensible moat, and equity retention".into());
+    } else {
+        // Domain assumptions
+        match profile.domain.as_str() {
+            "computers" => {
+                assumptions.push("Assume standard system architecture and memory hierarchy unless specified".into());
+                assumptions.push("Assume high efficiency, reliability, and correctness requirements".into());
+            },
+            "science" | "scientific-research" => {
+                assumptions.push("Assume adherence to the scientific method and empirical reproducibility".into());
+                assumptions.push("Assume peer-reviewed standards for statistical validity".into());
+            },
+            "health" | "medical" | "pharma" => {
+                assumptions.push("Assume evidence-based clinical practices and safety-first protocols".into());
+                assumptions.push("Assume compliance with relevant healthcare regulations and ethics".into());
+            },
+            "software" | "software-engineering" | "devops" | "devops-infra" => {
+                if !lower.contains("legacy") && !lower.contains("old") {
+                    assumptions.push("Assume modern, idiomatic technology stack and best practices".into());
+                }
+                assumptions.push("Assume production-grade requirements (security, logging, error handling)".into());
+            },
+            "data-science" | "ai-ml" => {
+                assumptions.push("Assume data is imperfect and requires preprocessing/cleaning".into());
+                assumptions.push("Assume model scalability and ethical considerations are paramount".into());
+            },
+            _ => {}
         }
-        _ => {}
     }
     
     // Intent-based assumptions
@@ -1009,8 +1181,20 @@ fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
     assumptions
 }
 
-/// Derive dynamic final instruction based on intent
-fn derive_dynamic_instruction(profile: &IntentProfile) -> String {
+/// Derive dynamic final instruction based on intent and goal engineering
+fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
+    let lower = raw.to_lowercase();
+    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
+    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+
+    if is_financial && !profile.domain.starts_with("workplace") {
+        return "Execute a comprehensive Goal-Decomposition and Wealth-Engineering plan for the user's objective:\n1. TARGET DEFINITION: Disambiguate the goal into exact Target Amount ($), Currency, Target Type (Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth), and Horizon.\n2. CURRENT-STATE BASELINE: Audit financial baseline (income, expenses, cash, investments, debt) and human capital (skills, network, market value).\n3. WEALTH GAP CALCULATION: Calculate Net Worth Gap, Required Annual Savings, Required Gross/Net Income, and Required CAGR with quantitative modeling.\n4. INCOME ENGINE & LEVERAGE: Rank scalable monetization vehicles (career advancement, high-ticket services, business ownership, AI leverage) by time-to-revenue and ROI.\n5. CAPITAL ALLOCATION & RISK: Define liquidity buffers, diversified compounding, and comprehensive risk mitigation (income, market, debt, tax).\n6. SCENARIO MODELING: Provide Conservative, Base Case, and Aggressive projections.\n7. EXECUTION ROADMAP & KPIS: Detail milestones across 30-day, 90-day, 6-12 month, 3-year, and 5-10 year horizons with quantitative KPIs.\n8. REALITY CHECK: If the target is mathematically inconsistent with current constraints, explicitly quantify the gap, explain which variables must change, and state the feasibility verdict.".into();
+    }
+
+    if is_business {
+        return "Execute an Enterprise & Business Growth Engineering plan:\n1. TARGET & VALUATION: Define target revenue, EBITDA, and enterprise valuation multiple over the target horizon.\n2. BUSINESS MODEL & UNIT ECONOMICS: Specify product/service offering, pricing model, gross margins, and customer acquisition economics (LTV/CAC).\n3. GO-TO-MARKET & SCALABILITY: Detail distribution leverage, sales channels, and technology/AI operational moats.\n4. CAPITAL & RESOURCE ALLOCATION: Outline capital requirements, funding strategy (bootstrapped vs equity), and reinvestment roadmap.\n5. SCENARIOS & RISKS: Model Conservative, Base, and Aggressive growth cases with competition and execution risk mitigation.\n6. EXECUTION TIMELINE & KPIS: Structure roadmap across PMF, initial scale, team expansion, and valuation milestones with measurable business KPIs.".into();
+    }
+
     match profile.primary_intent {
         super::intent::IntentClass::Explain => "Provide a well-structured explanation that balances simplicity with depth.".into(),
         super::intent::IntentClass::Build => {
@@ -1047,5 +1231,109 @@ fn derive_persona_anchor(domain: &str, role: &str, config: Option<&super::config
         "legal" => format!("Senior {} with expertise in regulatory compliance, contract law, and strategic advisory.", role),
         "workplace-productivity" => format!("Senior {} specializing in organizational dynamics, distributed team performance, and workplace culture.", role),
         _ => format!("Professional {} with deep expertise in the {} domain and related methodologies.", role, domain),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_structurer_pre_validate_valid() {
+        let structurer = HttpStructurer {
+            route: "/prompt".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: "How do I optimize SQL queries?".to_string(),
+        };
+        let input = structurer.collect().unwrap();
+        assert!(structurer.pre_validate(&input).is_ok());
+    }
+
+    #[test]
+    fn test_http_structurer_pre_validate_case_variations() {
+        let structurer = HttpStructurer {
+            route: "/prompt".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: "".to_string(),
+        };
+
+        let xss_inputs = [
+            "<script>alert(1)</script>",
+            "<SCRIPT src='malicious.js'></SCRIPT>",
+            "<ScRiPt>console.log(1)</sCrIpT>",
+            "<img src=x onerror=alert(1)>",
+            "<body ONLOAD=evil()>",
+            "javascript:void(0)",
+            "JaVaScRiPt:alert(1)",
+        ];
+
+        for text in xss_inputs {
+            let input = RawInput {
+                text: text.to_string(),
+                source: PromptSource::Http {
+                    remote_addr: "127.0.0.1".to_string(),
+                    route: "/prompt".to_string(),
+                },
+                trust_level: TrustLevel::Medium,
+                metadata: InputMetadata::new(),
+            };
+            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for: {}", text);
+        }
+
+        let sqli_inputs = [
+            "DROP TABLE users;",
+            "drop table customers",
+            "dRoP tAbLe logs",
+            "DELETE FROM accounts",
+            "insert into users values (1)",
+            "UNION SELECT * FROM credentials",
+            "admin' OR 1=1 --",
+            "test'; --",
+        ];
+
+        for text in sqli_inputs {
+            let input = RawInput {
+                text: text.to_string(),
+                source: PromptSource::Http {
+                    remote_addr: "127.0.0.1".to_string(),
+                    route: "/prompt".to_string(),
+                },
+                trust_level: TrustLevel::Medium,
+                metadata: InputMetadata::new(),
+            };
+            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for: {}", text);
+        }
+    }
+
+    #[test]
+    fn test_http_structurer_pre_validate_url_encoded() {
+        let structurer = HttpStructurer {
+            route: "/prompt".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: "".to_string(),
+        };
+
+        let encoded_attacks = [
+            "%3Cscript%3Ealert(1)%3C/script%3E",
+            "%3CSCRIPT%3Ealert(1)%3C/SCRIPT%3E",
+            "DROP%20TABLE%20users",
+            "drop%20table%20users",
+            "admin%27%20OR%201%3D1%20--",
+            "union%20select%201,2,3",
+            "%6a%61%76%61%73%63%72%69%70%74%3aalert(1)", // javascript:
+        ];
+
+        for text in encoded_attacks {
+            let input = RawInput {
+                text: text.to_string(),
+                source: PromptSource::Http {
+                    remote_addr: "127.0.0.1".to_string(),
+                    route: "/prompt".to_string(),
+                },
+                trust_level: TrustLevel::Medium,
+                metadata: InputMetadata::new(),
+            };
+            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for URL encoded: {}", text);
+        }
     }
 }

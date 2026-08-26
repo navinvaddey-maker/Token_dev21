@@ -57,6 +57,7 @@ regex     = "1"
 once_cell = "1"
 dotenvy   = "0.15"
 time      = { version = "0.3", features = ["serde"] }
+urlencoding = "2.1"
 
 # NEW: Token compression engine dependencies
 arrayvec   = "0.7"          # stack-allocated fixed-capacity arrays (WM slots)

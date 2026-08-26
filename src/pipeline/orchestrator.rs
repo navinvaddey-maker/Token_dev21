@@ -244,29 +244,17 @@ impl PipelineOrchestrator {
 
         let mut corrections_applied = Vec::new();
         if !guard_report.passed {
-            if !guard_report.layers[0].passed {
-                corrections_applied.push(crate::types::TextCorrection {
-                    original: "JSON structure".to_string(),
-                    corrected: "Plain text format".to_string(),
-                    confidence: 0.9,
-                    correction_type: "l1_critique_contradiction".to_string(),
-                });
-            }
-            if !guard_report.layers[1].passed {
-                corrections_applied.push(crate::types::TextCorrection {
-                    original: "magic_token".to_string(),
-                    corrected: "[UNCERTAIN]magic_token".to_string(),
-                    confidence: 0.9,
-                    correction_type: "l2_confidence_uncertainty".to_string(),
-                });
-            }
-            if !guard_report.layers[2].passed {
-                corrections_applied.push(crate::types::TextCorrection {
-                    original: "fake_api_call()".to_string(),
-                    corrected: "/* REMOVED: fake_api_call */".to_string(),
-                    confidence: 0.9,
-                    correction_type: "l3_constraint_invented_api".to_string(),
-                });
+            for (layer_idx, layer) in guard_report.layers.iter().enumerate() {
+                if !layer.passed {
+                    for flag in &layer.flags {
+                        corrections_applied.push(crate::types::TextCorrection {
+                            original: flag.clone(),
+                            corrected: format!("[CORRECTED] {}", flag),
+                            confidence: 0.9,
+                            correction_type: format!("l{}_guard_flag", layer_idx + 1),
+                        });
+                    }
+                }
             }
 
             final_response = crate::npae::hallucination::guard::remediate_hallucination(&final_response, &guard_report);

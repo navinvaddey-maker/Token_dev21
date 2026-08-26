@@ -133,6 +133,24 @@ fn domain_anchored_fallback(domain: &str, intent: &IntentClass) -> &'static str 
         ("business", IntentClass::Explain) => "Business Consultant",
         ("business", _)                    => "Business Advisor",
         
+        // Computers
+        ("computers", IntentClass::Build)   => "Computer Systems Architect",
+        ("computers", IntentClass::Analyze) => "Systems Performance Analyst",
+        ("computers", IntentClass::Explain) => "Computer Science Educator",
+        ("computers", _)                    => "Computer Systems Engineer",
+
+        // Science
+        ("science", IntentClass::Build)     => "Lead Research Scientist",
+        ("science", IntentClass::Analyze)   => "Scientific Data Analyst",
+        ("science", IntentClass::Explain)   => "Science Communicator",
+        ("science", _)                      => "Research Scientist",
+
+        // Health
+        ("health", IntentClass::Build)      => "Clinical Health Specialist",
+        ("health", IntentClass::Analyze)    => "Health Data Analyst",
+        ("health", IntentClass::Explain)    => "Health & Wellness Educator",
+        ("health", _)                       => "Healthcare Professional",
+
         // Software  (was "software-engineering")
         ("software", IntentClass::Build)     => "Software Architect",
         ("software", IntentClass::Debug)     => "Systems Debugger",

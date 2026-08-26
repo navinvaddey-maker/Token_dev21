@@ -1,27 +1,326 @@
 {
   "domain_taxonomy": [
     {
-      "domain": "pharma",
-      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech", "pharmacokinetics", "pharmacodynamics", "formulation", "clinical-trial"],
-      "boost": 3
+      "domain": "computers",
+      "aliases": ["computer-science", "computing", "it", "systems-architecture"],
+      "boost": 3,
+      "keywords": [
+        "computer", "computing", "cpu", "gpu", "processor", "memory", "ram", "storage", "ssd", "nvme",
+        "operating-system", "kernel", "linux", "unix", "windows", "network", "tcp-ip", "dns", "lan", "wan",
+        "distributed-systems", "concurrency", "threading", "compiler", "runtime", "virtual-machine", "hypervisor",
+        "cache", "bus", "firmware", "assembly", "instruction-set", "risc", "cisc", "cloud-computing", "server"
+      ],
+      "persona_template": "Principal {role} specializing in computer systems architecture, low-level optimization, runtime performance, and scalable infrastructure.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "System Architecture & Specs",
+            "description": "Define hardware/software compute requirements, throughput constraints, and interface specifications.",
+            "estimated_duration": "3-5 days",
+            "deliverables": ["System Architecture Specification", "Compute & Memory Budget"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Core System Implementation",
+            "description": "Develop core modules, memory management, concurrency models, and driver/OS integrations.",
+            "estimated_duration": "1-3 weeks",
+            "deliverables": ["Working System Implementation", "Benchmark Test Suite"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Optimization & Deployment",
+            "description": "Profile bottlenecks, optimize cache/memory locality, and configure production telemetry.",
+            "estimated_duration": "3-5 days",
+            "deliverables": ["Performance Audit Report", "Production Configuration"]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Profiling & Telemetry Gathering",
+            "description": "Collect hardware counters, trace system calls, and benchmark latency/throughput profiles.",
+            "estimated_duration": "1-2 days",
+            "deliverables": ["Telemetry Profile Dataset", "Resource Utilization Baseline"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Bottleneck & Root Cause Analysis",
+            "description": "Analyze thread contention, cache misses, IO saturation, and algorithmic complexity.",
+            "estimated_duration": "2-3 days",
+            "deliverables": ["Bottleneck Diagnosis Matrix", "Optimization Opportunity Log"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Optimization Roadmap",
+            "description": "Formulate prioritized architectural and configuration recommendations.",
+            "estimated_duration": "1-2 days",
+            "deliverables": ["Target Architecture Recommendations", "Implementation Roadmap"]
+          }
+        ]
+      }
+    },
+    {
+      "domain": "science",
+      "aliases": ["scientific-research", "natural-sciences", "physics", "chemistry", "biology"],
+      "boost": 3,
+      "keywords": [
+        "science", "scientific", "physics", "chemistry", "biology", "experiment", "hypothesis", "laboratory",
+        "empirical", "theory", "methodology", "quantum", "molecule", "genetics", "cellular", "astrophysics",
+        "peer-review", "thermodynamics", "mathematics", "spectroscopy", "crystallography", "reaction",
+        "organism", "ecology", "statistical-significance", "protocol", "replication", "control-group"
+      ],
+      "persona_template": "Lead Research {role} with rigorous expertise in empirical methodology, theoretical modeling, experimental validation, and peer-reviewed analysis.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Hypothesis & Experimental Design",
+            "description": "Formulate testable hypotheses, define control/variable parameters, and establish statistical power criteria.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": ["Experimental Protocol", "Power Analysis & Sampling Plan"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Data Acquisition & Execution",
+            "description": "Execute experimental runs, record instrument telemetry, and calibrate baseline measurements.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": ["Raw Experimental Dataset", "Calibration & Quality Log"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Synthesis & Peer Review",
+            "description": "Perform statistical hypothesis testing, synthesize findings, and draft formal scientific report.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": ["Peer-Review Ready Paper", "Reproducibility Artifacts"]
+          }
+        ],
+        "explain": [
+          {
+            "phase_number": 1,
+            "name": "Core Scientific Principles",
+            "description": "Introduce fundamental laws, underlying physics/chemistry/biology concepts, and historical context.",
+            "estimated_duration": "Step 1",
+            "deliverables": ["Theoretical Foundation Brief"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Mechanistic Deep Dive",
+            "description": "Detail molecular, mathematical, or physical mechanisms with empirical proof points.",
+            "estimated_duration": "Step 2",
+            "deliverables": ["Mechanistic Breakdown"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Modern Applications & Frontiers",
+            "description": "Connect theory to modern research frontiers, experimental instruments, and real-world impact.",
+            "estimated_duration": "Step 3",
+            "deliverables": ["State of the Art Summary"]
+          }
+        ]
+      }
+    },
+    {
+      "domain": "health",
+      "aliases": ["healthcare", "medicine", "clinical", "wellness", "public-health"],
+      "boost": 3,
+      "keywords": [
+        "health", "healthcare", "wellness", "medical", "clinical", "patient", "diagnosis", "treatment",
+        "preventative", "therapy", "vital-signs", "physiology", "mental-health", "immunity", "epidemiology",
+        "rehabilitation", "symptoms", "disease", "pathology", "vitality", "cardiovascular", "longevity",
+        "screening", "doctor", "hospital", "clinic", "wellbeing", "stress-management", "lifestyle"
+      ],
+      "persona_template": "Board-Certified {role} specializing in evidence-based clinical protocols, preventative medicine, physiological assessment, and healthcare optimization.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Health Assessment & Baseline Audit",
+            "description": "Evaluate biomarkers, health history, risk factors, and physiological baseline parameters.",
+            "estimated_duration": "1-3 days",
+            "deliverables": ["Biomarker & Risk Profile", "Health Baseline Summary"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Intervention & Protocol Design",
+            "description": "Structure evidence-based lifestyle, therapeutic, or clinical intervention roadmap.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": ["Personalized Health Protocol", "Safety & Monitoring Guidelines"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Monitoring & Long-Term Adaptation",
+            "description": "Track health markers, evaluate clinical outcomes, and calibrate ongoing maintenance.",
+            "estimated_duration": "Ongoing",
+            "deliverables": ["Progress Tracking Dashboard", "Outcome Evaluation Report"]
+          }
+        ]
+      }
+    },
+    {
+      "domain": "finance",
+      "aliases": ["personal-finance", "wealth-management", "financial-planning", "investing"],
+      "boost": 3,
+      "keywords": [
+        "money", "earn", "income", "wealth", "cashflow", "salary", "capital", "passive-income", "savings",
+        "net-worth", "compensation", "investment", "portfolio", "stock", "crypto", "trading", "banking",
+        "loan", "interest", "dividend", "accounting", "audit", "tax", "fintech", "asset", "equity",
+        "asset-allocation", "financial-freedom", "budgeting", "compound-interest", "side-hustle",
+        "million", "millions", "billion", "dollars", "rich", "monetize", "monetization"
+      ],
+      "persona_template": "Principal {role} specializing in income acceleration, capital allocation, wealth preservation, and risk-adjusted growth strategies.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Financial & Asset Audit (30 Days)",
+            "description": "Evaluate current active/passive income sources, monthly burn rate, balance sheet assets/debt, and human capital monetization inventory.",
+            "estimated_duration": "30 days",
+            "deliverables": ["Financial Baseline & Burn Rate Audit", "Human Capital & Monetization Matrix", "Target Definition & Wealth Gap Calculation"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategy & Vehicle Selection (90 Days)",
+            "description": "Select and launch primary high-leverage monetization vehicles (career advancement, high-ticket services, business equity, or dividend/index investing).",
+            "estimated_duration": "90 days",
+            "deliverables": ["Vehicle Feasibility Matrix", "Income Growth Blueprint", "First Revenue Milestone Report"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Execution & Reinvestment (6-12 Months)",
+            "description": "Launch revenue-generating initiatives, secure initial cash flows, and configure automated compounding reinvestment.",
+            "estimated_duration": "6-12 months",
+            "deliverables": ["Execution Action Checklist", "Cash Flow & Surplus Automation Blueprint", "Diversified Asset Allocation Strategy"]
+          },
+          {
+            "phase_number": 4,
+            "name": "Equity & Asset Expansion (3-5 Years)",
+            "description": "Scale business equity, expand productive assets, and optimize capital compounding across market cycles.",
+            "estimated_duration": "3-5 years",
+            "deliverables": ["Equity & Portfolio Growth Model", "Scenario Stress-Test Report (Conservative/Base/Aggressive)"]
+          },
+          {
+            "phase_number": 5,
+            "name": "Wealth Compounding & Preservation (5-10 Years)",
+            "description": "Maximize compound growth, achieve targeted net worth milestone, and implement estate, tax, and capital preservation structures.",
+            "estimated_duration": "5-10 years",
+            "deliverables": ["Target Achievement & Wealth Preservation Blueprint", "Financial Freedom Audit"]
+          }
+        ]
+      }
+    },
+    {
+      "domain": "software",
+      "aliases": ["software-engineering", "technical-writing", "web-development"],
+      "boost": 2,
+      "keywords": [
+        "code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker",
+        "kubernetes", "typescript", "javascript", "refactoring", "git", "ci", "microservices", "compiler",
+        "framework", "sdk", "full-stack", "rest", "graphql", "sql", "nosql"
+      ],
+      "persona_template": "Principal {role} specializing in modular software architecture, high-performance clean code, testing rigor, and robust production systems.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Design & Architecture",
+            "description": "System design, technology selection, API contract definitions, and architecture blueprints.",
+            "estimated_duration": "3-5 days",
+            "deliverables": ["Architecture Document", "Tech Stack Decision Matrix"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Implementation & Testing",
+            "description": "Core module development, automated unit/integration tests, and iterative refinement.",
+            "estimated_duration": "1-3 weeks",
+            "deliverables": ["Working Codebase", "Automated Test Suite"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Deployment & Validation",
+            "description": "Staging validation, performance benchmarking, and production release with telemetry.",
+            "estimated_duration": "2-3 days",
+            "deliverables": ["Deployed Production Service", "Monitoring & Alerting Setup"]
+          }
+        ]
+      }
+    },
+    {
+      "domain": "business",
+      "aliases": ["business-strategy", "career-growth", "monetization"],
+      "boost": 2,
+      "keywords": [
+        "business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale",
+        "venture", "customer", "monetize", "b2b", "b2c", "churn", "arr", "mrr", "valuation", "business-plan",
+        "client-acquisition", "freelancing", "consulting", "offer-creation", "pricing"
+      ],
+      "persona_template": "Senior {role} specializing in business model design, go-to-market strategy, customer acquisition, and scalable unit economics.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Market Validation & Discovery",
+            "description": "Target customer research, competitor benchmarking, and value proposition validation.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": ["Market Validation Report", "Competitor Matrix"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategy & Model Design",
+            "description": "Business model canvas, pricing structure, and go-to-market funnel blueprint.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": ["Business Model Canvas", "Revenue & Pricing Model"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Launch & Go-To-Market",
+            "description": "Launch campaigns, customer acquisition execution, and early feedback optimization.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": ["Launch Execution Plan", "First 30-Day Customer Acquisition Report"]
+          }
+        ]
+      }
     },
     {
       "domain": "nutrition",
       "aliases": ["sports-nutrition", "clinical-nutrition", "dietetics"],
-      "keywords": ["meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician", "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic", "vegetarian", "micronutrients", "caloric-deficit"],
-      "boost": 2
+      "boost": 2,
+      "keywords": [
+        "meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician",
+        "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic",
+        "vegetarian", "micronutrients", "caloric-deficit", "meal-plan"
+      ],
+      "persona_template": "Registered {role} specializing in evidence-based nutritional science, metabolic optimization, and personalized dietary programming.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Baseline Nutritional Assessment",
+            "description": "Assess energy expenditure, dietary habits, macro targets, and health constraints.",
+            "estimated_duration": "Day 1",
+            "deliverables": ["Nutritional Baseline Assessment", "Daily Macro/Micro Targets"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Meal Protocol Design",
+            "description": "Develop structured daily/weekly meal protocols with whole-food sourcing and timing.",
+            "estimated_duration": "Day 2-3",
+            "deliverables": ["Detailed Meal Protocol", "Supplement & Hydration Guide"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Adherence & Calibration",
+            "description": "Monitor body composition changes, energy levels, and adjust macro ratios.",
+            "estimated_duration": "Ongoing",
+            "deliverables": ["Progress Tracking Sheet", "Protocol Calibration Log"]
+          }
+        ]
+      }
     },
     {
-      "domain": "software",
-      "aliases": ["software-engineering", "technical-writing"],
-      "keywords": ["code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker", "kubernetes", "typescript", "javascript", "refactoring", "git", "ci", "microservices", "compiler", "framework", "sdk"],
-      "boost": 2
-    },
-    {
-      "domain": "business",
-      "aliases": ["business-strategy"],
-      "keywords": ["business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale", "venture", "customer", "monetize", "b2b", "b2c", "churn", "arr", "mrr", "valuation", "business-plan"],
-      "boost": 2
+      "domain": "pharma",
+      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech", "pharmacokinetics", "pharmacodynamics", "formulation", "clinical-trial"],
+      "boost": 3
     },
     {
       "domain": "data-science",
@@ -54,11 +353,6 @@
       "domain": "marketing",
       "keywords": ["marketing", "brand", "campaign", "seo", "content", "social-media", "conversion", "funnel", "audience", "ads", "copywriting", "ppc", "ctr", "email-marketing", "influencer", "lead-gen"],
       "boost": 2
-    },
-    {
-      "domain": "finance",
-      "keywords": ["investment", "portfolio", "stock", "crypto", "trading", "banking", "loan", "interest", "dividend", "accounting", "audit", "tax", "ledger", "fintech", "quantitative", "derivatives", "hedge-fund", "valuation", "asset", "equity"],
-      "boost": 3
     },
     {
       "domain": "devops",
@@ -151,13 +445,71 @@
   "roles": [
     {
       "priority": 6,
+      "domain": "computers",
+      "base_title": "Computer Systems Architect",
+      "verbs": [
+        { "word": "computer",         "weight": 10 },
+        { "word": "computing",        "weight": 10 },
+        { "word": "operating-system", "weight": 10 },
+        { "word": "kernel",           "weight": 9 },
+        { "word": "processor",        "weight": 9 },
+        { "word": "architecture",     "weight": 9 }
+      ]
+    },
+    {
+      "priority": 6,
+      "domain": "science",
+      "base_title": "Lead Research Scientist",
+      "verbs": [
+        { "word": "science",          "weight": 10 },
+        { "word": "scientific",       "weight": 10 },
+        { "word": "experiment",       "weight": 10 },
+        { "word": "hypothesis",       "weight": 10 },
+        { "word": "physics",          "weight": 9 },
+        { "word": "chemistry",        "weight": 9 },
+        { "word": "biology",          "weight": 9 }
+      ]
+    },
+    {
+      "priority": 6,
+      "domain": "health",
+      "base_title": "Clinical Health Specialist",
+      "verbs": [
+        { "word": "health",           "weight": 10 },
+        { "word": "healthcare",       "weight": 10 },
+        { "word": "wellness",         "weight": 9 },
+        { "word": "clinical",         "weight": 9 },
+        { "word": "prevention",       "weight": 8 },
+        { "word": "vitality",         "weight": 8 }
+      ]
+    },
+    {
+      "priority": 6,
+      "domain": "finance",
+      "base_title": "Wealth & Income Strategist",
+      "verbs": [
+        { "word": "earn",             "weight": 10 },
+        { "word": "money",            "weight": 10 },
+        { "word": "income",           "weight": 10 },
+        { "word": "wealth",           "weight": 10 },
+        { "word": "million",          "weight": 10 },
+        { "word": "millions",         "weight": 10 },
+        { "word": "billion",          "weight": 10 },
+        { "word": "cashflow",         "weight": 9 },
+        { "word": "salary",           "weight": 8 },
+        { "word": "investment",       "weight": 9 },
+        { "word": "portfolio",        "weight": 9 }
+      ]
+    },
+    {
+      "priority": 6,
       "domain": "pharma",
       "base_title": "Pharmacologist",
       "verbs": [
         { "word": "pharmacokinetics", "weight": 10 },
-        { "word": "dosage",           "weight": 9  },
+        { "word": "dosage",           "weight": 9 },
         { "word": "bioavailability",  "weight": 10 },
-        { "word": "receptor",         "weight": 9  }
+        { "word": "receptor",         "weight": 9 }
       ]
     },
     {
@@ -417,9 +769,9 @@
       "is_forbidden": true,
       "description": "Gluten containing grains",
       "trigger": [
-        [{ "word": "avoid",  "weight": 6 }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "gluten", "weight": 8 }, { "word": "free",   "weight": 6  }]
+        [{ "word": "avoid", "weight": 6 }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "gluten", "weight": 8 }, { "word": "free", "weight": 6 }]
       ]
     },
     {
@@ -429,7 +781,7 @@
       "is_forbidden": false,
       "description": "High carbohydrate loading protocol",
       "trigger": [
-        [{ "word": "high",   "weight": 7 }, { "word": "carb", "weight": 9 }],
+        [{ "word": "high", "weight": 7 }, { "word": "carb", "weight": 9 }],
         [{ "word": "loading", "weight": 8 }, { "word": "carbohydrate", "weight": 10 }]
       ]
     },
@@ -440,10 +792,10 @@
       "is_forbidden": true,
       "description": "All dairy products",
       "trigger": [
-        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from", "lactose-free"] }, { "word": "dairy",  "weight": 10 }],
-        [{ "word": "avoid",  "weight": 6 }, { "word": "dairy",  "weight": 10 }],
-        [{ "word": "dairy",  "weight": 8 }, { "word": "free",   "weight": 6  }],
-        [{ "word": "lactose", "weight": 8 }, { "word": "free",  "weight": 6  }]
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from", "lactose-free"] }, { "word": "dairy", "weight": 10 }],
+        [{ "word": "avoid", "weight": 6 }, { "word": "dairy", "weight": 10 }],
+        [{ "word": "dairy", "weight": 8 }, { "word": "free", "weight": 6 }],
+        [{ "word": "lactose", "weight": 8 }, { "word": "free", "weight": 6 }]
       ]
     },
     {
@@ -453,7 +805,7 @@
       "is_forbidden": false,
       "description": "Low fiber dietary approach",
       "trigger": [
-        [{ "word": "low",    "weight": 7 }, { "word": "fiber",  "weight": 9 }]
+        [{ "word": "low", "weight": 7 }, { "word": "fiber", "weight": 9 }]
       ]
     },
     {
@@ -463,8 +815,8 @@
       "is_forbidden": true,
       "description": "Nightshade vegetables (tomatoes, peppers, eggplant, potatoes)",
       "trigger": [
-        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "nightshades", "weight": 10 }],
-        [{ "word": "avoid",  "weight": 6 }, { "word": "nightshades", "weight": 10 }]
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "nightshades", "weight": 10 }],
+        [{ "word": "avoid", "weight": 6 }, { "word": "nightshades", "weight": 10 }]
       ]
     },
     {
@@ -474,7 +826,7 @@
       "is_forbidden": false,
       "description": "Budget-constrained approach",
       "trigger": [
-        [{ "word": "low",    "weight": 6 }, { "word": "budget",   "weight": 9 }],
+        [{ "word": "low", "weight": 6 }, { "word": "budget", "weight": 9 }],
         [{ "word": "bootstrap", "weight": 10 }],
         [{ "word": "minimal", "weight": 7 }, { "word": "investment", "weight": 8 }]
       ]
@@ -486,7 +838,7 @@
       "is_forbidden": false,
       "description": "SaaS business model focus",
       "trigger": [
-        [{ "word": "saas",   "weight": 10 }],
+        [{ "word": "saas", "weight": 10 }],
         [{ "word": "subscription", "weight": 9 }, { "word": "model", "weight": 7 }]
       ]
     },
@@ -508,8 +860,8 @@
       "is_forbidden": true,
       "description": "No external API dependencies",
       "trigger": [
-        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
-        [{ "word": "no",     "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "dependencies", "weight": 9 }]
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "dependencies", "weight": 9 }]
       ]
     },
     {
@@ -519,8 +871,8 @@
       "is_forbidden": false,
       "description": "GDPR compliance required",
       "trigger": [
-        [{ "word": "gdpr",   "weight": 10 }],
-        [{ "word": "data",   "weight": 6 }, { "word": "privacy", "weight": 9 }]
+        [{ "word": "gdpr", "weight": 10 }],
+        [{ "word": "data", "weight": 6 }, { "word": "privacy", "weight": 9 }]
       ]
     }
   ]

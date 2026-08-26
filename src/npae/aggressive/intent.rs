@@ -137,23 +137,25 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
                 best_domain = &tax.domain;
             }
         }
-        return best_domain.to_string();
+        return super::config::normalize_domain(best_domain, &cfg.domain_taxonomy).to_string();
     }
 
     // Centroids for each domain fallback — names MUST match unified.json canonical domain names.
     // Use config::normalize_domain() at call-sites to resolve any legacy alias → canonical.
     let domains = [
-        ("nutrition",              vec!["nutritionist", "diet", "macro", "protein", "training"]),
-        ("software",               vec!["code", "rust", "api", "backend", "software"]),
-        ("software",               vec!["article", "documentation", "tutorial", "guide"]),
-        ("business",               vec!["business", "startup", "revenue", "market", "strategy"]),
+        ("computers",              vec!["computer", "computing", "cpu", "processor", "memory", "kernel", "operating-system", "linux", "systems"]),
+        ("science",                vec!["science", "scientific", "physics", "chemistry", "biology", "experiment", "hypothesis", "research"]),
+        ("health",                 vec!["health", "healthcare", "wellness", "medical", "clinical", "patient", "vitality", "prevention"]),
+        ("nutrition",              vec!["nutritionist", "diet", "macro", "protein", "training", "nutrition", "supplement"]),
+        ("software",               vec!["code", "rust", "api", "backend", "software", "developer", "programming", "implementation"]),
+        ("business",               vec!["business", "startup", "revenue", "market", "strategy", "monetize", "pricing", "growth"]),
         ("data-science",           vec!["data", "ml", "model", "prediction", "analysis"]),
         ("education",              vec!["teach", "learn", "curriculum", "course", "pedagogy"]),
         ("creative",               vec!["story", "novel", "plot", "fiction", "narrative"]),
         ("health-fitness",         vec!["workout", "exercise", "health", "wellness", "fitness"]),
         ("legal",                  vec!["contract", "legal", "compliance", "law", "attorney"]),
         ("marketing",              vec!["marketing", "brand", "campaign", "seo", "audience"]),
-        ("finance",                vec!["investment", "stock", "portfolio", "banking", "finance"]),
+        ("finance",                vec!["money", "earn", "income", "wealth", "salary", "investment", "stock", "portfolio", "banking", "finance", "cashflow", "million", "millions", "billion", "dollars", "rich"]),
         ("devops",                 vec!["pipeline", "infrastructure", "cloud", "aws", "devops"]),
         ("ai-ml",                  vec!["llm", "neural", "transformer", "alignment", "ai"]),
         ("medical",                vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
@@ -206,6 +208,9 @@ fn extract_subject(raw: &str) -> Option<String> {
         "analyze", "explain", "debug", "fix", "deploy", "optimize", "plan",
         "compare", "evaluate", "generate", "set", "start", "become", "get",
         "help", "give", "provide", "show", "tell", "find", "list", "identify",
+        "earn", "gain", "increase", "grow", "raise", "boost", "maximize",
+        "scale", "accumulate", "learn", "study", "research", "diagnose", "treat",
+        "improve", "advance", "launch",
     ].iter().copied().collect();
 
     // Isolate the user's actual prompt (strip Context/RAG prefixes)
@@ -223,14 +228,14 @@ fn extract_subject(raw: &str) -> Option<String> {
     let mut past_first_verb = false;
 
     for word in &words {
-        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+        let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '$');
         if clean.is_empty() { continue; }
         let lower = clean.to_lowercase();
 
         // Skip stop words and action verbs — they precede the subject
         if stop_words.contains(lower.as_str()) {
             // If we were building a phrase, save it as candidate
-            if current_phrase.len() > best_phrase.len() {
+            if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
                 best_phrase = current_phrase.clone();
             }
             current_phrase.clear();
@@ -239,7 +244,7 @@ fn extract_subject(raw: &str) -> Option<String> {
 
         if action_verbs.contains(lower.as_str()) {
             past_first_verb = true;
-            if current_phrase.len() > best_phrase.len() {
+            if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
                 best_phrase = current_phrase.clone();
             }
             current_phrase.clear();
@@ -255,7 +260,7 @@ fn extract_subject(raw: &str) -> Option<String> {
     }
 
     // Final flush
-    if current_phrase.len() > best_phrase.len() {
+    if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
         best_phrase = current_phrase;
     }
 
@@ -267,8 +272,11 @@ fn extract_subject(raw: &str) -> Option<String> {
     Some(result.join(" "))
 }
 
-/// Title-cases a single word: "kubernetes" → "Kubernetes", "API" stays "API"
+/// Title-cases a single word: "kubernetes" → "Kubernetes", "$10M" stays "$10M", "API" stays "API"
 fn title_case_word(word: &str) -> String {
+    if word.starts_with('$') && word.len() > 1 {
+        return format!("${}", title_case_word(&word[1..]));
+    }
     // If it's already all-caps (acronym), keep it
     if word.len() <= 4 && word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic()) {
         return word.to_string();
@@ -323,23 +331,36 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
     let phase_signals = ["phase", "phases", "stage", "stages", "sprint", "iteration", "milestone"];
     let has_phases = phase_signals.iter().any(|s| lower.contains(s));
 
-    // Timeline signals
-    let timeline_patterns = [
-        ("day", "daily"), ("week", "weekly"), ("month", "monthly"),
-        ("quarter", "quarterly"), ("year", "yearly"), ("hour", "hourly"),
+    // Multi-year and specific timeline patterns
+    let specific_spans = [
+        "10 years", "7 years", "5 years", "3 years", "2 years", "1 year",
+        "12 months", "6 months", "90 days", "30 days",
     ];
 
     let mut detected_scope = None;
-    let has_timeline;
-
-    for (short, long) in &timeline_patterns {
-        if lower.contains(long) || lower.contains(short) {
-            detected_scope = Some(long.to_string());
+    for span in &specific_spans {
+        if lower.contains(span) {
+            detected_scope = Some(span.replace(' ', "_"));
             break;
         }
     }
 
-    has_timeline = detected_scope.is_some() || has_phases;
+    // General timeline signals
+    if detected_scope.is_none() {
+        let timeline_patterns = [
+            ("day", "daily"), ("week", "weekly"), ("month", "monthly"),
+            ("quarter", "quarterly"), ("year", "yearly"), ("hour", "hourly"),
+        ];
+
+        for (short, long) in &timeline_patterns {
+            if lower.contains(long) || lower.contains(short) {
+                detected_scope = Some(long.to_string());
+                break;
+            }
+        }
+    }
+
+    let has_timeline = detected_scope.is_some() || has_phases;
 
     let scope = if has_phases && detected_scope.is_some() {
         format!("phased_{}", detected_scope.unwrap())
