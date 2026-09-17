@@ -1,6 +1,5 @@
 use crate::{
     algorithms::semantic_clustering::SemanticClustering,
-    algorithms::sparse_coding::SparseCoding,
     algorithms::working_memory::{ContextFrame, WorkingMemory},
     types::{AlgorithmOutput, Mode, SlotSource, WmSlot},
 };
@@ -8,7 +7,6 @@ use crate::{
 /// Handles Stage 3: Context Management
 pub struct Stage3 {
     clustering: SemanticClustering,
-    _sparse: SparseCoding,
 }
 
 impl Stage3 {
@@ -16,7 +14,6 @@ impl Stage3 {
     pub fn new() -> Self {
         Self {
             clustering: SemanticClustering::default(),
-            _sparse: SparseCoding::default(),
         }
     }
 

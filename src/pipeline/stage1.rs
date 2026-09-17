@@ -4,6 +4,7 @@ use crate::{
 };
 
 /// Handles Stage 1: Signal Reduction (Lexical Compression → Sparse Coding)
+#[derive(Default)]
 pub struct Stage1 {
     lexical: LexicalCompression,
     sparse: SparseCoding,

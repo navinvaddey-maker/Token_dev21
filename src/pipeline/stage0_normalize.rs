@@ -44,6 +44,15 @@ lazy_static! {
         m.insert("script".to_string(), FieldContentType::Code);
         m
     };
+
+    /// Field regex pattern
+    static ref FIELD_RE: Regex = Regex::new(r#"(?m)^\s*(\w+)\s*:\s*(.+?)\s*$"#).unwrap();
+
+    /// Date format YYYY-MM-DD pattern
+    static ref DATE_RE: Regex = Regex::new(r#"^\d{4}-\d{2}-\d{2}$"#).unwrap();
+
+    /// Identifier pattern
+    static ref ID_RE: Regex = Regex::new(r#"^[a-zA-Z0-9_-]+$"#).unwrap();
 }
 
 pub struct NormalizationPrePass;
@@ -76,10 +85,8 @@ impl NormalizationPrePass {
 
         // 1. Typo correction using domain vocabulary
 
-        // 2. Field mismatch detection
-        // Simple field extraction: look for "field: value" patterns
-        let field_re = Regex::new(r#"(?m)^\s*(\w+)\s*:\s*(.+?)\s*$"#).unwrap();
-        for cap in field_re.captures_iter(&normalized) {
+        // 2. Field mismatch detection using precompiled regex
+        for cap in FIELD_RE.captures_iter(&normalized) {
             let field_name = cap.get(1).unwrap().as_str().to_lowercase();
             let value = cap.get(2).unwrap().as_str().trim();
 
@@ -122,14 +129,12 @@ impl NormalizationPrePass {
         }
 
         // Check for date (simple YYYY-MM-DD)
-        let date_re = Regex::new(r#"^\d{4}-\d{2}-\d{2}$"#).unwrap();
-        if date_re.is_match(value) {
+        if DATE_RE.is_match(value) {
             return FieldContentType::Date;
         }
 
         // Check for identifier (alphanumeric, underscores, hyphens)
-        let id_re = Regex::new(r#"^[a-zA-Z0-9_-]+$"#).unwrap();
-        if id_re.is_match(value) && !value.contains(' ') {
+        if ID_RE.is_match(value) && !value.contains(' ') {
             return FieldContentType::Identifier;
         }
 
@@ -149,7 +154,7 @@ impl NormalizationPrePass {
             return 1.0;
         }
 
-        let distance = Self::levenshtein_distance(original, normalized);
+        let distance = edit_distance::edit_distance(original, normalized);
         let max_len = original.len().max(normalized.len());
 
         if max_len == 0 {
@@ -158,34 +163,6 @@ impl NormalizationPrePass {
 
         // Score is 1.0 minus normalized edit distance
         (1.0 - (distance as f32 / max_len as f32)).clamp(0.0, 1.0)
-    }
-
-    /// Calculate Levenshtein distance between two strings
-    fn levenshtein_distance(s1: &str, s2: &str) -> usize {
-        let chars1: Vec<char> = s1.chars().collect();
-        let chars2: Vec<char> = s2.chars().collect();
-        let len1 = chars1.len();
-        let len2 = chars2.len();
-
-        let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-
-        for i in 0..=len1 {
-            matrix[i][0] = i;
-        }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
-        }
-
-        for i in 1..=len1 {
-            for j in 1..=len2 {
-                let cost = if chars1[i - 1] == chars2[j - 1] { 0 } else { 1 };
-                matrix[i][j] = (matrix[i - 1][j] + 1)
-                    .min(matrix[i][j - 1] + 1)
-                    .min(matrix[i - 1][j - 1] + cost);
-            }
-        }
-
-        matrix[len1][len2]
     }
 }
 

@@ -9,7 +9,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     
     <style>
-    <style>
         /* Base / Morning Theme */
         :root, body.theme-morning {
             --page-bg: #f0f0ec;
@@ -350,6 +349,15 @@
         }
         .tc-compress-btn:active {
             transform: scale(0.98);
+        }
+        .tc-compress-btn:disabled,
+        .tc-compress-btn[disabled] {
+            opacity: 0.45 !important;
+            cursor: not-allowed !important;
+            filter: grayscale(80%) !important;
+            pointer-events: none !important;
+            box-shadow: none !important;
+            transform: none !important;
         }
 
         .clear-btn {
@@ -865,6 +873,7 @@
                 <div class="form-row">
                     <label for="prompt-input" class="section-label">Raw Prompt</label>
                     <textarea id="prompt-input" class="tc-textarea" placeholder="Paste your lengthy prompt here..."></textarea>
+                    <div id="prompt-error" style="color: #ff4444; font-size: 12px; margin-top: 5px; display: none;">Prompt must be at least 8 words.</div>
                 </div>
                 
                 <div class="form-row" style="display: none;">
@@ -913,7 +922,7 @@
                     </select>
                 </div>
 
-                <button class="tc-compress-btn" onclick="compress()" id="compress-btn">
+                <button class="tc-compress-btn" onclick="compress()" id="compress-btn" disabled>
                     ⚡ Compress Prompt
                 </button>
 
@@ -994,8 +1003,8 @@
 <script src="neuron_animation.js?v=3"></script>
 <script src="dev_engine.js?v=3"></script>
 <script src="prompt_optimizer.js?v=3"></script>
-<script src="mock_api.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="mock_api.js?v=4"></script>
+<script src="app.js?v=6"></script>
 
     <!-- Neuro Progress Overlay -->
     <div id="neuro-progress-overlay">

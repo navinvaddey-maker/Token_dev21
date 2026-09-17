@@ -65,15 +65,27 @@ pub fn verify_jwt(token: &str) -> Result<String, AppError> {
 // ── User auth ──────────────────────────────────────────────────────────────
 
 pub async fn register_user(pool: &DbPool, req: RegisterRequest) -> Result<User, AppError> {
+    let username = req.username.trim();
+    if username.len() < 3 || username.len() > 50 {
+        return Err(AppError::Validation("Username must be between 3 and 50 characters".into()));
+    }
+    if req.password.len() < 8 {
+        return Err(AppError::Validation("Password must be at least 8 characters".into()));
+    }
+    let email = req.email.trim();
+    if !email.contains('@') || !email.contains('.') || email.len() < 5 {
+        return Err(AppError::Validation("A valid email address is required".into()));
+    }
+
     let id = Uuid::new_v4().to_string();
     let pw_hash = hash(&req.password, DEFAULT_COST)
         .map_err(|_| AppError::Internal("bcrypt failed".into()))?;
     Repository::create_user(
         pool,
         &id,
-        &req.username,
+        username,
         &pw_hash,
-        &req.email,
+        email,
         req.business_type.as_deref().unwrap_or("Developer"),
     )
     .await

@@ -14,45 +14,45 @@
 
 ## 🔴 Critical
 
-- [ ] **[GAP-001]** Remove hardcoded JWT secret from source code `Effort: XS` `[Backend]`
-  > `src/domain.rs:20` — `JWT_SECRET` is a compile-time constant `"change_this_in_production"`. Move to env var `JWT_SECRET` loaded via `dotenvy`. Any deployed instance uses this value and all tokens are forgeable.
+- [x] **[GAP-001]** Remove hardcoded JWT secret from source code `Effort: XS` `[Backend]`
+  > `src/domain.rs:20` — `JWT_SECRET` is loaded via `std::env::var("JWT_SECRET")` at startup.
 
-- [ ] **[GAP-002]** Remove database credentials from committed `.env` file `Effort: XS` `[DevOps]`
-  > `.env:1` — Contains `postgres://HauG:password%40123@localhost:5432/token_optimizer` with real credentials. `.env` is in `.gitignore` but may already be in git history. Rotate credentials immediately and add `.env.example` with placeholder values.
+- [x] **[GAP-002]** Remove database credentials from committed `.env` file `Effort: XS` `[DevOps]`
+  > `.env` is properly ignored in `.gitignore` and `.env.example` provides template variables.
 
-- [ ] **[GAP-003]** Fix missing `ADMIN_PASSWORD` env var causing startup panic `Effort: XS` `[Backend]`
-  > `src/main.rs:37` — Uses `expect()` which panics if `ADMIN_PASSWORD` not set. The `.env` file does not contain `ADMIN_PASSWORD`, meaning startup crashes without it. Add fallback or document the required var.
+- [x] **[GAP-003]** Fix missing `ADMIN_PASSWORD` env var causing startup panic `Effort: XS` `[Backend]`
+  > `src/main.rs:132-135` — Uses safe fallback generator with warning instead of panic.
 
-- [ ] **[GAP-004]** Fix SQL dialect mismatch — PostgreSQL syntax used against SQLite `Effort: L` `[Backend]`
-  > `src/data.rs` uses PostgreSQL-specific syntax (`::BIGINT`, `::FLOAT8`, `NOW()`, `INTERVAL`, `EXTRACT(EPOCH FROM ...)`, `JSONB`, `gen_random_uuid()`) but `ARCHITECTURE.md` and `Cargo.toml` both declare SQLite + Postgres. The `db` crate re-exports `PgPool` so the actual runtime requires Postgres, but `CLAUDE.md` says "SQLite" (Section 1), `main.rs` runs `sqlx::migrate!` that uses `gen_random_uuid()` (Postgres-only). The documentation says SQLite; the code requires Postgres. One of them is wrong. Resolve the contradiction and update all docs.
+- [x] **[GAP-004]** Fix SQL dialect mismatch — PostgreSQL syntax used against SQLite `Effort: L` `[Backend]`
+  > SQLite dialect is standardized across `db`, `data.rs` (using julianday/datetime), and migrations.
 
-- [ ] **[GAP-005]** Wire the 7-stage `PipelineOrchestrator` into the actual compress endpoint `Effort: M` `[Backend]`
-  > `src/domain.rs:137` calls `pipeline::run()` (the old 5-stage engine pipeline at `src/engine/pipeline.rs`). The new 7-stage `PipelineOrchestrator` at `src/pipeline/orchestrator.rs` is never invoked from any production code path. All pipeline stages 0A–6B, dual scoring, correction cycles, and scope injection are dead code in production.
+- [x] **[GAP-005]** Wire the 7-stage `PipelineOrchestrator` into the actual compress endpoint `Effort: M` `[Backend]`
+  > Wired into `/api/compress` via `domain::compress_new` invoking `state.pipeline.process`.
 
-- [ ] **[GAP-006]** Fix `engine/pipeline.rs` rejecting empty `task` field despite UI making it optional `Effort: S` `[Backend]`
-  > `src/engine/pipeline.rs:60-61` returns `Err("task must not be empty")` but `api.rs:101` makes `task` an `Option<String>` and `domain.rs:131` defaults it to `""`. Every compress request without an explicit task fails with "task must not be empty".
+- [x] **[GAP-006]** Fix `engine/pipeline.rs` rejecting empty `task` field despite UI making it optional `Effort: S` `[Backend]`
+  > Empty task falls back safely to `"Auto-optimize prompt"`.
 
 ---
 
 ## 🟠 High
 
-- [ ] **[GAP-007]** Fix admin delete user — no cascade/orphan protection for open sessions `Effort: S` `[Backend]`
-  > `src/data.rs:242-248` deletes user by ID. SQL migration has `ON DELETE CASCADE` but there is no check for whether the user being deleted is the last admin, which would lock out all admin functionality.
+- [x] **[GAP-007]** Fix admin delete user — no cascade/orphan protection for open sessions `Effort: S` `[Backend]`
+  > `src/domain.rs:566` checks `count_admins <= 1` before deleting an admin user.
 
-- [ ] **[GAP-008]** Add rate limiting to auth endpoints `Effort: S` `[Backend]`
-  > `/api/register` and `/api/login` have no rate limiting. Brute-force attacks on login are trivially possible. Add `tower::limit::RateLimitLayer` or similar.
+- [x] **[GAP-008]** Add rate limiting to auth endpoints `Effort: S` `[Backend]`
+  > Rate limiting (5 req/sec) added to `/api/register` and `/api/login` with `HandleErrorLayer`.
 
-- [ ] **[GAP-009]** Fix `list_history` — no pagination, hardcoded limit of 50 `Effort: S` `[Backend]`
-  > `src/domain.rs:192` hardcodes `limit: 50`. No cursor or offset parameter. Violates CLAUDE.md rule 2.3 ("Always paginate — no `findAll()` without `LIMIT` + `OFFSET` or cursor").
+- [x] **[GAP-009]** Fix `list_history` — no pagination, hardcoded limit of 50 `Effort: S` `[Backend]`
+  > Paginated with `limit` and `offset` parameters in `domain::list_history` and `Repository::list_history`.
 
-- [ ] **[GAP-010]** Fix `list_all_users` — no pagination, returns all users `Effort: S` `[Backend]`
-  > `src/data.rs:233-240` — `SELECT ... FROM users ORDER BY created_at DESC` with no LIMIT. Violates CLAUDE.md pagination rules.
+- [x] **[GAP-010]** Fix `list_all_users` — no pagination, returns all users `Effort: S` `[Backend]`
+  > Paginated with `limit` and `offset` parameters.
 
-- [ ] **[GAP-011]** Remove placeholder values in `package_response` `Effort: S` `[Backend]`
-  > `src/pipeline/orchestrator.rs:186-194` returns hardcoded `"cluster1"`, `"cluster2"`, `"delta1"`, `"delta2"` instead of real data. Any consumer of the clusters/delta fields gets meaningless data.
+- [x] **[GAP-011]** Remove placeholder values in `package_response` `Effort: S` `[Backend]`
+  > Real clusters and delta_tokens mapped from `algorithm_output`.
 
-- [ ] **[GAP-012]** Fix duplicate `SparseCoding` / `SemanticClustering` instantiation across stages `Effort: M` `[Backend]`
-  > `Stage3` and `Stage5` each create their own `SparseCoding` and `SemanticClustering` instances. `Stage5` re-runs clustering on the same `delta_tokens` that Stage3 already clustered, wasting compute and potentially producing inconsistent results. Share the clustering result or pass it downstream.
+- [x] **[GAP-012]** Fix duplicate `SparseCoding` / `SemanticClustering` instantiation across stages `Effort: M` `[Backend]`
+  > Stage 5 reuses `out.cluster_labels` from Stage 3 without redundant re-clustering.
 
 - [ ] **[GAP-013]** Fix `correction/cycle.rs` — module imported but contains only `use` statements `Effort: S` `[Backend]`
   > `src/correction/cycle.rs` is 3 lines of dead imports. The `CorrectionCycle` struct and its methods live in `src/types.rs:237-289`. The `correction` module is declared in `lib.rs` and imported in `orchestrator.rs` but does nothing. Remove or implement.
@@ -60,14 +60,14 @@
 - [ ] **[GAP-014]** Fix CorrectionCycle — placeholder logic never actually corrects `Effort: M` `[Backend]`
   > `src/types.rs:265-283` — `analyze_corrections()` uses empty string placeholders for original/corrected text. `calculate_improvement()` is `overall * 0.1` (meaningless). The 6B correction cycle is a no-op that pretends to work.
 
-- [ ] **[GAP-015]** Implement `updated_at` column on `token_history` table `Effort: XS` `[Backend]`
-  > `src/data.rs:305` — `get_system_performance()` calculates `AVG(EXTRACT(EPOCH FROM (updated_at - created_at)))` but `token_history` has no `updated_at` column in migration `0002`. Query will always fail at runtime.
+- [x] **[GAP-015]** Implement `updated_at` column on `token_history` table `Effort: XS` `[Backend]`
+  > `migrations/0011_add_updated_at_to_token_history.sql` adds column and auto-update trigger.
 
-- [ ] **[GAP-016]** Fix neuro orchestrator `package_response` returning zeroed-out response `Effort: M` `[Backend]`
-  > `src/engine/neuro/orchestrator.rs:89-111` returns a `CompressionResponse` with all fields empty/zero/default. This alternate orchestrator is non-functional.
+- [x] **[GAP-016]** Fix neuro orchestrator `package_response` returning zeroed-out response `Effort: M` `[Backend]`
+  > `src/engine/neuro/orchestrator.rs` populates real fields from `AlgorithmOutput`.
 
-- [ ] **[GAP-017]** FeedbackDetector signals are never consumed by the learning loop `Effort: M` `[Backend]`
-  > `src/behavior/feedback_detector.rs` defines `detect()` which returns `Vec<DetectedSignal>`, but this function is never called anywhere in the codebase. Implicit signals (repetition, fast-reprompt, forgot) are defined but never wired into the Hebbian/Competitive learning engines.
+- [x] **[GAP-017]** FeedbackDetector signals are never consumed by the learning loop `Effort: M` `[Backend]`
+  > `feedback_detector::detect` is wired in `domain.rs` and consumed by both learning engine and pipeline schema priors.
 
 - [x] **[GAP-018]** Fix TES scoring inversion — higher compression gives LOWER score `Effort: S` `[Backend]`
   > `src/scoring/tes.rs:40-44` — `compression_ratio = output / input`. A 50% compression (50/100 = 0.5) scores 5.0. But 0% compression (100/100 = 1.0) scores 10.0. This means NO compression = perfect score. The metric is inverted — it should reward savings, not penalize them.
@@ -76,8 +76,8 @@
 
 ## 🟡 Medium
 
-- [ ] **[GAP-019]** Create `.env.example` with all required environment variables `Effort: XS` `[DevOps]`
-  > Project requires `DATABASE_URL`, `ADMIN_PASSWORD`, `RUST_LOG`, and (should require) `JWT_SECRET`. No `.env.example` exists.
+- [x] **[GAP-019]** Create `.env.example` with all required environment variables `Effort: XS` `[DevOps]`
+  > `.env.example` contains `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, and `RUST_LOG`.
 
 - [ ] **[GAP-020]** Remove stale debug files from root directory `Effort: XS` `[DevOps]`
   > `debug_comparison.rs`, `debug_full_pipeline.rs`, `debug_hysteresis.rs`, `debug_sparse.rs`, `debug_test.rs`, `run_test.rs`, `test_lexical.rs`, `test_run.rs`, `test_scope_injection.rs`, `test_admin.html`, `test_admin_fixed.html` — 11 files in root that are also gitignored. Delete them.
@@ -106,17 +106,17 @@
 - [ ] **[GAP-028]** Fix Change Log entries appearing AFTER "## 7. Where This File Lives" in CLAUDE.md `Effort: XS` `[Docs]`
   > `CLAUDE.md:209-318` — 15+ change log entries appear after Section 7, which is supposed to be the end of the file. Entries should be under Section 4.
 
-- [ ] **[GAP-029]** Add input validation to the registration endpoint `Effort: S` `[Backend]`
-  > `src/domain.rs:55-69` — No validation on username length, password strength, email format. Only `bcrypt` hashing is applied. Add minimum password length, email regex, username constraints.
+- [x] **[GAP-029]** Add input validation to the registration endpoint `Effort: S` `[Backend]`
+  > `src/domain.rs:67-79` — Validates username length (3..=50), password length (>=8), and email format before DB insertion.
 
-- [ ] **[GAP-030]** Add connection pooling configuration `Effort: S` `[Backend]`
-  > `src/main.rs:20` — `DbPool::connect()` with no pool configuration (min/max connections, timeouts). CLAUDE.md rule 2.3 requires "min 5, max 20".
+- [x] **[GAP-030]** Add connection pooling configuration `Effort: S` `[Backend]`
+  > `src/main.rs:22-28` — `SqlitePoolOptions::new().min_connections(5).max_connections(20)...` configured.
 
-- [ ] **[GAP-031]** Implement Levenshtein via `edit-distance` crate instead of manual implementation `Effort: XS` `[Backend]`
-  > `src/pipeline/stage0_normalize.rs:159-184` — Manual O(n×m) Levenshtein implementation when `edit-distance = "2.1"` is already in `Cargo.toml` dependencies.
+- [x] **[GAP-031]** Implement Levenshtein via `edit-distance` crate instead of manual implementation `Effort: XS` `[Backend]`
+  > `src/pipeline/stage0_normalize.rs:148` — Uses `edit_distance::edit_distance` crate dependency.
 
-- [ ] **[GAP-032]** Fix `NormalizationPrePass` compiling `Regex` on every call `Effort: XS` `[Backend]`
-  > `src/pipeline/stage0_normalize.rs:76` and `120-122` — `Regex::new()` called inside `run()` method, recompiling on every request. Move to `lazy_static!`.
+- [x] **[GAP-032]** Fix `NormalizationPrePass` compiling `Regex` on every call `Effort: XS` `[Backend]`
+  > `src/pipeline/stage0_normalize.rs` — `FIELD_RE`, `DATE_RE`, and `ID_RE` precompiled once in `lazy_static!`.
 
 - [ ] **[GAP-033]** Remove duplicate `TokenCompressionPipeline` struct `Effort: M` `[Backend]`
   > `src/pipeline/mod.rs:33-54` defines `TokenCompressionPipeline` with stages 1-5. `src/pipeline/orchestrator.rs:25-38` defines `PipelineOrchestrator` with stages 0A-6B. `src/engine/neuro/orchestrator.rs:50-52` defines a THIRD `PipelineOrchestrator` with a trait-based `Stage` system. Three pipeline implementations exist; only one (the old `engine/pipeline.rs::run()`) is actually used.
@@ -127,18 +127,18 @@
 - [ ] **[GAP-035]** Add proper error types for pipeline failures `Effort: S` `[Backend]`
   > `src/engine/pipeline.rs:52` returns `Result<PipelineOutput, String>` — stringly-typed errors. Should use `thiserror` enum like the rest of the codebase.
 
-- [ ] **[GAP-036]** Fix `Ambiguous` mode never being produced by `decide_mode` `Effort: S` `[Backend]`
-  > `src/algorithms/predictive_coding.rs:132-178` — `decide_mode()` only returns `Mode::Gentle` or `Mode::Aggressive`, never `Mode::Ambiguous`, even though `is_ambiguous` is computed and the `Ambiguous` variant exists with handling in Stage 3.
+- [x] **[GAP-036]** Fix `Ambiguous` mode never being produced by `decide_mode` `Effort: S` `[Backend]`
+  > `src/algorithms/predictive_coding.rs:193-196` — Returns `Mode::Balanced` for ambiguous structures.
 
 ---
 
 ## 🟢 Low
 
-- [ ] **[GAP-037]** Add `#[derive(Default)]` for `Stage1` `Effort: XS` `[Backend]`
-  > `src/pipeline/stage1.rs` has no `Default` impl despite being constructible with `new()`.
+- [x] **[GAP-037]** Add `#[derive(Default)]` for `Stage1` `Effort: XS` `[Backend]`
+  > `src/pipeline/stage1.rs` derives `Default`.
 
-- [ ] **[GAP-038]** Remove unused `SparseCoding` field from `Stage3` and `Stage5` `Effort: XS` `[Backend]`
-  > `Stage3.sparse` and `Stage5.sparse` are constructed but never referenced.
+- [x] **[GAP-038]** Remove unused `SparseCoding` field from `Stage3` and `Stage5` `Effort: XS` `[Backend]`
+  > `Stage3` and `Stage5` unused `_sparse` fields removed.
 
 - [ ] **[GAP-039]** Consistent casing for `business_type` admin values `Effort: XS` `[Backend]`
   > `TROUBLESHOOTING_ADMIN_ACCESS.md` says `"Admin"` (capital A), `main.rs` seeds as `"admin"` (lowercase), `domain.rs:248` uses `.to_lowercase()`. The `.to_lowercase()` fix works but the inconsistency should be documented.
@@ -152,8 +152,8 @@
 - [ ] **[GAP-042]** Add integration tests for the compress endpoint `Effort: L` `[Testing]`
   > Existing tests cover unit-level algorithms (sparse coding, working memory, predictive coding, TES/SFS) but no integration test exercises the full `/api/compress` → DB → response flow.
 
-- [ ] **[GAP-043]** Rename `Ambiguous` mode to `Balanced` to match API mode names `Effort: XS` `[Backend]`
-  > The API exposes modes as `["gentle", "balanced", "aggressive"]` (domain.rs:230) but the internal enum uses `Gentle/Ambiguous/Aggressive`. "Balanced" ≠ "Ambiguous" semantically.
+- [x] **[GAP-043]** Rename `Ambiguous` mode to `Balanced` to match API mode names `Effort: XS` `[Backend]`
+  > Unified `Balanced` mode across API and predictive coding matrix.
 
 - [ ] **[GAP-044]** Clean up Cargo.toml — remove `tower 0.4` or pin `0.5` `Effort: XS` `[Backend]`
   > `Cargo.toml:41` pins `tower = "0.4"` but `tower-http 0.5` may expect `0.5`. Verify compatibility.

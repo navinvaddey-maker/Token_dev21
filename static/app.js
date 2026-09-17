@@ -141,6 +141,7 @@ function showMainSection() {
         console.log('Hiding admin link');
         document.getElementById('admin-link').style.display = 'none';
     }
+    if (typeof validatePromptLength === 'function') validatePromptLength();
 }
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ function switchTab(tab) {
 
     if (tab === 'compress') {
         document.getElementById('tab-compress').classList.add('active');
+        if (typeof validatePromptLength === 'function') validatePromptLength();
     } else if (tab === 'history') {
         document.getElementById('tab-history-content').classList.add('active');
         loadHistory();
@@ -172,6 +174,13 @@ async function compress() {
     const mode    = document.getElementById('mode').value;
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
+
+    const words = raw.trim().split(/\s+/).filter(Boolean);
+    if (words.length < 8) {
+        return showToast('Raw Prompt must be at least 8 words', 'error');
+    }
+
+
 
     // Show Neuro Progress Overlay
     const overlay = document.getElementById('neuro-progress-overlay');
@@ -343,6 +352,37 @@ function escapeHtml(text) {
     return d.innerHTML;
 }
 
+// ── Validation ──────────────────────────────────────────────────────────────
+function validatePromptLength() {
+    const promptInput = document.getElementById('prompt-input');
+    const compressBtn = document.getElementById('compress-btn');
+    const errorDiv = document.getElementById('prompt-error');
+    if (!compressBtn) return;
+
+    if (!promptInput) {
+        compressBtn.disabled = true;
+        return;
+    }
+
+    const raw = promptInput.value.trim();
+    const words = raw ? raw.split(/\s+/).filter(Boolean) : [];
+    
+    if (words.length >= 8) {
+        compressBtn.disabled = false;
+        if (errorDiv) errorDiv.style.display = 'none';
+    } else {
+        compressBtn.disabled = true;
+        if (errorDiv) {
+            if (raw.length > 0) {
+                errorDiv.textContent = `Prompt must be at least 8 words (currently ${words.length} / 8).`;
+                errorDiv.style.display = 'block';
+            } else {
+                errorDiv.style.display = 'none';
+            }
+        }
+    }
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -357,4 +397,15 @@ document.addEventListener('DOMContentLoaded', () => {
         State.businessType = businessType;
         showMainSection();
     }
+
+    const promptInput = document.getElementById('prompt-input');
+    if (promptInput) {
+        promptInput.addEventListener('input', validatePromptLength);
+        promptInput.addEventListener('change', validatePromptLength);
+        promptInput.addEventListener('paste', () => setTimeout(validatePromptLength, 20));
+        promptInput.addEventListener('keyup', validatePromptLength);
+    }
+    // Button starts disabled and only enables when >= 120 words
+    validatePromptLength();
 });
+

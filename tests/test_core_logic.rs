@@ -56,3 +56,50 @@ async fn test_feedback_value_assignment() {
     assert_eq!(thumbs_up, 1.0);
     assert_eq!(thumbs_down, -1.0);
 }
+
+#[tokio::test]
+async fn test_registration_validation() {
+    let pool = db::DbPool::connect("sqlite::memory:").await.expect("in-memory db");
+    
+    // Short username (< 3 chars)
+    let req_short_user = token_compress_engine::models::user::RegisterRequest {
+        username: "ab".to_string(),
+        password: "password123".to_string(),
+        email: "test@example.com".to_string(),
+        business_type: None,
+    };
+    match domain::register_user(&pool, req_short_user).await {
+        Err(token_compress_engine::errors::AppError::Validation(msg)) => {
+            assert!(msg.contains("Username"));
+        }
+        other => panic!("Expected validation error for short username, got {:?}", other),
+    }
+
+    // Short password (< 8 chars)
+    let req_short_pw = token_compress_engine::models::user::RegisterRequest {
+        username: "validuser".to_string(),
+        password: "short".to_string(),
+        email: "test@example.com".to_string(),
+        business_type: None,
+    };
+    match domain::register_user(&pool, req_short_pw).await {
+        Err(token_compress_engine::errors::AppError::Validation(msg)) => {
+            assert!(msg.contains("Password"));
+        }
+        other => panic!("Expected validation error for short password, got {:?}", other),
+    }
+
+    // Invalid email
+    let req_invalid_email = token_compress_engine::models::user::RegisterRequest {
+        username: "validuser".to_string(),
+        password: "password123".to_string(),
+        email: "notanemail".to_string(),
+        business_type: None,
+    };
+    match domain::register_user(&pool, req_invalid_email).await {
+        Err(token_compress_engine::errors::AppError::Validation(msg)) => {
+            assert!(msg.contains("email"));
+        }
+        other => panic!("Expected validation error for invalid email, got {:?}", other),
+    }
+}

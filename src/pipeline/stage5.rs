@@ -1,22 +1,16 @@
 use crate::{
-    algorithms::{
-        schema_filling::DeterminismScopeInjector,
-        sparse_coding::SparseCoding,
-    },
+    algorithms::schema_filling::DeterminismScopeInjector,
     types::{AlgorithmOutput, Mode},
 };
 
 /// Handles Stage 5: Scope Injection
-pub struct Stage5 {
-    _sparse: SparseCoding,
-}
+#[derive(Default)]
+pub struct Stage5;
 
 impl Stage5 {
     /// Creates a new Stage5 instance
     pub fn new() -> Self {
-        Self {
-            _sparse: SparseCoding::default(),
-        }
+        Self
     }
 
     /// Processes input through Stage 5: Scope Injection

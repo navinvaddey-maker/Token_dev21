@@ -19,7 +19,13 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = db::DbPool::connect(&db_url).await?;
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .min_connections(5)
+        .max_connections(20)
+        .idle_timeout(std::time::Duration::from_secs(300))
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .connect(&db_url)
+        .await?;
     
     // Ensure Ory table exists (standardizing on SQLite for Ory memory)
     sqlx::query(
