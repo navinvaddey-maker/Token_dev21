@@ -27,7 +27,31 @@ impl AggressiveEngine {
         let mut profile = super::intent::extract_with_config(repr, &user_prompt, Some(&config_guard))?;
         
         // Enhance Aggressive intent with Ory's deep learning
-        if ory_result.intent.confidence_score > profile.confidence {
+        let domain_agreement = ory_result.intent.inferred_domain == profile.domain;
+        let confidence_margin = ory_result.intent.confidence_score - profile.confidence;
+
+        if !domain_agreement {
+            tracing::warn!(
+                "Domain mismatch: aggressive='{}', ory='{}', aggressive_conf={:.3}, ory_conf={:.3}, margin={:.3}",
+                profile.domain,
+                ory_result.intent.inferred_domain,
+                profile.confidence,
+                ory_result.intent.confidence_score,
+                confidence_margin
+            );
+        }
+
+        // Only override if Ory confidence exceeds aggressive by significant margin (0.15)
+        // This prevents low-confidence Ory predictions from overriding high-confidence aggressive predictions
+        if ory_result.intent.confidence_score > profile.confidence + 0.15 {
+            if !domain_agreement {
+                tracing::info!(
+                    "Overriding domain: '{}' -> '{}' (margin: {:.3})",
+                    profile.domain,
+                    ory_result.intent.inferred_domain,
+                    confidence_margin
+                );
+            }
             profile.domain = ory_result.intent.inferred_domain.clone();
             profile.confidence = ory_result.intent.confidence_score;
         }
