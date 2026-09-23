@@ -186,7 +186,8 @@ impl PipelineOrchestrator {
                 &npae_cfg,
                 self.npae_config_handle.clone(),
                 self.ory_engine.clone(),
-                &structurer
+                &structurer,
+                &reconstructed,
             ).await.map_err(|e| e.to_string())?;
 
             // Push to session history for tracking

@@ -404,7 +404,15 @@ async fn npae_aggressive(
         body: req.prompt.clone(),
     };
     
-    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(&req.prompt, &repr, cfg, state.npae_config.clone(), state.ory_engine.clone(), &structurer)
+    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
+        &req.prompt,
+        &repr,
+        cfg,
+        state.npae_config.clone(),
+        state.ory_engine.clone(),
+        &structurer,
+        &crate::types::ReconstructedInput::default(),
+    )
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())

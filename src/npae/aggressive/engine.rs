@@ -12,6 +12,7 @@ impl AggressiveEngine {
         config_handle: std::sync::Arc<super::config::ConfigHandle>,
         ory_engine: std::sync::Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
         structurer_impl: &dyn super::structurer::Structurer,
+        reconstructed: &crate::types::ReconstructedInput,
     ) -> Result<StructuredPromptResponse, String> {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
@@ -62,10 +63,11 @@ impl AggressiveEngine {
         let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
 
         // 2. Build structured prompt (using isolated prompt so inference isn't confused by RAG chunks)
-        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt, Some(&config_guard))?;
+        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt, Some(&config_guard), reconstructed)?;
+
 
         // 3. Score ambiguity
-        let amb = super::ambiguity::score(repr, &user_prompt)?;
+        let amb = super::ambiguity::score(repr, &user_prompt, reconstructed)?;
         let threshold = cfg.ambiguity_threshold.unwrap_or(0.65);
 
         // 4. Generate domain-aware questions if threshold exceeded

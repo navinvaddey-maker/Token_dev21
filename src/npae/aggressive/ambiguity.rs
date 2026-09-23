@@ -1,9 +1,18 @@
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::AmbiguityAnalysis;
 
-pub fn score(repr: &CompressedRepr, raw: &str) -> Result<AmbiguityAnalysis, String> {
+pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::ReconstructedInput) -> Result<AmbiguityAnalysis, String> {
     let mut gap_zones = Vec::new();
     let mut score = 0.0;
+
+    // 1. Structural Ambiguity (from Reconstruction Stage -1)
+    if !reconstructed.ambiguity_register.is_empty() {
+        let reg_score = (reconstructed.ambiguity_register.len() as f32 * 0.15).min(0.5);
+        score += reg_score;
+        for flag in &reconstructed.ambiguity_register {
+            gap_zones.push(format!("structural_ambiguity: {}", flag.reason));
+        }
+    }
 
     let lower_raw = raw.to_lowercase();
     let vague_words = ["stuff", "things", "somehow", "maybe", "whatever", "something", "anyway"];

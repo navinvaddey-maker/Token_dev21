@@ -360,10 +360,17 @@ impl std::fmt::Display for crate::npae::schema::types::Priority {
     }
 }
 
-pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::ResolvedPrompt, config: Option<&super::config::UnifiedConfig>) -> std::result::Result<StructuredPrompt, String> {
+pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::ResolvedPrompt, config: Option<&super::config::UnifiedConfig>, reconstructed: &crate::types::ReconstructedInput) -> std::result::Result<StructuredPrompt, String> {
     let role_primary = resolved.role.clone();
-    let inclusions = resolved.inclusions.clone();
+    let mut inclusions = resolved.inclusions.clone();
     let forbidden = resolved.forbidden.clone();
+
+    // Inject Structural Locks from Stage -1
+    for lock in &reconstructed.constraint_locks {
+        if !inclusions.contains(&lock.text) {
+            inclusions.push(lock.text.clone());
+        }
+    }
 
     let user_level_str = match profile.user_knowledge {
         super::intent::KnowledgeLevel::Novice => "novice",
