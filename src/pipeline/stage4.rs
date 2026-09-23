@@ -24,7 +24,8 @@ impl Stage4 {
         // Determine layers based on mode (default to Gentle if not set)
         let mode = out.mode.as_ref().unwrap_or(&crate::types::Mode::Gentle);
         let layers = match mode {
-            crate::types::Mode::Gentle | crate::types::Mode::Ambiguous | crate::types::Mode::Balanced => 1,
+            crate::types::Mode::Gentle | crate::types::Mode::Ambiguous => 1,
+            crate::types::Mode::Balanced => 2,
             crate::types::Mode::Aggressive => 3,
         };
 

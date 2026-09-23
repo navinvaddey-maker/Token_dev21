@@ -189,6 +189,27 @@ impl SchemaFilling {
         // Flatten all sources
         let all_sources: Vec<String> = sources.into_iter().flatten().collect();
 
+        let (locks, expected_output, mode) = if let Some(o) = output.as_ref() {
+            (
+                o.constraint_locks.clone(),
+                o.expected_deliverables.clone(),
+                o.mode.clone(),
+            )
+        } else {
+            (Vec::new(), Vec::new(), None)
+        };
+
+        let mut constraints: Vec<crate::types::Constraint> = locks
+            .iter()
+            .map(|l| crate::types::Constraint {
+                name: l.text.clone(),
+            })
+            .collect();
+        let mut deliverables: Vec<crate::types::Deliverable> = expected_output
+            .iter()
+            .map(|d| crate::types::Deliverable { name: d.clone() })
+            .collect();
+
         let task = self.infer_task(&wm_texts, &all_sources);
         let role = self.infer_role(&wm_texts, &all_sources);
         let context = self.infer_context(&wm_texts, &all_sources, &cluster_texts);
@@ -196,6 +217,10 @@ impl SchemaFilling {
         // Determine what was inferred vs what was NULL
         let null_fields = self.detect_null_fields(&task, &context);
         let task_inferred = task.is_some();
+
+        if layers >= 2 {
+            Self::infer_implicit_deliverables(&task, &constraints, &mode, &mut deliverables);
+        }
 
         // If layers == 3 (Aggressive) and output is provided, compute and attach scope injections
         if layers == 3 {
@@ -216,10 +241,45 @@ impl SchemaFilling {
             task,
             role,
             context,
-            constraints: Vec::new(),
-            output: Vec::new(),
+            constraints,
+            output: deliverables,
             null_fields,
             task_inferred,
+        }
+    }
+
+    fn infer_implicit_deliverables(
+        task: &Option<String>,
+        constraints: &[crate::types::Constraint],
+        mode: &Option<crate::types::Mode>,
+        deliverables: &mut Vec<crate::types::Deliverable>,
+    ) {
+        let allow = matches!(
+            mode,
+            Some(crate::types::Mode::Balanced) | Some(crate::types::Mode::Aggressive)
+        );
+        if !allow {
+            return;
+        }
+        let task_text = task.as_deref().unwrap_or("").to_lowercase();
+        let constraint_text: String = constraints
+            .iter()
+            .map(|c| c.name.to_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let meal_plan =
+            task_text.contains("meal") || task_text.contains("plan") || task_text.contains("nutrition");
+        let dietary = ["fiber", "dairy", "nightshade", "carb", "macro"]
+            .iter()
+            .any(|k| constraint_text.contains(k));
+        if meal_plan && dietary {
+            for extra in ["shopping_list", "substitution_guide"] {
+                if !deliverables.iter().any(|d| d.name == extra) {
+                    deliverables.push(crate::types::Deliverable {
+                        name: extra.to_string(),
+                    });
+                }
+            }
         }
     }
 

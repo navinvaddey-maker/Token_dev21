@@ -23,6 +23,15 @@ impl FieldTypeValidator {
         &self,
         schema: &crate::types::CompressionSchema,
     ) -> Vec<FieldValidationIssue> {
+        self.validate_full(schema, &crate::types::AlgorithmOutput::default())
+    }
+
+    /// Validates schema fields plus Stage -1 context (locks, deliverables, ambiguities).
+    pub fn validate_full(
+        &self,
+        schema: &crate::types::CompressionSchema,
+        output: &crate::types::AlgorithmOutput,
+    ) -> Vec<FieldValidationIssue> {
         let mut issues = Vec::new();
 
         issues.extend(self.check_task(&schema.task));
@@ -30,6 +39,47 @@ impl FieldTypeValidator {
         if let Some(ctx) = &schema.context {
             let context_issues = self.check_context(ctx, 0);
             issues.extend(context_issues);
+        }
+
+        for lock in &output.constraint_locks {
+            let present = schema
+                .constraints
+                .iter()
+                .any(|c| c.name.eq_ignore_ascii_case(&lock.text));
+            if !present {
+                issues.push(FieldValidationIssue {
+                    field_name: "constraints".to_string(),
+                    issue_type: "missing_required".to_string(),
+                    description: format!("Constraint lock '{}' missing from schema", lock.text),
+                    severity: "error".to_string(),
+                });
+            }
+        }
+
+        for expected in &output.expected_deliverables {
+            let present = schema
+                .output
+                .iter()
+                .any(|d| d.name.eq_ignore_ascii_case(expected));
+            if !present {
+                issues.push(FieldValidationIssue {
+                    field_name: "output".to_string(),
+                    issue_type: "missing_required".to_string(),
+                    description: format!("Expected deliverable '{}' not in schema", expected),
+                    severity: "warning".to_string(),
+                });
+            }
+        }
+
+        for flag in &output.ambiguity_register {
+            if flag.resolved_as.is_none() && flag.confidence < 0.7 {
+                issues.push(FieldValidationIssue {
+                    field_name: "ambiguity".to_string(),
+                    issue_type: "unresolved".to_string(),
+                    description: format!("{} ({})", flag.text, flag.reason),
+                    severity: "warning".to_string(),
+                });
+            }
         }
 
         issues

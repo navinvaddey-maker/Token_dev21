@@ -6,7 +6,9 @@ use crate::{
         field_validator::FieldTypeValidator,
         predictive_coding::PredictiveCoding,
     },
+    correction::{apply_targeted_correction, MAX_CORRECTION_CYCLES},
     engine::reconstruction::TokenReconstructor,
+    utils::tokens::estimate_tokens,
     pipeline::{
         stage0_normalize::NormalizationPrePass, stage0b_topology::TopologyClassifier,
         stage1::Stage1, stage2::Stage2, stage3::Stage3, stage4::Stage4, stage5::Stage5,
@@ -169,20 +171,20 @@ impl PipelineOrchestrator {
                 skip_stage: npae_config.and_then(|c| c.skip_stage.clone()),
             };
 
-            let repr = crate::npae::compression::pipeline::run_parallel_pipeline(input)
+            let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&normalized)
                 .map_err(|e| e.to_string())?;
 
             let structurer = crate::npae::aggressive::structurer::HttpStructurer {
                 route: "/api/compress".to_string(),
                 remote_addr: "127.0.0.1".to_string(), // In real app, pass actual address
-                body: input.to_string(),
+                body: normalized.clone(),
             };
 
             let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
-                input, 
-                &repr, 
-                &npae_cfg, 
-                self.npae_config_handle.clone(), 
+                &normalized,
+                &repr,
+                &npae_cfg,
+                self.npae_config_handle.clone(),
                 self.ory_engine.clone(),
                 &structurer
             ).await.map_err(|e| e.to_string())?;
@@ -201,27 +203,14 @@ impl PipelineOrchestrator {
         // Stage 4: Schema filling (NULL Resolution)
         self.stage4.run(&mut output);
 
+        // Stage 4B: Field validation (before scope injection)
+        let mut field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
+        output.field_issues = field_issues.clone();
+
         // Stage 5: Scope Injection
         self.stage5.run(&mut output);
 
-        // Stage 4B: Field validation
-        let field_issues = self.field_validator.validate(
-            &output.resolved_schema
-        );
-
-        // Update output with field issues
-        output.field_issues = field_issues.clone();
-
-        // Scoring stages
-        let scoring_result = crate::scoring::compute_scoring_result(&output, &field_issues);
-
-        // Update output with scores
-        output.scoring_result = Some(scoring_result.clone());
-
         // Stage 6A: Output generation
-        let stage6a_output = self.stage6a.run(&output)?;
-
-        // Post-generation validation using Hallucination Guard
         let guard_cfg = crate::npae::schema::types::HallucinationGuardConfig {
             self_critique_enabled: true,
             confidence_threshold: 0.75,
@@ -230,47 +219,56 @@ impl PipelineOrchestrator {
             uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
         };
 
-        let mut final_response = stage6a_output;
-        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_response, input, &guard_cfg)
-            .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
-                passed: true,
-                layers: [
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 1, passed: true, flags: vec![] },
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 2, passed: true, flags: vec![] },
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 3, passed: true, flags: vec![] },
-                ],
-                remediation: None,
-            });
+        let (mut final_response, (mut guard_report, mut corrections_applied)) =
+            self.run_guarded_generation(input, &guard_cfg, &output)?;
 
-        let mut corrections_applied = Vec::new();
-        if !guard_report.passed {
-            for (layer_idx, layer) in guard_report.layers.iter().enumerate() {
-                if !layer.passed {
-                    for flag in &layer.flags {
-                        corrections_applied.push(crate::types::TextCorrection {
-                            original: flag.clone(),
-                            corrected: format!("[CORRECTED] {}", flag),
-                            confidence: 0.9,
-                            correction_type: format!("l{}_guard_flag", layer_idx + 1),
-                        });
-                    }
+        let mut correction_cycle =
+            crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number);
+        let mut cycle_num = 0u32;
+        let mut scoring_result = crate::types::ScoringResult::default();
+
+        loop {
+            output.output_token_count = estimate_tokens(&final_response);
+            field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
+            output.field_issues = field_issues.clone();
+
+            let scoring_result =
+                crate::scoring::compute_scoring_result(&output, &field_issues);
+            output.scoring_result = Some(scoring_result.clone());
+
+            let scores_ok = scoring_result.tes >= 6.0
+                && scoring_result.sfs >= 6.0
+                && scoring_result.scs >= 6.0;
+
+            if scores_ok || cycle_num >= MAX_CORRECTION_CYCLES {
+                if !scores_ok {
+                    correction_cycle = self.correction_cycle.new_cycle(
+                        &final_response,
+                        &field_issues,
+                        &scoring_result,
+                    );
                 }
+                break;
             }
 
-            final_response = crate::npae::hallucination::guard::remediate_hallucination(&final_response, &guard_report);
-            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_response, input, &guard_cfg) {
-                guard_report = new_report;
+            let Some(axis) = scoring_result.correction_axis.clone() else {
+                break;
+            };
+
+            corrections_applied.extend(apply_targeted_correction(&mut output, &axis));
+            if axis != crate::types::ScoreAxis::TaskEssential {
+                self.stage4.run(&mut output);
+                field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
+                self.stage5.run(&mut output);
             }
+
+            let (new_response, (new_report, new_corrections)) =
+                self.run_guarded_generation(input, &guard_cfg, &output)?;
+            final_response = new_response;
+            guard_report = new_report;
+            corrections_applied.extend(new_corrections);
+            cycle_num += 1;
         }
-
-        // Stage 6B: Correction cycle (conditionally triggers on low scores)
-        let mut correction_cycle = if scoring_result.tes < 6.0 || scoring_result.sfs < 6.0 || scoring_result.scs < 6.0 {
-            self.correction_cycle
-                .new_cycle(&final_response, &field_issues, &scoring_result)
-        } else {
-            // Keep empty default cycle if scores are good
-            crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number)
-        };
 
         correction_cycle.corrections_applied.extend(corrections_applied);
 
@@ -300,6 +298,79 @@ impl PipelineOrchestrator {
         // Simple tokenization for feedback application
         let tokens: Vec<String> = prompt.split_whitespace().map(|s| s.to_string()).collect();
         self.stage2.apply_feedback(&tokens, weight);
+    }
+
+    /// Runs Stage 6A and the tri-layer hallucination guard on the generated prompt.
+    fn run_guarded_generation(
+        &self,
+        input: &str,
+        guard_cfg: &crate::npae::schema::types::HallucinationGuardConfig,
+        output: &AlgorithmOutput,
+    ) -> Result<
+        (
+            String,
+            (
+                crate::npae::hallucination::guard::HallucinationReport,
+                Vec<crate::types::TextCorrection>,
+            ),
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let mut final_response = self.stage6a.run(output)?;
+        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(
+            &final_response,
+            input,
+            guard_cfg,
+        )
+        .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
+            passed: true,
+            layers: [
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 1,
+                    passed: true,
+                    flags: vec![],
+                },
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 2,
+                    passed: true,
+                    flags: vec![],
+                },
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 3,
+                    passed: true,
+                    flags: vec![],
+                },
+            ],
+            remediation: None,
+        });
+
+        let mut corrections_applied = Vec::new();
+        if !guard_report.passed {
+            for (layer_idx, layer) in guard_report.layers.iter().enumerate() {
+                if !layer.passed {
+                    for flag in &layer.flags {
+                        corrections_applied.push(crate::types::TextCorrection {
+                            original: flag.clone(),
+                            corrected: format!("[CORRECTED] {}", flag),
+                            confidence: 0.9,
+                            correction_type: format!("l{}_guard_flag", layer_idx + 1),
+                        });
+                    }
+                }
+            }
+
+            final_response = crate::npae::hallucination::guard::remediate_hallucination(
+                &final_response,
+                &guard_report,
+            );
+            if let Ok(new_report) =
+                crate::npae::hallucination::guard::run_tri_layer(&final_response, input, guard_cfg)
+            {
+                guard_report = new_report;
+            }
+        }
+
+        Ok((final_response, (guard_report, corrections_applied)))
     }
 
     /// Packages the pipeline output into a CompressionResponse with all new fields.

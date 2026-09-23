@@ -160,6 +160,9 @@ pub struct AlgorithmOutput {
     pub scope_injections: Vec<String>,
     pub scoring_result: Option<ScoringResult>,
     pub correction_cycle: Option<CorrectionCycle>,
+    /// When true, Stage 6A emits a compact prompt (correction for low TES).
+    #[serde(default)]
+    pub force_compact_generation: bool,
 }
 
 /// Unified response enum for the PipelineOrchestrator

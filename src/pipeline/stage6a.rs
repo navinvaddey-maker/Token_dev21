@@ -15,6 +15,22 @@ impl Stage6a {
         &self,
         schema_filled: &AlgorithmOutput,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        if schema_filled.force_compact_generation {
+            let compact = if !schema_filled.sparse_tokens.is_empty() {
+                schema_filled
+                    .sparse_tokens
+                    .iter()
+                    .map(|t| t.text.clone())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            } else {
+                schema_filled.clean_tokens.join(" ")
+            };
+            if !compact.is_empty() {
+                return Ok(compact);
+            }
+        }
+
         // Primary: Generate professional, structured output from the resolved schema
         let mut parts = Vec::new();
 

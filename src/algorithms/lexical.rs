@@ -31,6 +31,12 @@ impl LexicalCompression {
     /// Also extracts ordinal sequence for pipeline use.
     pub fn compress(&self, text: &str, output: &mut AlgorithmOutput) -> LexicalResult {
         // Basic tokenization: split on whitespace and punctuation
+        let protected: HashSet<String> = output
+            .constraint_locks
+            .iter()
+            .map(|c| c.text.to_lowercase())
+            .collect();
+
         let tokens: Vec<String> = text
             .to_lowercase()
             .chars()
@@ -44,7 +50,11 @@ impl LexicalCompression {
             .collect::<String>()
             .split_whitespace()
             .filter_map(|s| {
-                if s.is_empty() || self.stopwords.contains(s) {
+                if s.is_empty() {
+                    None
+                } else if protected.contains(s) {
+                    Some(s.to_string())
+                } else if self.stopwords.contains(s) {
                     None
                 } else {
                     Some(s.to_string())

@@ -84,7 +84,26 @@ impl NormalizationPrePass {
         }
 
         // 1. Typo correction using domain vocabulary
-
+        for (typo, fixed) in DOMAIN_VOCAB.iter() {
+            if normalized.to_lowercase().contains(typo) {
+                let pattern = format!(r"\b{}\b", regex::escape(typo));
+                if let Ok(re) = Regex::new(&pattern) {
+                    if re.is_match(&normalized) {
+                        let before = normalized.clone();
+                        normalized = re.replace_all(&normalized, fixed.as_str()).to_string();
+                        if before != normalized {
+                            applied_rules.push(format!("typo:{}", typo));
+                            corrections.push(TextCorrection {
+                                original: typo.clone(),
+                                corrected: fixed.clone(),
+                                confidence: 0.95,
+                                correction_type: "typo".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
         // 2. Field mismatch detection using precompiled regex
         for cap in FIELD_RE.captures_iter(&normalized) {
             let field_name = cap.get(1).unwrap().as_str().to_lowercase();
