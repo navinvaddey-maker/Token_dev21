@@ -1,6 +1,6 @@
 use crate::types::{ScoredToken, TokenSource};
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 /// Sparse Coding — identifies the minimum active token set.
 ///
@@ -119,15 +119,22 @@ impl SparseCoding {
     }
 
     /// Apply sparse filter: keep top N% tokens, preserve original order.
-    /// Pre-boundary = use aggressive ratio (we don't know mode yet at stage 1).
+    /// la_mode: "temporal", "tree", "spectral", "columnar"
     pub fn apply(
-        &self, 
-        tokens: &[String], 
+        &self,
+        tokens: &[String],
         keep_ratio: f32,
-        locks: &[crate::types::ConstraintToken]
+        locks: &[crate::types::ConstraintToken],
+        mode: &str,
     ) -> Vec<ScoredToken> {
+        if mode == "tree" {
+            return self.apply_tree(tokens, keep_ratio, locks);
+        }
+
         let scored = self.compute_salience(tokens);
         let keep_n = ((tokens.len() as f32 * keep_ratio) as usize).max(3);
+
+
 
         let lock_texts: HashSet<&str> = locks.iter().map(|l| l.text.as_str()).collect();
 
@@ -166,7 +173,77 @@ impl SparseCoding {
             .collect()
     }
 
+    /// Hierarchical "Neuron Duplicate Tree" pruning.
+    /// Instead of global top-N, it identifies redundant semantic branches (duplicate trees)
+    /// and prunes based on branch-level salience.
+    fn apply_tree(&self, tokens: &[String], keep_ratio: f32, locks: &[crate::types::ConstraintToken]) -> Vec<ScoredToken> {
+        let scored = self.compute_salience(tokens);
+        let lock_texts: HashSet<&str> = locks.iter().map(|l| l.text.as_str()).collect();
+
+        // 1. Group into "Neuron Trees" (simplified semantic clusters)
+        let mut trees: HashMap<String, Vec<(usize, f32)>> = HashMap::new();
+        for (i, (token, score)) in scored.iter().enumerate() {
+            let tree_id = self.get_tree_id(token);
+            trees.entry(tree_id).or_default().push((i, *score));
+        }
+
+        // 2. Prune duplicate trees (branches with low aggregate salience)
+        let mut survivors = HashSet::new();
+        let keep_n = ((tokens.len() as f32 * keep_ratio) as usize).max(3);
+
+        let mut tree_salience: Vec<(String, f32)> = trees.iter()
+            .map(|(id, members)| {
+                let max_sal = members.iter().map(|(_, s)| *s).fold(0.0, f32::max);
+                (id.clone(), max_sal)
+            })
+            .collect();
+
+        tree_salience.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Keep the most salient trees until we hit our token budget
+        let mut tokens_collected = 0;
+        for (id, _) in tree_salience {
+            if let Some(members) = trees.get(&id) {
+                // Keep the top token from this tree, and maybe others if we have budget
+                if let Some(&(idx, _)) = members.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()) {
+                    survivors.insert(idx);
+                    tokens_collected += 1;
+                }
+            }
+            if tokens_collected >= keep_n { break; }
+        }
+
+        // Always keep locks
+        for (i, (token, _)) in scored.iter().enumerate() {
+            if lock_texts.contains(token.as_str()) {
+                survivors.insert(i);
+            }
+        }
+
+        // Map back to original order
+        tokens.iter().enumerate().filter_map(|(i, t)| {
+            if survivors.contains(&i) {
+                let salience = scored[i].1;
+                Some(ScoredToken {
+                    text: t.clone(),
+                    salience,
+                    source: TokenSource::Sparse,
+                })
+            } else {
+                None
+            }
+        }).collect()
+    }
+
+    fn get_tree_id(&self, token: &str) -> String {
+        // Simplified neuron-grouping: tokens with same starting letter or common roots
+        let t = token.to_lowercase();
+        if t.len() < 2 { return "root".to_string(); }
+        t[0..2].to_string()
+    }
+
     /// Wire this to your domain-specific vocabulary.
+
     /// Technical terms (authentication, fintech, HSM) score high.
     fn domain_specificity(&self, token: &str) -> f32 {
         // Replace with lookup into your actual domain vocab map

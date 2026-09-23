@@ -165,6 +165,12 @@ pub struct AlgorithmOutput {
     pub force_compact_generation: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnrichmentContext {
+    pub cluster_vocab: Option<String>,
+    pub rag_chunks: Option<String>,
+}
+
 /// Unified response enum for the PipelineOrchestrator
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]

@@ -6,27 +6,26 @@ use crate::{
 
 /// Handles Stage 3: Context Management
 pub struct Stage3 {
-    clustering: SemanticClustering,
+    // clustering: SemanticClustering,
 }
 
 impl Stage3 {
     /// Creates a new Stage3 instance
     pub fn new() -> Self {
         Self {
-            clustering: SemanticClustering::default(),
         }
     }
 
     /// Processes input through Stage 3: Context Management
-    /// Mode-aware: Gentle skips Semantic Clustering.
+    /// Mode-aware: Seeding priority changes based on mode.
     pub fn run(&self, out: &mut AlgorithmOutput) {
         let mode = out.mode.as_ref().unwrap_or(&Mode::Gentle);
 
-        // Pre-seed WM using Constraint Locks and Clusters
+        // Pre-seed WM using a strict priority hierarchy: Locks -> Clusters -> Sparse Tokens
         let mut wm = WorkingMemory::new(mode);
         let mut items = Vec::new();
 
-        // 1. Add all CONSTRAINT_LOCK tokens with highest priority
+        // 1. HIGHEST PRIORITY: Constraint Locks (Non-negotiable structural anchors)
         for lock in &out.constraint_locks {
             items.push(WmSlot {
                 content: lock.text.clone(),
@@ -37,35 +36,31 @@ impl Stage3 {
             });
         }
 
-        // 2. Add clusters or sparse tokens based on mode
-        match mode {
-            Mode::Gentle | Mode::Ambiguous | Mode::Balanced => {
-                // Use sparse tokens for remaining slots
-                for t in &out.sparse_tokens {
-                    items.push(WmSlot {
-                        content: t.text.clone(),
-                        salience: t.salience,
-                        source: SlotSource::Delta,
-                        is_protected: false,
-                        last_accessed: std::time::Instant::now(),
-                    });
-                }
+        // 2. SECONDARY PRIORITY: Structural Clusters (from Stage -1)
+        // This fixes GAP-23 by using the cluster map instead of just raw tokens
+        for (label, members) in out.cluster_labels.iter().zip(&out.clusters) {
+            if let Some(top_token) = members.first() {
+                items.push(WmSlot {
+                    content: format!("{}: {}", label, top_token),
+                    salience: 0.85,
+                    source: SlotSource::Cluster,
+                    is_protected: false,
+                    last_accessed: std::time::Instant::now(),
+                });
             }
-            Mode::Aggressive => {
-                // Semantic Clustering on delta_tokens → load clusters as slots
-                let cluster_result = self.clustering.cluster(&out.delta_tokens);
-                out.clusters = cluster_result.groups.clone();
-                out.cluster_labels = cluster_result.labels.clone();
+        }
 
-                for (i, label) in cluster_result.labels.iter().enumerate() {
-                    items.push(WmSlot {
-                        content: label.clone(),
-                        salience: 0.70 + (i as f32 * 0.03),
-                        source: SlotSource::Cluster,
-                        is_protected: false,
-                        last_accessed: std::time::Instant::now(),
-                    });
-                }
+        // 3. TERTIARY PRIORITY: Sparse Tokens (Fill remaining slots)
+        for t in &out.sparse_tokens {
+            // Avoid duplicating tokens already added via locks or clusters
+            if !items.iter().any(|item| item.content.contains(&t.text)) {
+                items.push(WmSlot {
+                    content: t.text.clone(),
+                    salience: t.salience,
+                    source: SlotSource::Delta,
+                    is_protected: false,
+                    last_accessed: std::time::Instant::now(),
+                });
             }
         }
 

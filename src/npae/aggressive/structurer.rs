@@ -509,9 +509,13 @@ fn extract_task_description(raw: &str, intent_type: &str) -> String {
 /// Build background that adds NEW information — includes context unpacking for vagueness resolution
 fn build_background(profile: &IntentProfile, user_level: &str, raw: &str) -> String {
     let mut parts = Vec::new();
-    
+
     parts.push(format!("Domain: {} | Audience: {}", profile.domain, user_level));
-    
+
+    if let Some(ref baseline) = profile.baseline_knowledge {
+        parts.push(format!("User Baseline: {}", baseline));
+    }
+
     // Vagueness Resolution / Context Unpacking
     if let Some(roadmap) = unpack_context(profile, raw) {
         parts.push(format!("Roadmap: {}", roadmap));
@@ -526,14 +530,30 @@ fn build_background(profile: &IntentProfile, user_level: &str, raw: &str) -> Str
     if profile.has_validation {
         parts.push("Validation/QA gates required".to_string());
     }
-    if let Some(ref geo) = profile.detected_geography {
-        parts.push(format!("Geography: {}", geo));
-    }
     if let Some(ref biz) = profile.detected_biz_type {
         parts.push(format!("Business type: {}", biz));
     }
     
     parts.join(". ")
+}
+
+fn naturalize_subject(subject: &str, intent: &crate::npae::aggressive::intent::IntentClass) -> String {
+    let lower = subject.to_lowercase();
+    let abstract_terms = ["industry", "domain", "sector", "field", "tech", "technology", "business", "market"];
+
+    let is_abstract = abstract_terms.iter().any(|&term| lower.contains(term))
+        || lower.split_whitespace().count() <= 2;
+
+    if !is_abstract {
+        return subject.to_string();
+    }
+
+    match intent {
+        crate::npae::aggressive::intent::IntentClass::Build => "system".to_string(),
+        crate::npae::aggressive::intent::IntentClass::Analyze => "framework".to_string(),
+        crate::npae::aggressive::intent::IntentClass::Explain => "concept".to_string(),
+        _ => "solution".to_string(),
+    }
 }
 
 /// Infer execution phases from temporal scope, config templates, and raw prompt
@@ -731,6 +751,36 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                 deliverables: vec!["First Closed Transactions".into(), "Client Referral Pipeline".into()],
             });
         }
+        "career-growth" => {
+            phases.push(ExecutionPhase {
+                phase_number: 1,
+                name: "Gap Analysis & Baseline Audit".into(),
+                description: "Compare current skills, certifications, and experience against target role requirements and industry benchmarks.".into(),
+                estimated_duration: "1-2 weeks".into(),
+                deliverables: vec!["Skills Gap Matrix".into(), "Target Role Requirement Specification".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 2,
+                name: "Skill Acquisition & Certification".into(),
+                description: "Execute targeted learning paths, acquire necessary industry certifications, and build project-based evidence of competency.".into(),
+                estimated_duration: "3-6 months".into(),
+                deliverables: vec!["Certification/Credential Proof".into(), "Technical Portfolio/Case Studies".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 3,
+                name: "Positioning & Market Alignment".into(),
+                description: "Optimize professional branding, build strategic industry network, and align resume/LinkedIn with target role keywords.".into(),
+                estimated_duration: "2-4 weeks".into(),
+                deliverables: vec!["Optimized Professional Profile".into(), "Industry Networking Map".into()],
+            });
+            phases.push(ExecutionPhase {
+                phase_number: 4,
+                name: "Execution & Transition".into(),
+                description: "Implement high-conversion application strategy, execute interview frameworks, and secure target role.".into(),
+                estimated_duration: "1-3 months".into(),
+                deliverables: vec!["Interview Performance Log".into(), "Secured Offer/Role Transition".into()],
+            });
+        }
         "software" | "devops" => {
             phases.push(ExecutionPhase {
                 phase_number: 1,
@@ -836,14 +886,14 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                         name: format!("{} Discovery", subject),
                         description: format!("Identify key variables, stakeholders, and data sources for {}.", subject).into(),
                         estimated_duration: "Phase 1".into(),
-                        deliverables: vec![format!("{} assessment report", subject).into()],
+                        deliverables: vec![format!("{} assessment report", naturalize_subject(&subject, &profile.primary_intent)).into()],
                     });
                     phases.push(ExecutionPhase {
                         phase_number: 2,
                         name: format!("{} Deep Dive", subject),
                         description: format!("Perform detailed analytical investigation into {} dynamics.", subject).into(),
                         estimated_duration: "Phase 2".into(),
-                        deliverables: vec![format!("{} analytical model", subject).into()],
+                        deliverables: vec![format!("{} analytical model", naturalize_subject(&subject, &profile.primary_intent)).into()],
                     });
                     phases.push(ExecutionPhase {
                         phase_number: 3,
@@ -863,21 +913,21 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                             name: "Architecture & Design".into(),
                             description: format!("Define structural requirements and design for {}.", subject).into(),
                             estimated_duration: "Design Phase".into(),
-                            deliverables: vec![format!("{} blueprint", subject).into()],
+                            deliverables: vec![format!("{} blueprint", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 2,
                             name: "Core Implementation".into(),
                             description: format!("Construct the functional components of {}.", subject).into(),
                             estimated_duration: "Build Phase".into(),
-                            deliverables: vec![format!("Functional {} prototype", subject).into()],
+                            deliverables: vec![format!("Functional {} prototype", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 3,
                             name: "Validation & Polish".into(),
                             description: format!("Test, refine, and finalize {} for production.", subject).into(),
                             estimated_duration: "Final Phase".into(),
-                            deliverables: vec![format!("Optimized {}", subject).into()],
+                            deliverables: vec![format!("Optimized {}", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                     } else {
                         phases.push(ExecutionPhase {
@@ -885,21 +935,21 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                             name: "Planning & Strategy".into(),
                             description: format!("Define goals, foundational requirements, and operational roadmap for {}.", subject).into(),
                             estimated_duration: "Phase 1".into(),
-                            deliverables: vec![format!("{} strategy roadmap", subject).into()],
+                            deliverables: vec![format!("{} strategy roadmap", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 2,
                             name: "Execution & Setup".into(),
                             description: format!("Establish core operational assets, compliance, and systems for {}.", subject).into(),
                             estimated_duration: "Phase 2".into(),
-                            deliverables: vec![format!("Functional {} setup", subject).into()],
+                            deliverables: vec![format!("Functional {} setup", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 3,
                             name: "Launch & Optimization".into(),
                             description: format!("Deploy, monitor initial outcomes, and optimize performance for {}.", subject).into(),
                             estimated_duration: "Phase 3".into(),
-                            deliverables: vec![format!("Launched {}", subject).into()],
+                            deliverables: vec![format!("Launched {}", naturalize_subject(&subject, &profile.primary_intent)).into()],
                         });
                     }
                 }
@@ -917,7 +967,7 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                         name: "Execution".into(),
                         description: format!("Execute core {} tasks.", subject).into(),
                         estimated_duration: "Execution".into(),
-                        deliverables: vec![format!("{} core output", subject).into()],
+                        deliverables: vec![format!("{} core output", naturalize_subject(&subject, &profile.primary_intent)).into()],
                     });
                 }
             }
@@ -982,6 +1032,12 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
 
     // Domain-Aware Success Criteria for other domains
     match (profile.primary_intent.clone(), profile.domain.as_str()) {
+        (super::intent::IntentClass::Build, "career-growth") => {
+            criteria.push("Comprehensive skills gap analysis completed and validated against industry benchmarks".into());
+            criteria.push("Target certifications or credentials acquired and verified".into());
+            criteria.push("Professional portfolio demonstrates competency in target role core requirements".into());
+            criteria.push("Market positioning aligned with target role expectations".into());
+        }
         (super::intent::IntentClass::Build, "software") | (super::intent::IntentClass::Build, "software-engineering") | (super::intent::IntentClass::Build, "devops") | (super::intent::IntentClass::Build, "devops-infra") => {
             criteria.push("Functional, bug-free implementation with optimized performance".into());
             criteria.push("Adheres to industry-standard architectural patterns and best practices".into());
@@ -1016,7 +1072,7 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
         }
         (super::intent::IntentClass::Build, _) => {
             let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "deliverable".into());
-            criteria.push(format!("Functional, high-quality {} is produced with modular design.", subject).into());
+            criteria.push(format!("Functional, high-quality {} is produced with modular design.", naturalize_subject(&subject, &profile.primary_intent)).into());
             criteria.push("Strict adherence to specified requirements and best practices.".into());
         }
 
@@ -1096,6 +1152,7 @@ fn derive_tone(profile: &IntentProfile) -> String {
 /// Vagueness Resolution: Unpacks generic requests into structured roadmaps
 fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
     let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "the core topic".into());
+    let naturalized = naturalize_subject(&subject, &profile.primary_intent);
     let lower = raw.to_lowercase();
     let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
     let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
@@ -1103,25 +1160,25 @@ fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
     if is_financial && !profile.domain.starts_with("workplace") {
         return Some(format!(
             "Target Definition (Disambiguate: Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth; quantify target amount, currency, and horizon). Current-State Baseline (Audit income, burn rate, assets, liabilities, and human capital monetization). Wealth Gap & Quantitative Modeling (Calculate Net Worth Gap, Required Annual Savings, Required Gross/Net Income, and Required CAGR). Income Engine & Leverage (Rank monetization vehicles: career, high-ticket services, equity, tech leverage by ROI). Capital Allocation & Risk Framework (Liquidity buffers, productive asset compounding, and downside mitigation across Conservative, Base, and Aggressive scenarios). Reality-Check (Quantify feasibility against constraints and identify required variable adjustments for {}).",
-            subject
+            naturalized
         ));
     }
     if is_business {
         return Some(format!(
             "Define target enterprise valuation and revenue milestones for {}. Validate unit economics (LTV/CAC, gross margin), business model canvas, go-to-market scalability, and capitalization roadmap across multi-year horizon.",
-            subject
+            naturalized
         ));
     }
     match profile.domain.as_str() {
-        "computers" => Some(format!("Cover computing architecture for {}, low-level hardware-software interaction, memory constraints, and runtime efficiency.", subject)),
-        "science" | "scientific-research" => Some(format!("Cover empirical foundations of {}, theoretical framework, experimental methodology, and potential impact.", subject)),
-        "health" | "medical" => Some(format!("Cover physiological mechanisms of {}, clinical presentation, evidence-based interventions, and long-term outcomes.", subject)),
-        "finance" => Some(format!("Cover capital dynamics of {}, market mechanisms, risk-adjusted returns, and actionable execution strategies.", subject)),
-        "ai-ml" => Some(format!("Cover definition of {}, how it differs from current AI, how it might work, key challenges, risks, and real-world implications.", subject)),
-        "workplace-productivity" => Some(format!("Analyze objective output vs subjective perception for {}, remote/hybrid dynamics, and cultural impact.", subject)),
-        "education" => Some(format!("Cover pedagogical foundations of {}, cognitive load optimization, retention strategies, and application milestones.", subject)),
-        "software" | "software-engineering" | "devops" | "devops-infra" => Some(format!("Cover system architecture for {}, deployment strategy, scalability bottlenecks, and security considerations.", subject)),
-        _ => Some(format!("Break down {} into fundamental components, current state, key challenges, and future implications.", subject)),
+        "computers" => Some(format!("Cover computing architecture for {}, low-level hardware-software interaction, memory constraints, and runtime efficiency.", naturalized)),
+        "science" | "scientific-research" => Some(format!("Cover empirical foundations of {}, theoretical framework, experimental methodology, and potential impact.", naturalized)),
+        "health" | "medical" => Some(format!("Cover physiological mechanisms of {}, clinical presentation, evidence-based interventions, and long-term outcomes.", naturalized)),
+        "finance" => Some(format!("Cover capital dynamics of {}, market mechanisms, risk-adjusted returns, and actionable execution strategies.", naturalized)),
+        "ai-ml" => Some(format!("Cover definition of {}, how it differs from current AI, how it might work, key challenges, risks, and real-world implications.", naturalized)),
+        "workplace-productivity" => Some(format!("Analyze objective output vs subjective perception for {}, remote/hybrid dynamics, and cultural impact.", naturalized)),
+        "education" => Some(format!("Cover pedagogical foundations of {}, cognitive load optimization, retention strategies, and application milestones.", naturalized)),
+        "software" | "software-engineering" | "devops" | "devops-infra" => Some(format!("Cover system architecture for {}, deployment strategy, scalability bottlenecks, and security considerations.", naturalized)),
+        _ => Some(format!("Break down {} into fundamental components, current state, key challenges, and future implications.", naturalized)),
     }
 }
 
@@ -1195,11 +1252,11 @@ fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
     let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
 
     if is_financial && !profile.domain.starts_with("workplace") {
-        return "Execute a comprehensive Goal-Decomposition and Wealth-Engineering plan for the user's objective:\n1. TARGET DEFINITION: Disambiguate the goal into exact Target Amount ($), Currency, Target Type (Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth), and Horizon.\n2. CURRENT-STATE BASELINE: Audit financial baseline (income, expenses, cash, investments, debt) and human capital (skills, network, market value).\n3. WEALTH GAP CALCULATION: Calculate Net Worth Gap, Required Annual Savings, Required Gross/Net Income, and Required CAGR with quantitative modeling.\n4. INCOME ENGINE & LEVERAGE: Rank scalable monetization vehicles (career advancement, high-ticket services, business ownership, AI leverage) by time-to-revenue and ROI.\n5. CAPITAL ALLOCATION & RISK: Define liquidity buffers, diversified compounding, and comprehensive risk mitigation (income, market, debt, tax).\n6. SCENARIO MODELING: Provide Conservative, Base Case, and Aggressive projections.\n7. EXECUTION ROADMAP & KPIS: Detail milestones across 30-day, 90-day, 6-12 month, 3-year, and 5-10 year horizons with quantitative KPIs.\n8. REALITY CHECK: If the target is mathematically inconsistent with current constraints, explicitly quantify the gap, explain which variables must change, and state the feasibility verdict.".into();
+        return "Execute the comprehensive Goal-Decomposition and Wealth-Engineering plan detailed in the Roadmap section, ensuring each of the 8 quantitative milestones is addressed with mathematical rigor.".into();
     }
 
     if is_business {
-        return "Execute an Enterprise & Business Growth Engineering plan:\n1. TARGET & VALUATION: Define target revenue, EBITDA, and enterprise valuation multiple over the target horizon.\n2. BUSINESS MODEL & UNIT ECONOMICS: Specify product/service offering, pricing model, gross margins, and customer acquisition economics (LTV/CAC).\n3. GO-TO-MARKET & SCALABILITY: Detail distribution leverage, sales channels, and technology/AI operational moats.\n4. CAPITAL & RESOURCE ALLOCATION: Outline capital requirements, funding strategy (bootstrapped vs equity), and reinvestment roadmap.\n5. SCENARIOS & RISKS: Model Conservative, Base, and Aggressive growth cases with competition and execution risk mitigation.\n6. EXECUTION TIMELINE & KPIS: Structure roadmap across PMF, initial scale, team expansion, and valuation milestones with measurable business KPIs.".into();
+        return "Execute the Enterprise & Business Growth Engineering plan detailed in the Roadmap section, ensuring all valuation milestones and unit economic validations are addressed.".into();
     }
 
     match profile.primary_intent {

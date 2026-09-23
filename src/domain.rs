@@ -132,8 +132,8 @@ pub async fn compress_new(
         return Err(AppError::Engine("Prompt blocked by constraints".into()));
     }
 
-    // 2. Pre-load domain vocabulary for prompt enrichment
-    let context_prefix = engine_result
+    // 2. Prepare enrichment context (Cluster Vocab + RAG)
+    let cluster_vocab = engine_result
         .cluster_vocab
         .iter()
         .map(|(token, _): &(String, f32)| token.as_str())
@@ -142,10 +142,9 @@ pub async fn compress_new(
 
     let history_id = Uuid::new_v4().to_string();
 
-    let mut enriched_prompt = if !context_prefix.is_empty() {
-        format!("Context: [{}]\n\n{}", context_prefix, req.raw_text)
-    } else {
-        req.raw_text.clone()
+    let mut enrichment = crate::types::EnrichmentContext {
+        cluster_vocab: if !cluster_vocab.is_empty() { Some(cluster_vocab) } else { None },
+        rag_chunks: None,
     };
 
     if req.rag_enabled.unwrap_or(false) {
@@ -174,12 +173,8 @@ pub async fn compress_new(
                     ));
                 }
                 rag_section.push_str("--- End Retrieved Knowledge ---\n");
-                
-                if !context_prefix.is_empty() {
-                    enriched_prompt = format!("Context: [{}]\n\n{}{}", context_prefix, rag_section, req.raw_text);
-                } else {
-                    enriched_prompt = format!("{}{}", rag_section, req.raw_text);
-                }
+
+                enrichment.rag_chunks = Some(rag_section);
             }
         }
     }
@@ -201,7 +196,7 @@ pub async fn compress_new(
 
     let orchestrator_response = state
         .pipeline
-        .process(&enriched_prompt, &mut session, req.mode.as_deref(), Some(&npae_cfg))
+        .process(&req.raw_text, &mut session, req.mode.as_deref(), Some(&npae_cfg), Some(enrichment))
         .await
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
 
@@ -227,7 +222,7 @@ pub async fn compress_new(
             )
             .bind(&history_id)
             .bind(user_id_str)
-            .bind(&enriched_prompt)
+            .bind(&req.raw_text)
             .bind(&resp.optimized_prompt)
             .bind(token_saved as i64)
             .bind(token_original as i64)
@@ -273,7 +268,7 @@ pub async fn compress_new(
                 user_id: user_id_str.to_string(),
                 history_id: history_id.clone(),
                 prev_prompt: prev_history.as_ref().map(|h| h.original_prompt.clone()),
-                curr_prompt: enriched_prompt.clone(),
+                curr_prompt: req.raw_text.clone(),
                 response_time_ms,
                 engagement_ms: 0,
             };
@@ -282,7 +277,7 @@ pub async fn compress_new(
             for sig in signals {
                 let weight = sig.map_to_weight();
                 if weight != 0.0 {
-                    let target_prompt = if let Some(ref prev) = prev_history { &prev.original_prompt } else { &enriched_prompt };
+                    let target_prompt = if let Some(ref prev) = prev_history { &prev.original_prompt } else { &req.raw_text };
                     let mut engine = state.engine.lock().await;
                     let _ = engine.apply_feedback(user_id, target_prompt, weight).await;
                     
@@ -309,12 +304,12 @@ pub async fn compress_new(
     };
 
     // 4. Compute token counts
-    let token_original = estimate_tokens(&enriched_prompt) as usize;
+    let token_original = estimate_tokens(&req.raw_text) as usize;
     let token_final = estimate_tokens(&compression_response.response) as usize;
     let token_saved = token_original.saturating_sub(token_final);
 
     // 5. Run evaluation metrics (lexical overlap, semantic similarity, fact recall)
-    let eval = evaluation::evaluate(&enriched_prompt, &compression_response.response);
+    let eval = evaluation::evaluate(&req.raw_text, &compression_response.response);
 
     // 6. Persist to DB
     let mut verbose = crate::models::verbose::SqlxVerbose::default();
@@ -322,7 +317,7 @@ pub async fn compress_new(
         &state.pool,
         &history_id,
         user_id_str,
-        &enriched_prompt,
+        &req.raw_text,
         &compression_response,
         token_original,
         token_final,

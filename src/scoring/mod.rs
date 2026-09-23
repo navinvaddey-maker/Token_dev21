@@ -36,7 +36,7 @@ pub fn compute_scoring_result(
         correction_axis = Some(ScoreAxis::SchemaFidelity);
     }
     if scs < threshold && scs < lowest {
-        lowest = scs;
+        let _lowest = scs;
         correction_needed = true;
         correction_axis = Some(ScoreAxis::SemanticCompleteness);
     }

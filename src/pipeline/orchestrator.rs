@@ -114,6 +114,7 @@ impl PipelineOrchestrator {
         session: &mut SessionHistory,
         forced_mode: Option<&str>,
         npae_config: Option<&crate::npae::schema::types::NpaeConfig>,
+        _enrichment: Option<crate::types::EnrichmentContext>,
     ) -> Result<OrchestratorResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
@@ -145,7 +146,8 @@ impl PipelineOrchestrator {
         let _topology = self.topology_classifier.classify(&normalized, &mut output);
 
         // Stage 1: Signal Reduction (Lexical Compression → Sparse Coding)
-        self.stage1.run(&normalized, &mut output);
+        let topology = output.topology.clone().unwrap_or_default();
+        self.stage1.run(&normalized, &mut output, &topology, forced_mode);
 
         // Stage 2: Boundary Detection (Predictive Coding → mode decision)
         if let Some(fm) = forced_mode {
@@ -159,6 +161,9 @@ impl PipelineOrchestrator {
         } else {
             self.stage2.run(session, &mut output);
         }
+
+        // Stage 3: Context Management (Seeding WM from locks and clusters)
+        self.stage3.run(&mut output);
 
         let is_aggressive = output.mode.as_ref() == Some(&Mode::Aggressive);
 
@@ -192,14 +197,11 @@ impl PipelineOrchestrator {
 
             // Push to session history for tracking
             session.push(input, &output);
-            
+
             return Ok(OrchestratorResponse::Aggressive(resp));
         }
 
         // -- Legacy Routing (Balanced/Gentle) --
-        
-        // Stage 3: Context Management
-        self.stage3.run(&mut output);
 
         // Stage 4: Schema filling (NULL Resolution)
         self.stage4.run(&mut output);
@@ -226,16 +228,16 @@ impl PipelineOrchestrator {
         let mut correction_cycle =
             crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number);
         let mut cycle_num = 0u32;
-        let mut scoring_result = crate::types::ScoringResult::default();
+        let scoring_result = crate::types::ScoringResult::default();
 
         loop {
             output.output_token_count = estimate_tokens(&final_response);
             field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
             output.field_issues = field_issues.clone();
 
-            let scoring_result =
-                crate::scoring::compute_scoring_result(&output, &field_issues);
-            output.scoring_result = Some(scoring_result.clone());
+        let scoring_result =
+            crate::scoring::compute_scoring_result(&output, &field_issues);
+        output.scoring_result = Some(scoring_result.clone());
 
             let scores_ok = scoring_result.tes >= 6.0
                 && scoring_result.sfs >= 6.0

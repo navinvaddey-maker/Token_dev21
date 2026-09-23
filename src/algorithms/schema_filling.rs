@@ -199,7 +199,7 @@ impl SchemaFilling {
             (Vec::new(), Vec::new(), None)
         };
 
-        let mut constraints: Vec<crate::types::Constraint> = locks
+        let constraints: Vec<crate::types::Constraint> = locks
             .iter()
             .map(|l| crate::types::Constraint {
                 name: l.text.clone(),

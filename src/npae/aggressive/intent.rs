@@ -25,6 +25,7 @@ pub struct IntentProfile {
     pub detected_biz_type: Option<String>,
     pub detected_team:     Option<String>,
     pub dynamic_subject:   Option<String>,
+    pub baseline_knowledge: Option<String>,
 }
 
 pub fn extract(repr: &CompressedRepr, raw: &str) -> Result<IntentProfile, String> {
@@ -88,6 +89,7 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
     let detected_biz_type = detect_business_type(&lower);
     let detected_team = detect_team_composition(&lower);
     let dynamic_subject = extract_subject(raw);
+    let baseline_knowledge = extract_baseline(raw);
     let deliverable_type = detect_deliverable_type(&lower, &primary_intent, &domain);
 
     Ok(IntentProfile {
@@ -106,7 +108,34 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
         detected_biz_type,
         detected_team,
         dynamic_subject,
+        baseline_knowledge,
     })
+}
+
+/// Extract the user's current professional or technical baseline
+fn extract_baseline(raw: &str) -> Option<String> {
+    let lower = raw.to_lowercase();
+    let patterns = [
+        ("currently a ", ""),
+        ("starting from ", ""),
+        ("my background is ", ""),
+        ("experience as a ", ""),
+        ("background in ", ""),
+        ("work as a ", ""),
+    ];
+
+    for (pattern, _) in &patterns {
+        if let Some(start_idx) = lower.find(pattern) {
+            let actual_start = start_idx + pattern.len();
+            let remaining = &raw[actual_start..];
+            let end_idx = remaining.find(['.', ',', ';']).unwrap_or(remaining.len());
+            let baseline = remaining[..end_idx].trim();
+            if !baseline.is_empty() {
+                return Some(baseline.to_string());
+            }
+        }
+    }
+    None
 }
 
 use crate::npae::ory::math::cosine_similarity;
@@ -162,6 +191,7 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
         ("cybersecurity",          vec!["security", "hacking", "firewall", "encryption", "threat"]),
         ("real-estate",            vec!["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
         ("workplace-productivity", vec!["productivity", "culture", "collaboration", "burnout"]),
+        ("career-growth",           vec!["career", "become", "transition", "professional", "job", "promotion", "certification", "credential", "salary", "role", "position"]),
     ];
 
     for (name, keywords) in domains {
