@@ -29,7 +29,7 @@ async fn test_npae_config_override_threading() {
     };
 
     let resp_high = orchestrator
-        .process(ambiguous_input, &mut session, Some("aggressive"), Some(&override_high_threshold))
+        .process(ambiguous_input, &mut session, Some("aggressive"), Some(&override_high_threshold), None)
         .await
         .expect("Process should succeed");
 
@@ -51,7 +51,7 @@ async fn test_npae_config_override_threading() {
     };
 
     let resp_low = orchestrator
-        .process(ambiguous_input, &mut session, Some("aggressive"), Some(&override_low_threshold))
+        .process(ambiguous_input, &mut session, Some("aggressive"), Some(&override_low_threshold), None)
         .await
         .expect("Process should succeed");
 

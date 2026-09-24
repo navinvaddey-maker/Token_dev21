@@ -270,7 +270,7 @@ mod tests {
             .split_whitespace()
             .map(String::from)
             .collect();
-        let result = sc.apply(&tokens, 0.30, &[]);
+        let result = sc.apply(&tokens, 0.30, &[], "gentle");
         assert!(
             result.len() < tokens.len(),
             "Sparse coding must reduce token count"

@@ -38,6 +38,7 @@ pub struct PipelineOrchestrator {
     _token_efficiency_scorer: TokenEfficiencyScorer,
     _semantic_fidelity_scorer: SemanticFidelityScorer,
     stage6a: Stage6a,
+    stage6b: crate::pipeline::stage6b::Stage6b,
     correction_cycle: CorrectionCycle,
     npae_config_handle: Arc<ConfigHandle>,
     ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
@@ -74,6 +75,7 @@ impl PipelineOrchestrator {
             _token_efficiency_scorer: token_efficiency_scorer,
             _semantic_fidelity_scorer: semantic_fidelity_scorer,
             stage6a,
+            stage6b: crate::pipeline::stage6b::Stage6b::new(),
             correction_cycle,
             npae_config_handle: Arc::new(ConfigHandle::new(crate::npae::aggressive::config::UnifiedConfig {
                 domain_taxonomy: vec![],
@@ -101,6 +103,7 @@ impl PipelineOrchestrator {
             _token_efficiency_scorer: TokenEfficiencyScorer::new(),
             _semantic_fidelity_scorer: SemanticFidelityScorer::new(),
             stage6a: Stage6a::new(),
+            stage6b: crate::pipeline::stage6b::Stage6b::new(),
             correction_cycle: CorrectionCycle::new(0),
             npae_config_handle,
             ory_engine,
@@ -114,10 +117,11 @@ impl PipelineOrchestrator {
         session: &mut SessionHistory,
         forced_mode: Option<&str>,
         npae_config: Option<&crate::npae::schema::types::NpaeConfig>,
-        _enrichment: Option<crate::types::EnrichmentContext>,
+        enrichment: Option<crate::types::EnrichmentContext>,
     ) -> Result<OrchestratorResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
+        output.enrichment = enrichment.clone();
 
         // Stage -1: Token Reconstruction
         let reconstructed = self.reconstructor.run(input);
@@ -195,6 +199,10 @@ impl PipelineOrchestrator {
                 &reconstructed,
             ).await.map_err(|e| e.to_string())?;
 
+            // Populate output fields for session history and feedback tracking
+            output.output_token_count = resp.token_final;
+            output.scoring_result = Some(resp.scoring_result.clone());
+
             // Push to session history for tracking
             session.push(input, &output);
 
@@ -222,61 +230,28 @@ impl PipelineOrchestrator {
             uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
         };
 
-        let (mut final_response, (mut guard_report, mut corrections_applied)) =
+        let (initial_response, (initial_report, initial_corrections)) =
             self.run_guarded_generation(input, &guard_cfg, &output)?;
 
-        let mut correction_cycle =
-            crate::types::CorrectionCycle::new(self.correction_cycle.cycle_number);
-        let mut cycle_num = 0u32;
-        let scoring_result = crate::types::ScoringResult::default();
+        // Stage 6B: Targeted Quality Correction Loop (managed by Stage6b module)
+        let stage6b_out = self.stage6b.run(
+            input,
+            &mut output,
+            &guard_cfg,
+            &self.field_validator,
+            &self.stage4,
+            &self.stage5,
+            &self.stage6a,
+            initial_response,
+            initial_report,
+            initial_corrections,
+        )?;
 
-        loop {
-            output.output_token_count = estimate_tokens(&final_response);
-            field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
-            output.field_issues = field_issues.clone();
-
-        let scoring_result =
-            crate::scoring::compute_scoring_result(&output, &field_issues);
-        output.scoring_result = Some(scoring_result.clone());
-
-            let scores_ok = scoring_result.tes >= 6.0
-                && scoring_result.sfs >= 6.0
-                && scoring_result.scs >= 6.0;
-
-            if scores_ok || cycle_num >= MAX_CORRECTION_CYCLES {
-                if !scores_ok {
-                    correction_cycle = self.correction_cycle.new_cycle(
-                        &final_response,
-                        &field_issues,
-                        &scoring_result,
-                    );
-                }
-                break;
-            }
-
-            let Some(axis) = scoring_result.correction_axis.clone() else {
-                break;
-            };
-
-            corrections_applied.extend(apply_targeted_correction(&mut output, &axis));
-            if axis != crate::types::ScoreAxis::TaskEssential {
-                self.stage4.run(&mut output);
-                field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
-                self.stage5.run(&mut output);
-            }
-
-            let (new_response, (new_report, new_corrections)) =
-                self.run_guarded_generation(input, &guard_cfg, &output)?;
-            final_response = new_response;
-            guard_report = new_report;
-            corrections_applied.extend(new_corrections);
-            cycle_num += 1;
-        }
-
-        correction_cycle.corrections_applied.extend(corrections_applied);
-
-        // Update output with correction cycle
-        output.correction_cycle = Some(correction_cycle.clone());
+        let final_response = stage6b_out.final_response;
+        let guard_report = stage6b_out.guard_report;
+        let field_issues = stage6b_out.field_issues;
+        let scoring_result = stage6b_out.scoring_result;
+        let correction_cycle = stage6b_out.correction_cycle;
 
         // Auto-Learn: Always update schema and push to session history
         // This fires unconditionally regardless of mode or error paths out of process()

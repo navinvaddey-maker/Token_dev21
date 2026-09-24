@@ -27,6 +27,7 @@ fn test_real_estate_prompt_structuring() {
         detected_biz_type: Some("Real Estate Agency".to_string()),
         detected_team: None,
         dynamic_subject: Some("Real Estate Company".to_string()),
+        baseline_knowledge: None,
     };
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);
@@ -40,7 +41,8 @@ fn test_real_estate_prompt_structuring() {
         status: "RESOLVED".to_string(),
     };
 
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config)).expect("Failed to build structured prompt");
+    let reconstructed = token_compress_engine::types::ReconstructedInput::default();
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     println!("Rendered Output:\n{}", rendered);

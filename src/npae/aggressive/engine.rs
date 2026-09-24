@@ -97,97 +97,52 @@ impl AggressiveEngine {
                 remediation: None,
             });
 
-        // Trigger targeted correction if not passed
+        // Trigger targeted correction if HallucinationGuard failed
         if !guard_report.passed {
             final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
-            // Re-run the guard check on the corrected prompt
             if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg) {
                 guard_report = new_report;
             }
         }
         
+        // Initial scoring calculation for Aggressive mode
+        let mut scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions);
+
+        // Stage 6B: Quality Guardrails & Targeted Correction Loop
+        let max_correction_cycles = 3;
+        let mut cycle_num = 0;
+
+        while (scoring_result.correction_needed || !guard_report.passed) && cycle_num < max_correction_cycles {
+            cycle_num += 1;
+            if let Some(axis) = &scoring_result.correction_axis {
+                match axis {
+                    crate::types::ScoreAxis::TaskEssential => {
+                        // TES low: Strip non-essential questions / render crisp compact prompt
+                        final_prompt = super::structurer::render_crisp_prompt(&structured, &[], raw);
+                    }
+                    crate::types::ScoreAxis::SchemaFidelity => {
+                        // SFS low: Remediate structural omissions
+                        final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
+                    }
+                    crate::types::ScoreAxis::SemanticCompleteness => {
+                        // SCS low: Ensure questions and constraints are fully rendered
+                        final_prompt = super::structurer::render_crisp_prompt(&structured, &questions, raw);
+                    }
+                }
+            } else if !guard_report.passed {
+                final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
+            }
+
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg) {
+                guard_report = new_report;
+            }
+            scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions);
+        }
+
         // Final token accounting for UI
         let token_original = crate::utils::tokens::estimate_tokens(raw);
         let token_final = crate::utils::tokens::estimate_tokens(&final_prompt);
         let token_saved = token_original.saturating_sub(token_final);
-
-        // Calculate scoring for aggressive mode (v2 — computed, not hardcoded)
-        // TES: Token efficiency — uses v2 savings-based formula
-        let tes_score = if token_original > 0 {
-            let savings = 1.0 - (token_final as f32 / token_original as f32);
-            let base = if savings < 0.0 {
-                (0.3 + savings * 0.4).max(0.1)
-            } else if savings <= 0.1 {
-                0.3 + savings * 2.0
-            } else if savings <= 0.6 {
-                0.5 + savings * 0.667
-            } else if savings <= 0.8 {
-                0.9 - (savings - 0.6) * 0.5
-            } else {
-                0.8 - (savings - 0.8) * 2.0
-            };
-            (base * 10.0).clamp(0.0, 10.0)
-        } else {
-            0.0
-        };
-
-        // SFS: Schema Fidelity — evaluate structural completeness of generated prompt
-        let sfs_score = {
-            let mut sfs = 0.0_f32;
-            let total_checks = 7.0_f32;
-            // Check role presence and quality
-            if !structured.role.primary.is_empty() { sfs += 1.0; }
-            if !structured.role.persona_anchor.is_empty() { sfs += 1.0; }
-            // Check context
-            if !structured.context.description.is_empty() { sfs += 1.0; }
-            if !structured.context.background.is_empty() { sfs += 1.0; }
-            // Check constraints
-            if !structured.constraints.required_inclusions.is_empty() || !structured.constraints.forbidden_topics.is_empty() { sfs += 1.0; }
-            // Check execution phases
-            if !structured.execution_phases.is_empty() { sfs += 1.0; }
-            // Check success criteria
-            if !structured.success_criteria.is_empty() { sfs += 1.0; }
-            (sfs / total_checks * 10.0).clamp(0.0, 10.0)
-        };
-
-        // SCS: Semantic Completeness — check constraint and question coverage
-        let scs_score = {
-            let mut score = 10.0_f32;
-            // Penalize if ambiguity is high but no clarifying questions generated
-            if amb.score > 0.5 && questions.is_empty() {
-                score -= 2.0;
-            }
-            // Penalize if no success criteria could be inferred
-            if structured.success_criteria.is_empty() {
-                score -= 1.5;
-            }
-            // Penalize if dynamic instruction is generic
-            if structured.dynamic_instruction.is_empty() {
-                score -= 2.0;
-            }
-            // Reward constraint coverage
-            if structured.constraints.required_inclusions.is_empty() && structured.constraints.forbidden_topics.is_empty() {
-                score -= 1.0;
-            }
-            score.clamp(0.0, 10.0)
-        };
-
-        let avg_score = (tes_score + sfs_score + scs_score) / 3.0;
-        let scoring_result = crate::types::ScoringResult {
-            tes: tes_score,
-            sfs: sfs_score,
-            scs: scs_score,
-            correction_needed: avg_score < 6.0,
-            correction_axis: if tes_score < 6.0 {
-                Some(crate::types::ScoreAxis::TaskEssential)
-            } else if sfs_score < 6.0 {
-                Some(crate::types::ScoreAxis::SchemaFidelity)
-            } else if scs_score < 6.0 {
-                Some(crate::types::ScoreAxis::SemanticCompleteness)
-            } else {
-                None
-            },
-        };
 
         // 6. Record Outcome to Ory Engine Memory
         if let Some(blueprint) = &ory_result.blueprint {
@@ -214,5 +169,95 @@ impl AggressiveEngine {
             scoring_result,
             hallucination_report: Some(guard_report),
         })
+    }
+}
+
+fn compute_aggressive_scoring(
+    raw: &str,
+    final_prompt: &str,
+    structured: &crate::npae::schema::types::StructuredPrompt,
+    amb: &crate::npae::schema::types::AmbiguityAnalysis,
+    questions: &[crate::npae::schema::types::ClarifyingQuestion],
+) -> crate::types::ScoringResult {
+    let token_original = crate::utils::tokens::estimate_tokens(raw);
+    let token_final = crate::utils::tokens::estimate_tokens(final_prompt);
+
+    // TES: Token efficiency
+    let tes_score = if token_original > 0 {
+        let savings = 1.0 - (token_final as f32 / token_original as f32);
+        let base = if savings < 0.0 {
+            (0.3 + savings * 0.4).max(0.1)
+        } else if savings <= 0.1 {
+            0.3 + savings * 2.0
+        } else if savings <= 0.6 {
+            0.5 + savings * 0.667
+        } else if savings <= 0.8 {
+            0.9 - (savings - 0.6) * 0.5
+        } else {
+            0.8 - (savings - 0.8) * 2.0
+        };
+        (base * 10.0).clamp(0.0, 10.0)
+    } else {
+        0.0
+    };
+
+    // SFS: Schema Fidelity
+    let sfs_score = {
+        let mut sfs = 0.0_f32;
+        let total_checks = 7.0_f32;
+        if !structured.role.primary.is_empty() { sfs += 1.0; }
+        if !structured.role.persona_anchor.is_empty() { sfs += 1.0; }
+        if !structured.context.description.is_empty() { sfs += 1.0; }
+        if !structured.context.background.is_empty() { sfs += 1.0; }
+        if !structured.constraints.required_inclusions.is_empty() || !structured.constraints.forbidden_topics.is_empty() { sfs += 1.0; }
+        if !structured.execution_phases.is_empty() { sfs += 1.0; }
+        if !structured.success_criteria.is_empty() { sfs += 1.0; }
+        (sfs / total_checks * 10.0).clamp(0.0, 10.0)
+    };
+
+    // SCS: Semantic Completeness
+    let scs_score = {
+        let mut score = 10.0_f32;
+        if amb.score > 0.5 && questions.is_empty() {
+            score -= 2.0;
+        }
+        if structured.success_criteria.is_empty() {
+            score -= 1.5;
+        }
+        if structured.dynamic_instruction.is_empty() {
+            score -= 2.0;
+        }
+        if structured.constraints.required_inclusions.is_empty() && structured.constraints.forbidden_topics.is_empty() {
+            score -= 1.0;
+        }
+        score.clamp(0.0, 10.0)
+    };
+
+    let threshold = 6.0;
+    let mut correction_needed = false;
+    let mut lowest = 10.0;
+    let mut correction_axis = None;
+
+    if tes_score < threshold && tes_score < lowest {
+        lowest = tes_score;
+        correction_needed = true;
+        correction_axis = Some(crate::types::ScoreAxis::TaskEssential);
+    }
+    if sfs_score < threshold && sfs_score < lowest {
+        lowest = sfs_score;
+        correction_needed = true;
+        correction_axis = Some(crate::types::ScoreAxis::SchemaFidelity);
+    }
+    if scs_score < threshold && scs_score < lowest {
+        correction_needed = true;
+        correction_axis = Some(crate::types::ScoreAxis::SemanticCompleteness);
+    }
+
+    crate::types::ScoringResult {
+        tes: tes_score,
+        sfs: sfs_score,
+        scs: scs_score,
+        correction_needed,
+        correction_axis,
     }
 }

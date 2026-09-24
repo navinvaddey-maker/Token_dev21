@@ -66,6 +66,14 @@ impl Stage6a {
             }
         }
 
+        if let Some(enrichment) = &schema_filled.enrichment {
+            if let Some(rag_chunks) = &enrichment.rag_chunks {
+                if !parts.iter().any(|p| p.contains("Source Knowledge:") || p.contains("Retrieved Knowledge:")) {
+                    parts.push(rag_chunks.clone());
+                }
+            }
+        }
+
         if !schema_filled.scope_injections.is_empty() {
             let scopes = schema_filled.scope_injections.join(", ");
             parts.push(format!("**Directives:** {}", scopes));

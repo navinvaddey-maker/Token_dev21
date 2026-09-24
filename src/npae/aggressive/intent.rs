@@ -146,7 +146,7 @@ use crate::npae::ory::embeddings::embed_text;
 fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> String {
     let prompt_vec = embed_text(raw);
     let mut best_domain = "general";
-    let mut best_score = 0.35f32; // Minimum threshold for domain matching
+    let mut best_score = 0.05f32; // Minimum threshold for domain matching
 
     if let Some(cfg) = config {
         for tax in &cfg.domain_taxonomy {
@@ -158,11 +158,17 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
                     centroid[i] += kw_vec[i];
                 }
             }
+            if !tax.keywords.is_empty() {
+                for i in 0..centroid.len() {
+                    centroid[i] /= tax.keywords.len() as f32;
+                }
+            }
             crate::npae::ory::math::l2_normalize(&mut centroid);
 
             let similarity = cosine_similarity(&prompt_vec, &centroid);
-            if similarity > best_score {
-                best_score = similarity;
+            let score = similarity * (tax.boost.max(1) as f32);
+            if score > best_score {
+                best_score = score;
                 best_domain = &tax.domain;
             }
         }

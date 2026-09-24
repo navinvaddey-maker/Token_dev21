@@ -163,6 +163,7 @@ pub struct AlgorithmOutput {
     /// When true, Stage 6A emits a compact prompt (correction for low TES).
     #[serde(default)]
     pub force_compact_generation: bool,
+    pub enrichment: Option<EnrichmentContext>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -390,13 +391,37 @@ impl CorrectionCycle {
         corrections
     }
 
+    /// Create a new correction cycle with actual empirical score improvement calculation.
+    pub fn new_cycle_with_delta(
+        &self,
+        compressed_output: &str,
+        field_issues: &[FieldValidationIssue],
+        before_scoring: &ScoringResult,
+        after_scoring: &ScoringResult,
+    ) -> Self {
+        let corrections = Self::analyze_corrections(compressed_output, field_issues);
+        let improvement = Self::calculate_improvement_delta(before_scoring, after_scoring);
+
+        Self {
+            cycle_number: self.cycle_number + 1,
+            corrections_applied: corrections,
+            improvement,
+        }
+    }
+
+    /// Calculate actual improvement between pre-correction and post-correction scoring results.
+    pub fn calculate_improvement_delta(before: &ScoringResult, after: &ScoringResult) -> f32 {
+        let before_avg = (before.tes + before.sfs + before.scs) / 3.0;
+        let after_avg = (after.tes + after.sfs + after.scs) / 3.0;
+        (after_avg - before_avg).max(0.0)
+    }
+
     /// Calculate expected improvement per correction cycle.
     /// Uses the gap between current scores and the target (10.0) to estimate
     /// how much improvement each correction should provide.
     fn calculate_improvement(scoring: &ScoringResult) -> f32 {
         let overall = (scoring.tes + scoring.sfs + scoring.scs) / 3.0;
         let gap = (10.0 - overall).max(0.0);
-        // Each correction cycle is expected to close ~30% of the gap
-        gap * 0.3
+        gap * 0.30
     }
 }

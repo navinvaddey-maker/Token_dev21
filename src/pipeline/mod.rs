@@ -22,6 +22,7 @@ pub mod stage3;
 pub mod stage4;
 pub mod stage5;
 pub mod stage6a;
+pub mod stage6b;
 pub mod tee_topology_classifier;
 
 // Import specific items from submodules
