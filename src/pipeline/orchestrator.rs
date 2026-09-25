@@ -6,9 +6,7 @@ use crate::{
         field_validator::FieldTypeValidator,
         predictive_coding::PredictiveCoding,
     },
-    correction::{apply_targeted_correction, MAX_CORRECTION_CYCLES},
     engine::reconstruction::TokenReconstructor,
-    utils::tokens::estimate_tokens,
     pipeline::{
         stage0_normalize::NormalizationPrePass, stage0b_topology::TopologyClassifier,
         stage1::Stage1, stage2::Stage2, stage3::Stage3, stage4::Stage4, stage5::Stage5,
@@ -39,7 +37,7 @@ pub struct PipelineOrchestrator {
     _semantic_fidelity_scorer: SemanticFidelityScorer,
     stage6a: Stage6a,
     stage6b: crate::pipeline::stage6b::Stage6b,
-    correction_cycle: CorrectionCycle,
+    _correction_cycle: CorrectionCycle,
     npae_config_handle: Arc<ConfigHandle>,
     ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
 }
@@ -76,7 +74,7 @@ impl PipelineOrchestrator {
             _semantic_fidelity_scorer: semantic_fidelity_scorer,
             stage6a,
             stage6b: crate::pipeline::stage6b::Stage6b::new(),
-            correction_cycle,
+            _correction_cycle: correction_cycle,
             npae_config_handle: Arc::new(ConfigHandle::new(crate::npae::aggressive::config::UnifiedConfig {
                 domain_taxonomy: vec![],
                 roles: vec![],
@@ -104,7 +102,7 @@ impl PipelineOrchestrator {
             _semantic_fidelity_scorer: SemanticFidelityScorer::new(),
             stage6a: Stage6a::new(),
             stage6b: crate::pipeline::stage6b::Stage6b::new(),
-            correction_cycle: CorrectionCycle::new(0),
+            _correction_cycle: CorrectionCycle::new(0),
             npae_config_handle,
             ory_engine,
         }
@@ -215,7 +213,7 @@ impl PipelineOrchestrator {
         self.stage4.run(&mut output);
 
         // Stage 4B: Field validation (before scope injection)
-        let mut field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
+        let field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
         output.field_issues = field_issues.clone();
 
         // Stage 5: Scope Injection

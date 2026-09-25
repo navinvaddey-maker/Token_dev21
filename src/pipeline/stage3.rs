@@ -1,5 +1,4 @@
 use crate::{
-    algorithms::semantic_clustering::SemanticClustering,
     algorithms::working_memory::{ContextFrame, WorkingMemory},
     types::{AlgorithmOutput, Mode, SlotSource, WmSlot},
 };

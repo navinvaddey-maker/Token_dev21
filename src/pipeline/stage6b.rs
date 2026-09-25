@@ -89,7 +89,6 @@ impl Stage6b {
             corrections_applied.extend(apply_targeted_correction(output, &axis));
             if axis != ScoreAxis::TaskEssential {
                 stage4.run(output);
-                field_issues = field_validator.validate_full(&output.resolved_schema, output);
                 stage5.run(output);
             }
 
