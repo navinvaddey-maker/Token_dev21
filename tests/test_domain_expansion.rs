@@ -45,6 +45,11 @@ fn test_finance_income_structuring() {
         detected_team: None,
         dynamic_subject: Some("Money".to_string()),
         baseline_knowledge: None,
+        goal_intent: None,
+        vertical: None,
+        rule_locked: false,
+        legal_as_constraint: false,
+        composed_primary_role: None,
     };
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);
@@ -138,6 +143,11 @@ fn test_computers_structuring() {
         detected_team: None,
         dynamic_subject: Some("Operating System Kernel".to_string()),
         baseline_knowledge: None,
+        goal_intent: None,
+        vertical: None,
+        rule_locked: false,
+        legal_as_constraint: false,
+        composed_primary_role: None,
     };
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);
@@ -182,6 +192,11 @@ fn test_science_structuring() {
         detected_team: None,
         dynamic_subject: Some("Quantum Coherence Hypothesis".to_string()),
         baseline_knowledge: None,
+        goal_intent: None,
+        vertical: None,
+        rule_locked: false,
+        legal_as_constraint: false,
+        composed_primary_role: None,
     };
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);

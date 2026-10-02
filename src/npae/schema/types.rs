@@ -78,6 +78,8 @@ pub struct StructuredPrompt {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PromptRole {
     pub primary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secondary: Option<String>,
     pub expertise_domains: Vec<String>,
     pub persona_constraints: Vec<String>,
     #[serde(default)]

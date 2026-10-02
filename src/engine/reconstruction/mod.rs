@@ -22,19 +22,25 @@ impl TokenReconstructor {
         }
     }
 
-    pub fn run(&self, input: &str) -> ReconstructedInput {
+    pub fn run(&self, input: &str, scenario: Option<crate::classifier::signal::ScenarioSignal>) -> ReconstructedInput {
         // Step 1: Repetition scoring
         let deduplicated = self.deduplicator.process(input);
-        
+
         // Steps 2 & 3: Typo correction & Truncation completion
         let (resolved_tokens, ambiguities) = self.ambiguity_register.resolve(&deduplicated);
-        
+
         // Step 4: Semantic clustering
-        let clusters = self.cluster_mapper.group_into_clusters(&resolved_tokens);
-        
+        let mut weights = crate::engine::reconstruction::cluster_mapper::ClusterWeights::default();
+        if let Some(ref signal) = scenario {
+            if signal.is_usable() {
+                weights.apply_intent_class_bias(&signal.intent_class);
+            }
+        }
+        let clusters = self.cluster_mapper.group_into_clusters(&resolved_tokens, &weights);
+
         // Step 5: Schema slot inference
         let (slot_map, locks) = self.slot_inferencer.infer_slots(&clusters);
-        
+
         ReconstructedInput {
             clusters: slot_map,
             constraint_locks: locks,

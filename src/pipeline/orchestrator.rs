@@ -87,6 +87,16 @@ impl PipelineOrchestrator {
     /// Build orchestrator from shared schema priors — convenience factory.
     /// All 12 stage components are constructed internally with defaults.
     pub fn build(schema_priors: Arc<DashMap<String, u32>>, npae_config_handle: Arc<ConfigHandle>, ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>) -> Self {
+        Self::build_with_pool(schema_priors, npae_config_handle, ory_engine, None)
+    }
+
+    /// Build orchestrator with an optional database pool for Stage 4 schema lookup.
+    pub fn build_with_pool(
+        schema_priors: Arc<DashMap<String, u32>>,
+        npae_config_handle: Arc<ConfigHandle>,
+        ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
+        pool: Option<sqlx::SqlitePool>,
+    ) -> Self {
         let predictive = PredictiveCoding::new(schema_priors);
         Self {
             reconstructor: TokenReconstructor::new(),
@@ -95,7 +105,7 @@ impl PipelineOrchestrator {
             stage1: Stage1::new(),
             stage2: Stage2::new(predictive),
             stage3: Stage3::new(),
-            stage4: Stage4::new(),
+            stage4: Stage4::with_optional_pool(pool),
             stage5: Stage5::new(),
             field_validator: FieldTypeValidator::new(),
             _token_efficiency_scorer: TokenEfficiencyScorer::new(),
@@ -113,16 +123,18 @@ impl PipelineOrchestrator {
         &self,
         input: &str,
         session: &mut SessionHistory,
+        scenario: Option<crate::classifier::signal::ScenarioSignal>,
         forced_mode: Option<&str>,
         npae_config: Option<&crate::npae::schema::types::NpaeConfig>,
         enrichment: Option<crate::types::EnrichmentContext>,
     ) -> Result<OrchestratorResponse, Box<dyn std::error::Error>> {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
+        output.scenario = scenario;
         output.enrichment = enrichment.clone();
 
         // Stage -1: Token Reconstruction
-        let reconstructed = self.reconstructor.run(input);
+        let reconstructed = self.reconstructor.run(input, output.scenario.clone());
         output.constraint_locks = reconstructed.constraint_locks.clone();
         output.ambiguity_register = reconstructed.ambiguity_register.clone();
         output.input_structure_score = reconstructed.input_structure_score;
@@ -210,7 +222,7 @@ impl PipelineOrchestrator {
         // -- Legacy Routing (Balanced/Gentle) --
 
         // Stage 4: Schema filling (NULL Resolution)
-        self.stage4.run(&mut output);
+        self.stage4.run(&mut output).await;
 
         // Stage 4B: Field validation (before scope injection)
         let field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
@@ -243,7 +255,7 @@ impl PipelineOrchestrator {
             initial_response,
             initial_report,
             initial_corrections,
-        )?;
+        ).await?;
 
         let final_response = stage6b_out.final_response;
         let guard_report = stage6b_out.guard_report;

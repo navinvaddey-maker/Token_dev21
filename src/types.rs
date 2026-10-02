@@ -160,16 +160,30 @@ pub struct AlgorithmOutput {
     pub scope_injections: Vec<String>,
     pub scoring_result: Option<ScoringResult>,
     pub correction_cycle: Option<CorrectionCycle>,
+    pub scenario: Option<crate::classifier::signal::ScenarioSignal>,
     /// When true, Stage 6A emits a compact prompt (correction for low TES).
     #[serde(default)]
     pub force_compact_generation: bool,
     pub enrichment: Option<EnrichmentContext>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RagChunk {
+    pub domain_tag: String,
+    pub content: String,
+    pub metadata: Option<ChunkMetadata>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChunkMetadata {
+    pub page_number: Option<u32>,
+    pub source_file: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EnrichmentContext {
     pub cluster_vocab: Option<String>,
-    pub rag_chunks: Option<String>,
+    pub rag_chunks: Option<Vec<RagChunk>>,
 }
 
 /// Unified response enum for the PipelineOrchestrator

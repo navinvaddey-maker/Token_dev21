@@ -1,8 +1,10 @@
 pub mod algorithms;
 pub mod api;
 pub mod behavior;
+pub mod classifier;
 pub mod correction;
 pub mod data;
+pub mod db;
 pub mod domain;
 pub mod engine;
 pub mod errors;
@@ -32,5 +34,5 @@ pub struct AppState {
     pub ory_engine: Arc<Mutex<crate::npae::ory::OryEngine>>,
     pub rag_store: Arc<crate::rag::store::RagStore>,
     pub sessions: Arc<dashmap::DashMap<String, crate::session::SessionHistory>>,
+    pub embedding_engine: Arc<crate::rag::embeddings::EmbeddingEngine>,
 }
-

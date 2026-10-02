@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    classifier::ScenarioClassifier,
     data::Repository,
     engine::evaluation,
     errors::AppError,
@@ -160,7 +161,7 @@ pub async fn compress_new(
             if !retrieved_chunks.is_empty() {
                 let mut rag_section = String::new();
                 rag_section.push_str("\n--- Retrieved Knowledge ---\n");
-                for res in retrieved_chunks {
+                for res in &retrieved_chunks {
                     let page_str = res.chunk.metadata.as_ref()
                         .and_then(|m| m.page_number)
                         .map(|p| format!(", Page {}", p))
@@ -174,10 +175,28 @@ pub async fn compress_new(
                 }
                 rag_section.push_str("--- End Retrieved Knowledge ---\n");
 
-                enrichment.rag_chunks = Some(rag_section);
+                                    let chunks = retrieved_chunks.into_iter().map(|res| crate::types::RagChunk {
+                        domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
+                        content: res.chunk.content,
+                        metadata: Some(crate::types::ChunkMetadata {
+                            page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
+                            source_file: res.document_filename,
+                        }),
+                    }).collect();
+                    enrichment.rag_chunks = Some(chunks);
             }
         }
     }
+
+    // 2. Scenario Classification (NEW)
+    let scenario = ScenarioClassifier::new(&state.pool, &state.embedding_engine)
+        .classify_query_into_scenario(&req.raw_text)
+        .await;
+
+    tracing::debug!(
+        "ScenarioClassifier result: {:?}",
+        scenario.as_ref().map(|s| (&s.domain, &s.intent_class, s.confidence))
+    );
 
     // 3. Run the 7-stage pipeline (0A → 6B)
     // Multi-turn context carryover via persistent AppState.sessions
@@ -196,7 +215,7 @@ pub async fn compress_new(
 
     let orchestrator_response = state
         .pipeline
-        .process(&req.raw_text, &mut session, req.mode.as_deref(), Some(&npae_cfg), Some(enrichment))
+        .process(&req.raw_text, &mut session, scenario, req.mode.as_deref(), Some(&npae_cfg), Some(enrichment))
         .await
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
 

@@ -69,7 +69,21 @@ impl Stage6a {
         if let Some(enrichment) = &schema_filled.enrichment {
             if let Some(rag_chunks) = &enrichment.rag_chunks {
                 if !parts.iter().any(|p| p.contains("Source Knowledge:") || p.contains("Retrieved Knowledge:")) {
-                    parts.push(rag_chunks.clone());
+                    let mut text = String::new();
+                    for chunk in rag_chunks {
+                        let page_str = chunk.metadata.as_ref()
+                            .and_then(|m| m.page_number)
+                            .map(|p| format!(", Page {}", p))
+                            .unwrap_or_default();
+                        let source_str = chunk.metadata.as_ref()
+                            .map(|m| format!("[Source: {}{}]\n", m.source_file, page_str))
+                            .unwrap_or_default();
+                        text.push_str(&format!("{}{}\n\n", source_str, chunk.content));
+                    }
+                    let text = text.trim();
+                    if !text.is_empty() {
+                        parts.push(format!("**Retrieved Knowledge:**\n{}", text));
+                    }
                 }
             }
         }

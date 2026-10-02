@@ -16,6 +16,13 @@ pub fn generate_role(
     domain_taxonomy: &[DomainTaxonomy],
     roles: &[RoleRule]
 ) -> String {
+    if let Some(verdict) = crate::classifier::intent_rule::resolve_prompt_rules(raw) {
+        return verdict.primary_role.to_string();
+    }
+    if let Some(ref composed) = profile.composed_primary_role {
+        return composed.clone();
+    }
+
     // Resolve any alias → canonical domain name so all downstream lookups are consistent.
     let canonical_domain = super::config::normalize_domain(&profile.domain, domain_taxonomy);
     let lower = raw.to_lowercase();
@@ -280,7 +287,7 @@ fn extract_domain_noun(raw: &str) -> Option<String> {
     None 
 }
 
-fn to_title_case(s: &str) -> String {
+pub(crate) fn to_title_case(s: &str) -> String {
     s.split(|c: char| c == '-' || c == '_')
         .map(|word| {
             let mut chars = word.chars();

@@ -5,8 +5,8 @@ Project    : token_compress_engine
 Stack      : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale      : Monolithic service, designed for millions of records
 Owner      : navinvaddey
-Version    : 3.0.0 (Architecture Reality Audit)
-Last updated : 2026-09-24 by Antigravity (Claude Sonnet 4.6 Thinking)
+Version    : 3.1.0 (Deterministic Intent × Vertical Composition & Reality Audit)
+Last updated : 2026-10-02 by Antigravity (Gemini 3.8 Flash)
 Status     : Ground-truth comparison of v1/v2 SPEC vs actual implemented code
 ```
 
@@ -80,34 +80,63 @@ Mode = Balanced | Gentle → Legacy path
 
 **Both paths enforce identical quality guardrails, Scoring (TES, SFS, SCS), HallucinationGuard, and Stage 6B correction iterations.**
 
+### 1.4 Scenario Classification & Intent × Vertical Role Composition (Deterministic Rules & Gated Fallback)
+
+To eliminate domain and role hallucination (e.g. classifying venture building in pharma as software/finance development, or personal wealth asks as generic builders), a deterministic Intent × Vertical rule layer executes prior to and inside NPAE / Pipeline processing:
+
+```
+raw prompt
+    │
+    ├─ 1. Intent detect (rules, synonym classes: GoalIntent::WealthBuild, GoalIntent::LegalQuery)
+    ├─ 2. Vertical detect (rules, synonym classes: pharma, fintech, energy, real-estate, software, ecommerce)
+    ├─ 3. Role compose: generic primary = f(intent), secondary = vertical
+    │       - primary: "Business Strategist" (WealthBuild), "Legal Advisor" (LegalQuery)
+    │       - secondary: "Pharma", "Fintech", "Real Estate", etc.
+    ├─ 4. Precedence: legal owns role only if question is legal; regulations on wealth paths act as constraints
+    │       - wealth + FDA/licensing → primary="Business Strategist", legal_as_constraint=true
+    └─ 5. Fallback: hash/embedding classifier + margin gate (HASH_MARGIN_GAP = 0.05)
+            → emit domain  OR  abstain (None / "general")
+```
+
+The resulting `ScenarioSignal` and NPAE rule profile inject:
+- **`primary_role`**: Generic intent-driven role scaling across N verticals.
+- **`secondary`**: Title-cased industry vertical (surfaced in `PromptRole.secondary` and `# ROLE:` rendering).
+- **`persona_anchor`**: Specialized vertical persona anchor (e.g. `"Senior Business Strategist specializing in Pharma venture building, capital strategy, and industry structure. Finance is a sub-skill, not the owning frame."`).
+- **`legal_as_constraint`**: Keeps legal/regulatory lenses as constraints without hijacking the primary role.
+- **Fast-path stage routing**:
+  - `Stage 0B`: Uses `(domain, task_type)` to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
+  - `Stage 4`: Injects composed primary role, secondary domain, and constraint locks.
+
 ---
 
 ## 2. Full Component Map (What Really Exists)
 
 ```
 User → API (Axum) → Auth+RateLimit → Domain
-                                          │
-                                    PipelineOrchestrator
-                                          │
-                              Stage -1: TokenReconstructor
-                              Stage 0A: Normalization
-                              Stage 0B: Topology
-                              Stage 1: Signal Reduction
-                              Stage 2: Mode Router ──────────────────────┐
-                                    │                                    │
-                              Mode: Balanced/Gentle               Mode: Aggressive
-                              Stage 3: Context Mgmt               NPAE path:
-                              Stage 4: Schema Filling               compression::pipeline
-                              Stage 4B: Field Validation            AggressiveEngine::run()
-                              Stage 5: Scope Injection              OryEngine (pattern memory)
-                              Stage 6A: Generation                  ↓
-                              HallucinationGuard (tri-layer)   AggressiveResponse
-                              Scoring: TES+SFS+SCS             (no guard, no scoring)
-                              Stage 6B: Correction (inline)
-                                    │
-                              LearningEngine.update()
-                              OryEngine.record_outcome()
-                              SQLite write
+                                       ├─ RAG Retrieval (when rag_enabled)
+                                       ├─ ScenarioClassifier (Intent × Vertical Rule + Hash/Margin)
+                                       │    └─ ScenarioSignal (domain, task_type, primary_role, secondary, rule_locked)
+                                       └─ PipelineOrchestrator
+                                             │
+                                       Stage -1: TokenReconstructor
+                                       Stage 0A: Normalization
+                                       Stage 0B: Topology (fast-path via ScenarioSignal)
+                                       Stage 1: Signal Reduction
+                                       Stage 2: Mode Router ──────────────────────┐
+                                             │                                    │
+                                       Mode: Balanced/Gentle               Mode: Aggressive
+                                       Stage 3: Context Mgmt               NPAE path:
+                                       Stage 4: Schema Filling               compression::pipeline
+                                       Stage 4B: Field Validation            AggressiveEngine::run()
+                                       Stage 5: Scope Injection              OryEngine (pattern memory)
+                                       Stage 6A: Generation                  ↓
+                                       HallucinationGuard (tri-layer)   AggressiveResponse
+                                       Scoring: TES+SFS+SCS             (fully guarded & scored)
+                                       Stage 6B: Correction (inline)
+                                             │
+                                       LearningEngine.update()
+                                       OryEngine.record_outcome()
+                                       SQLite write
 ```
 
 ---
@@ -190,6 +219,7 @@ User compresses prompt
 | CorrectionCycle | Real correction | Targeted per-axis | **Implemented (GAP-014 Fixed)**: `calculate_improvement_delta()` calculates empirical pre- vs post-correction score deltas. |
 | Learning loop | Hebbian/Competitive | Same | FeedbackDetector wired (GAP-017 fixed). LearningEngine functional. |
 | CONSTRAINT_LOCK | Stage 1 | All stages | Stored in `output.constraint_locks`. Enforced in Stage 1 & validated downstream. |
+| Role & Domain Classification | None / Heuristic | Stage 0B Pattern | **Implemented (GAP-41)**: 5-Layer Intent × Vertical composition (`intent_rule.rs`) + Gated Centroid Embedding Fallback (`detect_domain` + `ScenarioClassifier`) |
 
 ---
 
@@ -202,6 +232,7 @@ User compresses prompt
 | GAP-33 | Aggressive path exits before Scoring, HallucinationGuard, SCS | ✅ **RESOLVED** | `npae/aggressive/engine.rs` — Guardrails & 6B loop added |
 | GAP-014 / GAP-34 | CorrectionCycle placeholder | ✅ **RESOLVED** | `types.rs` — Replaced with `calculate_improvement_delta()` |
 | GAP-040 | Un-wired legacy pipeline drafts | ✅ **RESOLVED** | `orchestrator.rs` marked canonical engine; drafts deprecated |
+| GAP-41 | Role mismatch across vertical boundaries (e.g. venture asks in pharma mapped to dev roles) | ✅ **RESOLVED** | `classifier/intent_rule.rs`, `npae/aggressive/role.rs`, `structurer.rs` |
 | GAP-35 | OryEngine.process() called on Aggressive path but result not used for output routing | 🟠 High | `npae/aggressive/engine.rs` |
 | GAP-36 | HallucinationGuard remediation is hardcoded string replacement, not semantic | 🟠 High | `npae/hallucination/guard.rs:62-78` |
 | GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | 🟡 Medium | `rag/ingest.rs:240` |
@@ -384,4 +415,13 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - GAP-32 FIXED: Replaced non-deterministic `DefaultHasher` in `npae/ory/embeddings.rs` with `crate::rag::embeddings::EmbeddingEngine` (shared 384-dim vector space).
     - GAP-33 FIXED: Implemented TES/SFS/SCS scoring, tri-layer `HallucinationGuard`, and Stage 6B correction loop for Aggressive mode in `engine.rs` & `orchestrator.rs`.
   All 130+ unit and integration tests passing cleanly.
+
+[2026-10-02] [Antigravity / Gemini 3.8 Flash] ARCHITECTURE_v3.md
+  Implemented & Audited Deterministic Intent × Vertical Role Composition & Scenario Classifier (GAP-41):
+    - 5-Layer Intent × Vertical pipeline implemented in `src/classifier/intent_rule.rs` and `src/classifier/mod.rs`.
+    - Wired `ScenarioClassifier` into `domain.rs`, feeding `ScenarioSignal` into `PipelineOrchestrator`.
+    - Threaded `ScenarioSignal` through Stage 0B (topology fast-path) and Stage 4 (schema filling).
+    - Integrated rule-based role composition into NPAE `extract_with_config`, `generate_role`, and `structurer.rs` with `PromptRole.secondary` and `persona_anchor`.
+    - Gated centroid embedding fallback in `detect_domain` with `HASH_MARGIN_GAP = 0.05` preserving canonical domain fallback tables.
+    - All unit and integration tests passing cleanly.
 ```

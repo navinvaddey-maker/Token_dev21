@@ -187,6 +187,11 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         if is_role_valid {
             out.push_str(&format!("# ROLE: {}\n", prompt.role.primary.to_uppercase()));
         }
+        if let Some(ref secondary) = prompt.role.secondary {
+            if !secondary.is_empty() {
+                out.push_str(&format!("Secondary domain: {}\n", secondary));
+            }
+        }
         if !prompt.role.persona_anchor.is_empty() {
             out.push_str(&format!("Profile: {}\n", prompt.role.persona_anchor));
         }
@@ -413,8 +418,16 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Derive appropriate tone from domain + knowledge level
     let tone = derive_tone(profile);
 
+    let rule_verdict = crate::classifier::intent_rule::resolve_prompt_rules(raw);
+
     // Derive high-resolution persona anchor
-    let persona_anchor = derive_persona_anchor(&profile.domain, &role_primary, config);
+    let persona_anchor = if let Some(ref v) = rule_verdict {
+        v.persona_anchor()
+    } else {
+        derive_persona_anchor(&profile.domain, &role_primary, config)
+    };
+    let secondary = rule_verdict.as_ref().and_then(|v| v.display_secondary())
+        .or_else(|| profile.vertical.as_deref().map(super::role::to_title_case));
 
     // GAP-13: Derive length bounds from input complexity and intent
     let word_count = raw.split_whitespace().count();
@@ -431,28 +444,40 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     Ok(StructuredPrompt {
         role: PromptRole {
             primary: role_primary,
+            secondary,
             expertise_domains: vec![profile.domain.clone()],
-            persona_constraints: match profile.domain.as_str() {
-                "software-engineering" | "devops-infra" => vec![
-                    "production_grade_only".into(),
-                    "no_placeholder_code".into(),
-                ],
-                "medical" | "pharma" => vec![
-                    "evidence_based_only".into(),
-                    "cite_sources_required".into(),
-                    "no_medical_advice_disclaimer".into(),
-                ],
-                "legal" => vec![
-                    "jurisdiction_aware".into(),
-                    "cite_statutes".into(),
-                ],
-                "creative" => vec![
-                    "maintain_narrative_voice".into(),
-                    "show_dont_tell".into(),
-                ],
-                _ => vec![
-                    "accurate_and_thorough".into(),
-                ],
+            persona_constraints: {
+                let mut constraints = match profile.domain.as_str() {
+                    "software-engineering" | "devops-infra" => vec![
+                        "production_grade_only".into(),
+                        "no_placeholder_code".into(),
+                    ],
+                    "medical" | "pharma" => vec![
+                        "evidence_based_only".into(),
+                        "cite_sources_required".into(),
+                        "no_medical_advice_disclaimer".into(),
+                    ],
+                    "legal" => vec![
+                        "jurisdiction_aware".into(),
+                        "cite_statutes".into(),
+                    ],
+                    "creative" => vec![
+                        "maintain_narrative_voice".into(),
+                        "show_dont_tell".into(),
+                    ],
+                    _ => vec![
+                        "accurate_and_thorough".into(),
+                    ],
+                };
+                if profile.legal_as_constraint || rule_verdict.as_ref().map(|v| v.legal_as_constraint).unwrap_or(false) {
+                    if !constraints.iter().any(|c| c == "jurisdiction_aware") {
+                        constraints.push("jurisdiction_aware".into());
+                    }
+                    if !constraints.iter().any(|c| c == "regulatory_compliance") {
+                        constraints.push("regulatory_compliance".into());
+                    }
+                }
+                constraints
             },
             persona_anchor,
         },

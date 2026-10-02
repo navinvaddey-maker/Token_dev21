@@ -50,6 +50,14 @@ async fn main() -> anyhow::Result<()> {
     // Run migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
 
+    let embedding_engine = Arc::new(token_compress_engine::rag::embeddings::EmbeddingEngine::new());
+
+    // Seed ScenarioClassifier archetypes
+    let classifier = token_compress_engine::classifier::ScenarioClassifier::new(&pool, &embedding_engine);
+    if let Err(e) = classifier.seed_archetype_vectors_on_startup().await {
+        tracing::error!("Failed to seed scenario archetypes: {:?}", e);
+    }
+
     let engine = Arc::new(Mutex::new(LearningEngine::new(pool.clone())));
 
     // Load NPAE unified config once at startup for high-performance memory access
@@ -61,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
     // The DashMap is shared across all requests — enables cross-request schema learning
     // (prediction error drops 20–35% over 10 turns on familiar topics).
     let schema_priors: Arc<DashMap<String, u32>> = Arc::new(DashMap::new());
-    let pipeline = Arc::new(PipelineOrchestrator::build(schema_priors, npae_config.clone(), ory_engine.clone()));
+    let pipeline = Arc::new(PipelineOrchestrator::build_with_pool(schema_priors, npae_config.clone(), ory_engine.clone(), Some(pool.clone())));
 
     // Spawn FileWatcher background task
     let watcher_config_handle = npae_config.clone();
@@ -127,6 +135,7 @@ async fn main() -> anyhow::Result<()> {
         ory_engine: ory_engine.clone(),
         rag_store,
         sessions,
+        embedding_engine,
     };
 
     let api_router = token_compress_engine::api::router(state);

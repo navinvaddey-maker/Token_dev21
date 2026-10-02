@@ -26,6 +26,26 @@ pub struct IntentProfile {
     pub detected_team:     Option<String>,
     pub dynamic_subject:   Option<String>,
     pub baseline_knowledge: Option<String>,
+    /// Goal intent from the deterministic rule layer (`wealth-building`, `legal-query`).
+    pub goal_intent: Option<String>,
+    /// Industry vertical, independent of primary role.
+    pub vertical: Option<String>,
+    /// When true, hash/Ory classifiers must not override domain or role.
+    pub rule_locked: bool,
+    /// Legal/regulatory is a constraint lens, not the owning role.
+    pub legal_as_constraint: bool,
+    /// Generic primary role composed by the rule layer.
+    pub composed_primary_role: Option<String>,
+}
+
+impl IntentProfile {
+    pub fn is_wealth_build(&self) -> bool {
+        self.goal_intent.as_deref() == Some("wealth-building")
+    }
+
+    pub fn is_legal_query(&self) -> bool {
+        self.goal_intent.as_deref() == Some("legal-query")
+    }
 }
 
 pub fn extract(repr: &CompressedRepr, raw: &str) -> Result<IntentProfile, String> {
@@ -39,8 +59,13 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
 
     let lower = raw.to_lowercase();
 
-    // Dynamic domain detection (10+ domains or loaded config)
-    let domain = detect_domain(raw, config);
+    // Rule layer first: intent × vertical. Hash domain is fallback only.
+    let rule = crate::classifier::intent_rule::resolve_prompt_rules(raw);
+    let domain = if let Some(ref verdict) = rule {
+        verdict.pipeline_domain().to_string()
+    } else {
+        detect_domain(raw, config)
+    };
 
     // Simplistic mapping: locate max in intent_vec
     let (max_idx, max_val) = repr.intent_vec.iter().enumerate()
@@ -91,6 +116,9 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
     let dynamic_subject = extract_subject(raw);
     let baseline_knowledge = extract_baseline(raw);
     let deliverable_type = detect_deliverable_type(&lower, &primary_intent, &domain);
+    if rule.as_ref().map(|v| v.intent) == Some(crate::classifier::intent_rule::GoalIntent::WealthBuild) {
+        primary_intent = IntentClass::Build;
+    }
 
     Ok(IntentProfile {
         primary_intent,
@@ -99,7 +127,7 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
         user_knowledge,
         temporal_scope,
         output_preference,
-        confidence: max_val,
+        confidence: if rule.is_some() { 0.95 } else { max_val },
         has_timeline,
         has_phases,
         has_validation,
@@ -109,6 +137,11 @@ pub fn extract_with_config(repr: &CompressedRepr, raw: &str, config: Option<&sup
         detected_team,
         dynamic_subject,
         baseline_knowledge,
+        goal_intent: rule.as_ref().map(|v| v.intent_class().to_string()),
+        vertical: rule.as_ref().and_then(|v| v.vertical.map(|s| s.to_string())),
+        rule_locked: rule.is_some(),
+        legal_as_constraint: rule.as_ref().map(|v| v.legal_as_constraint).unwrap_or(false),
+        composed_primary_role: rule.as_ref().map(|v| v.primary_role.to_string()),
     })
 }
 
@@ -145,81 +178,81 @@ use crate::npae::ory::embeddings::embed_text;
 /// Replaces heuristic keyword matching with semantic centroid comparison.
 fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> String {
     let prompt_vec = embed_text(raw);
-    let mut best_domain = "general";
-    let mut best_score = 0.05f32; // Minimum threshold for domain matching
+    let mut scored: Vec<(String, f32)> = Vec::new();
 
     if let Some(cfg) = config {
         for tax in &cfg.domain_taxonomy {
             if tax.keywords.is_empty() { continue; }
-            let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
-            for kw in &tax.keywords {
-                let kw_vec = embed_text(kw);
-                for i in 0..centroid.len() {
-                    centroid[i] += kw_vec[i];
-                }
-            }
-            if !tax.keywords.is_empty() {
-                for i in 0..centroid.len() {
-                    centroid[i] /= tax.keywords.len() as f32;
-                }
-            }
-            crate::npae::ory::math::l2_normalize(&mut centroid);
-
-            let similarity = cosine_similarity(&prompt_vec, &centroid);
-            let score = similarity * (tax.boost.max(1) as f32);
-            if score > best_score {
-                best_score = score;
-                best_domain = &tax.domain;
-            }
+            let score = centroid_similarity(&prompt_vec, &tax.keywords) * (tax.boost.max(1) as f32);
+            scored.push((tax.domain.clone(), score));
         }
-        return super::config::normalize_domain(best_domain, &cfg.domain_taxonomy).to_string();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let picked = pick_hash_domain(&scored);
+        return super::config::normalize_domain(&picked, &cfg.domain_taxonomy).to_string();
     }
 
-    // Centroids for each domain fallback — names MUST match unified.json canonical domain names.
-    // Use config::normalize_domain() at call-sites to resolve any legacy alias → canonical.
-    let domains = [
-        ("computers",              vec!["computer", "computing", "cpu", "processor", "memory", "kernel", "operating-system", "linux", "systems"]),
-        ("science",                vec!["science", "scientific", "physics", "chemistry", "biology", "experiment", "hypothesis", "research"]),
-        ("health",                 vec!["health", "healthcare", "wellness", "medical", "clinical", "patient", "vitality", "prevention"]),
-        ("nutrition",              vec!["nutritionist", "diet", "macro", "protein", "training", "nutrition", "supplement"]),
-        ("software",               vec!["code", "rust", "api", "backend", "software", "developer", "programming", "implementation"]),
-        ("business",               vec!["business", "startup", "revenue", "market", "strategy", "monetize", "pricing", "growth"]),
-        ("data-science",           vec!["data", "ml", "model", "prediction", "analysis"]),
-        ("education",              vec!["teach", "learn", "curriculum", "course", "pedagogy"]),
-        ("creative",               vec!["story", "novel", "plot", "fiction", "narrative"]),
-        ("health-fitness",         vec!["workout", "exercise", "health", "wellness", "fitness"]),
-        ("legal",                  vec!["contract", "legal", "compliance", "law", "attorney"]),
-        ("marketing",              vec!["marketing", "brand", "campaign", "seo", "audience"]),
-        ("finance",                vec!["money", "earn", "income", "wealth", "salary", "investment", "stock", "portfolio", "banking", "finance", "cashflow", "million", "millions", "billion", "dollars", "rich"]),
-        ("devops",                 vec!["pipeline", "infrastructure", "cloud", "aws", "devops"]),
-        ("ai-ml",                  vec!["llm", "neural", "transformer", "alignment", "ai"]),
-        ("medical",                vec!["medical", "patient", "doctor", "hospital", "healthcare"]),
-        ("cybersecurity",          vec!["security", "hacking", "firewall", "encryption", "threat"]),
-        ("real-estate",            vec!["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
-        ("workplace-productivity", vec!["productivity", "culture", "collaboration", "burnout"]),
-        ("career-growth",           vec!["career", "become", "transition", "professional", "job", "promotion", "certification", "credential", "salary", "role", "position"]),
+    let domains: &[(&str, &[&str])] = &[
+        ("computers", &["computer", "computing", "cpu", "processor", "memory", "kernel", "operating-system", "linux", "systems"]),
+        ("science", &["science", "scientific", "physics", "chemistry", "biology", "experiment", "hypothesis", "research"]),
+        ("health", &["health", "healthcare", "wellness", "medical", "clinical", "patient", "vitality", "prevention"]),
+        ("nutrition", &["nutritionist", "diet", "macro", "protein", "training", "nutrition", "supplement"]),
+        ("software", &["code", "rust", "api", "backend", "software", "developer", "programming", "implementation"]),
+        ("business", &["business", "startup", "revenue", "market", "strategy", "monetize", "pricing", "growth"]),
+        ("data-science", &["data", "ml", "model", "prediction", "analysis"]),
+        ("education", &["teach", "learn", "curriculum", "course", "pedagogy"]),
+        ("creative", &["story", "novel", "plot", "fiction", "narrative"]),
+        ("health-fitness", &["workout", "exercise", "health", "wellness", "fitness"]),
+        ("legal", &["contract", "legal", "compliance", "law", "attorney"]),
+        ("marketing", &["marketing", "brand", "campaign", "seo", "audience"]),
+        ("finance", &["money", "earn", "income", "wealth", "salary", "investment", "stock", "portfolio", "banking", "finance", "cashflow", "million", "millions", "billion", "dollars", "rich"]),
+        ("devops", &["pipeline", "infrastructure", "cloud", "aws", "devops"]),
+        ("ai-ml", &["llm", "neural", "transformer", "alignment", "ai"]),
+        ("medical", &["medical", "patient", "doctor", "hospital", "healthcare"]),
+        ("cybersecurity", &["security", "hacking", "firewall", "encryption", "threat"]),
+        ("real-estate", &["realtor", "property", "estate", "housing", "mortgage", "brokerage", "agent"]),
+        ("workplace-productivity", &["productivity", "culture", "collaboration", "burnout"]),
+        ("career-growth", &["career", "become", "transition", "professional", "job", "promotion", "certification", "credential", "salary", "role", "position"]),
     ];
 
     for (name, keywords) in domains {
-        // Simple centroid: average of keyword embeddings
-        let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
-        for kw in keywords {
-            let kw_vec = embed_text(kw);
-            for i in 0..centroid.len() {
-                centroid[i] += kw_vec[i];
-            }
-        }
-        crate::npae::ory::math::l2_normalize(&mut centroid);
+        let kw: Vec<String> = keywords.iter().map(|s| (*s).to_string()).collect();
+        scored.push(((*name).to_string(), centroid_similarity(&prompt_vec, &kw)));
+    }
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    pick_hash_domain(&scored)
+}
 
-        let similarity = cosine_similarity(&prompt_vec, &centroid);
-        if similarity > best_score {
-            best_score = similarity;
-            best_domain = name;
+fn centroid_similarity(prompt_vec: &[f32], keywords: &[String]) -> f32 {
+    let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
+    for kw in keywords {
+        let kw_vec = embed_text(kw);
+        for i in 0..centroid.len() {
+            centroid[i] += kw_vec[i];
         }
     }
-
-    best_domain.to_string()
+    if !keywords.is_empty() {
+        let n = keywords.len() as f32;
+        for v in centroid.iter_mut() {
+            *v /= n;
+        }
+    }
+    crate::npae::ory::math::l2_normalize(&mut centroid);
+    cosine_similarity(prompt_vec, &centroid)
 }
+
+fn pick_hash_domain(scored: &[(String, f32)]) -> String {
+    if scored.is_empty() {
+        return "general".to_string();
+    }
+    let top = scored[0].1;
+    let second = scored.get(1).map(|s| s.1);
+    if crate::classifier::intent_rule::hash_margin_allows(top, second, 0.05) {
+        scored[0].0.clone()
+    } else {
+        "general".to_string()
+    }
+}
+
 
 /// Multi-word noun-phrase extraction — extracts the most specific subject from ANY domain.
 /// Examples:

@@ -39,9 +39,29 @@ impl TopologyClassifier {
     /// Classify the topology of a prompt and update the AlgorithmOutput
     /// Returns the classified topology for chaining if needed
     pub fn classify(&self, prompt: &str, out: &mut AlgorithmOutput) -> PromptTopology {
-        let topology = Self::detect_topology(prompt);
+        let topology = if let Some(ref signal) = out.scenario {
+            if signal.confidence >= 0.75 {
+                self.derive_topology_from_domain_and_task(&signal.domain, &signal.task_type)
+            } else {
+                Self::detect_topology(prompt)
+            }
+        } else {
+            Self::detect_topology(prompt)
+        };
         out.topology = Some(topology.clone());
         topology
+    }
+
+    /// Maps known domain+task combinations to their expected topology.
+    /// Used as a fast-path when scenario confidence >= 0.75.
+    fn derive_topology_from_domain_and_task(&self, domain: &str, task_type: &str) -> PromptTopology {
+        match (domain, task_type) {
+            ("real-estate", "creation")  => PromptTopology::Hierarchical,
+            ("legal",        "analysis") => PromptTopology::Network,
+            ("finance",      "analysis") => PromptTopology::Hierarchical,
+            (_,         "troubleshooting") => PromptTopology::Linear,
+            _                            => PromptTopology::Flat,
+        }
     }
 
     /// Detect topology from prompt text using pattern matching

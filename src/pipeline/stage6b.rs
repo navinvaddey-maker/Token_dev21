@@ -35,7 +35,7 @@ impl Stage6b {
 
     /// Executes Stage 6B targeted correction loop.
     /// Iterates until TES, SFS, and SCS score thresholds (>= 6.0) are satisfied or MAX_CORRECTION_CYCLES is reached.
-    pub fn run(
+    pub async fn run(
         &self,
         input: &str,
         output: &mut AlgorithmOutput,
@@ -88,7 +88,7 @@ impl Stage6b {
 
             corrections_applied.extend(apply_targeted_correction(output, &axis));
             if axis != ScoreAxis::TaskEssential {
-                stage4.run(output);
+                stage4.run(output).await;
                 stage5.run(output);
             }
 
