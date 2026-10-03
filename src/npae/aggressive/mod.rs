@@ -14,3 +14,5 @@ pub mod enricher;
 pub mod config;
 pub mod watcher;
 pub mod metrics;
+pub mod grammar;
+pub mod rag_context;

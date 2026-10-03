@@ -65,6 +65,8 @@ dashmap    = { version = "5",  features = ["serde"] }            # concurrent Ha
 rayon      = "1"            # parallel salience scoring (sparse coding)
 lazy_static = "1.4"
 phf        = { version = "0.8", features = ["macros"] }          # perfect hash maps for domain phrase lookup
+harper-core = "2.11"
+
 
 # RAG dependencies
 pdf-extract = "0.7"

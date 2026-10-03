@@ -395,6 +395,33 @@ async fn npae_aggressive(
 ) -> Result<axum::response::Response, AppError> {
     let empty_cfg = crate::npae::schema::types::NpaeConfig { ambiguity_threshold: None, max_questions: None, confidence_threshold: None, skip_stage: None };
     let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
+
+    let mut enrichment = crate::types::EnrichmentContext::default();
+    if req.rag_enabled.unwrap_or(false) {
+        let history_id = uuid::Uuid::new_v4().to_string();
+        let query = crate::rag::types::RetrievalQuery {
+            query_text: req.prompt.clone(),
+            user_id: "default_user".to_string(),
+            document_ids: req.rag_document_ids.clone(),
+            top_k: req.rag_top_k.unwrap_or(5),
+            min_similarity: 0.25,
+        };
+        let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
+        if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
+            if !retrieved_chunks.is_empty() {
+                let chunks = retrieved_chunks.into_iter().map(|res| crate::types::RagChunk {
+                    domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
+                    content: res.chunk.content,
+                    metadata: Some(crate::types::ChunkMetadata {
+                        page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
+                        source_file: res.document_filename,
+                    }),
+                }).collect();
+                enrichment.rag_chunks = Some(chunks);
+            }
+        }
+    }
+
     let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
         .map_err(|e| AppError::Internal(e.to_string()))?;
         
@@ -412,11 +439,13 @@ async fn npae_aggressive(
         state.ory_engine.clone(),
         &structurer,
         &crate::types::ReconstructedInput::default(),
+        Some(&enrichment),
     )
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
+
 
 async fn npae_hallucination_check(
     State(_state): State<AppState>,

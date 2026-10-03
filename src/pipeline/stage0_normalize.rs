@@ -9,6 +9,13 @@ lazy_static! {
     /// Domain vocabulary mapping common misspellings to correct terms
     static ref DOMAIN_VOCAB: HashMap<String, String> = {
         let mut m = HashMap::new();
+        m.insert("dharma".to_string(), "pharma".to_string());
+        m.insert("dhrama".to_string(), "pharma".to_string());
+        m.insert("billionaier".to_string(), "billionaire".to_string());
+        m.insert("billionaiers".to_string(), "billionaires".to_string());
+        m.insert("farmaceutical".to_string(), "pharmaceutical".to_string());
+        m.insert("biotak".to_string(), "biotech".to_string());
+        m.insert("softwear".to_string(), "software".to_string());
         m.insert("taslk".to_string(), "task".to_string());
         m.insert("deliverrable".to_string(), "deliverable".to_string());
         m.insert("contex".to_string(), "context".to_string());
@@ -83,8 +90,19 @@ impl NormalizationPrePass {
             }
         }
 
-        // 1. Typo correction using domain vocabulary
+        // 1. Grammar & Spelling Correction via Harper-Core (safely preserving numbers/dates/units)
+        let (grammar_corrected, grammar_edits) = crate::npae::aggressive::grammar::GrammarCorrector::correct(&normalized);
+        if !grammar_edits.is_empty() {
+            normalized = grammar_corrected;
+            for edit in &grammar_edits {
+                applied_rules.push(format!("grammar:{}", edit.original));
+            }
+            corrections.extend(grammar_edits);
+        }
+
+        // 1b. Typo correction using domain vocabulary
         for (typo, fixed) in DOMAIN_VOCAB.iter() {
+
             if normalized.to_lowercase().contains(typo) {
                 let pattern = format!(r"\b{}\b", regex::escape(typo));
                 if let Ok(re) = Regex::new(&pattern) {

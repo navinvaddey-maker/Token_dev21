@@ -1,7 +1,14 @@
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::AmbiguityAnalysis;
 
-pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::ReconstructedInput) -> Result<AmbiguityAnalysis, String> {
+use super::rag_context::DerivedRagContext;
+
+pub fn score(
+    repr: &CompressedRepr,
+    raw: &str,
+    reconstructed: &crate::types::ReconstructedInput,
+    derived_rag: Option<&DerivedRagContext>,
+) -> Result<AmbiguityAnalysis, String> {
     let mut gap_zones = Vec::new();
     let mut score = 0.0;
 
@@ -10,7 +17,15 @@ pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::Rec
         let reg_score = (reconstructed.ambiguity_register.len() as f32 * 0.15).min(0.5);
         score += reg_score;
         for flag in &reconstructed.ambiguity_register {
-            gap_zones.push(format!("structural_ambiguity: {}", flag.reason));
+            let gap_str = format!("structural_ambiguity: {}", flag.reason);
+            // Skip gap zone if RAG facts cover this specific gap
+            if let Some(rag) = derived_rag {
+                if rag.covered_gaps.contains(&gap_str) || rag.covered_gaps.contains(&flag.reason) {
+                    score -= (reg_score * 0.5).min(score);
+                    continue;
+                }
+            }
+            gap_zones.push(gap_str);
         }
     }
 
@@ -25,8 +40,18 @@ pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::Rec
 
     let word_count = raw.split_whitespace().count();
     if word_count < 10 {
-        score += 0.2;
-        gap_zones.push("prompt_too_short".into());
+        if let Some(rag) = derived_rag {
+            if !rag.facts.is_empty() {
+                // RAG facts supply sufficient context, reduce short prompt penalty
+                score += 0.05;
+            } else {
+                score += 0.2;
+                gap_zones.push("prompt_too_short".into());
+            }
+        } else {
+            score += 0.2;
+            gap_zones.push("prompt_too_short".into());
+        }
     } else if word_count > 40 {
         score -= 0.15;
     }
@@ -37,8 +62,17 @@ pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::Rec
     }
 
     if repr.intent_vec.is_empty() {
-        score += 0.3;
-        gap_zones.push("domain_context_missing".into());
+        if let Some(rag) = derived_rag {
+            if rag.covered_gaps.contains("domain_context_missing") || !rag.facts.is_empty() {
+                score += 0.05;
+            } else {
+                score += 0.3;
+                gap_zones.push("domain_context_missing".into());
+            }
+        } else {
+            score += 0.3;
+            gap_zones.push("domain_context_missing".into());
+        }
     } else {
         let max_intent = repr.intent_vec.iter().fold(0.0f32, |a, &b| a.max(b));
         let min_intent = repr.intent_vec.iter().fold(1.0f32, |a, &b| a.min(b));
@@ -57,3 +91,4 @@ pub fn score(repr: &CompressedRepr, raw: &str, reconstructed: &crate::types::Rec
         gap_zones,
     })
 }
+

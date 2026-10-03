@@ -1,10 +1,13 @@
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::{NpaeConfig, StructuredPromptResponse, CompressionMeta, ProcessingMeta};
 use std::time::Instant;
+use super::rag_context::DerivedRagContext;
+use super::grammar::GrammarCorrector;
 
 pub struct AggressiveEngine;
 
 impl AggressiveEngine {
+
     pub async fn run(
         raw: &str,
         repr: &CompressedRepr,
@@ -13,14 +16,21 @@ impl AggressiveEngine {
         ory_engine: std::sync::Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
         structurer_impl: &dyn super::structurer::Structurer,
         reconstructed: &crate::types::ReconstructedInput,
+        enrichment: Option<&crate::types::EnrichmentContext>,
     ) -> Result<StructuredPromptResponse, String> {
         let request_id = uuid::Uuid::new_v4().to_string();
         let t_start = Instant::now();
 
-        // Isolate the actual user request from the RAG chunks and semantic context
-        let (_, _, user_prompt) = super::structurer::split_raw_input(raw);
+        // 0. Isolate prompt and run grammar/spelling correction (preserving numbers/dates/units)
+        let (_, _, raw_user_prompt) = super::structurer::split_raw_input(raw);
+        let (user_prompt, _grammar_corrections) = GrammarCorrector::correct(&raw_user_prompt);
 
-        // 1. Ory Engine: Meta-Orchestration and Deep Learning (using isolated prompt)
+        // Derive RAG context (250 token fact budget, repetition-free, no source citations)
+        let derived_rag = enrichment
+            .and_then(|e| e.rag_chunks.as_ref())
+            .map(|chunks| DerivedRagContext::derive(chunks, &user_prompt, 250));
+
+        // 1. Ory Engine: Meta-Orchestration and Deep Learning (using corrected prompt)
         let mut ory_lock = ory_engine.lock().await;
         let config_guard = config_handle.read();
         let ory_result = ory_lock.process(&user_prompt, &config_guard).map_err(|e| e.to_string())?;
@@ -43,7 +53,6 @@ impl AggressiveEngine {
         }
 
         // Only override if Ory confidence exceeds aggressive by significant margin (0.15)
-        // This prevents low-confidence Ory predictions from overriding high-confidence aggressive predictions
         if ory_result.intent.confidence_score > profile.confidence + 0.15 {
             if !domain_agreement {
                 tracing::info!(
@@ -62,12 +71,18 @@ impl AggressiveEngine {
         let mut router = super::resolver::StructurerRouter::new(resolver);
         let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
 
-        // 2. Build structured prompt (using isolated prompt so inference isn't confused by RAG chunks)
-        let structured = super::structurer::build(&profile, &user_prompt, &resolved_prompt, Some(&config_guard), reconstructed)?;
+        // 2. Build structured prompt with derived RAG facts in context background
+        let structured = super::structurer::build(
+            &profile,
+            &user_prompt,
+            &resolved_prompt,
+            Some(&config_guard),
+            reconstructed,
+            derived_rag.as_ref(),
+        )?;
 
-
-        // 3. Score ambiguity
-        let amb = super::ambiguity::score(repr, &user_prompt, reconstructed)?;
+        // 3. Score ambiguity (accounting for gaps resolved by RAG facts)
+        let amb = super::ambiguity::score(repr, &user_prompt, reconstructed, derived_rag.as_ref())?;
         let threshold = cfg.ambiguity_threshold.unwrap_or(0.65);
 
         // 4. Generate domain-aware questions if threshold exceeded
@@ -81,12 +96,23 @@ impl AggressiveEngine {
         let aggressive_ms = t_start.elapsed().as_millis() as u64;
 
         // Render final optimized prompt for UI
-        let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions, raw);
+        let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
         
-        // Post-generation validation using Hallucination Guard
+        // Post-generation validation using Hallucination Guard (including RAG facts as trusted context)
         let guard_cfg = &structured.hallucination_guard;
         let mut final_prompt = optimized_prompt;
-        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg)
+        
+        let guard_source_text = if let Some(ref rag) = derived_rag {
+            if !rag.facts.is_empty() {
+                format!("{}\nContext Facts: {}", raw, rag.facts.join(". "))
+            } else {
+                raw.to_string()
+            }
+        } else {
+            raw.to_string()
+        };
+
+        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg)
             .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
                 passed: true,
                 layers: [
@@ -100,13 +126,14 @@ impl AggressiveEngine {
         // Trigger targeted correction if HallucinationGuard failed
         if !guard_report.passed {
             final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
-            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg) {
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg) {
                 guard_report = new_report;
             }
         }
         
+        let rag_tokens = derived_rag.as_ref().map(|r| r.tokens_added).unwrap_or(0);
         // Initial scoring calculation for Aggressive mode
-        let mut scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions);
+        let mut scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions, rag_tokens);
 
         // Stage 6B: Quality Guardrails & Targeted Correction Loop
         let max_correction_cycles = 3;
@@ -118,7 +145,7 @@ impl AggressiveEngine {
                 match axis {
                     crate::types::ScoreAxis::TaskEssential => {
                         // TES low: Strip non-essential questions / render crisp compact prompt
-                        final_prompt = super::structurer::render_crisp_prompt(&structured, &[], raw);
+                        final_prompt = super::structurer::render_crisp_prompt(&structured, &[], &user_prompt);
                     }
                     crate::types::ScoreAxis::SchemaFidelity => {
                         // SFS low: Remediate structural omissions
@@ -126,17 +153,17 @@ impl AggressiveEngine {
                     }
                     crate::types::ScoreAxis::SemanticCompleteness => {
                         // SCS low: Ensure questions and constraints are fully rendered
-                        final_prompt = super::structurer::render_crisp_prompt(&structured, &questions, raw);
+                        final_prompt = super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
                     }
                 }
             } else if !guard_report.passed {
                 final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
             }
 
-            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, raw, guard_cfg) {
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg) {
                 guard_report = new_report;
             }
-            scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions);
+            scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions, rag_tokens);
         }
 
         // Final token accounting for UI
@@ -172,19 +199,23 @@ impl AggressiveEngine {
     }
 }
 
+
 fn compute_aggressive_scoring(
     raw: &str,
     final_prompt: &str,
     structured: &crate::npae::schema::types::StructuredPrompt,
     amb: &crate::npae::schema::types::AmbiguityAnalysis,
     questions: &[crate::npae::schema::types::ClarifyingQuestion],
+    rag_tokens_added: u32,
 ) -> crate::types::ScoringResult {
     let token_original = crate::utils::tokens::estimate_tokens(raw);
     let token_final = crate::utils::tokens::estimate_tokens(final_prompt);
+    let net_token_final = token_final.saturating_sub(rag_tokens_added);
 
-    // TES: Token efficiency
+    // TES: Token efficiency (excluding injected RAG fact tokens so RAG enrichment is not penalized)
     let tes_score = if token_original > 0 {
-        let savings = 1.0 - (token_final as f32 / token_original as f32);
+        let savings = 1.0 - (net_token_final as f32 / token_original as f32);
+
         let base = if savings < 0.0 {
             (0.3 + savings * 0.4).max(0.1)
         } else if savings <= 0.1 {

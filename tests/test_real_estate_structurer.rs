@@ -47,7 +47,8 @@ fn test_real_estate_prompt_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None).expect("Failed to build structured prompt");
+
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     println!("Rendered Output:\n{}", rendered);

@@ -172,7 +172,8 @@ pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
 }
 
 pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQuestion], raw_input: &str) -> String {
-    let (context_opt, rag_opt, user_prompt) = split_raw_input(raw_input);
+    let (context_opt, _rag_opt, user_prompt) = split_raw_input(raw_input);
+
     let mut out = String::new();
     
     // ROLE — High-resolution persona
@@ -248,13 +249,8 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         out.push('\n');
     }
 
-    if let Some(rag) = rag_opt {
-        out.push_str("# SOURCE KNOWLEDGE:\n");
-        out.push_str(&rag);
-        out.push_str("\n\n");
-    }
-
     // CONSTRAINTS — only non-empty sections
+
     let has_inclusions = !prompt.constraints.required_inclusions.is_empty();
     let has_exclusions = !prompt.constraints.forbidden_topics.is_empty();
     let has_custom_format = prompt.constraints.output_format != "markdown" && !prompt.constraints.output_format.is_empty();
@@ -365,7 +361,16 @@ impl std::fmt::Display for crate::npae::schema::types::Priority {
     }
 }
 
-pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::ResolvedPrompt, config: Option<&super::config::UnifiedConfig>, reconstructed: &crate::types::ReconstructedInput) -> std::result::Result<StructuredPrompt, String> {
+use super::rag_context::DerivedRagContext;
+
+pub fn build(
+    profile: &IntentProfile,
+    raw: &str,
+    resolved: &super::resolver::ResolvedPrompt,
+    config: Option<&super::config::UnifiedConfig>,
+    reconstructed: &crate::types::ReconstructedInput,
+    derived_rag: Option<&DerivedRagContext>,
+) -> std::result::Result<StructuredPrompt, String> {
     let role_primary = resolved.role.clone();
     let mut inclusions = resolved.inclusions.clone();
     let forbidden = resolved.forbidden.clone();
@@ -394,8 +399,19 @@ pub fn build(profile: &IntentProfile, raw: &str, resolved: &super::resolver::Res
     // Extract a concise task description (not just raw first line)
     let description = extract_task_description(raw, intent_type);
 
-    // Build a non-redundant background — includes goal decomposition & context unpacking
-    let background = build_background(profile, &user_level_str, raw);
+    // Build a non-redundant background — includes goal decomposition, context unpacking, and RAG facts
+    let mut background = build_background(profile, &user_level_str, raw);
+    if let Some(rag) = derived_rag {
+        if !rag.facts.is_empty() {
+            let facts_str = format!("Known facts: {}", rag.facts.join("; "));
+            if background.is_empty() {
+                background = facts_str;
+            } else {
+                background = format!("{}. {}", background, facts_str);
+            }
+        }
+    }
+
 
     // Infer execution phases based on temporal scope, domain templates, and intent
     let execution_phases = infer_execution_phases(profile, raw, config);

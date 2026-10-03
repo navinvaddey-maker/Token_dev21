@@ -5,7 +5,11 @@ use crate::npae::compression::types::CompressedRepr;
 pub struct AggressiveRequest {
     pub prompt: String,
     pub config: Option<NpaeConfig>,
+    pub rag_enabled: Option<bool>,
+    pub rag_document_ids: Option<Vec<String>>,
+    pub rag_top_k: Option<usize>,
 }
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NpaeConfig {

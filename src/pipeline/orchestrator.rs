@@ -207,7 +207,9 @@ impl PipelineOrchestrator {
                 self.ory_engine.clone(),
                 &structurer,
                 &reconstructed,
+                output.enrichment.as_ref(),
             ).await.map_err(|e| e.to_string())?;
+
 
             // Populate output fields for session history and feedback tracking
             output.output_token_count = resp.token_final;

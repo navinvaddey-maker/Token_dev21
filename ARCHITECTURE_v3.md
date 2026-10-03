@@ -170,7 +170,8 @@ User → API (Axum) → Auth+RateLimit → Domain
 
 | Gap | Severity | Details |
 |---|---|---|
-| **RAG not wired into pipeline** | ✅ **FIXED (GAP-31)** | `EnrichmentContext` is now populated in `domain.rs`, passed to `orchestrator.process()`, stored in `output.enrichment`, and injected into Stage 6A output under `**Retrieved Knowledge:**`. |
+| **RAG not wired into pipeline** | ✅ **FIXED (GAP-31)** | `EnrichmentContext` is populated in `domain.rs`/`api.rs`, passed to `orchestrator.process()` & `AggressiveEngine::run()`. In Gentle/Balanced mode, chunks render in Stage 6A. In Aggressive mode, `DerivedRagContext` derives clean, non-repetitive facts (250-token budget) into `context.background` without raw source citations, resolving gap zones and hallucination checks. |
+
 | **Hash-based embeddings, not semantic** | 🟠 Medium | FNV-1a hash projection. Paraphrases and synonyms produce lower similarity than neural models. Comment in code: "For production, replace with sentence-transformers or fastembed-rs." |
 | **Two incompatible embedding spaces** | ✅ **FIXED (GAP-32)** | Both RAG and ORY now share `crate::rag::embeddings::EmbeddingEngine` (384-dim FNV-1a feature hashing + TF-IDF term weighting). Vectors across RAG & ORY are 100% compatible. |
 | **Full-table cosine scan** | 🟠 High | `RagStore::search()` loads ALL user embeddings into memory. Self-documented limit: <10K chunks. No ANN index. |

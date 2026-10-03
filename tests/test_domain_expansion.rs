@@ -64,7 +64,8 @@ fn test_finance_income_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
+.expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("WEALTH & INCOME STRATEGIST"));
@@ -96,7 +97,8 @@ fn test_finance_earn_millions_e2e_intent_and_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
+.expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("WEALTH & INCOME STRATEGIST"));
@@ -162,7 +164,8 @@ fn test_computers_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
+.expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("COMPUTER SYSTEMS ARCHITECT"));
@@ -211,7 +214,8 @@ fn test_science_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
+.expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("LEAD RESEARCH SCIENTIST"));
@@ -241,11 +245,22 @@ fn test_health_structuring_e2e() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed).expect("Failed to build structured prompt");
+    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
+.expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("CLINICAL HEALTH SPECIALIST"));
     assert!(rendered.contains("Health Assessment & Baseline Audit"));
     assert!(rendered.contains("Intervention & Protocol Design"));
     assert!(rendered.contains("Monitoring & Long-Term Adaptation"));
+}
+
+#[test]
+fn test_pharma_wealthiest_e2e() {
+    let raw_input = "I want to become wealthiest men in the pharma industry. how where can I start from";
+    let verdict = token_compress_engine::classifier::intent_rule::resolve_prompt_rules(raw_input)
+        .expect("Should resolve rule verdict for pharma wealth build prompt");
+    assert_eq!(verdict.primary_role, "Business Strategist");
+    assert_eq!(verdict.vertical, Some("pharma"));
+    assert!(verdict.persona_anchor().contains("Pharma"));
 }
