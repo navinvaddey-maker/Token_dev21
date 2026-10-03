@@ -20,6 +20,7 @@
             <li data-section="history"><a href="#">Global History</a></li>
             <li data-section="feedback"><a href="#">Feedback Signals</a></li>
             <li data-section="rag"><a href="#">📚 RAG Knowledge Base</a></li>
+            <li data-section="ask"><a href="#">💬 Ask (RAG)</a></li>
         </ul>
         <div class="sidebar-footer">
             <button id="logout-btn">Logout</button>
@@ -180,6 +181,55 @@
                         <tr><td colspan="8" class="empty-row">Loading…</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </section>
+
+        <!-- ── Ask (RAG) Section ─────────────────────────────── -->
+        <section id="ask-section">
+            <div class="table-container glass" style="margin-top: 2rem; padding: 24px;">
+                <h2>Admin Ask (RAG) Query</h2>
+                
+                <div style="margin-bottom: 16px; margin-top: 16px;">
+                    <label for="admin-scenario-mode-select" style="display:block; margin-bottom: 8px;">Pipeline Mode</label>
+                    <select id="admin-scenario-mode-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
+                        <option value="Scenario">Scenario Mode</option>
+                        <option value="Regular" selected>Regular Mode</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="admin-scenario-domain-select" style="display:block; margin-bottom: 8px;">Domain Scope</label>
+                    <select id="admin-scenario-domain-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
+                        <option value="" disabled selected>-- Select Mandatory Domain --</option>
+                        <option value="legal">Legal</option>
+                        <option value="business">Business</option>
+                        <option value="finance">Finance</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="admin-scenario-style-select" style="display:block; margin-bottom: 8px;">Output Style</label>
+                    <select id="admin-scenario-style-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
+                        <option value="balanced" selected>Balanced</option>
+                        <option value="concise">Concise</option>
+                        <option value="detailed">Detailed</option>
+                        <option value="aggressive">Aggressive</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label for="admin-scenario-query-input" style="display:block; margin-bottom: 8px;">Query / Intake</label>
+                    <textarea id="admin-scenario-query-input" placeholder="Ask a question against internal knowledge base..." style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); min-height: 80px;"></textarea>
+                </div>
+
+                <button id="admin-ask-btn" class="btn-primary" style="margin-bottom: 24px;">
+                    🔍 Query Internal Knowledge Base
+                </button>
+
+                <div id="admin-scenario-result-section" style="display:none;">
+                    <h3>Response Output</h3>
+                    <div id="admin-scenario-result-output" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;"></div>
+                </div>
             </div>
         </section>
 

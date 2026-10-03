@@ -75,6 +75,8 @@ function switchSection(sectionId) {
 
     if (sectionId === 'rag') {
         document.getElementById('section-title').textContent = 'RAG Knowledge Base';
+    } else if (sectionId === 'ask') {
+        document.getElementById('section-title').textContent = 'Ask (RAG)';
     } else {
         document.getElementById('section-title').textContent = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
     }

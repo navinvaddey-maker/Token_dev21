@@ -12,7 +12,6 @@ pub struct PipelineInput {
     pub raw_text: String,
     pub task: String,
 
-    pub model: String,
     pub use_case: String,
     pub mode: String,
     pub max_tokens: usize,
@@ -117,7 +116,6 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
         &s3.chunks,
         &task_safe,
         &input.use_case,
-        &input.model,
     );
     info!(principle = "predictive_coding", ms = s4.duration_ms);
     logs.push(PrincipleLog {
@@ -141,15 +139,10 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
         duration_ms: s5.duration_ms,
     });
 
-    let mut token_final = estimate_tokens(&s5.text) as usize;
-    let mut optimized_prompt = s5.text;
+    let token_final = estimate_tokens(&s5.text) as usize;
+    let optimized_prompt = s5.text;
 
-    if token_final > token_original && input.model != "Claude" {
-        warnings
-            .push("Optimization increased token count — falling back to original prompt".into());
-        optimized_prompt = input.raw_text.clone();
-        token_final = token_original;
-    } else if token_final > token_original {
+    if token_final > token_original {
         warnings.push("Note: Role assignment increased token count beyond original input".into());
     }
 

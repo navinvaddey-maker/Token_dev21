@@ -478,6 +478,7 @@
             margin-bottom: 24px;
             border-bottom: 1px solid var(--divider);
             padding-bottom: 12px;
+            overflow: visible;
         }
         .nav-tab {
             padding: 8px 16px;
@@ -861,6 +862,7 @@
 
             <div class="nav-bar">
                 <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Compress</button>
+                <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask">Ask (RAG)</button>
                 <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
                 <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
                 <button class="nav-tab" id="btn-custom-skin" style="margin-left: auto;">🎨 Customize</button>
@@ -882,28 +884,15 @@
                 </div>
 
 
-                <div class="form-grid">
-                    <div class="form-row">
-                        <label for="model-select" class="section-label">Target Model</label>
-                        <div class="select-wrap">
-                            <select id="model-select" class="tc-select">
-                                <option value="Claude" selected>Claude</option>
-                                <option value="ChatGPT">ChatGPT</option>
-                                <option value="Copilot">Copilot</option>
-                            </select>
-                            <div class="select-chevron">▼</div>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <label for="mode" class="section-label">Compression Mode</label>
-                        <div class="select-wrap">
-                            <select id="mode" class="tc-select">
-                                <option value="balanced">Balanced</option>
-                                <option value="gentle">Gentle</option>
-                                <option value="aggressive">Aggressive</option>
-                            </select>
-                            <div class="select-chevron">▼</div>
-                        </div>
+                <div class="form-row">
+                    <label for="mode" class="section-label">Compression Mode</label>
+                    <div class="select-wrap">
+                        <select id="mode" class="tc-select">
+                            <option value="balanced">Balanced</option>
+                            <option value="gentle">Gentle</option>
+                            <option value="aggressive">Aggressive</option>
+                        </select>
+                        <div class="select-chevron">▼</div>
                     </div>
                 </div>
 
@@ -952,6 +941,76 @@
                         <button class="btn-success-sm" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
                         <button class="btn-danger-sm" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
                         <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Ask (RAG) Tab ── -->
+            <div class="tab-content" id="tab-ask-content">
+                <div class="tag">Internal RAG Query</div>
+                
+                <div class="form-row">
+                    <label for="scenario-mode-select" class="section-label">Pipeline Mode</label>
+                    <div class="select-wrap">
+                        <select id="scenario-mode-select" class="tc-select" onchange="handleScenarioModeChange(this.value)">
+                            <option value="Scenario">Scenario Mode</option>
+                            <option value="Regular" selected>Regular Mode</option>
+                        </select>
+                        <div class="select-chevron">▼</div>
+                    </div>
+                    <div class="helper-text" id="mode-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Regular mode queries internal knowledge base with customized output styles & citations.</div>
+                </div>
+
+                <div class="form-row" id="domain-selector-row" style="display: none;">
+                    <label for="scenario-domain-select" class="section-label">Domain Scope</label>
+                    <div class="select-wrap">
+                        <select id="scenario-domain-select" class="tc-select" onchange="handleDomainChange(this.value)">
+                            <option value="" disabled selected>-- Select Mandatory Domain --</option>
+                            <option value="legal">Legal</option>
+                            <option value="business">Business</option>
+                            <option value="finance">Finance</option>
+                        </select>
+                        <div class="select-chevron">▼</div>
+                    </div>
+                    <div class="helper-text" id="domain-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Mandatory domain scope selector for Scenario pipeline.</div>
+                </div>
+
+                <div class="form-row" id="style-selector-row">
+                    <label for="scenario-style-select" class="section-label">Output Style</label>
+                    <div class="select-wrap">
+                        <select id="scenario-style-select" class="tc-select">
+                            <option value="balanced" selected>Balanced — Clear, well-structured response maintaining measured tone and context.</option>
+                            <option value="concise">Concise — Direct bulleted output focused strictly on primary findings.</option>
+                            <option value="detailed">Detailed — Comprehensive synthesis including structural breakdowns and contextual nuances.</option>
+                            <option value="aggressive">Aggressive — Assertive, direct stance that states strongest supported position, challenges weak assumptions, and flags risks bluntly.</option>
+                        </select>
+                        <div class="select-chevron">▼</div>
+                    </div>
+                    <div class="helper-text" id="style-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Tone & emphasis style loaded from Scenario_Style_Registry.</div>
+                </div>
+
+                <div class="form-row">
+                    <label for="scenario-query-input" class="section-label">Query / Intake</label>
+                    <textarea id="scenario-query-input" class="tc-textarea" placeholder="Ask a question against internal knowledge base..."></textarea>
+                </div>
+
+                <button class="tc-compress-btn" onclick="executeScenarioAsk()" id="ask-btn">
+                    🔍 Query Internal Knowledge Base
+                </button>
+
+                <div id="scenario-result-section" style="display:none; margin-top: 20px;">
+                    <hr class="divider">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="badge badge-accent" id="scenario-badge-source">Source: internal knowledge base only</span>
+                        <span class="badge badge-success" id="scenario-badge-ns">Namespace: general</span>
+                    </div>
+
+                    <div class="section-label" id="scenario-result-header">Response Output</div>
+                    <div class="output-box" id="scenario-result-output" style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;"></div>
+
+                    <div id="scenario-citations-box" style="margin-top: 16px; display: none;">
+                        <div class="section-label">Retrieved Internal Citations</div>
+                        <ul id="scenario-citations-list" style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-muted);"></ul>
                     </div>
                 </div>
             </div>

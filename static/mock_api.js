@@ -67,5 +67,16 @@ const API = {
 
     async devConfig() {
         return this.call('/api/dev/config');
+    },
+
+    async scenarioRegistry() {
+        return this.call('/api/scenario/registry');
+    },
+
+    async scenarioAsk(req) {
+        return this.call('/api/scenario/ask', {
+            method: 'POST',
+            body: JSON.stringify(req),
+        });
     }
 };

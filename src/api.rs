@@ -36,6 +36,7 @@ pub fn router(state: AppState) -> Router {
     let public = Router::new()
         .route("/api/health", get(health_check))
         .route("/api/rag/health", get(rag_health))
+        .route("/api/scenario/registry", get(scenario_get_registry))
         .merge(auth);
 
     let protected = Router::new()
@@ -45,6 +46,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/feedback", post(feedback))
         .route("/api/dev/config", get(dev_config))
         .route("/api/stats", get(stats))
+        .route("/api/scenario/ask", post(scenario_ask))
         .route("/api/rag/upload", post(rag_upload))
         .route("/api/rag/documents", get(rag_list_documents))
         .route("/api/rag/documents/:id", get(rag_get_document).delete(rag_delete_document))
@@ -159,7 +161,6 @@ pub struct CompressRequest {
     pub raw_text: String,
     pub task: Option<String>,
 
-    pub model: Option<String>,
     pub use_case: Option<String>,
     pub mode: Option<String>,
     pub max_tokens: Option<usize>,
@@ -757,4 +758,60 @@ async fn admin_rag_delete_document(
         })),
     )
         .into_response())
+}
+
+// ── Scenario endpoints ──────────────────────────────────────────────────────
+
+async fn scenario_get_registry(
+    State(state): State<AppState>,
+) -> Result<axum::response::Response, AppError> {
+    let domains = &state.scenario_router.domain_registry.domains;
+    let styles = &state.scenario_router.style_registry.styles;
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "domains": domains,
+            "styles": styles,
+        })),
+    )
+        .into_response())
+}
+
+#[derive(serde::Deserialize)]
+pub struct ScenarioAskRequest {
+    pub app_mode: String,
+    pub domain: Option<String>,
+    pub style: Option<String>,
+    pub question: String,
+    pub mode: Option<String>,
+}
+
+async fn scenario_ask(
+    State(state): State<AppState>,
+    axum::Extension(user_id_str): axum::Extension<String>,
+    Json(req): Json<ScenarioAskRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let user = crate::data::Repository::find_user_by_id(&state.pool, &user_id_str)
+        .await
+        .map_err(AppError::Database)?;
+    let business_type = user.map(|u| u.business_type).unwrap_or_else(|| "general".to_string());
+
+    let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
+
+    let resp = state
+        .scenario_router
+        .route_and_execute(
+            &req.app_mode,
+            req.domain.as_deref(),
+            req.style.as_deref(),
+            &req.question,
+            &user_id_str,
+            &business_type,
+            req.mode.as_deref(),
+            &retriever,
+        )
+        .await
+        .map_err(|e| AppError::Engine(e))?;
+
+    Ok((StatusCode::OK, Json(resp)).into_response())
 }

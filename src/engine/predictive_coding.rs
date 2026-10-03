@@ -168,7 +168,6 @@ pub fn run(
     chunks: &[String],
     task: &str,
     use_case: &str,
-    model: &str,
 ) -> PrincipleResult {
     let start = Instant::now();
     let combined_text = chunks.join("\n\n");
@@ -187,14 +186,8 @@ pub fn run(
     // Final neuro-assembly: Role/Audience -> Task -> Deliverable -> Constraints -> Content
     let mut output_parts = Vec::new();
 
-    if model == "Claude" {
-        // Explicitly bind the role prefix for Claude as requested
-        output_parts.push(format!("Role: {}", frame.role));
-        output_parts.push(format!("Audience: {}", frame.audience));
-    } else {
-        // For other models, maybe we just include the role without the explicit prefix or use a simpler format
-        output_parts.push(format!("Role: {}", frame.role));
-    }
+    output_parts.push(format!("Role: {}", frame.role));
+    output_parts.push(format!("Audience: {}", frame.audience));
 
     output_parts.push(format!("Task: {}", optimized_task));
 

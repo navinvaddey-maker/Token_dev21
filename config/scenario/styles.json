@@ -1,0 +1,32 @@
+{
+  "styles": [
+    {
+      "key": "balanced",
+      "label": "Balanced",
+      "description": "Clear, well-structured response maintaining measured tone and context.",
+      "prompt_file": "balanced.v1.md",
+      "version": "1.0.0"
+    },
+    {
+      "key": "concise",
+      "label": "Concise",
+      "description": "Direct bulleted output focused strictly on primary findings.",
+      "prompt_file": "concise.v1.md",
+      "version": "1.0.0"
+    },
+    {
+      "key": "detailed",
+      "label": "Detailed",
+      "description": "Comprehensive synthesis including structural breakdowns and contextual nuances.",
+      "prompt_file": "detailed.v1.md",
+      "version": "1.0.0"
+    },
+    {
+      "key": "aggressive",
+      "label": "Aggressive",
+      "description": "Assertive, direct stance that states strongest supported position, challenges weak assumptions, and flags risks bluntly.",
+      "prompt_file": "aggressive.v1.md",
+      "version": "1.0.0"
+    }
+  ]
+}

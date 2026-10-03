@@ -127,6 +127,28 @@ async fn main() -> anyhow::Result<()> {
     let rag_store = std::sync::Arc::new(token_compress_engine::rag::store::RagStore::new(pool.clone()));
     let sessions = std::sync::Arc::new(dashmap::DashMap::new());
 
+    let domain_registry = Arc::new(
+        token_compress_engine::scenario::ScenarioDomainRegistry::load_from_file("config/scenario/domains.json")
+            .unwrap_or_else(|e| panic!("Failed to load Scenario Domain Registry: {}", e))
+    );
+
+    let style_registry = Arc::new(
+        token_compress_engine::scenario::ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
+            .unwrap_or_else(|e| panic!("Failed to load Scenario Style Registry: {}", e))
+    );
+
+    let egress_guard = Arc::new(
+        token_compress_engine::scenario::ScenarioEgressGuard::load_from_file("config/scenario/egress.json")
+            .unwrap_or_else(|e| panic!("Failed to load Egress Guard Config: {}", e))
+    );
+
+    let scenario_router = Arc::new(token_compress_engine::scenario::ScenarioModeRouter::new(
+        domain_registry,
+        style_registry,
+        egress_guard,
+        "prompts/styles".to_string(),
+    ));
+
     let state = AppState {
         pool: pool.clone(),
         engine,
@@ -136,6 +158,7 @@ async fn main() -> anyhow::Result<()> {
         rag_store,
         sessions,
         embedding_engine,
+        scenario_router,
     };
 
     let api_router = token_compress_engine::api::router(state);

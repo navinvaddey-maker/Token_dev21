@@ -142,6 +142,7 @@ function showMainSection() {
         document.getElementById('admin-link').style.display = 'none';
     }
     if (typeof validatePromptLength === 'function') validatePromptLength();
+    if (typeof loadScenarioRegistry === 'function') loadScenarioRegistry();
 }
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
@@ -154,6 +155,9 @@ function switchTab(tab) {
     if (tab === 'compress') {
         document.getElementById('tab-compress').classList.add('active');
         if (typeof validatePromptLength === 'function') validatePromptLength();
+    } else if (tab === 'ask') {
+        document.getElementById('tab-ask-content').classList.add('active');
+        loadScenarioRegistry();
     } else if (tab === 'history') {
         document.getElementById('tab-history-content').classList.add('active');
         loadHistory();
@@ -170,7 +174,6 @@ async function compress() {
     const raw     = document.getElementById('prompt-input').value.trim();
     const task    = document.getElementById('task-input').value.trim();
     const useCase = document.getElementById('use-case').value;
-    const model   = document.getElementById('model-select').value;
     const mode    = document.getElementById('mode').value;
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
@@ -234,7 +237,6 @@ async function compress() {
             raw_text:  raw,
             task:      task || 'Optimize prompt',
             use_case:  detectedUseCase,
-            model:     model,
             mode:      mode,
         });
 
@@ -396,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
         State.username = username;
         State.businessType = businessType;
         showMainSection();
+        loadScenarioRegistry();
     }
 
     const promptInput = document.getElementById('prompt-input');
@@ -408,4 +411,139 @@ document.addEventListener('DOMContentLoaded', () => {
     // Button starts disabled and only enables when >= 120 words
     validatePromptLength();
 });
+
+// ── Scenario RAG Tab logic ──────────────────────────────────────────────────
+
+let scenarioRegistryLoaded = false;
+
+async function loadScenarioRegistry() {
+    if (scenarioRegistryLoaded) return;
+    try {
+        const reg = await API.scenarioRegistry();
+        const domainSel = document.getElementById('scenario-domain-select');
+        const styleSel  = document.getElementById('scenario-style-select');
+
+        if (domainSel && reg.domains) {
+            domainSel.innerHTML = '<option value="" disabled selected>-- Select Mandatory Domain --</option>' +
+                reg.domains.map(d => `<option value="${d.key}">${d.label}</option>`).join('');
+        }
+
+        if (styleSel && reg.styles) {
+            styleSel.innerHTML = reg.styles.map(s => `<option value="${s.key}">${s.label} — ${s.description}</option>`).join('');
+        }
+
+        scenarioRegistryLoaded = true;
+    } catch (err) {
+        showToast('Failed to load scenario registry: ' + err.message, 'error');
+    }
+}
+
+function handleScenarioModeChange(mode) {
+    const qInput = document.getElementById('scenario-query-input');
+    const resultSec = document.getElementById('scenario-result-section');
+    
+    if ((qInput && qInput.value.trim().length > 0) || (resultSec && resultSec.style.display !== 'none')) {
+        if (!confirm("Switching mode will reset current in-flight intake and results. Proceed?")) {
+            // Revert dropdown selection
+            const sel = document.getElementById('scenario-mode-select');
+            if (sel) sel.value = (mode === 'Scenario') ? 'Regular' : 'Scenario';
+            return;
+        }
+    }
+
+    if (qInput) qInput.value = '';
+    if (resultSec) resultSec.style.display = 'none';
+
+    const domainRow = document.getElementById('domain-selector-row');
+    const styleRow  = document.getElementById('style-selector-row');
+    const modeHelper = document.getElementById('mode-helper');
+
+    if (mode === 'Scenario') {
+        if (domainRow) domainRow.style.display = 'block';
+        if (styleRow) styleRow.style.display = 'none';
+        if (modeHelper) modeHelper.textContent = 'Scenario mode enforces structured domain pipeline & schema completeness check.';
+        if (qInput) {
+            qInput.disabled = true;
+            qInput.placeholder = 'Please select a mandatory domain first...';
+        }
+    } else {
+        if (domainRow) domainRow.style.display = 'none';
+        if (styleRow) styleRow.style.display = 'block';
+        if (modeHelper) modeHelper.textContent = 'Regular mode queries internal knowledge base with customized output styles & citations.';
+        if (qInput) {
+            qInput.disabled = false;
+            qInput.placeholder = 'Ask a question against internal knowledge base...';
+        }
+    }
+}
+
+function handleDomainChange(val) {
+    const qInput = document.getElementById('scenario-query-input');
+    if (qInput) {
+        qInput.disabled = !val;
+        if (val) qInput.placeholder = `Ask a question in ${val} domain...`;
+    }
+}
+
+async function executeScenarioAsk() {
+    const appMode   = document.getElementById('scenario-mode-select').value;
+    const domainVal = document.getElementById('scenario-domain-select')?.value;
+    const styleVal  = document.getElementById('scenario-style-select')?.value;
+    const question  = document.getElementById('scenario-query-input')?.value.trim();
+    const modeOpt   = document.getElementById('mode')?.value;
+
+    if (!question) return showToast('Question text is required', 'error');
+    if (appMode === 'Scenario' && !domainVal) return showToast('Mandatory domain selection required for Scenario mode', 'error');
+    if (appMode === 'Regular' && !styleVal) return showToast('Style selection required for Regular mode', 'error');
+
+    const btn = document.getElementById('ask-btn');
+    if (btn) btn.disabled = true;
+
+    try {
+        const resp = await API.scenarioAsk({
+            app_mode: appMode,
+            domain: appMode === 'Scenario' ? domainVal : null,
+            style: appMode === 'Regular' ? styleVal : null,
+            question: question,
+            mode: modeOpt,
+        });
+
+        renderScenarioResult(resp);
+        showToast('Knowledge query complete', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function renderScenarioResult(resp) {
+    const sec = document.getElementById('scenario-result-section');
+    const badgeSource = document.getElementById('scenario-badge-source');
+    const badgeNs     = document.getElementById('scenario-badge-ns');
+    const header      = document.getElementById('scenario-result-header');
+    const output      = document.getElementById('scenario-result-output');
+    const citBox      = document.getElementById('scenario-citations-box');
+    const citList     = document.getElementById('scenario-citations-list');
+
+    if (sec) sec.style.display = 'block';
+    if (badgeSource) badgeSource.textContent = resp.source_badge || 'Source: internal knowledge base only';
+    if (badgeNs) badgeNs.textContent = 'Namespaces: ' + (resp.searched_namespaces ? resp.searched_namespaces.join(', ') : 'general');
+    if (header) header.textContent = `Response Output [${resp.mode} Mode - ${resp.selection}]`;
+    if (output) output.textContent = resp.output_text;
+
+    if (resp.citations && resp.citations.length > 0) {
+        if (citBox) citBox.style.display = 'block';
+        if (citList) {
+            citList.innerHTML = resp.citations.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+        }
+    } else {
+        if (citBox) citBox.style.display = 'none';
+    }
+
+    if (resp.warnings && resp.warnings.length > 0) {
+        resp.warnings.forEach(w => showToast(w, 'error'));
+    }
+}
+
 

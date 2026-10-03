@@ -17,6 +17,8 @@ pub mod session;
 pub mod types;
 pub mod utils;
 
+pub mod scenario;
+
 use db::DbPool;
 use learning_engine::LearningEngine;
 use std::sync::Arc;
@@ -35,4 +37,5 @@ pub struct AppState {
     pub rag_store: Arc<crate::rag::store::RagStore>,
     pub sessions: Arc<dashmap::DashMap<String, crate::session::SessionHistory>>,
     pub embedding_engine: Arc<crate::rag::embeddings::EmbeddingEngine>,
+    pub scenario_router: Arc<crate::scenario::ScenarioModeRouter>,
 }

@@ -1,0 +1,8 @@
+{
+  "allowlist": [
+    "127.0.0.1",
+    "localhost",
+    "internal-vector-store.local",
+    "private-llm-endpoint.local"
+  ]
+}
