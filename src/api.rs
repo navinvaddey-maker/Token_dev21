@@ -782,6 +782,7 @@ pub struct ScenarioAskRequest {
     pub app_mode: String,
     pub domain: Option<String>,
     pub style: Option<String>,
+    pub geography: Option<String>,
     pub question: String,
     pub mode: Option<String>,
 }
@@ -804,6 +805,7 @@ async fn scenario_ask(
             &req.app_mode,
             req.domain.as_deref(),
             req.style.as_deref(),
+            req.geography.as_deref(),
             &req.question,
             &user_id_str,
             &business_type,

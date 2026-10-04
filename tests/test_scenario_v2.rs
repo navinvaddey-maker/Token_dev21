@@ -63,9 +63,13 @@ fn test_namespace_guard_isolation_and_entitlements() {
     assert!(admin_ns.contains(&"all".to_string()));
 
     // Chunk permission checks
-    assert!(ScenarioNamespaceGuard::is_chunk_permitted(Some("legal_docs"), &legal_user_ns));
-    assert!(!ScenarioNamespaceGuard::is_chunk_permitted(Some("financial_records"), &legal_user_ns));
-    assert!(ScenarioNamespaceGuard::is_chunk_permitted(Some("financial_records"), &admin_ns));
+    assert!(ScenarioNamespaceGuard::is_chunk_permitted(Some("legal_docs"), None, &legal_user_ns));
+    assert!(!ScenarioNamespaceGuard::is_chunk_permitted(Some("financial_records"), None, &legal_user_ns));
+    assert!(ScenarioNamespaceGuard::is_chunk_permitted(Some("financial_records"), None, &admin_ns));
+    
+    // Test Option B prefix matching with filename geography check
+    assert!(ScenarioNamespaceGuard::is_chunk_permitted(Some("legal"), Some("legal_docs_india.pdf"), &vec!["legal_docs_india".to_string()]));
+    assert!(!ScenarioNamespaceGuard::is_chunk_permitted(Some("legal"), Some("legal_docs_uk.pdf"), &vec!["legal_docs_india".to_string()]));
 }
 
 #[tokio::test]
@@ -87,22 +91,22 @@ async fn test_router_mode_validation() {
     let retriever = token_compress_engine::rag::retriever::DocumentRetriever::new(store);
 
     // Scenario mode requires domain
-    let err1 = router.route_and_execute("Scenario", None, None, "Question", "user1", "legal", None, &retriever).await;
+    let err1 = router.route_and_execute("Scenario", None, None, None, "Question", "user1", "legal", None, &retriever).await;
     assert!(err1.is_err());
     assert!(err1.unwrap_err().contains("Domain selection is mandatory"));
 
     // Scenario mode cannot have style
-    let err2 = router.route_and_execute("Scenario", Some("legal"), Some("balanced"), "Question", "user1", "legal", None, &retriever).await;
+    let err2 = router.route_and_execute("Scenario", Some("legal"), Some("balanced"), None, "Question", "user1", "legal", None, &retriever).await;
     assert!(err2.is_err());
     assert!(err2.unwrap_err().contains("Style selection is invalid"));
 
     // Regular mode requires style
-    let err3 = router.route_and_execute("Regular", None, None, "Question", "user1", "legal", None, &retriever).await;
+    let err3 = router.route_and_execute("Regular", None, None, None, "Question", "user1", "legal", None, &retriever).await;
     assert!(err3.is_err());
     assert!(err3.unwrap_err().contains("Style selection is mandatory"));
 
     // Invalid mode
-    let err4 = router.route_and_execute("UnknownMode", None, None, "Question", "user1", "legal", None, &retriever).await;
+    let err4 = router.route_and_execute("UnknownMode", None, None, None, "Question", "user1", "legal", None, &retriever).await;
     assert!(err4.is_err());
     assert!(err4.unwrap_err().contains("Invalid Mode"));
 }
@@ -129,6 +133,7 @@ async fn test_empty_knowledge_not_found_response() {
         "Regular",
         None,
         Some("balanced"),
+        None,
         "Please search the web for latest stocks",
         "user1",
         "legal",

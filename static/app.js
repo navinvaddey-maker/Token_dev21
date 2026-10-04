@@ -455,11 +455,13 @@ function handleScenarioModeChange(mode) {
     if (resultSec) resultSec.style.display = 'none';
 
     const domainRow = document.getElementById('domain-selector-row');
+    const geoRow = document.getElementById('geography-selector-row');
     const styleRow  = document.getElementById('style-selector-row');
     const modeHelper = document.getElementById('mode-helper');
 
     if (mode === 'Scenario') {
         if (domainRow) domainRow.style.display = 'block';
+        if (geoRow) geoRow.style.display = 'block';
         if (styleRow) styleRow.style.display = 'none';
         if (modeHelper) modeHelper.textContent = 'Scenario mode enforces structured domain pipeline & schema completeness check.';
         if (qInput) {
@@ -468,6 +470,7 @@ function handleScenarioModeChange(mode) {
         }
     } else {
         if (domainRow) domainRow.style.display = 'none';
+        if (geoRow) geoRow.style.display = 'none';
         if (styleRow) styleRow.style.display = 'block';
         if (modeHelper) modeHelper.textContent = 'Regular mode queries internal knowledge base with customized output styles & citations.';
         if (qInput) {
@@ -489,6 +492,7 @@ async function executeScenarioAsk() {
     const appMode   = document.getElementById('scenario-mode-select').value;
     const domainVal = document.getElementById('scenario-domain-select')?.value;
     const styleVal  = document.getElementById('scenario-style-select')?.value;
+    const geoVal    = document.getElementById('scenario-geography-select')?.value;
     const question  = document.getElementById('scenario-query-input')?.value.trim();
     const modeOpt   = document.getElementById('mode')?.value;
 
@@ -504,6 +508,7 @@ async function executeScenarioAsk() {
             app_mode: appMode,
             domain: appMode === 'Scenario' ? domainVal : null,
             style: appMode === 'Regular' ? styleVal : null,
+            geography: appMode === 'Scenario' && geoVal ? geoVal : null,
             question: question,
             mode: modeOpt,
         });

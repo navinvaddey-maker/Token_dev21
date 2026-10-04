@@ -104,11 +104,34 @@ impl ScenarioNamespaceGuard {
     }
 
     /// Checks if a retrieved chunk domain/namespace is permitted under current guard rules.
-    pub fn is_chunk_permitted(chunk_domain: Option<&str>, permitted_namespaces: &[String]) -> bool {
+    pub fn is_chunk_permitted(chunk_domain: Option<&str>, chunk_filename: Option<&str>, permitted_namespaces: &[String]) -> bool {
         if permitted_namespaces.contains(&"all".to_string()) {
             return true;
         }
         let domain = chunk_domain.unwrap_or("general").to_lowercase();
-        permitted_namespaces.iter().any(|p| p.to_lowercase() == domain)
+        let filename = chunk_filename.unwrap_or("").to_lowercase();
+
+        permitted_namespaces.iter().any(|p| {
+            let p_lower = p.to_lowercase();
+            if p_lower == domain {
+                return true;
+            }
+
+            if p_lower.starts_with(&domain) {
+                let base_namespaces = ["legal_docs", "business_strategy", "financial_records"];
+                if base_namespaces.contains(&p_lower.as_str()) {
+                    return true;
+                }
+
+                for base in base_namespaces.iter() {
+                    if p_lower.starts_with(base) {
+                        if filename.contains(&p_lower) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        })
     }
 }

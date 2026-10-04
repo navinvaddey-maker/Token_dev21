@@ -38,13 +38,14 @@ impl ScenarioModeRouter {
         app_mode: &str,
         domain_key: Option<&str>,
         style_key: Option<&str>,
+        geography: Option<&str>,
         question: &str,
         user_id: &str,
         user_business_type: &str,
         compression_mode: Option<&str>,
         retriever: &DocumentRetriever,
     ) -> Result<ScenarioResponse, String> {
-        info!("ScenarioModeRouter processing request: mode='{}', domain={:?}, style={:?}", app_mode, domain_key, style_key);
+        info!("ScenarioModeRouter processing request: mode='{}', domain={:?}, style={:?}, geography={:?}", app_mode, domain_key, style_key, geography);
 
         if question.trim().is_empty() {
             return Err("Validation Error: Question text cannot be empty.".to_string());
@@ -66,9 +67,14 @@ impl ScenarioModeRouter {
                     self.egress_guard.validate_tool_registration(tool, None)?;
                 }
 
+                let mut base_namespace = domain_cfg.rag_namespace.clone();
+                if let Some(geo) = geography {
+                    base_namespace = format!("{}_{}", base_namespace, geo.to_lowercase());
+                }
+
                 let permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
                     "scenario",
-                    Some(&domain_cfg.rag_namespace),
+                    Some(&base_namespace),
                     user_business_type,
                 );
 
@@ -86,7 +92,7 @@ impl ScenarioModeRouter {
                 // Filter retrieved chunks via ScenarioNamespaceGuard
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), &permitted_ns))
+                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), Some(&res.document_filename), &permitted_ns))
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,
@@ -107,6 +113,7 @@ impl ScenarioModeRouter {
                     &parser_summary,
                     &gap_issues,
                     &tool_logs,
+                    base_namespace.clone(),
                 );
 
                 ScenarioOutputValidator::validate(&resp.output_text, &resp.citations, resp.is_empty_knowledge)?;
@@ -140,7 +147,7 @@ impl ScenarioModeRouter {
 
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), &permitted_ns))
+                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), Some(&res.document_filename), &permitted_ns))
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,

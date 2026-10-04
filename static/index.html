@@ -975,6 +975,20 @@
                     <div class="helper-text" id="domain-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Mandatory domain scope selector for Scenario pipeline.</div>
                 </div>
 
+                <div class="form-row" id="geography-selector-row" style="display: none;">
+                    <label for="scenario-geography-select" class="section-label">Geography</label>
+                    <div class="select-wrap">
+                        <select id="scenario-geography-select" class="tc-select">
+                            <option value="">-- No Region Specific --</option>
+                            <option value="india">India</option>
+                            <option value="us">United States</option>
+                            <option value="uk">United Kingdom</option>
+                        </select>
+                        <div class="select-chevron">▼</div>
+                    </div>
+                    <div class="helper-text" id="geography-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Optional geography filter for regional internal knowledge.</div>
+                </div>
+
                 <div class="form-row" id="style-selector-row">
                     <label for="scenario-style-select" class="section-label">Output Style</label>
                     <div class="select-wrap">
@@ -1063,7 +1077,7 @@
 <script src="dev_engine.js?v=3"></script>
 <script src="prompt_optimizer.js?v=3"></script>
 <script src="mock_api.js?v=4"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 
     <!-- Neuro Progress Overlay -->
     <div id="neuro-progress-overlay">

@@ -64,14 +64,14 @@ impl ScenarioOutputComposer {
         parser_summary: &str,
         gap_issues: &[String],
         tool_logs: &[String],
+        searched_namespace: String,
     ) -> ScenarioResponse {
-        let searched_ns = vec![domain.rag_namespace.clone()];
+        let searched_ns = vec![searched_namespace];
 
         if rag_chunks.is_empty() {
             let not_found_text = format!(
-                "Not found in the internal knowledge base\n\nSearched namespaces: {}\n\n{}",
-                searched_ns.join(", "),
-                domain.disclaimer_text
+                "Not found in the internal knowledge base\n\nSearched namespaces: {}",
+                searched_ns.join(", ")
             );
             return ScenarioResponse {
                 mode: "Scenario".to_string(),
