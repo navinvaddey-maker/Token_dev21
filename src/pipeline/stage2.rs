@@ -51,12 +51,15 @@ impl Stage2 {
         out.is_ambiguous = result.is_ambiguous;
     }
 
-    fn derive_mode_from_scenario_intent(&self, signal: &crate::classifier::signal::ScenarioSignal) -> crate::types::Mode {
+    fn derive_mode_from_scenario_intent(
+        &self,
+        signal: &crate::classifier::signal::ScenarioSignal,
+    ) -> crate::types::Mode {
         match signal.intent_class.as_str() {
             "wealth-building" | "brand-building" => crate::types::Mode::Balanced,
-            "compliance" | "risk"                => crate::types::Mode::Gentle,
-            "aggressive-growth"                  => crate::types::Mode::Aggressive,
-            _                                    => crate::types::Mode::Balanced,
+            "compliance" | "risk" => crate::types::Mode::Gentle,
+            "aggressive-growth" => crate::types::Mode::Aggressive,
+            _ => crate::types::Mode::Balanced,
         }
     }
 

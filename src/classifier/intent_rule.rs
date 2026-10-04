@@ -101,81 +101,240 @@ impl RoleRuleVerdict {
 
 /// Venture-scale / business-building class. Not a single keyword.
 const VENTURE_SCALE: &[&str] = &[
-    "billionaire", "billionaires", "billionaier", "billionaiers", "tycoon", "mogul", "magnate",
-    "unicorn", "decacorn", "empire", "conglomerate", "fortune 500",
-    "venture-backed", "venture backed", "ipo", "go public",
-    "build a unicorn", "build an empire", "build a conglomerate",
-    "wealthiest", "wealthiest man", "wealthiest men", "richest", "richest man", "richest men",
-    "top earner", "top earners", "baron", "titan", "market leader", "industry leader",
-    "dominant player", "multi-billionaire", "centimillionaire",
+    "billionaire",
+    "billionaires",
+    "billionaier",
+    "billionaiers",
+    "tycoon",
+    "mogul",
+    "magnate",
+    "unicorn",
+    "decacorn",
+    "empire",
+    "conglomerate",
+    "fortune 500",
+    "venture-backed",
+    "venture backed",
+    "ipo",
+    "go public",
+    "build a unicorn",
+    "build an empire",
+    "build a conglomerate",
+    "wealthiest",
+    "wealthiest man",
+    "wealthiest men",
+    "richest",
+    "richest man",
+    "richest men",
+    "top earner",
+    "top earners",
+    "baron",
+    "titan",
+    "market leader",
+    "industry leader",
+    "dominant player",
+    "multi-billionaire",
+    "centimillionaire",
 ];
 
 /// Wealth language that is ambiguous until a non-personal-finance vertical appears.
 const WEALTH_CLASS: &[&str] = &[
-    "get rich", "become rich", "become wealthy", "make a fortune",
-    "fortune in", "wealth in", "rich in", "get wealthy",
-    "become wealthiest", "become richest", "make billions", "make millions",
-    "amass wealth", "build wealth in", "accumulate wealth", "generate fortune",
+    "get rich",
+    "become rich",
+    "become wealthy",
+    "make a fortune",
+    "fortune in",
+    "wealth in",
+    "rich in",
+    "get wealthy",
+    "become wealthiest",
+    "become richest",
+    "make billions",
+    "make millions",
+    "amass wealth",
+    "build wealth in",
+    "accumulate wealth",
+    "generate fortune",
 ];
 
 /// Personal-finance anchors. These keep the hash/finance path for earn/portfolio asks.
 const PERSONAL_FINANCE_ANCHORS: &[&str] = &[
-    "portfolio", "index fund", "401k", "401(k)", "ira ", "roth",
-    "retirement", "retire early", "passive income", "savings rate",
-    "budgeting", "budget", "net worth spreadsheet", "asset allocation",
-    "earn more money", "earn millions", "salary", "paycheck",
+    "portfolio",
+    "index fund",
+    "401k",
+    "401(k)",
+    "ira ",
+    "roth",
+    "retirement",
+    "retire early",
+    "passive income",
+    "savings rate",
+    "budgeting",
+    "budget",
+    "net worth spreadsheet",
+    "asset allocation",
+    "earn more money",
+    "earn millions",
+    "salary",
+    "paycheck",
 ];
 
 /// Legal *question* phrasing. Industry words like "regulation" do not count.
 const LEGAL_QUERY_PHRASES: &[&str] = &[
-    "is it legal", "is it lawful", "is this legal", "are we allowed",
-    "can i legally", "can we legally", "legally allowed", "legal to",
-    "contract clause", "clause for", "draft an nda", "draft a contract",
-    "draft an agreement", "review this contract", "indemnification",
-    "does this violate", "would this violate", "breach of contract",
-    "what licenses do i need to legally", "file a lawsuit",
-    "sue for", "attorney for", "statute of", "gdpr apply",
-    "is it compliant", "compliance requirements for", "legal risks of", "legal consequences",
+    "is it legal",
+    "is it lawful",
+    "is this legal",
+    "are we allowed",
+    "can i legally",
+    "can we legally",
+    "legally allowed",
+    "legal to",
+    "contract clause",
+    "clause for",
+    "draft an nda",
+    "draft a contract",
+    "draft an agreement",
+    "review this contract",
+    "indemnification",
+    "does this violate",
+    "would this violate",
+    "breach of contract",
+    "what licenses do i need to legally",
+    "file a lawsuit",
+    "sue for",
+    "attorney for",
+    "statute of",
+    "gdpr apply",
+    "is it compliant",
+    "compliance requirements for",
+    "legal risks of",
+    "legal consequences",
 ];
 
 /// Regulatory language that is a constraint lens, not a primary legal question.
 const LEGAL_CONSTRAINT_TERMS: &[&str] = &[
-    "regulation", "regulatory", "compliance", "license", "licensing",
-    "fda", "ema", "approval", "approvals", "patent", "liability",
-    "jurisdiction", "statute", "gdpr", "hipaa", "sec filing",
+    "regulation",
+    "regulatory",
+    "compliance",
+    "license",
+    "licensing",
+    "fda",
+    "ema",
+    "approval",
+    "approvals",
+    "patent",
+    "liability",
+    "jurisdiction",
+    "statute",
+    "gdpr",
+    "hipaa",
+    "sec filing",
 ];
 
 /// Industry verticals. Append a row to support a new domain — do not add roles.
 const VERTICALS: &[(&str, &[&str])] = &[
-    ("pharma", &[
-        "pharma", "pharmaceutical", "biotech", "biopharma", "biosimilar",
-        "drugs", "drug company", "therapeutics", "clinical trial",
-        "ind filing", "nda filing", "compounded drug", "dharma",
-        "biomedical", "pharmacology", "drug development", "drug manufacturing", "life sciences",
-    ]),
-    ("fintech", &[
-        "fintech", "neobank", "payments company", "payment rails",
-        "lending platform", "crypto exchange", "wealthtech", "insurtech",
-        "paytech", "crypto", "defi", "decentralized finance", "banking tech",
-    ]),
-    ("energy", &[
-        "energy", "oil and gas", "renewables", "solar farm", "wind farm",
-        "utilities", "grid storage", "cleantech", "clean energy", "renewable energy",
-        "green energy", "petroleum", "ev charging", "battery storage",
-    ]),
-    ("real-estate", &[
-        "real estate", "real-estate", "property development", "reit",
-        "multifamily", "brokerage empire", "proptech", "commercial real estate",
-        "residential real estate", "property investment",
-    ]),
-    ("software", &[
-        "saas", "software company", "devtools", "enterprise software",
-        "cloud platform", "b2b saas", "microservices", "tech startup", "software startup",
-    ]),
-    ("ecommerce", &[
-        "ecommerce", "e-commerce", "dtc brand", "marketplace empire",
-        "direct-to-consumer", "online store", "drop shipping", "retail tech",
-    ]),
+    (
+        "pharma",
+        &[
+            "pharma",
+            "pharmaceutical",
+            "biotech",
+            "biopharma",
+            "biosimilar",
+            "drugs",
+            "drug company",
+            "therapeutics",
+            "clinical trial",
+            "ind filing",
+            "nda filing",
+            "compounded drug",
+            "dharma",
+            "biomedical",
+            "pharmacology",
+            "drug development",
+            "drug manufacturing",
+            "life sciences",
+        ],
+    ),
+    (
+        "fintech",
+        &[
+            "fintech",
+            "neobank",
+            "payments company",
+            "payment rails",
+            "lending platform",
+            "crypto exchange",
+            "wealthtech",
+            "insurtech",
+            "paytech",
+            "crypto",
+            "defi",
+            "decentralized finance",
+            "banking tech",
+        ],
+    ),
+    (
+        "energy",
+        &[
+            "energy",
+            "oil and gas",
+            "renewables",
+            "solar farm",
+            "wind farm",
+            "utilities",
+            "grid storage",
+            "cleantech",
+            "clean energy",
+            "renewable energy",
+            "green energy",
+            "petroleum",
+            "ev charging",
+            "battery storage",
+        ],
+    ),
+    (
+        "real-estate",
+        &[
+            "real estate",
+            "real-estate",
+            "property development",
+            "reit",
+            "multifamily",
+            "brokerage empire",
+            "proptech",
+            "commercial real estate",
+            "residential real estate",
+            "property investment",
+        ],
+    ),
+    (
+        "software",
+        &[
+            "saas",
+            "software company",
+            "devtools",
+            "enterprise software",
+            "cloud platform",
+            "b2b saas",
+            "microservices",
+            "tech startup",
+            "software startup",
+        ],
+    ),
+    (
+        "ecommerce",
+        &[
+            "ecommerce",
+            "e-commerce",
+            "dtc brand",
+            "marketplace empire",
+            "direct-to-consumer",
+            "online store",
+            "drop shipping",
+            "retail tech",
+        ],
+    ),
 ];
 
 const HASH_MARGIN_GAP: f32 = 0.05;
@@ -249,7 +408,8 @@ fn personal_finance_only(lower: &str, vertical: Option<&str>) -> bool {
     if !contains_any(lower, PERSONAL_FINANCE_ANCHORS) {
         return false;
     }
-    matches!(vertical, None | Some("fintech")) && !contains_any(lower, VENTURE_SCALE)
+    matches!(vertical, None | Some("fintech"))
+        && !contains_any(lower, VENTURE_SCALE)
         && vertical.is_none()
 }
 
@@ -308,18 +468,62 @@ mod tests {
 
     #[test]
     fn wealth_build_synonyms_use_generic_strategist() {
-        expect_role("How do I become a billionaire in pharma", "Business Strategist", Some("pharma"));
-        expect_role("Become a pharma tycoon", "Business Strategist", Some("pharma"));
-        expect_role("Build a unicorn biotech", "Business Strategist", Some("pharma"));
+        expect_role(
+            "How do I become a billionaire in pharma",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "Become a pharma tycoon",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "Build a unicorn biotech",
+            "Business Strategist",
+            Some("pharma"),
+        );
         expect_role("Get rich in drugs", "Business Strategist", Some("pharma"));
-        expect_role("How to get rich in fintech", "Business Strategist", Some("fintech"));
-        expect_role("Build an energy empire", "Business Strategist", Some("energy"));
-        expect_role(" I want to become a billionaier in pharma industry", "Business Strategist", Some("pharma"));
-        expect_role("I want to become wealthiest men in the pharma industry. how where can I start from", "Business Strategist", Some("pharma"));
-        expect_role("I want to become wealthiest men in the dharma industry", "Business Strategist", Some("pharma"));
-        expect_role("Become the richest man in life sciences", "Business Strategist", Some("pharma"));
-        expect_role("How to become a titan in renewable energy", "Business Strategist", Some("energy"));
-        expect_role("Build a multi-billionaire SaaS startup", "Business Strategist", Some("software"));
+        expect_role(
+            "How to get rich in fintech",
+            "Business Strategist",
+            Some("fintech"),
+        );
+        expect_role(
+            "Build an energy empire",
+            "Business Strategist",
+            Some("energy"),
+        );
+        expect_role(
+            " I want to become a billionaier in pharma industry",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "I want to become wealthiest men in the pharma industry. how where can I start from",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "I want to become wealthiest men in the dharma industry",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "Become the richest man in life sciences",
+            "Business Strategist",
+            Some("pharma"),
+        );
+        expect_role(
+            "How to become a titan in renewable energy",
+            "Business Strategist",
+            Some("energy"),
+        );
+        expect_role(
+            "Build a multi-billionaire SaaS startup",
+            "Business Strategist",
+            Some("software"),
+        );
     }
 
     #[test]
@@ -337,8 +541,9 @@ mod tests {
     #[test]
     fn regulation_is_constraint_not_owner_on_wealth_path() {
         let v = resolve_prompt_rules(
-            "How do I become a pharma billionaire given FDA approvals and licensing"
-        ).unwrap();
+            "How do I become a pharma billionaire given FDA approvals and licensing",
+        )
+        .unwrap();
         assert_eq!(v.intent, GoalIntent::WealthBuild);
         assert_eq!(v.primary_role, "Business Strategist");
         assert!(v.legal_as_constraint);

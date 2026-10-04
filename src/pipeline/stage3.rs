@@ -11,8 +11,7 @@ pub struct Stage3 {
 impl Stage3 {
     /// Creates a new Stage3 instance
     pub fn new() -> Self {
-        Self {
-        }
+        Self {}
     }
 
     /// Processes input through Stage 3: Context Management

@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use dashmap::DashMap;
+use std::sync::Arc;
+use token_compress_engine::api::CompressRequest;
+use token_compress_engine::npae::aggressive::config::{ConfigHandle, ConfigLoader};
+use token_compress_engine::npae::ory::OryEngine;
+use token_compress_engine::npae::schema::types::NpaeConfig;
 use token_compress_engine::pipeline::orchestrator::PipelineOrchestrator;
 use token_compress_engine::session::SessionHistory;
-use token_compress_engine::npae::schema::types::NpaeConfig;
-use token_compress_engine::npae::aggressive::config::{ConfigLoader, ConfigHandle};
-use token_compress_engine::npae::ory::OryEngine;
 use token_compress_engine::types::OrchestratorResponse;
-use token_compress_engine::api::CompressRequest;
 
 #[tokio::test]
 async fn test_npae_config_override_threading() {
@@ -29,7 +29,14 @@ async fn test_npae_config_override_threading() {
     };
 
     let resp_high = orchestrator
-        .process(ambiguous_input, &mut session, None, Some("aggressive"), Some(&override_high_threshold), None)
+        .process(
+            ambiguous_input,
+            &mut session,
+            None,
+            Some("aggressive"),
+            Some(&override_high_threshold),
+            None,
+        )
         .await
         .expect("Process should succeed");
 
@@ -51,7 +58,14 @@ async fn test_npae_config_override_threading() {
     };
 
     let resp_low = orchestrator
-        .process(ambiguous_input, &mut session, None, Some("aggressive"), Some(&override_low_threshold), None)
+        .process(
+            ambiguous_input,
+            &mut session,
+            None,
+            Some("aggressive"),
+            Some(&override_low_threshold),
+            None,
+        )
         .await
         .expect("Process should succeed");
 
@@ -75,7 +89,8 @@ fn test_compress_request_deserialization_with_npae_fields() {
         "npae_confidence_threshold": 0.85
     }"#;
 
-    let req: CompressRequest = serde_json::from_str(json_data).expect("Failed to deserialize CompressRequest");
+    let req: CompressRequest =
+        serde_json::from_str(json_data).expect("Failed to deserialize CompressRequest");
     assert_eq!(req.raw_text, "Optimize my query");
     assert_eq!(req.npae_ambiguity_threshold, Some(0.45));
     assert_eq!(req.npae_max_questions, Some(2));

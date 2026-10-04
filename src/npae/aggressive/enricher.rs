@@ -1,12 +1,12 @@
-use super::config::{UnifiedConfig, ConstraintRule, WeightedWord};
-use super::feedback::{FeedbackStore, FeedbackStatus, FeedbackEntry};
+use super::config::{ConstraintRule, UnifiedConfig, WeightedWord};
+use super::feedback::{FeedbackEntry, FeedbackStatus, FeedbackStore};
 use anyhow::Result;
 use std::path::Path;
 
 pub enum ReviewMode {
-    AutoMerge,   // frequency trusted — merge directly into config.json
-    HumanGate,   // write to proposals/ — human approves
-    DryRun,      // log only — never write
+    AutoMerge, // frequency trusted — merge directly into config.json
+    HumanGate, // write to proposals/ — human approves
+    DryRun,    // log only — never write
 }
 
 pub struct ConfigEnricher {
@@ -18,7 +18,12 @@ impl ConfigEnricher {
         Self { mode }
     }
 
-    pub fn process(&self, config: &mut UnifiedConfig, store: &mut FeedbackStore, threshold: u32) -> Result<bool> {
+    pub fn process(
+        &self,
+        config: &mut UnifiedConfig,
+        store: &mut FeedbackStore,
+        threshold: u32,
+    ) -> Result<bool> {
         let mut changed = false;
         let mut promoted_ids = Vec::new();
 
@@ -38,7 +43,10 @@ impl ConfigEnricher {
                         entry.status = FeedbackStatus::Confirmed; // Mark as "pending" basically
                     }
                     ReviewMode::DryRun => {
-                        tracing::info!("DryRun: Would promote rule for fingerprint {}", fingerprint);
+                        tracing::info!(
+                            "DryRun: Would promote rule for fingerprint {}",
+                            fingerprint
+                        );
                     }
                 }
             }
@@ -57,14 +65,20 @@ impl ConfigEnricher {
             domain: entry.candidate.inferred_domain.clone(),
             priority: 2, // Default low priority for auto-generated rules
             is_forbidden: entry.candidate.inferred_intent == "forbidden",
-            description: format!("Auto-generated rule for terms: {:?}", entry.candidate.trigger_words),
-            trigger: vec![
-                entry.candidate.trigger_words.iter().map(|w| WeightedWord {
+            description: format!(
+                "Auto-generated rule for terms: {:?}",
+                entry.candidate.trigger_words
+            ),
+            trigger: vec![entry
+                .candidate
+                .trigger_words
+                .iter()
+                .map(|w| WeightedWord {
                     word: w.clone(),
                     weight: 7, // Default weight
                     synonyms: None,
-                }).collect()
-            ],
+                })
+                .collect()],
         }
     }
 

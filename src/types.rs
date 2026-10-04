@@ -28,7 +28,6 @@ pub struct CompressionSchema {
     pub output: Vec<Deliverable>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeightedToken {
     pub text: String,
@@ -150,7 +149,6 @@ pub struct AlgorithmOutput {
     pub resolved_schema: CompressionSchema,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
-
 
     // New fields from refinements guide
     pub topology: Option<PromptTopology>,
@@ -302,9 +300,9 @@ pub struct FieldValidationIssue {
 /// ScoringResult: TES + SFS + SCS
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScoringResult {
-    pub tes: f32,  // 0.0–10.0
-    pub sfs: f32,  // 0.0–10.0
-    pub scs: f32,  // 0.0–10.0 (NEW)
+    pub tes: f32, // 0.0–10.0
+    pub sfs: f32, // 0.0–10.0
+    pub scs: f32, // 0.0–10.0 (NEW)
     pub correction_needed: bool,
     pub correction_axis: Option<ScoreAxis>,
 }
@@ -372,8 +370,12 @@ impl CorrectionCycle {
                 // Extract the problematic content from the compressed output if identifiable
                 let original = if !issue.field_name.is_empty() {
                     // Try to find the field content in the output
-                    compressed_output.lines()
-                        .find(|line| line.to_lowercase().contains(&issue.field_name.to_lowercase()))
+                    compressed_output
+                        .lines()
+                        .find(|line| {
+                            line.to_lowercase()
+                                .contains(&issue.field_name.to_lowercase())
+                        })
                         .unwrap_or("")
                         .to_string()
                 } else {
@@ -382,7 +384,9 @@ impl CorrectionCycle {
 
                 let corrected = match issue.issue_type.as_str() {
                     "missing_required" => format!("[NEEDS: {}]", issue.field_name),
-                    "type_mismatch" => format!("[FIX TYPE: {} — {}]", issue.field_name, issue.description),
+                    "type_mismatch" => {
+                        format!("[FIX TYPE: {} — {}]", issue.field_name, issue.description)
+                    }
                     "empty_field" => format!("[FILL: {}]", issue.field_name),
                     _ => format!("[REVIEW: {} — {}]", issue.field_name, issue.description),
                 };

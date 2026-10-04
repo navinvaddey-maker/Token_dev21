@@ -1,9 +1,9 @@
 use std::time::Instant;
 use tracing::warn;
 
-use super::types::{RetrievalQuery, SearchResult};
-use super::store::RagStore;
 use super::embeddings::EmbeddingEngine;
+use super::store::RagStore;
+use super::types::{RetrievalQuery, SearchResult};
 
 /// RAG Retriever Component
 pub struct DocumentRetriever {
@@ -34,30 +34,37 @@ impl DocumentRetriever {
         // Generate query embedding
         let query_vector = self.embeddings.embed(&query.query_text);
 
-        // Perform cosine similarity search in database
-        let results = self.store.search(
-            &query_vector,
-            &query.user_id,
-            query.document_ids.as_deref(),
-            query.top_k,
-            query.min_similarity,
-        )
-        .await
-        .map_err(|e| format!("Database error during vector search: {}", e))?;
+        // Perform hybrid cosine similarity + BM25 search in database
+        let results = self
+            .store
+            .search_hybrid(
+                &query.query_text,
+                &query_vector,
+                &query.user_id,
+                query.document_ids.as_deref(),
+                query.top_k,
+                query.min_similarity,
+            )
+            .await
+            .map_err(|e| format!("Database error during hybrid search: {}", e))?;
 
         let duration_ms = start.elapsed().as_millis() as i64;
         let chunks_count = results.len() as i64;
         let top_similarity = results.first().map(|r| r.similarity_score).unwrap_or(0.0);
 
         // Log retrieval event for analysis
-        if let Err(e) = self.store.log_retrieval(
-            &query.user_id,
-            history_id,
-            &query.query_text,
-            chunks_count,
-            top_similarity,
-            duration_ms,
-        ).await {
+        if let Err(e) = self
+            .store
+            .log_retrieval(
+                &query.user_id,
+                history_id,
+                &query.query_text,
+                chunks_count,
+                top_similarity,
+                duration_ms,
+            )
+            .await
+        {
             warn!("Failed to write RAG retrieval log: {}", e);
         }
 

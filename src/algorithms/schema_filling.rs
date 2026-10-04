@@ -228,11 +228,8 @@ impl SchemaFilling {
                 // Clone the values needed for scope injection to avoid moving them
                 let task_clone = task.clone();
                 let context_clone = context.clone();
-                let injections = DeterminismScopeInjector::inject(
-                    &task_clone,
-                    &None,
-                    &context_clone,
-                );
+                let injections =
+                    DeterminismScopeInjector::inject(&task_clone, &None, &context_clone);
                 out.scope_injections = injections;
             }
         }
@@ -267,8 +264,9 @@ impl SchemaFilling {
             .map(|c| c.name.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
-        let meal_plan =
-            task_text.contains("meal") || task_text.contains("plan") || task_text.contains("nutrition");
+        let meal_plan = task_text.contains("meal")
+            || task_text.contains("plan")
+            || task_text.contains("nutrition");
         let dietary = ["fiber", "dairy", "nightshade", "carb", "macro"]
             .iter()
             .any(|k| constraint_text.contains(k));
@@ -320,20 +318,20 @@ impl SchemaFilling {
                 return Some(format!("Perform {} action", keyword));
             }
         }
-        
+
         // Robust fallback chain:
         // Try domain knowledge first
         if let Some(t) = self.domain_knowledge.get("task") {
             return Some(t.clone());
         }
-        
+
         // Then try first meaningful WM slot
         if !self.all_texts_vague(wm_texts) {
             if let Some(t) = wm_texts.first() {
                 return Some(t.clone());
             }
         }
-        
+
         // Final fallback to guarantee task resolution (prevent NULL task)
         Some("Analyze and process the provided context".to_string())
     }
@@ -393,11 +391,7 @@ impl SchemaFilling {
         context
     }
 
-    fn detect_null_fields(
-        &self,
-        task: &Option<String>,
-        context: &[String],
-    ) -> Vec<String> {
+    fn detect_null_fields(&self, task: &Option<String>, context: &[String]) -> Vec<String> {
         let mut null_fields = Vec::new();
         if task.is_none() {
             null_fields.push("task".to_string());

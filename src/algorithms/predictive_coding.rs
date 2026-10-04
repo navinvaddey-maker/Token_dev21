@@ -70,11 +70,11 @@ impl PredictiveCoding {
 
         // Session discount: if user asked about similar tokens, reduce novelty
         let discount = self.session_discount(sparse_tokens, session_history);
-        
+
         // Topology prior adjustment
         let (_, aggressive_prior) = topology_mode_prior(topology.clone());
         let topology_prior = aggressive_prior * 0.15; // Scaled impact
-        
+
         // Final error score adds topology prior to the discounted raw error
         let error_score = (raw_error * (1.0 - discount) + topology_prior).clamp(0.0, 1.0);
 
@@ -116,7 +116,7 @@ impl PredictiveCoding {
                     .and_modify(|count| *count += 1)
                     .or_insert(1);
             } else if weight < 0.0 {
-                // If negative feedback, we "un-learn" these tokens so they trigger 
+                // If negative feedback, we "un-learn" these tokens so they trigger
                 // deeper processing (Aggressive mode) next time.
                 self.schema_priors.entry(key).and_modify(|count| {
                     *count = count.saturating_sub(1);
@@ -208,7 +208,7 @@ pub struct SessionTurn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{PromptTopology};
+    use crate::types::PromptTopology;
     use crate::types::{ScoredToken, TokenSource};
 
     fn make_tokens(words: &[&str]) -> Vec<ScoredToken> {
@@ -252,9 +252,18 @@ mod tests {
         let mut output = crate::types::AlgorithmOutput::default();
         output.input_token_count = 10;
         output.constraint_locks = vec![
-            crate::types::ConstraintToken { text: "fintech".to_string(), weight: 1.0 },
-            crate::types::ConstraintToken { text: "hsm".to_string(), weight: 1.0 },
-            crate::types::ConstraintToken { text: "10m".to_string(), weight: 1.0 },
+            crate::types::ConstraintToken {
+                text: "fintech".to_string(),
+                weight: 1.0,
+            },
+            crate::types::ConstraintToken {
+                text: "hsm".to_string(),
+                weight: 1.0,
+            },
+            crate::types::ConstraintToken {
+                text: "10m".to_string(),
+                weight: 1.0,
+            },
         ];
         let result = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
         assert_eq!(result.mode, Mode::Aggressive);
@@ -280,13 +289,17 @@ mod tests {
     fn apply_feedback_modifies_error_score() {
         let pc = PredictiveCoding::new(Arc::new(DashMap::new()));
         let tokens = make_tokens(&["OAuth2", "PKCE", "fintech"]);
-        let token_strings = vec!["OAuth2".to_string(), "PKCE".to_string(), "fintech".to_string()];
+        let token_strings = vec![
+            "OAuth2".to_string(),
+            "PKCE".to_string(),
+            "fintech".to_string(),
+        ];
 
         let output = crate::types::AlgorithmOutput::default();
-        
+
         // Initial error (high)
         let first = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);
-        
+
         // Positive feedback -> error should drop
         pc.apply_feedback(&token_strings, 1.0);
         let second = pc.compute_error(&tokens, &[], PromptTopology::Linear, &output);

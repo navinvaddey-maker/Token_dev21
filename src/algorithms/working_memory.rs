@@ -88,7 +88,7 @@ impl WorkingMemory {
         let fidelity = Self::estimate_fidelity(slots.len(), capacity);
 
         let mut items: Vec<WmSlot> = slots.to_vec();
-        
+
         items.sort_by(|a, b| {
             b.salience
                 .partial_cmp(&a.salience)
@@ -114,7 +114,7 @@ impl WorkingMemory {
                         let elapsed = slot.last_accessed.elapsed().as_secs_f32();
                         slot.salience *= (-DECAY_LAMBDA * elapsed).exp();
                         slot.last_accessed = std::time::Instant::now();
-                        
+
                         if slot.salience < MIN_SALIENCE_THRESHOLD {
                             to_remove.push(i);
                         }
@@ -132,7 +132,7 @@ impl WorkingMemory {
                         let elapsed = slot.last_accessed.elapsed().as_secs_f32();
                         slot.salience *= (-DECAY_LAMBDA * elapsed).exp();
                         slot.last_accessed = std::time::Instant::now();
-                        
+
                         if slot.salience < MIN_SALIENCE_THRESHOLD {
                             to_remove.push(i);
                         }
@@ -277,7 +277,7 @@ mod tests {
     fn test_decay_over_time() {
         let mut wm = WorkingMemory::new(&Mode::Gentle);
         wm.load(vec![make_slot("decay_me", 1.0)]);
-        
+
         // Instant decay check
         let frame1 = wm.get_context_frame();
         assert!(frame1.items[0].salience <= 1.0);
@@ -285,10 +285,18 @@ mod tests {
         // Sleep for 1 second. Decay should reduce salience.
         // e^(-0.5 * 1) ≈ 0.606
         std::thread::sleep(std::time::Duration::from_millis(1100));
-        
+
         let frame2 = wm.get_context_frame();
-        assert!(frame2.items[0].salience < 0.7, "Salience should have decayed, got {}", frame2.items[0].salience);
-        assert!(frame2.items[0].salience > 0.4, "Salience shouldn't have decayed too much, got {}", frame2.items[0].salience);
+        assert!(
+            frame2.items[0].salience < 0.7,
+            "Salience should have decayed, got {}",
+            frame2.items[0].salience
+        );
+        assert!(
+            frame2.items[0].salience > 0.4,
+            "Salience shouldn't have decayed too much, got {}",
+            frame2.items[0].salience
+        );
     }
 
     #[test]
@@ -296,19 +304,22 @@ mod tests {
         let mut wm = WorkingMemory::new(&Mode::Gentle);
         // Start with very low salience
         wm.load(vec![make_slot("evict_me", 0.06)]);
-        
+
         // Wait for it to fall below 0.05
         // 0.06 * e^(-0.5 * t) < 0.05
         // e^(-0.5 * t) < 0.833
         // -0.5 * t < ln(0.833) ≈ -0.182
         // t > 0.364
         std::thread::sleep(std::time::Duration::from_millis(500));
-        
+
         // Call load or decay to trigger eviction
         wm.decay();
-        
+
         let frame = wm.get_context_frame();
-        assert_eq!(frame.slots_used, 0, "Slot should have been evicted due to low salience");
+        assert_eq!(
+            frame.slots_used, 0,
+            "Slot should have been evicted due to low salience"
+        );
     }
 
     #[test]
@@ -317,10 +328,13 @@ mod tests {
         let mut protected_slot = make_slot("protected", 1.0);
         protected_slot.is_protected = true;
         wm.load(vec![protected_slot]);
-        
+
         std::thread::sleep(std::time::Duration::from_millis(500));
-        
+
         let frame = wm.get_context_frame();
-        assert_eq!(frame.items[0].salience, 1.0, "Protected slots must not decay");
+        assert_eq!(
+            frame.items[0].salience, 1.0,
+            "Protected slots must not decay"
+        );
     }
 }

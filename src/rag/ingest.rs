@@ -1,14 +1,16 @@
+use sha2::{Digest, Sha256};
+use sqlx::SqlitePool;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use sha2::{Sha256, Digest};
+use tracing::{error, info};
 use uuid::Uuid;
-use sqlx::SqlitePool;
-use tracing::{info, error};
 
-use super::types::{ChunkingConfig, DocumentStatus, IngestionResult, RagChunk, RagDocument, ChunkMetadata};
-use super::store::RagStore;
 use super::embeddings::EmbeddingEngine;
+use super::store::RagStore;
+use super::types::{
+    ChunkMetadata, ChunkingConfig, DocumentStatus, IngestionResult, RagChunk, RagDocument,
+};
 
 /// PDF Ingestion Pipeline
 #[allow(dead_code)]
@@ -56,8 +58,15 @@ impl DocumentIngester {
         let content_hash = format!("{:x}", hasher.finalize());
 
         // Check if document already exists for this user
-        if let Ok(Some(existing_doc)) = self.store.find_by_content_hash(user_id, &content_hash).await {
-            info!("Document already exists with hash {}, skipping ingestion", content_hash);
+        if let Ok(Some(existing_doc)) = self
+            .store
+            .find_by_content_hash(user_id, &content_hash)
+            .await
+        {
+            info!(
+                "Document already exists with hash {}, skipping ingestion",
+                content_hash
+            );
             return Ok(IngestionResult {
                 document_id: existing_doc.id,
                 chunks_created: existing_doc.chunk_count.unwrap_or(0) as usize,
@@ -97,11 +106,11 @@ impl DocumentIngester {
 
         let result = tokio::task::spawn_blocking(move || {
             let _temp_store = RagStore::new(store_clone);
-            
+
             // Write PDF bytes to temp file inside workspace
             let temp_filename = format!("temp_upload_{}.pdf", Uuid::new_v4());
             let temp_path = Path::new(&temp_filename);
-            
+
             let mut file = match File::create(temp_path) {
                 Ok(f) => f,
                 Err(e) => {
@@ -158,28 +167,29 @@ impl DocumentIngester {
         match result {
             Ok(Ok((page_count, chunks, detected_domain))) => {
                 let chunk_count = chunks.len();
-                
+
                 // Save all chunks to the database
                 if let Err(e) = self.store.insert_chunks(&chunks).await {
                     error!("Failed to store chunks for document {}: {}", doc_id, e);
-                    let _ = self.store.update_document_status(
-                        &doc_id,
-                        DocumentStatus::Failed,
-                        0,
-                        0,
-                        None,
-                    ).await;
+                    let _ = self
+                        .store
+                        .update_document_status(&doc_id, DocumentStatus::Failed, 0, 0, None)
+                        .await;
                     return Err(format!("Database error writing chunks: {}", e));
                 }
 
                 // Update document to Ready with statistics
-                if let Err(e) = self.store.update_document_status(
-                    &doc_id,
-                    DocumentStatus::Ready,
-                    chunk_count as i64,
-                    page_count as i64,
-                    detected_domain.as_deref(),
-                ).await {
+                if let Err(e) = self
+                    .store
+                    .update_document_status(
+                        &doc_id,
+                        DocumentStatus::Ready,
+                        chunk_count as i64,
+                        page_count as i64,
+                        detected_domain.as_deref(),
+                    )
+                    .await
+                {
                     error!("Failed to update document status for {}: {}", doc_id, e);
                     return Err(format!("Database error updating document metadata: {}", e));
                 }
@@ -195,13 +205,10 @@ impl DocumentIngester {
             }
             Ok(Err(err_msg)) => {
                 error!("Ingestion process failed for {}: {}", doc_id, err_msg);
-                let _ = self.store.update_document_status(
-                    &doc_id,
-                    DocumentStatus::Failed,
-                    0,
-                    0,
-                    None,
-                ).await;
+                let _ = self
+                    .store
+                    .update_document_status(&doc_id, DocumentStatus::Failed, 0, 0, None)
+                    .await;
                 Ok(IngestionResult {
                     document_id: doc_id,
                     chunks_created: 0,
@@ -213,13 +220,10 @@ impl DocumentIngester {
             }
             Err(join_err) => {
                 error!("Ingestion task panicked for {}: {:?}", doc_id, join_err);
-                let _ = self.store.update_document_status(
-                    &doc_id,
-                    DocumentStatus::Failed,
-                    0,
-                    0,
-                    None,
-                ).await;
+                let _ = self
+                    .store
+                    .update_document_status(&doc_id, DocumentStatus::Failed, 0, 0, None)
+                    .await;
                 Ok(IngestionResult {
                     document_id: doc_id,
                     chunks_created: 0,
@@ -232,8 +236,6 @@ impl DocumentIngester {
         }
     }
 }
-
-
 
 /// Simple helper to detect domain from first two pages text
 fn detect_domain(text: &str) -> Option<String> {
@@ -286,7 +288,7 @@ fn chunk_text(pages: &[String], config: &ChunkingConfig) -> Vec<RagChunk> {
 
     for (page_idx, page_text) in pages.iter().enumerate() {
         let page_num = (page_idx + 1) as i64;
-        
+
         // Split page text into words with start/end character offsets
         let mut words = Vec::new();
         let mut start_idx = None;
@@ -310,30 +312,30 @@ fn chunk_text(pages: &[String], config: &ChunkingConfig) -> Vec<RagChunk> {
 
         let chunk_size = config.chunk_size_tokens;
         let overlap = config.overlap_tokens;
-        
+
         let mut i = 0;
         while i < words.len() {
             let end = std::cmp::min(i + chunk_size, words.len());
             let chunk_words = &words[i..end];
-            
+
             let chunk_content = chunk_words
                 .iter()
                 .map(|(_, _, w)| *w)
                 .collect::<Vec<_>>()
                 .join(" ");
-                
+
             let char_offset_start = chunk_words.first().map(|(s, _, _)| *s).unwrap_or(0);
             let char_offset_end = chunk_words.last().map(|(_, e, _)| *e).unwrap_or(0);
-            
+
             let section_title = detect_section_title(&chunk_content);
-            
+
             let metadata = ChunkMetadata {
                 page_number: Some(page_num),
                 section_title,
                 char_offset_start: Some(char_offset_start),
                 char_offset_end: Some(char_offset_end),
             };
-            
+
             let chunk = RagChunk {
                 id: Uuid::new_v4().to_string(),
                 document_id: String::new(), // Filled by caller
@@ -344,14 +346,14 @@ fn chunk_text(pages: &[String], config: &ChunkingConfig) -> Vec<RagChunk> {
                 token_count: Some(chunk_words.len() as i64),
                 created_at: chrono::Utc::now(),
             };
-            
+
             chunks.push(chunk);
             chunk_index += 1;
-            
+
             if end == words.len() {
                 break;
             }
-            
+
             if chunk_size > overlap {
                 i += chunk_size - overlap;
             } else {
@@ -370,7 +372,9 @@ fn detect_section_title(text: &str) -> Option<String> {
         if trimmed.is_empty() {
             continue;
         }
-        if trimmed.len() < 60 && (trimmed.chars().next()?.is_uppercase() || trimmed.to_uppercase() == trimmed) {
+        if trimmed.len() < 60
+            && (trimmed.chars().next()?.is_uppercase() || trimmed.to_uppercase() == trimmed)
+        {
             return Some(trimmed.to_string());
         }
         break;

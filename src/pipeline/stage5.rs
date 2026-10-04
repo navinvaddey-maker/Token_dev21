@@ -28,7 +28,11 @@ impl Stage5 {
                 let injections = DeterminismScopeInjector::inject(
                     &out.resolved_schema.task,
                     &None, // deliverable
-                    &out.resolved_schema.context.iter().cloned().collect::<Vec<_>>(),
+                    &out.resolved_schema
+                        .context
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 );
                 out.scope_injections = if injections.is_empty() {
                     // Fallback to cluster-derived, but filter non-semantic labels
@@ -97,6 +101,9 @@ mod tests {
             ..Default::default()
         };
         stage5.run(&mut out);
-        assert_eq!(out.scope_injections, vec!["Consider optimization".to_string()]);
+        assert_eq!(
+            out.scope_injections,
+            vec!["Consider optimization".to_string()]
+        );
     }
 }

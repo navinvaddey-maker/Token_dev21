@@ -1,18 +1,16 @@
-pub mod signal;
-pub mod similarity;
 pub mod expertise;
 pub mod intent_rule;
+pub mod signal;
+pub mod similarity;
 
 use crate::rag::embeddings::EmbeddingEngine;
-use sqlx::SqlitePool;
-use signal::{ScenarioSignal, ScenarioRow};
-use similarity::{
-    deserialize_vector_blob,
-    select_top_k_archetypes,
-    compute_confidence_from_rankings,
-};
 use expertise::detect_expertise_from_query;
 use intent_rule::{hash_margin_allows, resolve_prompt_rules};
+use signal::{ScenarioRow, ScenarioSignal};
+use similarity::{
+    compute_confidence_from_rankings, deserialize_vector_blob, select_top_k_archetypes,
+};
+use sqlx::SqlitePool;
 
 /// Number of archetypes to rank during top-k selection.
 const ARCHETYPE_TOP_K: usize = 3;
@@ -53,9 +51,13 @@ impl<'a> ScenarioClassifier<'a> {
         let query_vec = self.engine.embed(raw_query);
 
         // Step 2: Load all seeded archetypes from the scenario_index table.
-        let rows = self.load_seeded_archetype_rows().await.map_err(|e| {
-            tracing::warn!("ScenarioClassifier: failed to load archetypes: {}", e);
-        }).ok()?;
+        let rows = self
+            .load_seeded_archetype_rows()
+            .await
+            .map_err(|e| {
+                tracing::warn!("ScenarioClassifier: failed to load archetypes: {}", e);
+            })
+            .ok()?;
 
         if rows.is_empty() {
             tracing::warn!("ScenarioClassifier: scenario_index is empty — returning None");
@@ -66,13 +68,15 @@ impl<'a> ScenarioClassifier<'a> {
         let candidates: Vec<(Vec<f32>, String, String, String, String)> = rows
             .iter()
             .filter(|row| !row.vector_blob.is_empty())
-            .map(|row| (
-                deserialize_vector_blob(&row.vector_blob),
-                row.domain.clone(),
-                row.task_type.clone(),
-                row.expertise.clone(),
-                row.intent_class.clone(),
-            ))
+            .map(|row| {
+                (
+                    deserialize_vector_blob(&row.vector_blob),
+                    row.domain.clone(),
+                    row.task_type.clone(),
+                    row.expertise.clone(),
+                    row.intent_class.clone(),
+                )
+            })
             .collect();
 
         // Step 4: Rank archetypes by cosine similarity to the query vector.
@@ -91,7 +95,9 @@ impl<'a> ScenarioClassifier<'a> {
         {
             tracing::debug!(
                 "ScenarioClassifier: abstaining (confidence {:.2}, top {:.2}, second {:?})",
-                confidence, ranked[0].score, second
+                confidence,
+                ranked[0].score,
+                second
             );
             return None;
         }
@@ -116,9 +122,11 @@ impl<'a> ScenarioClassifier<'a> {
     }
 
     /// Seeds the scenario_index table by embedding all unseeded archetype example queries.
-    pub async fn seed_archetype_vectors_on_startup(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn seed_archetype_vectors_on_startup(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let unseeded_rows = sqlx::query_as::<_, (i64, String)>(
-            "SELECT id, example_query FROM scenario_index WHERE length(vector_blob) = 0"
+            "SELECT id, example_query FROM scenario_index WHERE length(vector_blob) = 0",
         )
         .fetch_all(self.pool)
         .await?;
@@ -134,10 +142,7 @@ impl<'a> ScenarioClassifier<'a> {
                 .await?;
         }
 
-        tracing::info!(
-            "ScenarioClassifier: seeded {} archetype vectors",
-            count
-        );
+        tracing::info!("ScenarioClassifier: seeded {} archetype vectors", count);
         Ok(())
     }
 
@@ -145,15 +150,23 @@ impl<'a> ScenarioClassifier<'a> {
         let rows = sqlx::query_as::<_, (String, String, String, String, String, Vec<u8>)>(
             "SELECT label, domain, task_type, expertise, intent_class, vector_blob
              FROM scenario_index
-             WHERE length(vector_blob) > 0"
+             WHERE length(vector_blob) > 0",
         )
         .fetch_all(self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|(label, domain, task_type, expertise, intent_class, vector_blob)| {
-            ScenarioRow {
-                label, domain, task_type, expertise, intent_class, vector_blob,
-            }
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(
+                |(label, domain, task_type, expertise, intent_class, vector_blob)| ScenarioRow {
+                    label,
+                    domain,
+                    task_type,
+                    expertise,
+                    intent_class,
+                    vector_blob,
+                },
+            )
+            .collect())
     }
 }

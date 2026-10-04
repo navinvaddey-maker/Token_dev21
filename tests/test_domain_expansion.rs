@@ -1,12 +1,14 @@
-use token_compress_engine::npae::aggressive::config::ConfigLoader;
-use token_compress_engine::npae::aggressive::intent::{extract_with_config, IntentProfile, IntentClass, KnowledgeLevel};
-use token_compress_engine::npae::schema::types::DeliverableType;
-use token_compress_engine::npae::aggressive::role::generate_role;
-use token_compress_engine::npae::aggressive::structurer::render_crisp_prompt;
-use token_compress_engine::npae::aggressive::resolver::ResolvedPrompt;
-use token_compress_engine::npae::aggressive::structurer;
-use token_compress_engine::npae::compression::types::{CompressedRepr, StageMetrics};
 use dashmap::DashMap;
+use token_compress_engine::npae::aggressive::config::ConfigLoader;
+use token_compress_engine::npae::aggressive::intent::{
+    extract_with_config, IntentClass, IntentProfile, KnowledgeLevel,
+};
+use token_compress_engine::npae::aggressive::resolver::ResolvedPrompt;
+use token_compress_engine::npae::aggressive::role::generate_role;
+use token_compress_engine::npae::aggressive::structurer;
+use token_compress_engine::npae::aggressive::structurer::render_crisp_prompt;
+use token_compress_engine::npae::compression::types::{CompressedRepr, StageMetrics};
+use token_compress_engine::npae::schema::types::DeliverableType;
 
 fn mock_compressed_repr(intent_vec: Vec<f32>) -> CompressedRepr {
     CompressedRepr {
@@ -64,8 +66,15 @@ fn test_finance_income_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
-.expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("WEALTH & INCOME STRATEGIST"));
@@ -81,7 +90,8 @@ fn test_finance_earn_millions_e2e_intent_and_structuring() {
 
     let repr = mock_compressed_repr(vec![0.9, 0.1, 0.1, 0.1, 0.1]);
 
-    let profile = extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
+    let profile =
+        extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
     assert_eq!(profile.domain, "finance");
     assert_eq!(profile.dynamic_subject, Some("Millions".to_string()));
 
@@ -97,8 +107,15 @@ fn test_finance_earn_millions_e2e_intent_and_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
-.expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("WEALTH & INCOME STRATEGIST"));
@@ -116,7 +133,8 @@ fn test_finance_wealth_passive_income_e2e() {
 
     let repr = mock_compressed_repr(vec![0.9, 0.1, 0.1, 0.1, 0.1]);
 
-    let profile = extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
+    let profile =
+        extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
     assert_eq!(profile.domain, "finance");
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);
@@ -164,8 +182,15 @@ fn test_computers_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
-.expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("COMPUTER SYSTEMS ARCHITECT"));
@@ -214,8 +239,15 @@ fn test_science_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
-.expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("LEAD RESEARCH SCIENTIST"));
@@ -230,7 +262,8 @@ fn test_health_structuring_e2e() {
 
     let repr = mock_compressed_repr(vec![0.9, 0.1, 0.1, 0.1, 0.1]);
 
-    let profile = extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
+    let profile =
+        extract_with_config(&repr, raw_input, Some(&config)).expect("Failed to extract intent");
     assert_eq!(profile.domain, "health");
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);
@@ -245,8 +278,15 @@ fn test_health_structuring_e2e() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None)
-.expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 
     assert!(rendered.contains("CLINICAL HEALTH SPECIALIST"));
@@ -257,7 +297,8 @@ fn test_health_structuring_e2e() {
 
 #[test]
 fn test_pharma_wealthiest_e2e() {
-    let raw_input = "I want to become wealthiest men in the pharma industry. how where can I start from";
+    let raw_input =
+        "I want to become wealthiest men in the pharma industry. how where can I start from";
     let verdict = token_compress_engine::classifier::intent_rule::resolve_prompt_rules(raw_input)
         .expect("Should resolve rule verdict for pharma wealth build prompt");
     assert_eq!(verdict.primary_role, "Business Strategist");

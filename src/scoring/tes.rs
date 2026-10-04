@@ -33,7 +33,10 @@ impl TokenEfficiencyScorer {
     ///   compression_savings = 1.0 - (output_tokens / input_tokens)
     ///   preservation_factor = bonus for keeping content within useful range
     ///   issue_penalty = field validation issues reduce score
-    pub fn score(output: &AlgorithmOutput, field_issues: &[FieldValidationIssue]) -> (f32, Vec<FieldValidationIssue>) {
+    pub fn score(
+        output: &AlgorithmOutput,
+        field_issues: &[FieldValidationIssue],
+    ) -> (f32, Vec<FieldValidationIssue>) {
         let raw = Self::calculate_raw(
             output.input_token_count,
             output.output_token_count,
@@ -53,7 +56,7 @@ impl TokenEfficiencyScorer {
         }
 
         let compression_ratio = output_tokens as f32 / input_tokens as f32;
-        
+
         // Savings = 1.0 - ratio. Expansion (ratio > 1.0) results in 0 savings.
         let savings = (1.0 - compression_ratio).max(0.0);
 
@@ -89,7 +92,11 @@ mod tests {
         };
         let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
         // 50% savings → base = 0.5^0.32 ≈ 0.8 → score = 8.0
-        assert!((score - 8.0).abs() < 0.1, "50% compression should score ~8.0, got {}", score);
+        assert!(
+            (score - 8.0).abs() < 0.1,
+            "50% compression should score ~8.0, got {}",
+            score
+        );
     }
 
     #[test]
@@ -128,7 +135,11 @@ mod tests {
         };
         let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
         // 20% savings → base = 0.2^0.32 ≈ 0.597 → score ≈ 5.97
-        assert!((score - 5.97).abs() < 0.01, "20% compression should score ~5.97, got {}", score);
+        assert!(
+            (score - 5.97).abs() < 0.01,
+            "20% compression should score ~5.97, got {}",
+            score
+        );
     }
 
     #[test]
@@ -141,7 +152,11 @@ mod tests {
         };
         let (score, _) = TokenEfficiencyScorer::score(&output, &[]);
         // 90% savings → base = 0.9^0.32 ≈ 0.966 → score ≈ 9.66
-        assert!(score > 9.0, "High compression should be rewarded if no issues, got {}", score);
+        assert!(
+            score > 9.0,
+            "High compression should be rewarded if no issues, got {}",
+            score
+        );
     }
 
     #[test]
@@ -151,18 +166,21 @@ mod tests {
             output_token_count: 50,
             ..Default::default()
         };
-        let field_issues = vec![
-            FieldValidationIssue {
-                field_name: "task".to_string(),
-                issue_type: "type_mismatch".to_string(),
-                description: "Task field expects String but got Number".to_string(),
-                severity: "error".to_string(),
-            },
-        ];
+        let field_issues = vec![FieldValidationIssue {
+            field_name: "task".to_string(),
+            issue_type: "type_mismatch".to_string(),
+            description: "Task field expects String but got Number".to_string(),
+            severity: "error".to_string(),
+        }];
         let (score, _) = TokenEfficiencyScorer::score(&output, &field_issues);
         let (clean_score, _) = TokenEfficiencyScorer::score(&output, &[]);
         // Score with issues should be lower than without
-        assert!(score < clean_score, "Issues should reduce score: {} vs {}", score, clean_score);
+        assert!(
+            score < clean_score,
+            "Issues should reduce score: {} vs {}",
+            score,
+            clean_score
+        );
     }
 
     #[test]
@@ -184,10 +202,10 @@ mod tests {
             output_token_count: out,
             ..Default::default()
         };
-        let (high, _) = TokenEfficiencyScorer::score(&make_output(100, 10), &[]);     // 90% savings
-        let (good, _) = TokenEfficiencyScorer::score(&make_output(100, 50), &[]);     // 50% savings
-        let (light, _) = TokenEfficiencyScorer::score(&make_output(100, 80), &[]);    // 20% savings
-        let (none, _) = TokenEfficiencyScorer::score(&make_output(100, 100), &[]);    // 0% savings
+        let (high, _) = TokenEfficiencyScorer::score(&make_output(100, 10), &[]); // 90% savings
+        let (good, _) = TokenEfficiencyScorer::score(&make_output(100, 50), &[]); // 50% savings
+        let (light, _) = TokenEfficiencyScorer::score(&make_output(100, 80), &[]); // 20% savings
+        let (none, _) = TokenEfficiencyScorer::score(&make_output(100, 100), &[]); // 0% savings
 
         assert!(high > good, "High > Good: {} > {}", high, good);
         assert!(good > light, "Good > Light: {} > {}", good, light);

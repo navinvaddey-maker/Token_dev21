@@ -31,7 +31,9 @@ pub struct DualScore {
     pub sfs: f32,
 }
 impl DualScore {
-    pub fn combined(&self) -> f32 { self.tes + self.sfs }
+    pub fn combined(&self) -> f32 {
+        self.tes + self.sfs
+    }
 }
 
 const DEGRADATION_THRESHOLD: f32 = 1.0;
@@ -39,13 +41,13 @@ const DEGRADATION_THRESHOLD: f32 = 1.0;
 #[async_trait::async_trait]
 pub trait PromptFrameRepository {
     async fn rollback_to(&self, version_id: uuid::Uuid) -> Result<(), sqlx::Error>;
-    
+
     async fn find_last_stable_version(&self) -> Result<PromptFrameVersion, sqlx::Error>;
-    
+
     async fn auto_rollback_if_degraded(
-        &self, 
-        current_scores: DualScore, 
-        baseline: DualScore
+        &self,
+        current_scores: DualScore,
+        baseline: DualScore,
     ) -> Result<(), sqlx::Error> {
         if current_scores.combined() < baseline.combined() - DEGRADATION_THRESHOLD {
             let stable = self.find_last_stable_version().await?;
@@ -54,4 +56,3 @@ pub trait PromptFrameRepository {
         Ok(())
     }
 }
-

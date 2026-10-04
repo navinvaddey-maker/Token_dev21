@@ -1,20 +1,20 @@
-use crate::npae::schema::types::HallucinationGuardConfig;
 use crate::npae::hallucination::l1_critique;
 use crate::npae::hallucination::l2_confidence;
 use crate::npae::hallucination::l3_constraint;
+use crate::npae::schema::types::HallucinationGuardConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LayerReport {
     pub layer_id: u8,
-    pub passed:   bool,
-    pub flags:    Vec<String>,
+    pub passed: bool,
+    pub flags: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HallucinationReport {
-    pub passed:      bool,
-    pub layers:      [LayerReport; 3],
+    pub passed: bool,
+    pub layers: [LayerReport; 3],
     pub remediation: Option<String>,
 }
 
@@ -50,15 +50,13 @@ fn derive_remediation(l1: &LayerReport, l2: &LayerReport, l3: &LayerReport) -> S
         return "Low confidence on certain claims. Wrap with [UNCERTAIN] marker.".into();
     }
     if !l3.passed {
-        return "Constraint violation detected. Check output formatting or forbidden topics.".into();
+        return "Constraint violation detected. Check output formatting or forbidden topics."
+            .into();
     }
     "Unknown".into()
 }
 
-pub fn remediate_hallucination(
-    output: &str,
-    report: &HallucinationReport,
-) -> String {
+pub fn remediate_hallucination(output: &str, report: &HallucinationReport) -> String {
     let mut corrected = output.to_string();
     if !report.passed {
         // Apply L1 contradiction correction: prompt forbids JSON, so remove JSON structural braces
@@ -124,14 +122,21 @@ mod tests {
         assert!(report.remediation.is_some());
 
         let corrected = remediate_hallucination(output, &report);
-        assert_eq!(corrected, " Here is [UNCERTAIN]magic_token and /* REMOVED: fake_api_call */ ");
+        assert_eq!(
+            corrected,
+            " Here is [UNCERTAIN]magic_token and /* REMOVED: fake_api_call */ "
+        );
 
         // Re-running on corrected should pass or be much better
         let report_after = run_tri_layer(&corrected, original_prompt, &cfg).unwrap();
-        assert!(report_after.layers[0].passed, "L1 should pass since braces were stripped");
+        assert!(
+            report_after.layers[0].passed,
+            "L1 should pass since braces were stripped"
+        );
         assert!(!report_after.layers[1].passed, "L2 remains failed because magic_token is still in the text, but now with uncertainty prefix");
-        assert!(report_after.layers[2].passed, "L3 should pass since fake_api_call was removed");
+        assert!(
+            report_after.layers[2].passed,
+            "L3 should pass since fake_api_call was removed"
+        );
     }
 }
-
-

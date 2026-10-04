@@ -7,6 +7,7 @@
       "parser": "legal_parser_v1",
       "gap_check_rules": ["clause_completeness", "jurisdiction_check", "liability_cap"],
       "rag_namespace": "legal_docs",
+      "min_similarity": 0.45,
       "tool_allowlist": ["internal_statute_lookup", "internal_clause_indexer"],
       "output_contract": "6_section_legal",
       "disclaimer_text": "DISCLAIMER: Legal guidance requires qualified counsel. This summary is derived strictly from internal repository indices."
@@ -18,6 +19,7 @@
       "parser": "business_parser_v1",
       "gap_check_rules": ["revenue_model_check", "market_scope_check"],
       "rag_namespace": "business_strategy",
+      "min_similarity": 0.45,
       "tool_allowlist": ["internal_metrics_lookup"],
       "output_contract": "6_section_business",
       "disclaimer_text": "DISCLAIMER: Business strategy recommendations based strictly on internal strategy records."
@@ -29,6 +31,7 @@
       "parser": "finance_parser_v1",
       "gap_check_rules": ["audit_trail_check", "cap_table_validation"],
       "rag_namespace": "financial_records",
+      "min_similarity": 0.45,
       "tool_allowlist": ["internal_ledger_lookup"],
       "output_contract": "6_section_finance",
       "disclaimer_text": "DISCLAIMER: Financial calculations derived strictly from internal audit records."

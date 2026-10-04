@@ -11,6 +11,8 @@ pub struct ScenarioDomainConfig {
     pub parser: String,
     pub gap_check_rules: Vec<String>,
     pub rag_namespace: String,
+    #[serde(default)]
+    pub min_similarity: Option<f32>,
     pub tool_allowlist: Vec<String>,
     pub output_contract: String,
     pub disclaimer_text: String,
@@ -27,12 +29,18 @@ impl ScenarioDomainRegistry {
             .map_err(|e| format!("Failed to read domain registry file '{}': {}", path, e))?;
         let registry: ScenarioDomainRegistry = serde_json::from_str(&content)
             .map_err(|e| format!("Failed to parse domain registry JSON: {}", e))?;
-        info!("Loaded {} scenario domains from {}", registry.domains.len(), path);
+        info!(
+            "Loaded {} scenario domains from {}",
+            registry.domains.len(),
+            path
+        );
         Ok(registry)
     }
 
     pub fn get_domain(&self, key: &str) -> Option<&ScenarioDomainConfig> {
-        self.domains.iter().find(|d| d.key.eq_ignore_ascii_case(key))
+        self.domains
+            .iter()
+            .find(|d| d.key.eq_ignore_ascii_case(key))
     }
 }
 
@@ -68,7 +76,11 @@ impl ScenarioStyleRegistry {
             }
         }
 
-        info!("Loaded and validated {} scenario styles from {}", registry.styles.len(), path);
+        info!(
+            "Loaded and validated {} scenario styles from {}",
+            registry.styles.len(),
+            path
+        );
         Ok(registry)
     }
 

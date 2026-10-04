@@ -1,11 +1,10 @@
-use std::sync::Arc;
+use crate::types::TextCorrection;
+use harper_core::linting::{LintGroup, Linter, Suggestion};
+use harper_core::spell::FstDictionary;
+use harper_core::{Dialect, Document};
 use lazy_static::lazy_static;
 use regex::Regex;
-use harper_core::linting::{Linter, LintGroup, Suggestion};
-use harper_core::spell::FstDictionary;
-use harper_core::{Document, Dialect};
-use crate::types::TextCorrection;
-
+use std::sync::Arc;
 
 lazy_static! {
     /// Regex pattern to detect numbers, decimals, percentages, currencies, dates, and units that MUST NEVER BE TOUCHED
@@ -68,11 +67,14 @@ impl GrammarCorrector {
         for lint in sorted_lints {
             if let Some(first_suggestion) = lint.suggestions.first() {
                 let replacement_str = match first_suggestion {
-                    Suggestion::ReplaceWith(tokens) => tokens.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(""),
+                    Suggestion::ReplaceWith(tokens) => tokens
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(""),
                     Suggestion::Remove => "".to_string(),
                     _ => continue,
                 };
-
 
                 let start = lint.span.start;
                 let end = lint.span.end;
@@ -81,7 +83,9 @@ impl GrammarCorrector {
                     let original_span: String = chars[start..end].iter().collect();
 
                     // Skip replacing if span contains placeholder markers
-                    if original_span.contains("__NUM_PROT_") || replacement_str.contains("__NUM_PROT_") {
+                    if original_span.contains("__NUM_PROT_")
+                        || replacement_str.contains("__NUM_PROT_")
+                    {
                         continue;
                     }
 
@@ -159,10 +163,20 @@ mod tests {
 
     #[test]
     fn test_domain_typo_correction() {
-        let (corrected, _) = GrammarCorrector::correct("I want to become wealthiest men in the dharma industry. How where can I start from");
-        assert!(corrected.contains("pharma industry"), "Expected dharma to be corrected to pharma, got: {}", corrected);
+        let (corrected, _) = GrammarCorrector::correct(
+            "I want to become wealthiest men in the dharma industry. How where can I start from",
+        );
+        assert!(
+            corrected.contains("pharma industry"),
+            "Expected dharma to be corrected to pharma, got: {}",
+            corrected
+        );
 
         let (corrected2, _) = GrammarCorrector::correct("Become the richest mogul in dhrama");
-        assert!(corrected2.contains("pharma"), "Expected dhrama to be corrected to pharma, got: {}", corrected2);
+        assert!(
+            corrected2.contains("pharma"),
+            "Expected dhrama to be corrected to pharma, got: {}",
+            corrected2
+        );
     }
 }

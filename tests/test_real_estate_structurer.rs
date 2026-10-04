@@ -1,15 +1,16 @@
 use token_compress_engine::npae::aggressive::config::ConfigLoader;
-use token_compress_engine::npae::aggressive::intent::{IntentProfile, IntentClass, KnowledgeLevel};
-use token_compress_engine::npae::schema::types::DeliverableType;
-use token_compress_engine::npae::aggressive::role::generate_role;
-use token_compress_engine::npae::aggressive::structurer::render_crisp_prompt;
+use token_compress_engine::npae::aggressive::intent::{IntentClass, IntentProfile, KnowledgeLevel};
 use token_compress_engine::npae::aggressive::resolver::ResolvedPrompt;
+use token_compress_engine::npae::aggressive::role::generate_role;
 use token_compress_engine::npae::aggressive::structurer;
+use token_compress_engine::npae::aggressive::structurer::render_crisp_prompt;
+use token_compress_engine::npae::schema::types::DeliverableType;
 
 #[test]
 fn test_real_estate_prompt_structuring() {
     let config = ConfigLoader::load("config/unified.json").expect("Failed to load unified.json");
-    let raw_input = "I want to become real estate agent. need to build good company tell me the steps";
+    let raw_input =
+        "I want to become real estate agent. need to build good company tell me the steps";
 
     let profile = IntentProfile {
         primary_intent: IntentClass::Build,
@@ -47,7 +48,15 @@ fn test_real_estate_prompt_structuring() {
     };
 
     let reconstructed = token_compress_engine::types::ReconstructedInput::default();
-    let structured = structurer::build(&profile, raw_input, &resolved, Some(&config), &reconstructed, None).expect("Failed to build structured prompt");
+    let structured = structurer::build(
+        &profile,
+        raw_input,
+        &resolved,
+        Some(&config),
+        &reconstructed,
+        None,
+    )
+    .expect("Failed to build structured prompt");
 
     let rendered = render_crisp_prompt(&structured, &[], raw_input);
 

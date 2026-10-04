@@ -1,30 +1,106 @@
+use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use super::types::EMBEDDING_DIM;
 
-/// A lightweight, local embedding engine that produces fixed-dimension vectors
-/// from text without requiring any external ML model or API.
+/// Globally shared in-process neural embedding model loaded once.
+static FASTEMBED_MODEL: Lazy<Option<Mutex<TextEmbedding>>> = Lazy::new(|| {
+    let mut options = TextInitOptions::default();
+    options.model_name = EmbeddingModel::AllMiniLML6V2;
+    options.show_download_progress = false;
+
+    match TextEmbedding::try_new(options) {
+        Ok(model) => Some(Mutex::new(model)),
+        Err(e) => {
+            tracing::debug!("FastEmbed local initialization deferred/offline ({}). Using deterministic feature hash fallback.", e);
+            None
+        }
+    }
+});
+
+/// A hybrid embedding engine that produces fixed-dimension (384) vectors from text.
 ///
-/// Uses a deterministic hash-based projection (random indexing / feature hashing)
-/// combined with TF-IDF-style term weighting. This approach:
-/// - Requires zero setup (no model downloads)
-/// - Is deterministic (same text → same vector)
-/// - Is fast (~microseconds per embedding)
-/// - Produces vectors suitable for cosine similarity retrieval
+/// Features:
+/// - Primary: In-process quantized ONNX neural embedding model (`all-MiniLM-L6-v2`) via `fastembed-rs`.
+///   Runs 100% locally on CPU SIMD with zero cloud API costs.
+/// - Fallback: Deterministic feature hashing (random indexing) with TF-IDF term weighting.
+///   Ensures 100% availability in offline, test, or constrained environments.
 ///
-/// For production-grade semantic similarity, replace the `embed()` method with
-/// a call to `rust-bert` sentence-transformers or `fastembed-rs`.
+/// # Invariants
+/// The returned embedding is always of length `EMBEDDING_DIM` (384) and L2-normalized.
 pub struct EmbeddingEngine {
     dim: usize,
 }
 
+impl Default for EmbeddingEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmbeddingEngine {
+    /// Constructs a new `EmbeddingEngine`.
     pub fn new() -> Self {
+        // Force lazy initialization on startup
+        let _ = &*FASTEMBED_MODEL;
         Self { dim: EMBEDDING_DIM }
     }
 
     /// Embed a single text string into a fixed-dimension f32 vector.
     pub fn embed(&self, text: &str) -> Vec<f32> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return vec![0.0; self.dim];
+        }
+
+        // 1. Try local neural embedding via fastembed if available
+        if let Some(ref mutex) = *FASTEMBED_MODEL {
+            if let Ok(mut model) = mutex.lock() {
+                if let Ok(mut embeddings) = model.embed(vec![trimmed], None) {
+                    if let Some(mut vec) = embeddings.pop() {
+                        if vec.len() == self.dim {
+                            l2_normalize(&mut vec);
+                            return vec;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Fallback to deterministic TF-IDF feature hashing
+        self.embed_hash_fallback(trimmed)
+    }
+
+    /// Embed multiple texts — convenience batch method.
+    pub fn embed_batch(&self, texts: &[String]) -> Vec<Vec<f32>> {
+        if texts.is_empty() {
+            return Vec::new();
+        }
+
+        if let Some(ref mutex) = *FASTEMBED_MODEL {
+            if let Ok(mut model) = mutex.lock() {
+                let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+                if let Ok(embeddings) = model.embed(refs, None) {
+                    if embeddings.len() == texts.len() {
+                        return embeddings
+                            .into_iter()
+                            .map(|mut v| {
+                                l2_normalize(&mut v);
+                                v
+                            })
+                            .collect();
+                    }
+                }
+            }
+        }
+
+        texts.iter().map(|t| self.embed_hash_fallback(t)).collect()
+    }
+
+    /// Deterministic FNV-1a hash projection fallback.
+    fn embed_hash_fallback(&self, text: &str) -> Vec<f32> {
         let tokens = tokenize(text);
         if tokens.is_empty() {
             return vec![0.0; self.dim];
@@ -48,7 +124,7 @@ impl EmbeddingEngine {
             let hash = stable_hash(token);
             let idx = (hash as usize) % self.dim;
             // Use sign from second hash to reduce collision bias
-            let sign = if stable_hash_secondary(token) % 2 == 0 {
+            let sign = if stable_hash_secondary(token).is_multiple_of(2) {
                 1.0
             } else {
                 -1.0
@@ -59,11 +135,6 @@ impl EmbeddingEngine {
         // L2 normalize for cosine similarity compatibility
         l2_normalize(&mut embedding);
         embedding
-    }
-
-    /// Embed multiple texts — convenience batch method.
-    pub fn embed_batch(&self, texts: &[String]) -> Vec<Vec<f32>> {
-        texts.iter().map(|t| self.embed(t)).collect()
     }
 }
 
@@ -122,14 +193,77 @@ fn l2_normalize(v: &mut [f32]) {
 fn is_stop_word(s: &str) -> bool {
     matches!(
         s,
-        "the" | "is" | "at" | "in" | "on" | "of" | "to" | "a" | "an" | "and" | "or"
-        | "it" | "by" | "as" | "be" | "do" | "if" | "so" | "we" | "he" | "up" | "no"
-        | "my" | "me" | "am" | "was" | "are" | "has" | "had" | "not" | "but" | "for"
-        | "this" | "that" | "with" | "from" | "they" | "been" | "have" | "its"
-        | "will" | "would" | "could" | "should" | "their" | "what" | "which"
-        | "when" | "where" | "how" | "who" | "whom" | "than" | "then" | "these"
-        | "those" | "each" | "every" | "all" | "both" | "few" | "more" | "most"
-        | "other" | "some" | "such" | "only" | "own" | "into" | "over" | "after"
+        "the"
+            | "is"
+            | "at"
+            | "in"
+            | "on"
+            | "of"
+            | "to"
+            | "a"
+            | "an"
+            | "and"
+            | "or"
+            | "it"
+            | "by"
+            | "as"
+            | "be"
+            | "do"
+            | "if"
+            | "so"
+            | "we"
+            | "he"
+            | "up"
+            | "no"
+            | "my"
+            | "me"
+            | "am"
+            | "was"
+            | "are"
+            | "has"
+            | "had"
+            | "not"
+            | "but"
+            | "for"
+            | "this"
+            | "that"
+            | "with"
+            | "from"
+            | "they"
+            | "been"
+            | "have"
+            | "its"
+            | "will"
+            | "would"
+            | "could"
+            | "should"
+            | "their"
+            | "what"
+            | "which"
+            | "when"
+            | "where"
+            | "how"
+            | "who"
+            | "whom"
+            | "than"
+            | "then"
+            | "these"
+            | "those"
+            | "each"
+            | "every"
+            | "all"
+            | "both"
+            | "few"
+            | "more"
+            | "most"
+            | "other"
+            | "some"
+            | "such"
+            | "only"
+            | "own"
+            | "into"
+            | "over"
+            | "after"
     )
 }
 

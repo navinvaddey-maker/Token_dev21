@@ -4,7 +4,7 @@
 //! with a matching fingerprint, it can retrieve the cached blueprint instead of
 //! regenerating from scratch.
 
-use crate::npae::ory::types::{LearnedIntent, DynamicBlueprint, LearnedPattern, PatternOutcome};
+use crate::npae::ory::types::{DynamicBlueprint, LearnedIntent, LearnedPattern, PatternOutcome};
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ pub struct PatternMemory {
 impl PatternMemory {
     /// Create empty in-memory store
     pub fn new() -> Self {
-        Self { 
+        Self {
             patterns: HashMap::new(),
             dirty: false,
         }
@@ -25,11 +25,9 @@ impl PatternMemory {
 
     /// Load patterns from SQLite
     pub async fn load_from_db(pool: &sqlx::SqlitePool) -> Result<Self> {
-        let rows = sqlx::query_as::<_, LearnedPattern>(
-            "SELECT * FROM learned_patterns"
-        )
-        .fetch_all(pool)
-        .await?;
+        let rows = sqlx::query_as::<_, LearnedPattern>("SELECT * FROM learned_patterns")
+            .fetch_all(pool)
+            .await?;
 
         let mut patterns = HashMap::new();
         for p in rows {
@@ -114,7 +112,8 @@ impl PatternMemory {
         let bp_json = serde_json::to_string(blueprint)?;
         let now = Utc::now();
 
-        let entry = self.patterns
+        let entry = self
+            .patterns
             .entry(intent.intent_fingerprint.clone())
             .or_insert_with(|| LearnedPattern {
                 pattern_id: format!("pat-{}", uuid::Uuid::new_v4()),
@@ -153,9 +152,8 @@ impl PatternMemory {
     /// Prune low-quality patterns (success_rate < 0.3 and usage > 5)
     pub fn prune(&mut self) {
         let old_len = self.patterns.len();
-        self.patterns.retain(|_, p| {
-            !(p.usage_count > 5 && p.success_rate < 0.3)
-        });
+        self.patterns
+            .retain(|_, p| !(p.usage_count > 5 && p.success_rate < 0.3));
         if self.patterns.len() < old_len {
             self.dirty = true;
         }

@@ -2,11 +2,9 @@ use dashmap::DashMap;
 use std::sync::Arc;
 
 use crate::{
-    algorithms::{
-        field_validator::FieldTypeValidator,
-        predictive_coding::PredictiveCoding,
-    },
+    algorithms::{field_validator::FieldTypeValidator, predictive_coding::PredictiveCoding},
     engine::reconstruction::TokenReconstructor,
+    npae::aggressive::config::ConfigHandle,
     pipeline::{
         stage0_normalize::NormalizationPrePass, stage0b_topology::TopologyClassifier,
         stage1::Stage1, stage2::Stage2, stage3::Stage3, stage4::Stage4, stage5::Stage5,
@@ -16,10 +14,9 @@ use crate::{
     scoring::tes::TokenEfficiencyScorer,
     session::SessionHistory,
     types::{
-        AlgorithmOutput, CompressionResponse, CorrectionCycle, FieldValidationIssue,
-        NormalizationResult, OrdinalSequence, PromptTopology, OrchestratorResponse, Mode,
+        AlgorithmOutput, CompressionResponse, CorrectionCycle, FieldValidationIssue, Mode,
+        NormalizationResult, OrchestratorResponse, OrdinalSequence, PromptTopology,
     },
-    npae::aggressive::config::ConfigHandle,
 };
 
 /// Orchestrates the token compression pipeline stages as specified in the refinements guide.
@@ -75,18 +72,24 @@ impl PipelineOrchestrator {
             stage6a,
             stage6b: crate::pipeline::stage6b::Stage6b::new(),
             _correction_cycle: correction_cycle,
-            npae_config_handle: Arc::new(ConfigHandle::new(crate::npae::aggressive::config::UnifiedConfig {
-                domain_taxonomy: vec![],
-                roles: vec![],
-                constraints: vec![],
-            })), // Fallback if not injected properly, though we will inject via build
+            npae_config_handle: Arc::new(ConfigHandle::new(
+                crate::npae::aggressive::config::UnifiedConfig {
+                    domain_taxonomy: vec![],
+                    roles: vec![],
+                    constraints: vec![],
+                },
+            )), // Fallback if not injected properly, though we will inject via build
             ory_engine,
         }
     }
 
     /// Build orchestrator from shared schema priors — convenience factory.
     /// All 12 stage components are constructed internally with defaults.
-    pub fn build(schema_priors: Arc<DashMap<String, u32>>, npae_config_handle: Arc<ConfigHandle>, ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>) -> Self {
+    pub fn build(
+        schema_priors: Arc<DashMap<String, u32>>,
+        npae_config_handle: Arc<ConfigHandle>,
+        ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
+    ) -> Self {
         Self::build_with_pool(schema_priors, npae_config_handle, ory_engine, None)
     }
 
@@ -138,30 +141,38 @@ impl PipelineOrchestrator {
         output.constraint_locks = reconstructed.constraint_locks.clone();
         output.ambiguity_register = reconstructed.ambiguity_register.clone();
         output.input_structure_score = reconstructed.input_structure_score;
-        
-        output.clusters = reconstructed.clusters.values()
+
+        output.clusters = reconstructed
+            .clusters
+            .values()
             .map(|tokens| tokens.iter().map(|t| t.text.clone()).collect())
             .collect();
-        output.cluster_labels = reconstructed.clusters.keys()
+        output.cluster_labels = reconstructed
+            .clusters
+            .keys()
             .map(|k| format!("{:?}", k))
             .collect();
-        
+
         // Extract expected deliverables (SlotType::Output)
-        if let Some(deliverable_tokens) = reconstructed.clusters.get(&crate::types::SlotType::Output) {
-            output.expected_deliverables = deliverable_tokens.iter()
-                .map(|t| t.text.clone())
-                .collect();
+        if let Some(deliverable_tokens) =
+            reconstructed.clusters.get(&crate::types::SlotType::Output)
+        {
+            output.expected_deliverables =
+                deliverable_tokens.iter().map(|t| t.text.clone()).collect();
         }
 
         // Stage 0A: Normalization pre-pass
-        let normalized = self.normalization_pre_pass.run(input, &reconstructed, &mut output);
+        let normalized = self
+            .normalization_pre_pass
+            .run(input, &reconstructed, &mut output);
 
         // Stage 0B: Topology classification
         let _topology = self.topology_classifier.classify(&normalized, &mut output);
 
         // Stage 1: Signal Reduction (Lexical Compression → Sparse Coding)
         let topology = output.topology.clone().unwrap_or_default();
-        self.stage1.run(&normalized, &mut output, &topology, forced_mode);
+        self.stage1
+            .run(&normalized, &mut output, &topology, forced_mode);
 
         // Stage 2: Boundary Detection (Predictive Coding → mode decision)
         if let Some(fm) = forced_mode {
@@ -184,9 +195,13 @@ impl PipelineOrchestrator {
         if is_aggressive {
             // -- Aggressive Routing (NPAE) --
             let npae_cfg = crate::npae::schema::types::NpaeConfig {
-                ambiguity_threshold: npae_config.and_then(|c| c.ambiguity_threshold).or(Some(0.65)),
+                ambiguity_threshold: npae_config
+                    .and_then(|c| c.ambiguity_threshold)
+                    .or(Some(0.65)),
                 max_questions: npae_config.and_then(|c| c.max_questions).or(Some(3)),
-                confidence_threshold: npae_config.and_then(|c| c.confidence_threshold).or(Some(0.75)),
+                confidence_threshold: npae_config
+                    .and_then(|c| c.confidence_threshold)
+                    .or(Some(0.75)),
                 skip_stage: npae_config.and_then(|c| c.skip_stage.clone()),
             };
 
@@ -208,8 +223,9 @@ impl PipelineOrchestrator {
                 &structurer,
                 &reconstructed,
                 output.enrichment.as_ref(),
-            ).await.map_err(|e| e.to_string())?;
-
+            )
+            .await
+            .map_err(|e| e.to_string())?;
 
             // Populate output fields for session history and feedback tracking
             output.output_token_count = resp.token_final;
@@ -227,7 +243,9 @@ impl PipelineOrchestrator {
         self.stage4.run(&mut output).await;
 
         // Stage 4B: Field validation (before scope injection)
-        let field_issues = self.field_validator.validate_full(&output.resolved_schema, &output);
+        let field_issues = self
+            .field_validator
+            .validate_full(&output.resolved_schema, &output);
         output.field_issues = field_issues.clone();
 
         // Stage 5: Scope Injection
@@ -246,18 +264,21 @@ impl PipelineOrchestrator {
             self.run_guarded_generation(input, &guard_cfg, &output)?;
 
         // Stage 6B: Targeted Quality Correction Loop (managed by Stage6b module)
-        let stage6b_out = self.stage6b.run(
-            input,
-            &mut output,
-            &guard_cfg,
-            &self.field_validator,
-            &self.stage4,
-            &self.stage5,
-            &self.stage6a,
-            initial_response,
-            initial_report,
-            initial_corrections,
-        ).await?;
+        let stage6b_out = self
+            .stage6b
+            .run(
+                input,
+                &mut output,
+                &guard_cfg,
+                &self.field_validator,
+                &self.stage4,
+                &self.stage5,
+                &self.stage6a,
+                initial_response,
+                initial_report,
+                initial_corrections,
+            )
+            .await?;
 
         let final_response = stage6b_out.final_response;
         let guard_report = stage6b_out.guard_report;
@@ -281,7 +302,8 @@ impl PipelineOrchestrator {
             correction_cycle,
             &output,
             Some(guard_report),
-        ).map(OrchestratorResponse::Legacy)
+        )
+        .map(OrchestratorResponse::Legacy)
     }
 
     pub fn apply_feedback(&self, prompt: &str, weight: f32) {
@@ -307,32 +329,29 @@ impl PipelineOrchestrator {
         Box<dyn std::error::Error>,
     > {
         let mut final_response = self.stage6a.run(output)?;
-        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(
-            &final_response,
-            input,
-            guard_cfg,
-        )
-        .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
-            passed: true,
-            layers: [
-                crate::npae::hallucination::guard::LayerReport {
-                    layer_id: 1,
+        let mut guard_report =
+            crate::npae::hallucination::guard::run_tri_layer(&final_response, input, guard_cfg)
+                .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
                     passed: true,
-                    flags: vec![],
-                },
-                crate::npae::hallucination::guard::LayerReport {
-                    layer_id: 2,
-                    passed: true,
-                    flags: vec![],
-                },
-                crate::npae::hallucination::guard::LayerReport {
-                    layer_id: 3,
-                    passed: true,
-                    flags: vec![],
-                },
-            ],
-            remediation: None,
-        });
+                    layers: [
+                        crate::npae::hallucination::guard::LayerReport {
+                            layer_id: 1,
+                            passed: true,
+                            flags: vec![],
+                        },
+                        crate::npae::hallucination::guard::LayerReport {
+                            layer_id: 2,
+                            passed: true,
+                            flags: vec![],
+                        },
+                        crate::npae::hallucination::guard::LayerReport {
+                            layer_id: 3,
+                            passed: true,
+                            flags: vec![],
+                        },
+                    ],
+                    remediation: None,
+                });
 
         let mut corrections_applied = Vec::new();
         if !guard_report.passed {
@@ -393,16 +412,21 @@ impl PipelineOrchestrator {
             topology,
             scope_injections: algorithm_output.scope_injections.clone(),
             clusters: if !algorithm_output.clusters.is_empty() {
-                Some(algorithm_output.clusters.iter()
-                    .enumerate()
-                    .flat_map(|(i, cluster)| {
-                        let label = algorithm_output.cluster_labels.get(i)
-                            .cloned()
-                            .unwrap_or_else(|| format!("cluster_{}", i));
-                        std::iter::once(format!("[{}]", label))
-                            .chain(cluster.iter().cloned())
-                    })
-                    .collect())
+                Some(
+                    algorithm_output
+                        .clusters
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(i, cluster)| {
+                            let label = algorithm_output
+                                .cluster_labels
+                                .get(i)
+                                .cloned()
+                                .unwrap_or_else(|| format!("cluster_{}", i));
+                            std::iter::once(format!("[{}]", label)).chain(cluster.iter().cloned())
+                        })
+                        .collect(),
+                )
             } else {
                 None
             },

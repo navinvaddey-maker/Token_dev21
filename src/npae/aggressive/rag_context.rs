@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use crate::types::RagChunk;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct DerivedRagContext {
@@ -49,15 +49,24 @@ impl DerivedRagContext {
 
         // Instruction/injection filter keywords
         let injection_keywords = [
-            "ignore previous", "system prompt", "you must", "assistant:", "system:",
-            "ignore instructions", "new instructions", "disregard",
+            "ignore previous",
+            "system prompt",
+            "you must",
+            "assistant:",
+            "system:",
+            "ignore instructions",
+            "new instructions",
+            "disregard",
         ];
 
         for sentence in raw_sentences {
             let sentence_lower = sentence.to_lowercase();
 
             // Injection safety check
-            if injection_keywords.iter().any(|&k| sentence_lower.contains(k)) {
+            if injection_keywords
+                .iter()
+                .any(|&k| sentence_lower.contains(k))
+            {
                 continue;
             }
 
@@ -79,7 +88,10 @@ impl DerivedRagContext {
                 .collect();
 
             if !sent_words.is_empty() {
-                let overlap_count = sent_words.iter().filter(|w| prompt_tokens.contains(*w)).count();
+                let overlap_count = sent_words
+                    .iter()
+                    .filter(|w| prompt_tokens.contains(*w))
+                    .count();
                 let overlap_ratio = overlap_count as f32 / sent_words.len() as f32;
                 if overlap_ratio >= 0.80 {
                     continue;
@@ -93,15 +105,31 @@ impl DerivedRagContext {
             }
 
             // Track covered gap zones based on keywords in facts
-            if sentence_lower.contains('$') || sentence_lower.contains('₹') || sentence_lower.contains("budget") || sentence_lower.contains("cost") || sentence_lower.contains("price") {
+            if sentence_lower.contains('$')
+                || sentence_lower.contains('₹')
+                || sentence_lower.contains("budget")
+                || sentence_lower.contains("cost")
+                || sentence_lower.contains("price")
+            {
                 covered_gaps.insert("budget".to_string());
-                covered_gaps.insert("structural_ambiguity: budget / financial targets not specified".to_string());
+                covered_gaps.insert(
+                    "structural_ambiguity: budget / financial targets not specified".to_string(),
+                );
             }
-            if sentence_lower.contains("timeline") || sentence_lower.contains("deadline") || sentence_lower.contains("month") || sentence_lower.contains("quarter") || sentence_lower.contains("date") {
+            if sentence_lower.contains("timeline")
+                || sentence_lower.contains("deadline")
+                || sentence_lower.contains("month")
+                || sentence_lower.contains("quarter")
+                || sentence_lower.contains("date")
+            {
                 covered_gaps.insert("timeline".to_string());
-                covered_gaps.insert("structural_ambiguity: temporal scope / deadline missing".to_string());
+                covered_gaps
+                    .insert("structural_ambiguity: temporal scope / deadline missing".to_string());
             }
-            if sentence_lower.contains("scope") || sentence_lower.contains("phase") || sentence_lower.contains("requirement") {
+            if sentence_lower.contains("scope")
+                || sentence_lower.contains("phase")
+                || sentence_lower.contains("requirement")
+            {
                 covered_gaps.insert("scope".to_string());
             }
             if sentence_lower.contains("domain") || sentence_lower.contains("industry") {

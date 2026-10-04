@@ -1,6 +1,6 @@
-use sqlx::SqlitePool;
 use crate::types::{CompressionSchema, Constraint, Deliverable};
 use serde::Deserialize;
+use sqlx::SqlitePool;
 
 /// Key used to look up the correct schema template for a given request.
 #[derive(Debug, Clone)]
@@ -54,7 +54,9 @@ fn parse_template_json(json_str: &str) -> Option<CompressionSchema> {
             } else if let Some(arr) = val.as_array() {
                 for item in arr {
                     if let Some(s) = item.as_str() {
-                        constraints.push(Constraint { name: s.to_string() });
+                        constraints.push(Constraint {
+                            name: s.to_string(),
+                        });
                     }
                 }
             }
@@ -101,12 +103,15 @@ impl SchemaRegistry {
     }
 
     /// Tier 1: Exact match on domain + task_type + expertise.
-    pub async fn find_exact_schema_match(&self, key: &SchemaLookupKey) -> Option<CompressionSchema> {
+    pub async fn find_exact_schema_match(
+        &self,
+        key: &SchemaLookupKey,
+    ) -> Option<CompressionSchema> {
         let pool = self.pool.as_ref()?;
         let row: Option<(String,)> = sqlx::query_as(
             "SELECT template_json FROM schema_index
              WHERE domain = ?1 AND task_type = ?2 AND expertise = ?3
-             LIMIT 1"
+             LIMIT 1",
         )
         .bind(&key.domain)
         .bind(&key.task_type)
@@ -119,12 +124,16 @@ impl SchemaRegistry {
     }
 
     /// Tier 2: Domain + task_type match, ignoring expertise.
-    pub async fn find_domain_level_schema(&self, domain: &str, task_type: &str) -> Option<CompressionSchema> {
+    pub async fn find_domain_level_schema(
+        &self,
+        domain: &str,
+        task_type: &str,
+    ) -> Option<CompressionSchema> {
         let pool = self.pool.as_ref()?;
         let row: Option<(String,)> = sqlx::query_as(
             "SELECT template_json FROM schema_index
              WHERE domain = ?1 AND task_type = ?2
-             ORDER BY version DESC LIMIT 1"
+             ORDER BY version DESC LIMIT 1",
         )
         .bind(domain)
         .bind(task_type)
@@ -140,7 +149,7 @@ impl SchemaRegistry {
         if let Some(pool) = self.pool.as_ref() {
             let row: Option<(String,)> = sqlx::query_as(
                 "SELECT template_json FROM schema_index
-                 WHERE domain = 'general' LIMIT 1"
+                 WHERE domain = 'general' LIMIT 1",
             )
             .fetch_optional(pool)
             .await
@@ -159,7 +168,10 @@ impl SchemaRegistry {
         if let Some(schema) = self.find_exact_schema_match(key).await {
             return schema;
         }
-        if let Some(schema) = self.find_domain_level_schema(&key.domain, &key.task_type).await {
+        if let Some(schema) = self
+            .find_domain_level_schema(&key.domain, &key.task_type)
+            .await
+        {
             return schema;
         }
         self.get_general_fallback_schema().await

@@ -1,10 +1,10 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
-use anyhow::{Result, Context};
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
-use std::collections::HashMap;
 use crate::npae::schema::types::ExecutionPhase;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UnifiedConfig {
@@ -95,9 +95,9 @@ impl ConfigLoader {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<UnifiedConfig> {
         let content = std::fs::read_to_string(&path)
             .with_context(|| format!("Failed to read config file at {:?}", path.as_ref()))?;
-        let config: UnifiedConfig = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse unified.json")?;
-        
+        let config: UnifiedConfig =
+            serde_json::from_str(&content).with_context(|| "Failed to parse unified.json")?;
+
         Ok(config)
     }
 

@@ -1,7 +1,7 @@
-use rayon;
-use crate::npae::compression::types::{CompressedRepr, StageMetrics};
 use crate::npae::compression::merge::{merge_stage1, merge_stage2, merge_stage3};
 use crate::npae::compression::semantic;
+use crate::npae::compression::types::{CompressedRepr, StageMetrics};
+use rayon;
 use std::time::Instant;
 
 pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
@@ -14,8 +14,13 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
     let (s1_lex, s1_spr) = rayon::join(
         || {
             // Real lexical compression (stop words removal)
-            let stop_words = ["the", "a", "an", "this", "that", "it", "i", "you", "he", "she", "we", "they", "is", "are", "was", "were", "will", "would", "can", "could", "to", "and", "or", "of", "in", "for", "with", "on", "at", "by"];
-            tokens.iter()
+            let stop_words = [
+                "the", "a", "an", "this", "that", "it", "i", "you", "he", "she", "we", "they",
+                "is", "are", "was", "were", "will", "would", "can", "could", "to", "and", "or",
+                "of", "in", "for", "with", "on", "at", "by",
+            ];
+            tokens
+                .iter()
                 .filter(|t| !stop_words.contains(&t.to_lowercase().as_str()))
                 .cloned()
                 .collect::<Vec<String>>()
@@ -34,7 +39,7 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
         || {
             let lower = lower_raw_clone;
             let mut dist = vec![0.1; 5];
-            
+
             if lower.contains("create") || lower.contains("build") || lower.contains("make") {
                 dist[0] += 0.5; // Build
             }
@@ -47,17 +52,23 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
             if lower.contains("analyze") || lower.contains("why") || lower.contains("compare") {
                 dist[3] += 0.5; // Analyze
             }
-            if lower.contains("refactor") || lower.contains("rewrite") || lower.contains("transform") {
+            if lower.contains("refactor")
+                || lower.contains("rewrite")
+                || lower.contains("transform")
+            {
                 dist[4] += 0.6; // Transform
             }
-            
+
             // Knowledge level boosts
-            if lower.contains("architecture") || lower.contains("optimize") || lower.contains("scale") {
+            if lower.contains("architecture")
+                || lower.contains("optimize")
+                || lower.contains("scale")
+            {
                 for v in dist.iter_mut() {
                     *v += 0.25;
                 }
             }
-            
+
             // Ensure at least one intent gets selected over 0.2 if nothing matched
             if dist.iter().all(|&x| x == 0.1) {
                 dist[0] = 0.6; // Default to Build > 0.5 (Intermediate)
@@ -74,9 +85,15 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
         || {
             // Basic Hebbian association based on input
             let mut concepts = Vec::new();
-            if lower_raw.contains("business") { concepts.push("strategy".to_string()); }
-            if lower_raw.contains("code") || lower_raw.contains("software") { concepts.push("architecture".to_string()); }
-            if lower_raw.contains("nutrition") { concepts.push("health".to_string()); }
+            if lower_raw.contains("business") {
+                concepts.push("strategy".to_string());
+            }
+            if lower_raw.contains("code") || lower_raw.contains("software") {
+                concepts.push("architecture".to_string());
+            }
+            if lower_raw.contains("nutrition") {
+                concepts.push("health".to_string());
+            }
             if concepts.is_empty() {
                 concepts.push("general_execution".to_string());
             }
@@ -89,5 +106,14 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
     );
     let stage3_ms = t2.elapsed().as_millis() as u64;
 
-    merge_stage3(&s2, s3_heb?, s3_cmp?, StageMetrics { stage1_ms, stage2_ms, stage3_ms })
+    merge_stage3(
+        &s2,
+        s3_heb?,
+        s3_cmp?,
+        StageMetrics {
+            stage1_ms,
+            stage2_ms,
+            stage3_ms,
+        },
+    )
 }

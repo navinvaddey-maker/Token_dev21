@@ -1,9 +1,17 @@
-use crate::npae::schema::types::HallucinationGuardConfig;
 use crate::npae::hallucination::guard::LayerReport;
+use crate::npae::schema::types::HallucinationGuardConfig;
 
-pub fn check(output: &str, original_prompt: &str, cfg: &HallucinationGuardConfig) -> Result<LayerReport, String> {
+pub fn check(
+    output: &str,
+    original_prompt: &str,
+    cfg: &HallucinationGuardConfig,
+) -> Result<LayerReport, String> {
     if !cfg.self_critique_enabled {
-        return Ok(LayerReport { layer_id: 1, passed: true, flags: vec![] });
+        return Ok(LayerReport {
+            layer_id: 1,
+            passed: true,
+            flags: vec![],
+        });
     }
 
     let mut flags = Vec::new();

@@ -1,6 +1,6 @@
 use crate::types::{ScoredToken, TokenSource};
 use rayon::prelude::*;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 /// Sparse Coding — identifies the minimum active token set.
 ///
@@ -134,8 +134,6 @@ impl SparseCoding {
         let scored = self.compute_salience(tokens);
         let keep_n = ((tokens.len() as f32 * keep_ratio) as usize).max(3);
 
-
-
         let lock_texts: HashSet<&str> = locks.iter().map(|l| l.text.as_str()).collect();
 
         // Build survivor set from top-N + constraint locks
@@ -144,7 +142,7 @@ impl SparseCoding {
             .take(keep_n)
             .map(|(t, _)| t.as_str())
             .collect();
-            
+
         for lock in &lock_texts {
             survivors.insert(lock);
         }
@@ -159,11 +157,11 @@ impl SparseCoding {
                     .find(|(tok, _)| tok == t)
                     .map(|(_, s)| *s)
                     .unwrap_or(0.1);
-                    
+
                 if lock_texts.contains(t.as_str()) {
                     salience = 1.0;
                 }
-                
+
                 ScoredToken {
                     text: t.clone(),
                     salience,
@@ -176,7 +174,12 @@ impl SparseCoding {
     /// Hierarchical "Neuron Duplicate Tree" pruning.
     /// Instead of global top-N, it identifies redundant semantic branches (duplicate trees)
     /// and prunes based on branch-level salience.
-    fn apply_tree(&self, tokens: &[String], keep_ratio: f32, locks: &[crate::types::ConstraintToken]) -> Vec<ScoredToken> {
+    fn apply_tree(
+        &self,
+        tokens: &[String],
+        keep_ratio: f32,
+        locks: &[crate::types::ConstraintToken],
+    ) -> Vec<ScoredToken> {
         let scored = self.compute_salience(tokens);
         let lock_texts: HashSet<&str> = locks.iter().map(|l| l.text.as_str()).collect();
 
@@ -191,7 +194,8 @@ impl SparseCoding {
         let mut survivors = HashSet::new();
         let keep_n = ((tokens.len() as f32 * keep_ratio) as usize).max(3);
 
-        let mut tree_salience: Vec<(String, f32)> = trees.iter()
+        let mut tree_salience: Vec<(String, f32)> = trees
+            .iter()
             .map(|(id, members)| {
                 let max_sal = members.iter().map(|(_, s)| *s).fold(0.0, f32::max);
                 (id.clone(), max_sal)
@@ -205,12 +209,16 @@ impl SparseCoding {
         for (id, _) in tree_salience {
             if let Some(members) = trees.get(&id) {
                 // Keep the top token from this tree, and maybe others if we have budget
-                if let Some(&(idx, _)) = members.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()) {
+                if let Some(&(idx, _)) =
+                    members.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                {
                     survivors.insert(idx);
                     tokens_collected += 1;
                 }
             }
-            if tokens_collected >= keep_n { break; }
+            if tokens_collected >= keep_n {
+                break;
+            }
         }
 
         // Always keep locks
@@ -221,24 +229,30 @@ impl SparseCoding {
         }
 
         // Map back to original order
-        tokens.iter().enumerate().filter_map(|(i, t)| {
-            if survivors.contains(&i) {
-                let salience = scored[i].1;
-                Some(ScoredToken {
-                    text: t.clone(),
-                    salience,
-                    source: TokenSource::Sparse,
-                })
-            } else {
-                None
-            }
-        }).collect()
+        tokens
+            .iter()
+            .enumerate()
+            .filter_map(|(i, t)| {
+                if survivors.contains(&i) {
+                    let salience = scored[i].1;
+                    Some(ScoredToken {
+                        text: t.clone(),
+                        salience,
+                        source: TokenSource::Sparse,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn get_tree_id(&self, token: &str) -> String {
         // Simplified neuron-grouping: tokens with same starting letter or common roots
         let t = token.to_lowercase();
-        if t.len() < 2 { return "root".to_string(); }
+        if t.len() < 2 {
+            return "root".to_string();
+        }
         t[0..2].to_string()
     }
 

@@ -19,8 +19,76 @@ pub struct ScenarioResponse {
 
 pub struct ScenarioParser;
 impl ScenarioParser {
-    pub fn parse(_input: &str, domain: &ScenarioDomainConfig) -> String {
-        format!("[Scenario_Parser:{}] Extracted intent and structured inputs for domain '{}'", domain.parser, domain.key)
+    pub fn parse(input: &str, domain: &ScenarioDomainConfig) -> String {
+        let clean_tokens: Vec<&str> = input
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| s.len() > 1)
+            .collect();
+        let token_count = clean_tokens.len();
+
+        let mut key_terms = Vec::new();
+        for t in &clean_tokens {
+            if t.len() >= 4
+                && !matches!(
+                    t.to_lowercase().as_str(),
+                    "this"
+                        | "that"
+                        | "with"
+                        | "from"
+                        | "they"
+                        | "been"
+                        | "have"
+                        | "what"
+                        | "which"
+                        | "when"
+                        | "where"
+                        | "how"
+                        | "who"
+                        | "whom"
+                        | "than"
+                        | "then"
+                        | "these"
+                        | "those"
+                        | "each"
+                        | "every"
+                        | "some"
+                        | "such"
+                        | "only"
+                        | "into"
+                        | "over"
+                        | "after"
+                        | "also"
+                        | "would"
+                        | "could"
+                        | "should"
+                        | "about"
+                        | "there"
+                        | "their"
+                        | "please"
+                )
+            {
+                key_terms.push(*t);
+            }
+        }
+        key_terms.dedup();
+        let sample = if !key_terms.is_empty() {
+            format!(
+                "; focus tokens: [{}]",
+                key_terms
+                    .iter()
+                    .take(4)
+                    .cloned()
+                    .collect::<Vec<&str>>()
+                    .join(", ")
+            )
+        } else {
+            String::new()
+        };
+
+        format!(
+            "[Scenario_Parser:{}] Extracted intent and structured inputs for domain '{}' ({} tokens{})",
+            domain.parser, domain.key, token_count, sample
+        )
     }
 }
 
@@ -28,9 +96,161 @@ pub struct ScenarioGapCheck;
 impl ScenarioGapCheck {
     pub fn evaluate(input: &str, domain: &ScenarioDomainConfig) -> (bool, Vec<String>) {
         let mut gaps = Vec::new();
+        let input_lower = input.to_lowercase();
+        let input_words: Vec<&str> = input_lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect();
+        let word_count = input_words.len();
+
         for rule in &domain.gap_check_rules {
-            if input.trim().len() < 10 {
-                gaps.push(format!("Rule '{}': input detail below recommended threshold", rule));
+            match rule.as_str() {
+                "clause_completeness" => {
+                    if word_count < 6 {
+                        gaps.push(format!("Rule '{}': input detail ({} words) below minimum threshold for clause completeness", rule, word_count));
+                    }
+                }
+                "jurisdiction_check" => {
+                    let known_jurisdictions = [
+                        "india",
+                        "court",
+                        "delhi",
+                        "kerala",
+                        "tamil nadu",
+                        "andhra",
+                        "telangana",
+                        "karnataka",
+                        "maharashtra",
+                        "federal",
+                        "california",
+                        "delaware",
+                        "england",
+                    ];
+                    let has_match = known_jurisdictions.iter().any(|&j| {
+                        if j.contains(' ') {
+                            input_lower.contains(j)
+                        } else {
+                            input_words.contains(&j)
+                        }
+                    }) || input_words.iter().any(|&w| {
+                        w == "act"
+                            || w == "state"
+                            || w == "statute"
+                            || w == "code"
+                            || w == "uk"
+                            || w == "us"
+                    });
+
+                    if !has_match {
+                        gaps.push(format!("Rule '{}': jurisdiction or governing territory not explicitly specified in scenario", rule));
+                    }
+                }
+                "liability_cap" => {
+                    let liability_terms = [
+                        "liability",
+                        "indemnit",
+                        "damages",
+                        "cap",
+                        "limit",
+                        "cents",
+                        "rs",
+                        "inr",
+                        "usd",
+                        "$",
+                        "penalty",
+                        "transfer",
+                        "consideration",
+                    ];
+                    if !liability_terms
+                        .iter()
+                        .any(|term| input_lower.contains(term))
+                    {
+                        gaps.push(format!(
+                            "Rule '{}': financial bounds or liability parameters not specified",
+                            rule
+                        ));
+                    }
+                }
+                "revenue_model_check" => {
+                    let rev_terms = [
+                        "revenue",
+                        "pricing",
+                        "subscription",
+                        "b2b",
+                        "b2c",
+                        "saas",
+                        "margin",
+                        "monetiz",
+                        "sales",
+                    ];
+                    if !rev_terms.iter().any(|term| input_lower.contains(term)) {
+                        gaps.push(format!(
+                            "Rule '{}': revenue model mechanics not stated",
+                            rule
+                        ));
+                    }
+                }
+                "market_scope_check" => {
+                    let scope_terms = [
+                        "market",
+                        "customer",
+                        "tam",
+                        "segment",
+                        "competitor",
+                        "global",
+                        "regional",
+                        "local",
+                    ];
+                    if !scope_terms.iter().any(|term| input_lower.contains(term)) {
+                        gaps.push(format!(
+                            "Rule '{}': market scope or target segment missing",
+                            rule
+                        ));
+                    }
+                }
+                "audit_trail_check" => {
+                    let audit_terms = [
+                        "audit",
+                        "ledger",
+                        "log",
+                        "transaction",
+                        "reconcil",
+                        "invoice",
+                        "receipt",
+                        "record",
+                    ];
+                    if !audit_terms.iter().any(|term| input_lower.contains(term)) {
+                        gaps.push(format!(
+                            "Rule '{}': audit trail or ledger source missing",
+                            rule
+                        ));
+                    }
+                }
+                "cap_table_validation" => {
+                    let cap_terms = [
+                        "equity",
+                        "share",
+                        "stock",
+                        "vesting",
+                        "dilution",
+                        "investor",
+                        "round",
+                        "ownership",
+                        "percent",
+                        "%",
+                    ];
+                    if !cap_terms.iter().any(|term| input_lower.contains(term)) {
+                        gaps.push(format!(
+                            "Rule '{}': cap table breakdown or equity split missing",
+                            rule
+                        ));
+                    }
+                }
+                _ => {
+                    if input.trim().is_empty() {
+                        gaps.push(format!("Rule '{}': required scenario input is empty", rule));
+                    }
+                }
             }
         }
         (gaps.is_empty(), gaps)
@@ -39,9 +259,31 @@ impl ScenarioGapCheck {
 
 pub struct ScenarioToolRouter;
 impl ScenarioToolRouter {
-    pub fn execute_tools(domain: &ScenarioDomainConfig) -> Vec<String> {
-        domain.tool_allowlist.iter()
-            .map(|t| format!("Executed local tool '{}'", t))
+    pub fn execute_tools(domain: &ScenarioDomainConfig, query: &str) -> Vec<String> {
+        let significant_words: Vec<&str> = query
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+            .filter(|w| w.len() > 3)
+            .take(4)
+            .collect();
+        let target_terms = if !significant_words.is_empty() {
+            significant_words.join(", ")
+        } else {
+            "general_context".to_string()
+        };
+
+        domain
+            .tool_allowlist
+            .iter()
+            .map(|tool| {
+                format!(
+                    "Dispatched tool '{}' [domain: '{}', target_terms: [{}], context_bytes: {}]",
+                    tool,
+                    domain.key,
+                    target_terms,
+                    query.len()
+                )
+            })
             .collect()
     }
 }
@@ -49,8 +291,14 @@ impl ScenarioToolRouter {
 pub struct ScenarioOutputValidator;
 impl ScenarioOutputValidator {
     pub fn validate(output: &str, citations: &[String], is_empty: bool) -> Result<(), String> {
-        if !is_empty && citations.is_empty() && !output.contains("Not found in the internal knowledge base") {
-            return Err("Scenario_Output_Validator error: Answer missing mandatory internal citations.".to_string());
+        if !is_empty
+            && citations.is_empty()
+            && !output.contains("Not found in the internal knowledge base")
+        {
+            return Err(
+                "Scenario_Output_Validator error: Answer missing mandatory internal citations."
+                    .to_string(),
+            );
         }
         Ok(())
     }
@@ -81,7 +329,10 @@ impl ScenarioOutputComposer {
                 searched_namespaces: searched_ns,
                 source_badge: "Source: internal knowledge base only".to_string(),
                 is_empty_knowledge: true,
-                warnings: vec!["Retrieval returned 0 relevant documents in target domain namespace.".to_string()],
+                warnings: vec![
+                    "Retrieval returned 0 relevant documents in target domain namespace."
+                        .to_string(),
+                ],
             };
         }
 
@@ -89,7 +340,9 @@ impl ScenarioOutputComposer {
             .iter()
             .enumerate()
             .map(|(i, c)| {
-                let src = c.metadata.as_ref()
+                let src = c
+                    .metadata
+                    .as_ref()
                     .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
                 format!("[Ref {}]: {}", i + 1, src)
@@ -97,8 +350,11 @@ impl ScenarioOutputComposer {
             .collect();
 
         let mut body = String::new();
-        body.push_str(&format!("## 1. Domain & Intent Context\nDomain: {}\n{}\n\n", domain.label, parser_summary));
-        
+        body.push_str(&format!(
+            "## 1. Domain & Intent Context\nDomain: {}\n{}\n\n",
+            domain.label, parser_summary
+        ));
+
         body.push_str("## 2. Retrieved Internal Knowledge\n");
         for (i, c) in rag_chunks.iter().enumerate() {
             body.push_str(&format!("### Key Evidence [{}]\n{}\n\n", i + 1, c.content));
@@ -121,7 +377,10 @@ impl ScenarioOutputComposer {
         body.push('\n');
 
         body.push_str("## 5. Output Contract Synthesis\n");
-        body.push_str(&format!("Contract Format: {}\nInternal knowledge integration complete.\n\n", domain.output_contract));
+        body.push_str(&format!(
+            "Contract Format: {}\nInternal knowledge verification complete ({} relevant evidence excerpt(s) mapped).\n\n",
+            domain.output_contract, rag_chunks.len()
+        ));
 
         body.push_str("## 6. Regulatory & Compliance Disclaimer\n");
         body.push_str(&domain.disclaimer_text);
@@ -177,14 +436,16 @@ impl ScenarioRegularPipeline {
         }
 
         let prompt_path = Path::new(prompts_dir).join(&style.prompt_file);
-        let _style_instructions = fs::read_to_string(&prompt_path)
-            .unwrap_or_else(|_| format!("Style: {}", style.label));
+        let style_instructions =
+            fs::read_to_string(&prompt_path).unwrap_or_else(|_| format!("Style: {}", style.label));
 
         let citations: Vec<String> = rag_chunks
             .iter()
             .enumerate()
             .map(|(i, c)| {
-                let src = c.metadata.as_ref()
+                let src = c
+                    .metadata
+                    .as_ref()
                     .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
                 format!("[Ref {}]: {}", i + 1, src)
@@ -193,7 +454,15 @@ impl ScenarioRegularPipeline {
 
         let mut body = String::new();
         let mode_tag = compression_mode.unwrap_or("balanced");
-        body.push_str(&format!("**Response Style**: {} (Mode: {})\n\n", style.label, mode_tag));
+        body.push_str(&format!(
+            "**Response Style**: {} (Mode: {})\n\n",
+            style.label, mode_tag
+        ));
+
+        // Inject persona and style guidance from prompt template (GAP-S01 fix)
+        body.push_str("### Style Persona & Directives\n");
+        body.push_str(style_instructions.trim());
+        body.push_str("\n\n");
 
         if style.key.eq_ignore_ascii_case("aggressive") {
             body.push_str("### Core Stance & Risk Evaluation\n");

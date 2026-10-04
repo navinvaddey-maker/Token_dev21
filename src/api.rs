@@ -4,6 +4,7 @@ use crate::{
     models::user::{LoginRequest, RegisterRequest},
     AppState,
 };
+use axum::error_handling::HandleErrorLayer;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -12,7 +13,6 @@ use axum::{
     routing::{get, post, put},
     Json, Router,
 };
-use axum::error_handling::HandleErrorLayer;
 use tower::ServiceBuilder;
 
 pub fn router(state: AppState) -> Router {
@@ -30,7 +30,7 @@ pub fn router(state: AppState) -> Router {
                     )
                 }))
                 .buffer(100)
-                .rate_limit(5, std::time::Duration::from_secs(1))
+                .rate_limit(5, std::time::Duration::from_secs(1)),
         );
 
     let public = Router::new()
@@ -49,7 +49,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/scenario/ask", post(scenario_ask))
         .route("/api/rag/upload", post(rag_upload))
         .route("/api/rag/documents", get(rag_list_documents))
-        .route("/api/rag/documents/:id", get(rag_get_document).delete(rag_delete_document))
+        .route(
+            "/api/rag/documents/:id",
+            get(rag_get_document).delete(rag_delete_document),
+        )
         .route("/api/rag/search", get(rag_search))
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -87,7 +90,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/error-metrics", get(admin_get_error_metrics))
         .route("/api/admin/rag/upload", post(admin_rag_upload))
         .route("/api/admin/rag/documents", get(admin_rag_list_documents))
-        .route("/api/admin/rag/documents/:id", axum::routing::delete(admin_rag_delete_document))
+        .route(
+            "/api/admin/rag/documents/:id",
+            axum::routing::delete(admin_rag_delete_document),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             admin_middleware,
@@ -100,7 +106,10 @@ pub fn router(state: AppState) -> Router {
     let npae_routes = Router::new()
         .route("/api/v1/compress", post(npae_compress))
         .route("/api/v1/aggressive", post(npae_aggressive))
-        .route("/api/v1/hallucination-check", post(npae_hallucination_check))
+        .route(
+            "/api/v1/hallucination-check",
+            post(npae_hallucination_check),
+        )
         .route("/api/v1/schema", get(npae_schema))
         .route("/api/v1/health", get(npae_health));
 
@@ -120,13 +129,23 @@ async fn register(
 ) -> Result<axum::response::Response, AppError> {
     // Input validation (GAP-029)
     if req.username.len() < 3 || req.username.len() > 50 {
-        return Err(AppError::Validation("Username must be 3-50 characters".into()));
+        return Err(AppError::Validation(
+            "Username must be 3-50 characters".into(),
+        ));
     }
-    if !req.username.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err(AppError::Validation("Username must contain only alphanumeric characters, underscores, or hyphens".into()));
+    if !req
+        .username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(AppError::Validation(
+            "Username must contain only alphanumeric characters, underscores, or hyphens".into(),
+        ));
     }
     if req.password.len() < 8 {
-        return Err(AppError::Validation("Password must be at least 8 characters".into()));
+        return Err(AppError::Validation(
+            "Password must be at least 8 characters".into(),
+        ));
     }
     if !req.email.contains('@') || !req.email.contains('.') {
         return Err(AppError::Validation("Invalid email format".into()));
@@ -147,11 +166,15 @@ async fn login(
 // ── Health check ───────────────────────────────────────────────────────────
 
 async fn health_check() -> Result<axum::response::Response, AppError> {
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "status": "healthy",
-        "engine_version": "2.0.0",
-        "timestamp": chrono::Utc::now().to_rfc3339(),
-    }))).into_response())
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "status": "healthy",
+            "engine_version": "2.0.0",
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        })),
+    )
+        .into_response())
 }
 
 // ── Compression endpoint ───────────────────────────────────────────────────
@@ -364,12 +387,12 @@ async fn auth_middleware(
         .ok_or(AppError::Unauthorized)?;
 
     let user_id = crate::domain::verify_jwt(token)?;
-    
+
     let user_exists = crate::data::Repository::find_user_by_id(&state.pool, &user_id)
         .await
         .map_err(|_| AppError::Internal("Database error".into()))?
         .is_some();
-        
+
     if !user_exists {
         return Err(AppError::Unauthorized);
     }
@@ -394,7 +417,12 @@ async fn npae_aggressive(
     State(state): State<AppState>,
     Json(req): Json<AggressiveRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    let empty_cfg = crate::npae::schema::types::NpaeConfig { ambiguity_threshold: None, max_questions: None, confidence_threshold: None, skip_stage: None };
+    let empty_cfg = crate::npae::schema::types::NpaeConfig {
+        ambiguity_threshold: None,
+        max_questions: None,
+        confidence_threshold: None,
+        skip_stage: None,
+    };
     let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
 
     let mut enrichment = crate::types::EnrichmentContext::default();
@@ -410,14 +438,22 @@ async fn npae_aggressive(
         let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
         if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
             if !retrieved_chunks.is_empty() {
-                let chunks = retrieved_chunks.into_iter().map(|res| crate::types::RagChunk {
-                    domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
-                    content: res.chunk.content,
-                    metadata: Some(crate::types::ChunkMetadata {
-                        page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
-                        source_file: res.document_filename,
-                    }),
-                }).collect();
+                let chunks = retrieved_chunks
+                    .into_iter()
+                    .map(|res| crate::types::RagChunk {
+                        domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
+                        content: res.chunk.content,
+                        metadata: Some(crate::types::ChunkMetadata {
+                            page_number: res
+                                .chunk
+                                .metadata
+                                .as_ref()
+                                .and_then(|m| m.page_number)
+                                .map(|p| p as u32),
+                            source_file: res.document_filename,
+                        }),
+                    })
+                    .collect();
                 enrichment.rag_chunks = Some(chunks);
             }
         }
@@ -425,13 +461,13 @@ async fn npae_aggressive(
 
     let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
         .map_err(|e| AppError::Internal(e.to_string()))?;
-        
+
     let structurer = crate::npae::aggressive::structurer::HttpStructurer {
         route: "/api/v1/aggressive".to_string(),
         remote_addr: "127.0.0.1".to_string(),
         body: req.prompt.clone(),
     };
-    
+
     let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
         &req.prompt,
         &repr,
@@ -442,11 +478,10 @@ async fn npae_aggressive(
         &crate::types::ReconstructedInput::default(),
         Some(&enrichment),
     )
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
-
 
 async fn npae_hallucination_check(
     State(_state): State<AppState>,
@@ -460,8 +495,9 @@ async fn npae_hallucination_check(
         uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
     };
     let cfg = req.guard_config.as_ref().unwrap_or(&default_cfg);
-    let report = crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let report =
+        crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 
@@ -492,7 +528,8 @@ async fn rag_health(State(state): State<AppState>) -> Result<axum::response::Res
             "subsystem": "rag",
             "timestamp": chrono::Utc::now().to_rfc3339(),
         })),
-    ).into_response())
+    )
+        .into_response())
 }
 
 async fn rag_upload(
@@ -503,17 +540,27 @@ async fn rag_upload(
     let mut filename = "unknown.pdf".to_string();
     let mut file_bytes = Vec::new();
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::Validation(e.to_string()))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?
+    {
         let name = field.name().unwrap_or_default().to_string();
         if name == "file" {
             filename = field.file_name().unwrap_or("unknown.pdf").to_string();
-            file_bytes = field.bytes().await.map_err(|e| AppError::Validation(e.to_string()))?.to_vec();
+            file_bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::Validation(e.to_string()))?
+                .to_vec();
             break;
         }
     }
 
     if file_bytes.is_empty() {
-        return Err(AppError::Validation("No file uploaded or file is empty".into()));
+        return Err(AppError::Validation(
+            "No file uploaded or file is empty".into(),
+        ));
     }
 
     let ingester = crate::rag::ingest::DocumentIngester::new(state.pool.clone());
@@ -521,10 +568,17 @@ async fn rag_upload(
 
     let user_id_clone = user_id.clone();
     let filename_clone = filename.clone();
-    
+
     tokio::spawn(async move {
-        if let Err(e) = ingester.ingest_pdf(&user_id_clone, &filename_clone, &file_bytes, &config).await {
-            tracing::error!("Background RAG PDF ingestion failed for user {}: {}", user_id_clone, e);
+        if let Err(e) = ingester
+            .ingest_pdf(&user_id_clone, &filename_clone, &file_bytes, &config)
+            .await
+        {
+            tracing::error!(
+                "Background RAG PDF ingestion failed for user {}: {}",
+                user_id_clone,
+                e
+            );
         }
     });
 
@@ -535,7 +589,8 @@ async fn rag_upload(
             "filename": filename,
             "message": "File upload accepted. Processing started in the background."
         })),
-    ).into_response())
+    )
+        .into_response())
 }
 
 async fn rag_list_documents(
@@ -546,7 +601,10 @@ async fn rag_list_documents(
     let limit = params.limit.unwrap_or(50).clamp(1, 100);
     let offset = params.offset.unwrap_or(0).max(0);
 
-    let docs = state.rag_store.list_documents(&user_id, limit, offset).await
+    let docs = state
+        .rag_store
+        .list_documents(&user_id, limit, offset)
+        .await
         .map_err(AppError::Database)?;
 
     Ok((StatusCode::OK, Json(docs)).into_response())
@@ -557,11 +615,17 @@ async fn rag_get_document(
     axum::Extension(user_id): axum::Extension<String>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
-    let doc = state.rag_store.get_document(&user_id, &id).await
+    let doc = state
+        .rag_store
+        .get_document(&user_id, &id)
+        .await
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Document not found".into()))?;
 
-    let chunk_count = state.rag_store.get_chunk_count(&id).await
+    let chunk_count = state
+        .rag_store
+        .get_chunk_count(&id)
+        .await
         .map_err(AppError::Database)?;
 
     Ok((
@@ -570,7 +634,8 @@ async fn rag_get_document(
             "document": doc,
             "chunk_count": chunk_count,
         })),
-    ).into_response())
+    )
+        .into_response())
 }
 
 async fn rag_delete_document(
@@ -578,11 +643,16 @@ async fn rag_delete_document(
     axum::Extension(user_id): axum::Extension<String>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
-    let deleted = state.rag_store.delete_document(&user_id, &id).await
+    let deleted = state
+        .rag_store
+        .delete_document(&user_id, &id)
+        .await
         .map_err(AppError::Database)?;
 
     if !deleted {
-        return Err(AppError::NotFound("Document not found or access denied".into()));
+        return Err(AppError::NotFound(
+            "Document not found or access denied".into(),
+        ));
     }
 
     Ok((
@@ -591,7 +661,8 @@ async fn rag_delete_document(
             "status": "success",
             "message": "Document and all related chunks deleted"
         })),
-    ).into_response())
+    )
+        .into_response())
 }
 
 async fn rag_search(
@@ -600,19 +671,25 @@ async fn rag_search(
     Query(params): Query<crate::rag::types::RagSearchQuery>,
 ) -> Result<axum::response::Response, AppError> {
     let doc_ids: Option<Vec<String>> = params.document_ids.map(|s| {
-        s.split(',').map(|id| id.trim().to_string()).filter(|id| !id.is_empty()).collect()
+        s.split(',')
+            .map(|id| id.trim().to_string())
+            .filter(|id| !id.is_empty())
+            .collect()
     });
 
     let query_vector = crate::rag::embeddings::EmbeddingEngine::new().embed(&params.query);
-    
-    let results = state.rag_store.search(
-        &query_vector,
-        &user_id,
-        doc_ids.as_deref(),
-        params.top_k.unwrap_or(5),
-        0.25,
-    ).await
-    .map_err(AppError::Database)?;
+
+    let results = state
+        .rag_store
+        .search(
+            &query_vector,
+            &user_id,
+            doc_ids.as_deref(),
+            params.top_k.unwrap_or(5),
+            0.25,
+        )
+        .await
+        .map_err(AppError::Database)?;
 
     Ok((StatusCode::OK, Json(results)).into_response())
 }
@@ -660,7 +737,9 @@ async fn admin_rag_upload(
     }
 
     if file_bytes.is_empty() {
-        return Err(AppError::Validation("No file field found or file is empty".into()));
+        return Err(AppError::Validation(
+            "No file field found or file is empty".into(),
+        ));
     }
 
     if !filename.to_lowercase().ends_with(".pdf") {
@@ -795,7 +874,9 @@ async fn scenario_ask(
     let user = crate::data::Repository::find_user_by_id(&state.pool, &user_id_str)
         .await
         .map_err(AppError::Database)?;
-    let business_type = user.map(|u| u.business_type).unwrap_or_else(|| "general".to_string());
+    let business_type = user
+        .map(|u| u.business_type)
+        .unwrap_or_else(|| "general".to_string());
 
     let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
 
@@ -811,9 +892,40 @@ async fn scenario_ask(
             &business_type,
             req.mode.as_deref(),
             &retriever,
+            Some(&state.pipeline),
         )
         .await
-        .map_err(|e| AppError::Engine(e))?;
+        .map_err(AppError::Engine)?;
+
+    // GAP-S05 Fix: Persist scenario execution into token_history for analytics and tracking
+    let history_id = uuid::Uuid::new_v4().to_string();
+    let original_tokens = crate::utils::tokens::estimate_tokens(&req.question) as i64;
+    let final_tokens = crate::utils::tokens::estimate_tokens(&resp.output_text) as i64;
+    let saved_tokens = (original_tokens - final_tokens).max(0);
+    let use_case = req
+        .domain
+        .as_deref()
+        .unwrap_or_else(|| req.style.as_deref().unwrap_or("scenario"));
+    let mode_str = req.mode.as_deref().unwrap_or_else(|| &req.app_mode);
+    let warnings_json = serde_json::to_string(&resp.warnings).unwrap_or_else(|_| "[]".to_string());
+
+    let _ = sqlx::query(
+        "INSERT INTO token_history (id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, warnings)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
+    )
+    .bind(&history_id)
+    .bind(&user_id_str)
+    .bind(&req.question)
+    .bind(&resp.output_text)
+    .bind(saved_tokens)
+    .bind(original_tokens)
+    .bind(final_tokens)
+    .bind(use_case)
+    .bind(mode_str)
+    .bind("3.1.0")
+    .bind(&warnings_json)
+    .execute(&state.pool)
+    .await;
 
     Ok((StatusCode::OK, Json(resp)).into_response())
 }

@@ -109,13 +109,11 @@ impl RagStore {
 
     /// Delete a document and all its chunks (CASCADE in schema).
     pub async fn delete_document(&self, user_id: &str, doc_id: &str) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "DELETE FROM rag_documents WHERE id = $1 AND user_id = $2",
-        )
-        .bind(doc_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
+        let result = sqlx::query("DELETE FROM rag_documents WHERE id = $1 AND user_id = $2")
+            .bind(doc_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -193,12 +191,10 @@ impl RagStore {
 
     /// Get chunk count for a document.
     pub async fn get_chunk_count(&self, doc_id: &str) -> Result<i64, sqlx::Error> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM rag_chunks WHERE document_id = $1",
-        )
-        .bind(doc_id)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM rag_chunks WHERE document_id = $1")
+            .bind(doc_id)
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0)
     }
 
@@ -223,7 +219,8 @@ impl RagStore {
                 return Ok(vec![]);
             }
             // Build dynamic IN clause
-            let placeholders: Vec<String> = (0..doc_ids.len()).map(|i| format!("${}", i + 2)).collect();
+            let placeholders: Vec<String> =
+                (0..doc_ids.len()).map(|i| format!("${}", i + 2)).collect();
             let in_clause = placeholders.join(", ");
             let query_str = format!(
                 "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
@@ -262,9 +259,10 @@ impl RagStore {
                     return None;
                 }
 
-                let metadata: Option<ChunkMetadata> = row.metadata.as_ref().and_then(|m| {
-                    serde_json::from_str(m).ok()
-                });
+                let metadata: Option<ChunkMetadata> = row
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| serde_json::from_str(m).ok());
 
                 Some(SearchResult {
                     chunk: RagChunk {
@@ -285,9 +283,160 @@ impl RagStore {
             .collect();
 
         // Sort by similarity descending, take top_k
-        results.sort_by(|a, b| b.similarity_score.partial_cmp(&a.similarity_score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.similarity_score
+                .partial_cmp(&a.similarity_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(top_k);
         Ok(results)
+    }
+
+    /// Retrieve chunks matching query using SQLite FTS5 BM25 lexical search.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure.
+    pub async fn search_fts(
+        &self,
+        query_text: &str,
+        user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        let words: Vec<String> = query_text
+            .split_whitespace()
+            .map(|w| {
+                w.chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect::<String>()
+            })
+            .filter(|w| w.len() >= 3)
+            .collect();
+
+        if words.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let match_expr = words.join(" OR ");
+        let query_str = "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
+                                d.filename, d.domain
+                         FROM rag_chunks_fts f
+                         JOIN rag_chunks c ON f.chunk_id = c.id
+                         JOIN rag_documents d ON c.document_id = d.id
+                         WHERE d.user_id = $1 AND rag_chunks_fts MATCH $2
+                         ORDER BY bm25(rag_chunks_fts) ASC
+                         LIMIT $3";
+
+        let rows = match sqlx::query_as::<_, ChunkSearchRow>(query_str)
+            .bind(user_id)
+            .bind(&match_expr)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!("FTS5 search skipped or table pending: {}", e);
+                return Ok(vec![]);
+            }
+        };
+
+        let results = rows
+            .into_iter()
+            .enumerate()
+            .map(|(rank, row)| {
+                let metadata: Option<ChunkMetadata> = row
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| serde_json::from_str(m).ok());
+
+                // Normalize rank score into an estimated similarity pseudo-score in [0.5, 0.95]
+                let score = (0.95 - (rank as f32 * 0.05)).max(0.50);
+
+                SearchResult {
+                    chunk: RagChunk {
+                        id: row.id,
+                        document_id: row.document_id,
+                        chunk_index: row.chunk_index,
+                        content: row.content,
+                        embedding: None,
+                        metadata,
+                        token_count: row.token_count,
+                        created_at: row.created_at,
+                    },
+                    similarity_score: score,
+                    document_filename: row.filename,
+                    document_domain: row.domain,
+                }
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Hybrid search combining Dense Vector Similarity and Sparse BM25 (FTS5) using Reciprocal Rank Fusion (RRF).
+    ///
+    /// # Invariants
+    /// RRF score formula: score = sum_m( 1.0 / (k + rank_m) ) with k = 60.
+    pub async fn search_hybrid(
+        &self,
+        query_text: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+    ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        let dense_results = self
+            .search(
+                query_embedding,
+                user_id,
+                document_ids,
+                top_k * 2,
+                min_similarity,
+            )
+            .await?;
+        let sparse_results = self
+            .search_fts(query_text, user_id, top_k * 2)
+            .await
+            .unwrap_or_default();
+
+        if sparse_results.is_empty() {
+            let mut res = dense_results;
+            res.truncate(top_k);
+            return Ok(res);
+        }
+
+        // Reciprocal Rank Fusion (RRF) with smoothing constant k = 60.0
+        let k = 60.0f32;
+        let mut scores: std::collections::HashMap<String, (f32, SearchResult)> =
+            std::collections::HashMap::new();
+
+        for (rank, item) in dense_results.into_iter().enumerate() {
+            let rrf = 1.0 / (k + (rank as f32) + 1.0);
+            scores.insert(item.chunk.id.clone(), (rrf, item));
+        }
+
+        for (rank, item) in sparse_results.into_iter().enumerate() {
+            let rrf = 1.0 / (k + (rank as f32) + 1.0);
+            if let Some((score, _)) = scores.get_mut(&item.chunk.id) {
+                *score += rrf;
+            } else {
+                scores.insert(item.chunk.id.clone(), (rrf, item));
+            }
+        }
+
+        let mut fused: Vec<(f32, SearchResult)> = scores.into_values().collect();
+        fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        fused.truncate(top_k);
+
+        Ok(fused
+            .into_iter()
+            .map(|(score, mut res)| {
+                // Scale and cap final score
+                res.similarity_score = (res.similarity_score + score * 5.0).min(1.0);
+                res
+            })
+            .collect())
     }
 
     // ── Retrieval Logging ──────────────────────────────────────────────────

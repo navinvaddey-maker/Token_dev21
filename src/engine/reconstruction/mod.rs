@@ -1,7 +1,7 @@
-pub mod deduplicator;
-pub mod cluster_mapper;
-pub mod slot_inferencer;
 pub mod ambiguity_register;
+pub mod cluster_mapper;
+pub mod deduplicator;
+pub mod slot_inferencer;
 
 use crate::types::ReconstructedInput;
 
@@ -22,7 +22,11 @@ impl TokenReconstructor {
         }
     }
 
-    pub fn run(&self, input: &str, scenario: Option<crate::classifier::signal::ScenarioSignal>) -> ReconstructedInput {
+    pub fn run(
+        &self,
+        input: &str,
+        scenario: Option<crate::classifier::signal::ScenarioSignal>,
+    ) -> ReconstructedInput {
         // Step 1: Repetition scoring
         let deduplicated = self.deduplicator.process(input);
 
@@ -36,7 +40,9 @@ impl TokenReconstructor {
                 weights.apply_intent_class_bias(&signal.intent_class);
             }
         }
-        let clusters = self.cluster_mapper.group_into_clusters(&resolved_tokens, &weights);
+        let clusters = self
+            .cluster_mapper
+            .group_into_clusters(&resolved_tokens, &weights);
 
         // Step 5: Schema slot inference
         let (slot_map, locks) = self.slot_inferencer.infer_slots(&clusters);
@@ -50,7 +56,7 @@ impl TokenReconstructor {
     }
 
     fn calculate_structure_score(&self, tokens: &[crate::types::WeightedToken]) -> f32 {
-        // Simple heuristic for structure score: proportion of tokens with normal weights 
+        // Simple heuristic for structure score: proportion of tokens with normal weights
         // implies less repetition and more structure. Return 0.5 as a baseline.
         if tokens.is_empty() {
             return 0.0;

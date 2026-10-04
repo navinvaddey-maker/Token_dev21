@@ -39,8 +39,9 @@ impl Stage6a {
         }
 
         if let Some(norm) = &schema_filled.normalization {
-            let (ctx_opt, rag_opt, user_prompt) = crate::npae::aggressive::structurer::split_raw_input(&norm.normalized_text);
-            
+            let (ctx_opt, rag_opt, user_prompt) =
+                crate::npae::aggressive::structurer::split_raw_input(&norm.normalized_text);
+
             parts.push(format!("**Task:** {}", user_prompt));
 
             if let Some(ctx) = ctx_opt {
@@ -68,14 +69,21 @@ impl Stage6a {
 
         if let Some(enrichment) = &schema_filled.enrichment {
             if let Some(rag_chunks) = &enrichment.rag_chunks {
-                if !parts.iter().any(|p| p.contains("Source Knowledge:") || p.contains("Retrieved Knowledge:")) {
+                if !parts
+                    .iter()
+                    .any(|p| p.contains("Source Knowledge:") || p.contains("Retrieved Knowledge:"))
+                {
                     let mut text = String::new();
                     for chunk in rag_chunks {
-                        let page_str = chunk.metadata.as_ref()
+                        let page_str = chunk
+                            .metadata
+                            .as_ref()
                             .and_then(|m| m.page_number)
                             .map(|p| format!(", Page {}", p))
                             .unwrap_or_default();
-                        let source_str = chunk.metadata.as_ref()
+                        let source_str = chunk
+                            .metadata
+                            .as_ref()
                             .map(|m| format!("[Source: {}{}]\n", m.source_file, page_str))
                             .unwrap_or_default();
                         text.push_str(&format!("{}{}\n\n", source_str, chunk.content));

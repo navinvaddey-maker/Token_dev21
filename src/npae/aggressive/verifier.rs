@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use super::builder::CandidateRule;
-use super::config::{UnifiedConfig, ConstraintRule};
+use super::config::{ConstraintRule, UnifiedConfig};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct MatchedRule {
@@ -26,10 +26,16 @@ pub fn verify_candidates(
     let mut unmatched = Vec::new();
 
     for candidate in candidates {
-        let best_match = config.constraints.iter()
+        let best_match = config
+            .constraints
+            .iter()
             .filter_map(|rule| {
                 let score = compute_match_score(candidate, rule);
-                if score > 0.0 { Some((rule, score)) } else { None }
+                if score > 0.0 {
+                    Some((rule, score))
+                } else {
+                    None
+                }
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -59,14 +65,18 @@ pub fn verify_candidates(
 }
 
 fn compute_match_score(candidate: &CandidateRule, rule: &ConstraintRule) -> f32 {
-    let candidate_set: HashSet<&str> = candidate
-        .trigger_words.iter().map(|s| s.as_str()).collect();
+    let candidate_set: HashSet<&str> = candidate.trigger_words.iter().map(|s| s.as_str()).collect();
 
-    let best = rule.trigger.iter()
+    let best = rule
+        .trigger
+        .iter()
         .map(|group| {
             let total: u32 = group.iter().map(|tw| tw.weight).sum();
-            if total == 0 { return 0.0; }
-            let matched_weight: u32 = group.iter()
+            if total == 0 {
+                return 0.0;
+            }
+            let matched_weight: u32 = group
+                .iter()
                 .filter(|tw| candidate_set.contains(tw.word.as_str()))
                 .map(|tw| tw.weight)
                 .sum();
@@ -74,6 +84,10 @@ fn compute_match_score(candidate: &CandidateRule, rule: &ConstraintRule) -> f32 
         })
         .fold(0.0f32, f32::max);
 
-    let domain_bonus = if candidate.inferred_domain == rule.domain { 0.1 } else { 0.0 };
+    let domain_bonus = if candidate.inferred_domain == rule.domain {
+        0.1
+    } else {
+        0.0
+    };
     (best + domain_bonus).min(1.0)
 }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-use tracing::{warn, info};
+use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EgressConfig {
@@ -19,9 +19,12 @@ impl ScenarioEgressGuard {
             .map_err(|e| format!("Failed to read egress config file '{}': {}", path, e))?;
         let cfg: EgressConfig = serde_json::from_str(&content)
             .map_err(|e| format!("Failed to parse egress config JSON: {}", e))?;
-        
+
         let allowlist = cfg.allowlist.into_iter().collect();
-        info!("Scenario_Egress_Guard initialized with allowlist: {:?}", allowlist);
+        info!(
+            "Scenario_Egress_Guard initialized with allowlist: {:?}",
+            allowlist
+        );
         Ok(Self { allowlist })
     }
 
@@ -34,7 +37,10 @@ impl ScenarioEgressGuard {
     /// Guard an outbound call. Logs and returns error if blocked.
     pub fn validate_egress(&self, destination: &str) -> Result<(), String> {
         if !self.is_allowed(destination) {
-            warn!("Scenario_Egress_Guard BLOCKED unauthorized egress attempt to: {}", destination);
+            warn!(
+                "Scenario_Egress_Guard BLOCKED unauthorized egress attempt to: {}",
+                destination
+            );
             return Err(format!(
                 "Security Egress Violation: Network call to '{}' denied by Scenario_Egress_Guard allowlist.",
                 destination
@@ -44,7 +50,11 @@ impl ScenarioEgressGuard {
     }
 
     /// Reject registration of any tool requiring non-allowlisted network calls.
-    pub fn validate_tool_registration(&self, tool_name: &str, required_endpoint: Option<&str>) -> Result<(), String> {
+    pub fn validate_tool_registration(
+        &self,
+        tool_name: &str,
+        required_endpoint: Option<&str>,
+    ) -> Result<(), String> {
         if let Some(endpoint) = required_endpoint {
             if !self.is_allowed(endpoint) {
                 return Err(format!(
@@ -104,7 +114,11 @@ impl ScenarioNamespaceGuard {
     }
 
     /// Checks if a retrieved chunk domain/namespace is permitted under current guard rules.
-    pub fn is_chunk_permitted(chunk_domain: Option<&str>, chunk_filename: Option<&str>, permitted_namespaces: &[String]) -> bool {
+    pub fn is_chunk_permitted(
+        chunk_domain: Option<&str>,
+        chunk_filename: Option<&str>,
+        permitted_namespaces: &[String],
+    ) -> bool {
         if permitted_namespaces.contains(&"all".to_string()) {
             return true;
         }
@@ -117,21 +131,80 @@ impl ScenarioNamespaceGuard {
                 return true;
             }
 
-            if p_lower.starts_with(&domain) {
-                let base_namespaces = ["legal_docs", "business_strategy", "financial_records"];
-                if base_namespaces.contains(&p_lower.as_str()) {
+            if p_lower.starts_with(&domain) || domain.starts_with(&p_lower) {
+                if filename.is_empty() || filename.contains(&p_lower) || !p_lower.contains('_') {
                     return true;
-                }
-
-                for base in base_namespaces.iter() {
-                    if p_lower.starts_with(base) {
-                        if filename.contains(&p_lower) {
-                            return true;
-                        }
-                    }
                 }
             }
             false
+        })
+    }
+
+    /// Generic content relevance filter:
+    /// Ensures retrieved chunks have topical keyword/semantic relevance to the user question,
+    /// preventing cross-domain or off-topic spurious matches (e.g. criminal code tables on civil succession queries).
+    pub fn is_chunk_content_relevant(query: &str, chunk_content: &str) -> bool {
+        let query_lower = query.to_lowercase();
+        let chunk_lower = chunk_content.to_lowercase();
+
+        // Extract query terms (length >= 4, ignoring common stop words)
+        let query_terms: Vec<&str> = query_lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| {
+                w.len() >= 4
+                    && !matches!(
+                        *w,
+                        "this"
+                            | "that"
+                            | "with"
+                            | "from"
+                            | "they"
+                            | "been"
+                            | "have"
+                            | "what"
+                            | "which"
+                            | "when"
+                            | "where"
+                            | "how"
+                            | "who"
+                            | "whom"
+                            | "than"
+                            | "then"
+                            | "these"
+                            | "those"
+                            | "each"
+                            | "every"
+                            | "some"
+                            | "such"
+                            | "only"
+                            | "into"
+                            | "over"
+                            | "after"
+                            | "also"
+                            | "would"
+                            | "could"
+                            | "should"
+                            | "about"
+                            | "there"
+                            | "their"
+                            | "please"
+                            | "search"
+                    )
+            })
+            .collect();
+
+        if query_terms.is_empty() {
+            return true;
+        }
+
+        // Must match at least one significant query term or stem
+        query_terms.iter().any(|&term| {
+            let stem = if term.len() > 5 {
+                &term[..term.len() - 1]
+            } else {
+                term
+            };
+            chunk_lower.contains(stem)
         })
     }
 }

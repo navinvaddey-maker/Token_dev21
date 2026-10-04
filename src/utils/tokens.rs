@@ -18,6 +18,9 @@ mod tests {
     fn test_estimate_tokens_basic() {
         assert_eq!(estimate_tokens("hello"), 2);
         assert_eq!(estimate_tokens("hello world"), 3);
-        assert_eq!(estimate_tokens("one two three four five six seven eight nine ten"), 13);
+        assert_eq!(
+            estimate_tokens("one two three four five six seven eight nine ten"),
+            13
+        );
     }
 }

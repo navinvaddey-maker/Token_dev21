@@ -8,7 +8,7 @@ pub struct ParsedPrompt {
 
 pub fn parse_prompt(raw: &str) -> ParsedPrompt {
     let lower = raw.to_lowercase();
-    
+
     // Tokenization
     let tokens: Vec<String> = lower
         .split(|c: char| !c.is_alphanumeric() && c != '-')

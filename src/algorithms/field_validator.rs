@@ -19,10 +19,7 @@ impl FieldTypeValidator {
     ///
     /// # Returns
     /// A vector of field validation issues found during validation
-    pub fn validate(
-        &self,
-        schema: &crate::types::CompressionSchema,
-    ) -> Vec<FieldValidationIssue> {
+    pub fn validate(&self, schema: &crate::types::CompressionSchema) -> Vec<FieldValidationIssue> {
         self.validate_full(schema, &crate::types::AlgorithmOutput::default())
     }
 
@@ -120,7 +117,6 @@ impl FieldTypeValidator {
         issues
     }
 
-
     /// Validates a single context field for type and content issues.
     fn check_context(&self, context: &String, index: usize) -> Vec<FieldValidationIssue> {
         let mut issues = Vec::new();
@@ -186,7 +182,6 @@ mod tests {
         assert_eq!(issues[0].issue_type, "empty");
         assert_eq!(issues[0].severity, "error");
     }
-
 
     #[test]
     fn test_validate_context_empty() {

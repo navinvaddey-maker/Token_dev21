@@ -1,6 +1,6 @@
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
-use anyhow::Result;
 
 pub struct FileWatcher {
     path: PathBuf,
@@ -11,8 +11,11 @@ impl FileWatcher {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let mtime = std::fs::metadata(&path)?.modified()?;
-        
-        Ok(Self { path, last_mtime: mtime })
+
+        Ok(Self {
+            path,
+            last_mtime: mtime,
+        })
     }
 
     /// Poll for changes. Returns Ok(()) if changed, or errors if check fails.

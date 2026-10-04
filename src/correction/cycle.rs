@@ -8,7 +8,10 @@ pub const MAX_CORRECTION_CYCLES: u32 = 2;
 /// @param out - Mutable pipeline state.
 /// @param axis - Which dimension failed the threshold.
 /// @returns Human-readable correction steps applied.
-pub fn apply_targeted_correction(out: &mut AlgorithmOutput, axis: &ScoreAxis) -> Vec<TextCorrection> {
+pub fn apply_targeted_correction(
+    out: &mut AlgorithmOutput,
+    axis: &ScoreAxis,
+) -> Vec<TextCorrection> {
     let mut corrections = Vec::new();
 
     match axis {
@@ -28,7 +31,8 @@ pub fn apply_targeted_correction(out: &mut AlgorithmOutput, axis: &ScoreAxis) ->
             infer_implicit_deliverables(out);
             corrections.push(TextCorrection {
                 original: String::new(),
-                corrected: "Merged constraints/deliverables and inferred implicit outputs".to_string(),
+                corrected: "Merged constraints/deliverables and inferred implicit outputs"
+                    .to_string(),
                 confidence: 0.85,
                 correction_type: "semantic_completeness".to_string(),
             });
@@ -57,7 +61,9 @@ pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
             .iter()
             .any(|c| c.name.eq_ignore_ascii_case(&name))
         {
-            out.resolved_schema.constraints.push(crate::types::Constraint { name });
+            out.resolved_schema
+                .constraints
+                .push(crate::types::Constraint { name });
         }
     }
 
@@ -68,11 +74,9 @@ pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
             .iter()
             .any(|d| d.name.eq_ignore_ascii_case(deliverable))
         {
-            out.resolved_schema
-                .output
-                .push(crate::types::Deliverable {
-                    name: deliverable.clone(),
-                });
+            out.resolved_schema.output.push(crate::types::Deliverable {
+                name: deliverable.clone(),
+            });
         }
     }
 }
@@ -102,7 +106,8 @@ pub fn infer_implicit_deliverables(out: &mut AlgorithmOutput) {
         .unwrap_or("")
         .to_lowercase();
 
-    let meal_plan = task_text.contains("meal") || task_text.contains("plan") || task_text.contains("nutrition");
+    let meal_plan =
+        task_text.contains("meal") || task_text.contains("plan") || task_text.contains("nutrition");
     let dietary_constraints = ["fiber", "dairy", "nightshade", "carb", "macro"]
         .iter()
         .any(|k| constraint_text.contains(k));
@@ -117,4 +122,3 @@ pub fn infer_implicit_deliverables(out: &mut AlgorithmOutput) {
         }
     }
 }
-

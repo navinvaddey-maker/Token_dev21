@@ -425,4 +425,15 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Integrated rule-based role composition into NPAE `extract_with_config`, `generate_role`, and `structurer.rs` with `PromptRole.secondary` and `persona_anchor`.
     - Gated centroid embedding fallback in `detect_domain` with `HASH_MARGIN_GAP = 0.05` preserving canonical domain fallback tables.
     - All unit and integration tests passing cleanly.
+
+[2026-10-04] [Antigravity / Gemini 3.8 Flash] ARCHITECTURE_v3.md
+  Implemented FAANG-Grade Hybrid RAG Retrieval (Dense + Sparse FTS5) & Scenario Mode Integration (GAP-S01, GAP-S02, GAP-S05):
+    - Upgraded `EmbeddingEngine` with `fastembed-rs` ONNX runtime (`AllMiniLML6V2`, 384-dim) with deterministic fallback.
+    - Added SQLite FTS5 migration (`0014_add_rag_chunks_fts.sql`) with automatic trigger synchronization.
+    - Added Reciprocal Rank Fusion (RRF, k=60.0) hybrid search across cosine vector similarity and BM25 lexical rank.
+    - Fixed GAP-S01: Loaded scenario `style_instructions` now active in prompt generation.
+    - Fixed GAP-S02: Threaded `PipelineOrchestrator` into `ScenarioModeRouter` with `EnrichmentContext` when `compression_mode` requested.
+    - Fixed GAP-S05: Persisted scenario interactions, metrics, citations, and warnings to `token_history` in `api.rs`.
+    - Generated comprehensive audit report PDF `TOKEN_COMPRESS_ENGINE_ARCHITECTURE_AND_RAG_NPAE_AUDIT.pdf`.
+    - 150+ unit and integration tests passing cleanly.
 ```

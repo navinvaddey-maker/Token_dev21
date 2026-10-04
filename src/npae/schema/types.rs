@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::npae::compression::types::CompressedRepr;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AggressiveRequest {
@@ -10,30 +10,29 @@ pub struct AggressiveRequest {
     pub rag_top_k: Option<usize>,
 }
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NpaeConfig {
-    pub ambiguity_threshold:  Option<f32>,
-    pub max_questions:        Option<u8>,
+    pub ambiguity_threshold: Option<f32>,
+    pub max_questions: Option<u8>,
     pub confidence_threshold: Option<f32>,
-    pub skip_stage:           Option<String>,
+    pub skip_stage: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StructuredPromptResponse {
-    pub schema_version:      String,
-    pub request_id:          String,
-    pub optimized_prompt:    String,      // Added for UI compatibility (app.js)
-    pub token_original:      u32,         // Added for UI compatibility
-    pub token_final:         u32,         // Added for UI compatibility
-    pub token_saved:         u32,         // Added for UI compatibility
-    pub compression:         CompressionMeta,
-    pub structured_prompt:   StructuredPrompt,
-    pub ambiguity_analysis:  AmbiguityAnalysis,
+    pub schema_version: String,
+    pub request_id: String,
+    pub optimized_prompt: String, // Added for UI compatibility (app.js)
+    pub token_original: u32,      // Added for UI compatibility
+    pub token_final: u32,         // Added for UI compatibility
+    pub token_saved: u32,         // Added for UI compatibility
+    pub compression: CompressionMeta,
+    pub structured_prompt: StructuredPrompt,
+    pub ambiguity_analysis: AmbiguityAnalysis,
     pub clarifying_questions: Vec<ClarifyingQuestion>,
-    pub confidence_score:    f32,
+    pub confidence_score: f32,
     pub processing_metadata: ProcessingMeta,
-    pub scoring_result:      crate::types::ScoringResult,
+    pub scoring_result: crate::types::ScoringResult,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hallucination_report: Option<crate::npae::hallucination::guard::HallucinationReport>,
 }
@@ -59,22 +58,22 @@ impl CompressionMeta {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StructuredPrompt {
-    pub role:               PromptRole,
+    pub role: PromptRole,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub objective:          Option<PromptObjective>,
-    pub context:            PromptContext,
-    pub constraints:        PromptConstraints,
+    pub objective: Option<PromptObjective>,
+    pub context: PromptContext,
+    pub constraints: PromptConstraints,
     pub hallucination_guard: HallucinationGuardConfig,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_spec:        Option<OutputSpec>,
+    pub output_spec: Option<OutputSpec>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub execution_phases:   Vec<ExecutionPhase>,
+    pub execution_phases: Vec<ExecutionPhase>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub validation_steps:   Vec<ValidationStep>,
+    pub validation_steps: Vec<ValidationStep>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub success_criteria:   Vec<String>,
+    pub success_criteria: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constraints_meta:   Option<ConstraintsMeta>,
+    pub constraints_meta: Option<ConstraintsMeta>,
     #[serde(default)]
     pub dynamic_instruction: String,
 }
@@ -121,16 +120,16 @@ pub struct LengthBound {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HallucinationGuardConfig {
-    pub self_critique_enabled:    bool,
-    pub confidence_threshold:     f32,
-    pub contradiction_check:      bool,
+    pub self_critique_enabled: bool,
+    pub confidence_threshold: f32,
+    pub contradiction_check: bool,
     pub claim_verification_rules: Vec<String>,
-    pub uncertainty_markers:      Vec<String>,
+    pub uncertainty_markers: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AmbiguityAnalysis {
-    pub score:     f32,
+    pub score: f32,
     pub threshold: f32,
     pub triggered: bool,
     pub gap_zones: Vec<String>,
@@ -138,16 +137,20 @@ pub struct AmbiguityAnalysis {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClarifyingQuestion {
-    pub id:               u8,
-    pub question:         String,
+    pub id: u8,
+    pub question: String,
     pub information_gain: f32,
-    pub gap_addressed:    String,
-    pub priority:         Priority,
+    pub gap_addressed: String,
+    pub priority: Priority,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
-pub enum Priority { High, Medium, Low }
+pub enum Priority {
+    High,
+    Medium,
+    Low,
+}
 
 // --- 6-Pillar Prompt Spec Types ---
 
@@ -164,11 +167,11 @@ pub struct PromptObjective {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliverableType {
-    Content,   // email, article, code, essay — needs Requirements, NOT roadmaps
-    Strategy,  // business plan, roadmap, analysis — needs Execution Phases
-    Hybrid,    // comprehensive guide + implementation — needs both
-    Artifact,  // code, config, schema — needs Output Format + Validation
-    Analysis,  // report, comparison, review — needs Requirements
+    Content,  // email, article, code, essay — needs Requirements, NOT roadmaps
+    Strategy, // business plan, roadmap, analysis — needs Execution Phases
+    Hybrid,   // comprehensive guide + implementation — needs both
+    Artifact, // code, config, schema — needs Output Format + Validation
+    Analysis, // report, comparison, review — needs Requirements
 }
 
 impl Default for DeliverableType {

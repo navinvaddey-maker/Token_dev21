@@ -35,7 +35,9 @@ impl NormalizationStage {
 
 pub struct TextNormalizer;
 impl TextNormalizer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 impl Normalizer for TextNormalizer {
     fn transform(&self, raw: &str) -> String {
@@ -46,7 +48,9 @@ impl Normalizer for TextNormalizer {
 
 pub struct ZScoreNormalizer;
 impl ZScoreNormalizer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 impl Normalizer for ZScoreNormalizer {
     fn transform(&self, raw: &str) -> String {
@@ -57,7 +61,9 @@ impl Normalizer for ZScoreNormalizer {
 
 pub struct AdjacencyNormalizer;
 impl AdjacencyNormalizer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 impl Normalizer for AdjacencyNormalizer {
     fn transform(&self, raw: &str) -> String {
@@ -67,7 +73,9 @@ impl Normalizer for AdjacencyNormalizer {
 
 pub struct L2Normalizer;
 impl L2Normalizer {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 impl Normalizer for L2Normalizer {
     fn transform(&self, raw: &str) -> String {

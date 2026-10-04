@@ -1,7 +1,7 @@
 use competitive_core::centroid::CentroidSnapshot;
 use hebbian_core::WeightDelta;
 use schema_engine::types::PromptSchema;
-use sqlx::{SqlitePool, Row};
+use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
 
 pub async fn save_prompt(

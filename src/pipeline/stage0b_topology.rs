@@ -54,13 +54,17 @@ impl TopologyClassifier {
 
     /// Maps known domain+task combinations to their expected topology.
     /// Used as a fast-path when scenario confidence >= 0.75.
-    fn derive_topology_from_domain_and_task(&self, domain: &str, task_type: &str) -> PromptTopology {
+    fn derive_topology_from_domain_and_task(
+        &self,
+        domain: &str,
+        task_type: &str,
+    ) -> PromptTopology {
         match (domain, task_type) {
-            ("real-estate", "creation")  => PromptTopology::Hierarchical,
-            ("legal",        "analysis") => PromptTopology::Network,
-            ("finance",      "analysis") => PromptTopology::Hierarchical,
-            (_,         "troubleshooting") => PromptTopology::Linear,
-            _                            => PromptTopology::Flat,
+            ("real-estate", "creation") => PromptTopology::Hierarchical,
+            ("legal", "analysis") => PromptTopology::Network,
+            ("finance", "analysis") => PromptTopology::Hierarchical,
+            (_, "troubleshooting") => PromptTopology::Linear,
+            _ => PromptTopology::Flat,
         }
     }
 

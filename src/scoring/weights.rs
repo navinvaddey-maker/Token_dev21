@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct IssueWeights {
     /// Weight for task field issues (0.0-1.0)
     pub task: f32,
- 
+
     /// Weight for context field issues (0.0-1.0)
     pub context: f32,
 }
@@ -103,11 +103,11 @@ mod tests {
     fn test_normalize() {
         let mut weights = IssueWeights::new(0.5, 0.0);
         weights.normalize();
- 
+
         // Should now be 1.0, 0.0 normalized to sum to 1.0
         assert!((weights.task - 1.0).abs() < f32::EPSILON);
         assert!((weights.context - 0.0).abs() < f32::EPSILON);
- 
+
         let total = weights.task + weights.context;
         assert!((total - 1.0).abs() < f32::EPSILON);
     }

@@ -58,9 +58,13 @@ pub enum ProcessingMode {
 pub struct ModeDecisionStage;
 
 impl ModeDecisionStage {
-    pub fn decide(&self, _boundary_map: &serde_json::Value, _ctx: &PipelineContext) -> ProcessingMode {
+    pub fn decide(
+        &self,
+        _boundary_map: &serde_json::Value,
+        _ctx: &PipelineContext,
+    ) -> ProcessingMode {
         // Feature extraction and model prediction go here
-        
+
         // Mock prediction based on working memory
         let _span = (); // ctx.working_memory.snapshot();
         ProcessingMode::Generative

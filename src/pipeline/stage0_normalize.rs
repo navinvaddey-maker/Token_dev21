@@ -67,7 +67,12 @@ pub struct NormalizationPrePass;
 impl NormalizationPrePass {
     /// Run normalization pre-pass on raw prompt
     /// Returns normalized text and updates AlgorithmOutput with corrections and issues
-    pub fn run(&self, raw_input: &str, reconstructed: &crate::types::ReconstructedInput, out: &mut AlgorithmOutput) -> String {
+    pub fn run(
+        &self,
+        raw_input: &str,
+        reconstructed: &crate::types::ReconstructedInput,
+        out: &mut AlgorithmOutput,
+    ) -> String {
         let raw_prompt = raw_input.trim().to_string();
         let mut normalized = raw_prompt.clone();
         let mut applied_rules = Vec::new();
@@ -91,7 +96,8 @@ impl NormalizationPrePass {
         }
 
         // 1. Grammar & Spelling Correction via Harper-Core (safely preserving numbers/dates/units)
-        let (grammar_corrected, grammar_edits) = crate::npae::aggressive::grammar::GrammarCorrector::correct(&normalized);
+        let (grammar_corrected, grammar_edits) =
+            crate::npae::aggressive::grammar::GrammarCorrector::correct(&normalized);
         if !grammar_edits.is_empty() {
             normalized = grammar_corrected;
             for edit in &grammar_edits {
@@ -102,7 +108,6 @@ impl NormalizationPrePass {
 
         // 1b. Typo correction using domain vocabulary
         for (typo, fixed) in DOMAIN_VOCAB.iter() {
-
             if normalized.to_lowercase().contains(typo) {
                 let pattern = format!(r"\b{}\b", regex::escape(typo));
                 if let Ok(re) = Regex::new(&pattern) {

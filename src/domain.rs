@@ -68,14 +68,20 @@ pub fn verify_jwt(token: &str) -> Result<String, AppError> {
 pub async fn register_user(pool: &DbPool, req: RegisterRequest) -> Result<User, AppError> {
     let username = req.username.trim();
     if username.len() < 3 || username.len() > 50 {
-        return Err(AppError::Validation("Username must be between 3 and 50 characters".into()));
+        return Err(AppError::Validation(
+            "Username must be between 3 and 50 characters".into(),
+        ));
     }
     if req.password.len() < 8 {
-        return Err(AppError::Validation("Password must be at least 8 characters".into()));
+        return Err(AppError::Validation(
+            "Password must be at least 8 characters".into(),
+        ));
     }
     let email = req.email.trim();
     if !email.contains('@') || !email.contains('.') || email.len() < 5 {
-        return Err(AppError::Validation("A valid email address is required".into()));
+        return Err(AppError::Validation(
+            "A valid email address is required".into(),
+        ));
     }
 
     let id = Uuid::new_v4().to_string();
@@ -144,7 +150,11 @@ pub async fn compress_new(
     let history_id = Uuid::new_v4().to_string();
 
     let mut enrichment = crate::types::EnrichmentContext {
-        cluster_vocab: if !cluster_vocab.is_empty() { Some(cluster_vocab) } else { None },
+        cluster_vocab: if !cluster_vocab.is_empty() {
+            Some(cluster_vocab)
+        } else {
+            None
+        },
         rag_chunks: None,
     };
 
@@ -162,28 +172,37 @@ pub async fn compress_new(
                 let mut rag_section = String::new();
                 rag_section.push_str("\n--- Retrieved Knowledge ---\n");
                 for res in &retrieved_chunks {
-                    let page_str = res.chunk.metadata.as_ref()
+                    let page_str = res
+                        .chunk
+                        .metadata
+                        .as_ref()
                         .and_then(|m| m.page_number)
                         .map(|p| format!(", Page {}", p))
                         .unwrap_or_default();
                     rag_section.push_str(&format!(
                         "[Source: {}{}]\n{}\n\n",
-                        res.document_filename,
-                        page_str,
-                        res.chunk.content
+                        res.document_filename, page_str, res.chunk.content
                     ));
                 }
                 rag_section.push_str("--- End Retrieved Knowledge ---\n");
 
-                                    let chunks = retrieved_chunks.into_iter().map(|res| crate::types::RagChunk {
+                let chunks = retrieved_chunks
+                    .into_iter()
+                    .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,
                         metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
+                            page_number: res
+                                .chunk
+                                .metadata
+                                .as_ref()
+                                .and_then(|m| m.page_number)
+                                .map(|p| p as u32),
                             source_file: res.document_filename,
                         }),
-                    }).collect();
-                    enrichment.rag_chunks = Some(chunks);
+                    })
+                    .collect();
+                enrichment.rag_chunks = Some(chunks);
             }
         }
     }
@@ -195,7 +214,9 @@ pub async fn compress_new(
 
     tracing::debug!(
         "ScenarioClassifier result: {:?}",
-        scenario.as_ref().map(|s| (&s.domain, &s.intent_class, s.confidence))
+        scenario
+            .as_ref()
+            .map(|s| (&s.domain, &s.intent_class, s.confidence))
     );
 
     // 3. Run the 7-stage pipeline (0A → 6B)
@@ -215,7 +236,14 @@ pub async fn compress_new(
 
     let orchestrator_response = state
         .pipeline
-        .process(&req.raw_text, &mut session, scenario, req.mode.as_deref(), Some(&npae_cfg), Some(enrichment))
+        .process(
+            &req.raw_text,
+            &mut session,
+            scenario,
+            req.mode.as_deref(),
+            Some(&npae_cfg),
+            Some(enrichment),
+        )
         .await
         .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
 
@@ -227,7 +255,7 @@ pub async fn compress_new(
         crate::types::OrchestratorResponse::Aggressive(resp) => {
             // Log aggressive mode history so feedback loop can function (GAP-N02 fix)
             let mut verbose = crate::models::verbose::SqlxVerbose::default();
-            
+
             // Map StructuredPromptResponse to something Repository can handle
             // Since StructuredPromptResponse is slightly different, we build a partial history entry
             let token_original = resp.token_original as usize;
@@ -271,14 +299,18 @@ pub async fn compress_new(
             if let Some(obj) = json_resp.as_object_mut() {
                 obj.insert("id".to_string(), serde_json::json!(history_id));
             }
-            
+
             // 8. Implicit Signal Detection (Aggressive Mode branch)
-            let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1).await
+            let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1)
+                .await
                 .ok()
                 .and_then(|list| list.into_iter().next());
 
             let response_time_ms = if let Some(ref prev) = prev_history {
-                chrono::Utc::now().signed_duration_since(prev.created_at).num_milliseconds().max(0) as u64
+                chrono::Utc::now()
+                    .signed_duration_since(prev.created_at)
+                    .num_milliseconds()
+                    .max(0) as u64
             } else {
                 0
             };
@@ -296,13 +328,17 @@ pub async fn compress_new(
             for sig in signals {
                 let weight = sig.map_to_weight();
                 if weight != 0.0 {
-                    let target_prompt = if let Some(ref prev) = prev_history { &prev.original_prompt } else { &req.raw_text };
+                    let target_prompt = if let Some(ref prev) = prev_history {
+                        &prev.original_prompt
+                    } else {
+                        &req.raw_text
+                    };
                     let mut engine = state.engine.lock().await;
                     let _ = engine.apply_feedback(user_id, target_prompt, weight).await;
-                    
+
                     // ALSO apply to schema priors (GAP-N03 fix)
                     state.pipeline.apply_feedback(target_prompt, weight);
-                    
+
                     let mut sig_model = crate::models::feedback_signal::FeedbackSignal {
                         id: Uuid::new_v4().to_string(),
                         user_id: user_id_str.to_string(),
@@ -313,11 +349,13 @@ pub async fn compress_new(
                         meta: sig.meta,
                         detected_at: chrono::Utc::now(),
                     };
-                    if let Some(ref prev) = prev_history { sig_model.history_id = prev.id.clone(); }
+                    if let Some(ref prev) = prev_history {
+                        sig_model.history_id = prev.id.clone();
+                    }
                     let _ = Repository::insert_feedback(&state.pool, &sig_model).await;
                 }
             }
-            
+
             return Ok(json_resp);
         }
     };
@@ -389,12 +427,16 @@ pub async fn compress_new(
 
     // 8. Implicit Signal Detection (GAP-N03)
     // Runs after current history is persisted to compare with previous prompt
-    let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1).await
+    let prev_history = Repository::list_history(&state.pool, user_id_str, 1, 1)
+        .await
         .ok()
         .and_then(|list| list.into_iter().next());
 
     let response_time_ms = if let Some(ref prev) = prev_history {
-        chrono::Utc::now().signed_duration_since(prev.created_at).num_milliseconds().max(0) as u64
+        chrono::Utc::now()
+            .signed_duration_since(prev.created_at)
+            .num_milliseconds()
+            .max(0) as u64
     } else {
         0
     };
@@ -424,7 +466,7 @@ pub async fn compress_new(
 
             // ALSO apply to schema priors (GAP-N03 fix)
             state.pipeline.apply_feedback(target_prompt, weight);
-            
+
             // Persist the detected implicit signal for transparency
             let mut sig_model = crate::models::feedback_signal::FeedbackSignal {
                 id: Uuid::new_v4().to_string(),
@@ -458,7 +500,12 @@ pub async fn get_history_record(
         .ok_or(AppError::NotFound(id.into()))
 }
 
-pub async fn list_history(pool: &DbPool, user_id: &str, limit: i64, offset: i64) -> Result<Vec<TokenHistory>, AppError> {
+pub async fn list_history(
+    pool: &DbPool,
+    user_id: &str,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<TokenHistory>, AppError> {
     Repository::list_history(pool, user_id, limit, offset)
         .await
         .map_err(AppError::Database)
@@ -472,19 +519,31 @@ pub async fn record_explicit_feedback(
     req: ExplicitFeedback,
 ) -> Result<(), AppError> {
     let pool = &state.pool;
-    let feedback_val = if req.rating == "thumbs_up" { 1.0f32 } else { -1.0f32 };
+    let feedback_val = if req.rating == "thumbs_up" {
+        1.0f32
+    } else {
+        -1.0f32
+    };
     let u_id = Uuid::parse_str(user_id).map_err(|_| AppError::Unauthorized)?;
 
     // 1. Fetch history FIRST to verify it exists and belongs to this user (GAP-N03 fix)
     if req.history_id.starts_with("mock-") {
-        tracing::info!("Received feedback for mock history ID: {}. Skipping database lookup.", req.history_id);
+        tracing::info!(
+            "Received feedback for mock history ID: {}. Skipping database lookup.",
+            req.history_id
+        );
         return Ok(());
     }
 
     let history = Repository::get_history(pool, user_id, &req.history_id)
         .await
         .map_err(AppError::Database)?
-        .ok_or_else(|| AppError::NotFound(format!("History record {} not found for user", req.history_id)))?;
+        .ok_or_else(|| {
+            AppError::NotFound(format!(
+                "History record {} not found for user",
+                req.history_id
+            ))
+        })?;
 
     // 2. Persist the raw explicit feedback signal
     let sig_id = Uuid::new_v4().to_string();
@@ -498,7 +557,7 @@ pub async fn record_explicit_feedback(
         meta: serde_json::json!({}),
         detected_at: chrono::Utc::now(),
     };
-    
+
     Repository::insert_feedback(pool, &sig)
         .await
         .map_err(AppError::Database)?;
@@ -506,15 +565,22 @@ pub async fn record_explicit_feedback(
     // 3. Trigger the learning loop
     {
         let mut engine = state.engine.lock().await;
-        let _ = engine.apply_feedback(u_id, &history.original_prompt, feedback_val).await;
-        
+        let _ = engine
+            .apply_feedback(u_id, &history.original_prompt, feedback_val)
+            .await;
+
         // ALSO apply to schema priors (GAP-N03 fix)
-        state.pipeline.apply_feedback(&history.original_prompt, feedback_val);
+        state
+            .pipeline
+            .apply_feedback(&history.original_prompt, feedback_val);
 
         // 4. Implicit Signal Detection at Feedback Time
         // Check for long engagement as an implicit positive signal
-        let engagement_ms = chrono::Utc::now().signed_duration_since(history.created_at).num_milliseconds().max(0) as u64;
-        
+        let engagement_ms = chrono::Utc::now()
+            .signed_duration_since(history.created_at)
+            .num_milliseconds()
+            .max(0) as u64;
+
         let ctx = crate::behavior::feedback_detector::DetectionContext {
             user_id: user_id.to_string(),
             history_id: req.history_id.clone(),
@@ -529,11 +595,15 @@ pub async fn record_explicit_feedback(
             if sig.signal_type == "long_engagement" {
                 let weight = sig.map_to_weight();
                 if weight != 0.0 {
-                    let _ = engine.apply_feedback(u_id, &history.original_prompt, weight).await;
-                    
+                    let _ = engine
+                        .apply_feedback(u_id, &history.original_prompt, weight)
+                        .await;
+
                     // ALSO apply to schema priors (GAP-N03 fix)
-                    state.pipeline.apply_feedback(&history.original_prompt, weight);
-                    
+                    state
+                        .pipeline
+                        .apply_feedback(&history.original_prompt, weight);
+
                     let sig_model = crate::models::feedback_signal::FeedbackSignal {
                         id: Uuid::new_v4().to_string(),
                         user_id: user_id.to_string(),
@@ -583,7 +653,11 @@ pub async fn is_admin(pool: &DbPool, user_id: &str) -> Result<bool, AppError> {
     Ok(user.business_type.to_lowercase() == "admin")
 }
 
-pub async fn admin_list_users(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<User>, AppError> {
+pub async fn admin_list_users(
+    pool: &DbPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<User>, AppError> {
     Repository::list_all_users(pool, limit, offset)
         .await
         .map_err(AppError::Database)
@@ -621,7 +695,11 @@ pub async fn admin_get_stats(pool: &DbPool) -> Result<serde_json::Value, AppErro
         .map_err(AppError::Database)
 }
 
-pub async fn admin_list_history(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<TokenHistory>, AppError> {
+pub async fn admin_list_history(
+    pool: &DbPool,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<TokenHistory>, AppError> {
     Repository::list_all_history(pool, limit, offset)
         .await
         .map_err(AppError::Database)

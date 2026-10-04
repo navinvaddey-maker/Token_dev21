@@ -31,10 +31,18 @@ impl Stage1 {
         // Map PromptTopology (metadata) to TopologyResult (routing engine)
         let routing_topology = crate::engine::neuro::routing::TopologyResult {
             topology_type: match topology {
-                crate::types::PromptTopology::Linear => crate::engine::neuro::routing::TopologyType::Sequential,
-                crate::types::PromptTopology::Hierarchical => crate::engine::neuro::routing::TopologyType::Hierarchical,
-                crate::types::PromptTopology::Network => crate::engine::neuro::routing::TopologyType::Graph,
-                crate::types::PromptTopology::Flat => crate::engine::neuro::routing::TopologyType::Tabular,
+                crate::types::PromptTopology::Linear => {
+                    crate::engine::neuro::routing::TopologyType::Sequential
+                }
+                crate::types::PromptTopology::Hierarchical => {
+                    crate::engine::neuro::routing::TopologyType::Hierarchical
+                }
+                crate::types::PromptTopology::Network => {
+                    crate::engine::neuro::routing::TopologyType::Graph
+                }
+                crate::types::PromptTopology::Flat => {
+                    crate::engine::neuro::routing::TopologyType::Tabular
+                }
             },
         };
 
@@ -47,12 +55,16 @@ impl Stage1 {
         let keep_ratio = match forced_mode {
             Some("gentle") => self.sparse.gentle_keep_ratio,
             Some("aggressive") => self.sparse.aggressive_keep_ratio,
-            Some("balanced") => (self.sparse.gentle_keep_ratio + self.sparse.aggressive_keep_ratio) / 2.0,
+            Some("balanced") => {
+                (self.sparse.gentle_keep_ratio + self.sparse.aggressive_keep_ratio) / 2.0
+            }
             _ => {
                 // Proxy ratio based on topology if mode is not forced
                 match routing_topology.topology_type {
                     crate::engine::neuro::routing::TopologyType::Hierarchical
-                    | crate::engine::neuro::routing::TopologyType::Graph => self.sparse.aggressive_keep_ratio,
+                    | crate::engine::neuro::routing::TopologyType::Graph => {
+                        self.sparse.aggressive_keep_ratio
+                    }
                     _ => self.sparse.gentle_keep_ratio,
                 }
             }
@@ -66,7 +78,12 @@ impl Stage1 {
         out.output_token_count = lex_result.output_tokens;
 
         // New: Sparse Coding — receives clean_tokens and resolved keep_ratio
-        let scored = self.sparse.apply(&out.clean_tokens, keep_ratio, &out.constraint_locks, &sparse_mode);
+        let scored = self.sparse.apply(
+            &out.clean_tokens,
+            keep_ratio,
+            &out.constraint_locks,
+            &sparse_mode,
+        );
         out.salience_map = scored
             .iter()
             .map(|t| (t.text.clone(), t.salience))

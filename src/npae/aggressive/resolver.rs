@@ -1,15 +1,15 @@
-use std::sync::Arc;
 use anyhow::Result;
+use std::sync::Arc;
 
-use super::config::ConfigHandle;
-use super::parser::parse_prompt;
 use super::builder::build_candidate_rules;
-use super::verifier::verify_candidates;
-use super::role::generate_role;
+use super::config::ConfigHandle;
 use super::constraints::extract_constraints;
-use super::metrics;
-use super::structurer::{Structurer, TrustLevel};
 use super::intent::IntentProfile;
+use super::metrics;
+use super::parser::parse_prompt;
+use super::role::generate_role;
+use super::structurer::{Structurer, TrustLevel};
+use super::verifier::verify_candidates;
 
 pub struct ResolvedPrompt {
     pub role: String,
@@ -40,19 +40,19 @@ impl PromptResolver {
         &self,
         text: &str,
         profile: &IntentProfile,
-        _source_name: &str
+        _source_name: &str,
     ) -> ResolvedPrompt {
         let config = self.config_handle.read();
-        
+
         // Phase 1: Parse
         let parsed = parse_prompt(text);
-        
+
         // Phase 2: Build Candidates
         let candidates = build_candidate_rules(&parsed, &config);
 
         // Phase 3: Verify
         let verification = verify_candidates(&candidates, &config, self.threshold);
-        
+
         let status = if verification.passed {
             "resolved"
         } else if candidates.is_empty() {
@@ -70,7 +70,8 @@ impl PromptResolver {
 
         // Generate Role and Constraints
         let role = generate_role(profile, text, &config.domain_taxonomy, &config.roles);
-        let (inclusions, forbidden) = extract_constraints(text, &config.domain_taxonomy, &config.constraints);
+        let (inclusions, forbidden) =
+            extract_constraints(text, &config.domain_taxonomy, &config.constraints);
 
         metrics::CONSTRAINTS_INCLUSION_TOTAL.inc_by(inclusions.len() as u64);
         metrics::CONSTRAINTS_FORBIDDEN_TOTAL.inc_by(forbidden.len() as u64);
@@ -103,14 +104,16 @@ impl StructurerRouter {
         structurer.pre_validate(&input)?;
 
         let threshold = match input.trust_level {
-            TrustLevel::High      => 0.90,
-            TrustLevel::Medium    => 0.95,
-            TrustLevel::Low       => 0.95,
+            TrustLevel::High => 0.90,
+            TrustLevel::Medium => 0.95,
+            TrustLevel::Low => 0.95,
             TrustLevel::Untrusted => 0.98,
         };
 
         self.resolver.set_threshold(threshold);
-        let result = self.resolver.resolve(&input.text, profile, structurer.source_name());
+        let result = self
+            .resolver
+            .resolve(&input.text, profile, structurer.source_name());
 
         Ok(result)
     }

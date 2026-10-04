@@ -16,7 +16,7 @@ impl AmbiguityRegister {
 
         for token in tokens {
             let t = &token.text;
-            
+
             // Phoneme truncation mock ("dair" -> "dairy")
             if t == "dair" {
                 ambiguities.push(AmbiguityFlag {
@@ -29,7 +29,8 @@ impl AmbiguityRegister {
                     text: "dairy".to_string(),
                     weight: token.weight,
                 });
-            } else if t == "conditions" && resolved.last().map(|w| w.text.as_str()) == Some("high") {
+            } else if t == "conditions" && resolved.last().map(|w| w.text.as_str()) == Some("high")
+            {
                 // Phrase sequence detection: "high" + "conditions"
                 let prev = resolved.pop().unwrap();
                 let combined = format!("{} {}", prev.text, t);

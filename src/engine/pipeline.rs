@@ -112,11 +112,7 @@ pub fn run(input: &PipelineInput) -> Result<PipelineOutput, String> {
     }
 
     // ── Stage 4: Predictive coding — prepend role frame ───────────────────
-    let s4 = predictive_coding::run(
-        &s3.chunks,
-        &task_safe,
-        &input.use_case,
-    );
+    let s4 = predictive_coding::run(&s3.chunks, &task_safe, &input.use_case);
     info!(principle = "predictive_coding", ms = s4.duration_ms);
     logs.push(PrincipleLog {
         principle: "predictive_coding".into(),

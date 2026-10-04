@@ -30,15 +30,31 @@ impl SemanticCompletenessScorer {
                 out.resolved_schema.role.as_deref().unwrap_or(""),
                 out.resolved_schema.context.as_deref().unwrap_or(""),
                 out.resolved_schema.task.as_deref().unwrap_or(""),
-                out.resolved_schema.constraints.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(" "),
-                out.resolved_schema.output.iter().map(|d| d.name.as_str()).collect::<Vec<_>>().join(" "),
-            ).to_lowercase();
+                out.resolved_schema
+                    .constraints
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                out.resolved_schema
+                    .output
+                    .iter()
+                    .map(|d| d.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
+            .to_lowercase();
 
-            let preserved = out.constraint_locks.iter()
+            let preserved = out
+                .constraint_locks
+                .iter()
                 .filter(|c| {
                     let ct = c.text.to_lowercase();
-                    schema_text.contains(&ct) ||
-                    out.clean_tokens.iter().any(|t| t.to_lowercase().contains(&ct))
+                    schema_text.contains(&ct)
+                        || out
+                            .clean_tokens
+                            .iter()
+                            .any(|t| t.to_lowercase().contains(&ct))
                 })
                 .count();
 
@@ -66,13 +82,19 @@ impl SemanticCompletenessScorer {
             (present as f32 / deliverables_expected as f32).min(1.0)
         } else {
             // If none expected, check if at least schema filling worked for core fields
-            if out.resolved_schema.task.is_some() { 1.0 } else { 0.5 }
+            if out.resolved_schema.task.is_some() {
+                1.0
+            } else {
+                0.5
+            }
         };
 
         // ── Dimension 3: Ambiguity Resolution (20% weight) ─────────────────
         let ambiguities_total = out.ambiguity_register.len();
         let ambiguity_ratio = if ambiguities_total > 0 {
-            let resolved = out.ambiguity_register.iter()
+            let resolved = out
+                .ambiguity_register
+                .iter()
                 .filter(|a| a.resolved_as.is_some() && a.confidence >= 0.7)
                 .count();
 
@@ -88,9 +110,8 @@ impl SemanticCompletenessScorer {
         };
 
         // ── Composite Score ────────────────────────────────────────────────
-        let raw_score = (constraint_ratio * 0.4)
-            + (deliverable_ratio * 0.4)
-            + (ambiguity_ratio * 0.2);
+        let raw_score =
+            (constraint_ratio * 0.4) + (deliverable_ratio * 0.4) + (ambiguity_ratio * 0.2);
 
         let score = (raw_score * 10.0).clamp(0.0, 10.0);
 
@@ -101,7 +122,9 @@ impl SemanticCompletenessScorer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AlgorithmOutput, ConstraintToken, AmbiguityFlag, CompressionSchema, Deliverable};
+    use crate::types::{
+        AlgorithmOutput, AmbiguityFlag, CompressionSchema, ConstraintToken, Deliverable,
+    };
 
     #[test]
     fn test_scs_perfect_no_constraints() {
@@ -117,7 +140,10 @@ mod tests {
             ..Default::default()
         };
         let (score, penalties) = SemanticCompletenessScorer::score(&output);
-        assert_eq!(score, 10.0, "Perfect schema with no constraints should score 10.0");
+        assert_eq!(
+            score, 10.0,
+            "Perfect schema with no constraints should score 10.0"
+        );
         assert!(penalties.is_empty());
     }
 
@@ -137,7 +163,11 @@ mod tests {
         let (score, _penalties) = SemanticCompletenessScorer::score(&output);
         // deliverable_ratio = 0.5 (task missing), constraints = 1.0, ambiguity = 1.0
         // score = (1.0*0.4 + 0.5*0.4 + 1.0*0.2) * 10 = 8.0
-        assert_eq!(score, 8.0, "Missing task should reduce score to 8.0, got {}", score);
+        assert_eq!(
+            score, 8.0,
+            "Missing task should reduce score to 8.0, got {}",
+            score
+        );
     }
 
     #[test]
@@ -169,8 +199,16 @@ mod tests {
         let (score, penalties) = SemanticCompletenessScorer::score(&output);
         // ambiguity_ratio = 1/2 = 0.5
         // score = (1.0*0.4 + 1.0*0.4 + 0.5*0.2) * 10 = 9.0
-        assert!(score < 10.0, "Unresolved ambiguity should penalize, got {}", score);
-        assert!(score > 8.0, "One resolved ambiguity should still be decent, got {}", score);
+        assert!(
+            score < 10.0,
+            "Unresolved ambiguity should penalize, got {}",
+            score
+        );
+        assert!(
+            score > 8.0,
+            "One resolved ambiguity should still be decent, got {}",
+            score
+        );
     }
 
     #[test]
@@ -184,9 +222,18 @@ mod tests {
                 output: Vec::new(),
             },
             constraint_locks: vec![
-                ConstraintToken { text: "low fiber".into(), weight: 1.0 },
-                ConstraintToken { text: "no dairy".into(), weight: 1.0 },
-                ConstraintToken { text: "anti-inflammatory".into(), weight: 1.0 },
+                ConstraintToken {
+                    text: "low fiber".into(),
+                    weight: 1.0,
+                },
+                ConstraintToken {
+                    text: "no dairy".into(),
+                    weight: 1.0,
+                },
+                ConstraintToken {
+                    text: "anti-inflammatory".into(),
+                    weight: 1.0,
+                },
             ],
             // Only "low fiber" is NOT in the schema text, but the others aren't either
             // since schema text is "nutritionist marathon runner needs meal plan create plan"
@@ -196,7 +243,11 @@ mod tests {
         // All 3 constraints are lost from the schema text
         // constraint_ratio = 0/3 = 0.0
         // score = (0.0*0.4 + 1.0*0.4 + 1.0*0.2) * 10 = 6.0
-        assert!(score < 8.0, "Lost constraints should heavily penalize, got {}", score);
+        assert!(
+            score < 8.0,
+            "Lost constraints should heavily penalize, got {}",
+            score
+        );
         assert!(penalties.iter().any(|p| p.contains("Constraint loss")));
     }
 
@@ -208,7 +259,9 @@ mod tests {
                 context: Some("Test".into()),
                 task: Some("Build".into()),
                 constraints: Vec::new(),
-                output: vec![Deliverable { name: "code".into() }],
+                output: vec![Deliverable {
+                    name: "code".into(),
+                }],
             },
             expected_deliverables: vec!["code".into(), "tests".into()],
             ..Default::default()

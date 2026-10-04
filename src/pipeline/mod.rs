@@ -57,7 +57,13 @@ impl TokenCompressionPipeline {
     /// Stage 1 — Signal Reduction
     /// Lexical Compression → Sparse Coding
     /// Always runs, both modes. No mode awareness yet.
-    pub fn stage1_reduction(&self, raw_prompt: &str, out: &mut AlgorithmOutput, topology: &crate::engine::neuro::routing::TopologyResult, forced_mode: Option<&str>) {
+    pub fn stage1_reduction(
+        &self,
+        raw_prompt: &str,
+        out: &mut AlgorithmOutput,
+        topology: &crate::engine::neuro::routing::TopologyResult,
+        forced_mode: Option<&str>,
+    ) {
         // Existing: Lexical Compression
         let lex_result = self.lexical.compress(raw_prompt, out);
         out.clean_tokens = lex_result.tokens;
@@ -67,18 +73,25 @@ impl TokenCompressionPipeline {
         let keep_ratio = match forced_mode {
             Some("gentle") => self.sparse.gentle_keep_ratio,
             Some("aggressive") => self.sparse.aggressive_keep_ratio,
-            Some("balanced") => (self.sparse.gentle_keep_ratio + self.sparse.aggressive_keep_ratio) / 2.0,
-            _ => {
-                match topology.topology_type {
-                    crate::engine::neuro::routing::TopologyType::Hierarchical
-                    | crate::engine::neuro::routing::TopologyType::Graph => self.sparse.aggressive_keep_ratio,
-                    _ => self.sparse.gentle_keep_ratio,
-                }
+            Some("balanced") => {
+                (self.sparse.gentle_keep_ratio + self.sparse.aggressive_keep_ratio) / 2.0
             }
+            _ => match topology.topology_type {
+                crate::engine::neuro::routing::TopologyType::Hierarchical
+                | crate::engine::neuro::routing::TopologyType::Graph => {
+                    self.sparse.aggressive_keep_ratio
+                }
+                _ => self.sparse.gentle_keep_ratio,
+            },
         };
 
         // New: Sparse Coding — receives clean_tokens
-        let scored = self.sparse.apply(&out.clean_tokens, keep_ratio, &out.constraint_locks, "temporal");
+        let scored = self.sparse.apply(
+            &out.clean_tokens,
+            keep_ratio,
+            &out.constraint_locks,
+            "temporal",
+        );
         out.salience_map = scored
             .iter()
             .map(|t| (t.text.clone(), t.salience))
@@ -174,7 +187,11 @@ impl TokenCompressionPipeline {
 
         out.resolved_schema = crate::types::CompressionSchema {
             role: result.role.clone(),
-            context: if result.context.is_empty() { None } else { Some(result.context.join(" ")) },
+            context: if result.context.is_empty() {
+                None
+            } else {
+                Some(result.context.join(" "))
+            },
             task: result.task.clone(),
             constraints: result.constraints,
             output: result.output,
@@ -189,9 +206,7 @@ impl TokenCompressionPipeline {
     /// Always runs after schema filling, regardless of mode.
     pub fn stage4_field_validation(&self, out: &mut AlgorithmOutput) {
         // Run field validation
-        let issues = self
-            .field_validator
-            .validate(&out.resolved_schema);
+        let issues = self.field_validator.validate(&out.resolved_schema);
         out.field_issues = issues;
     }
 

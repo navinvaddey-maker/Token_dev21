@@ -59,8 +59,10 @@ async fn test_feedback_value_assignment() {
 
 #[tokio::test]
 async fn test_registration_validation() {
-    let pool = db::DbPool::connect("sqlite::memory:").await.expect("in-memory db");
-    
+    let pool = db::DbPool::connect("sqlite::memory:")
+        .await
+        .expect("in-memory db");
+
     // Short username (< 3 chars)
     let req_short_user = token_compress_engine::models::user::RegisterRequest {
         username: "ab".to_string(),
@@ -72,7 +74,10 @@ async fn test_registration_validation() {
         Err(token_compress_engine::errors::AppError::Validation(msg)) => {
             assert!(msg.contains("Username"));
         }
-        other => panic!("Expected validation error for short username, got {:?}", other),
+        other => panic!(
+            "Expected validation error for short username, got {:?}",
+            other
+        ),
     }
 
     // Short password (< 8 chars)
@@ -86,7 +91,10 @@ async fn test_registration_validation() {
         Err(token_compress_engine::errors::AppError::Validation(msg)) => {
             assert!(msg.contains("Password"));
         }
-        other => panic!("Expected validation error for short password, got {:?}", other),
+        other => panic!(
+            "Expected validation error for short password, got {:?}",
+            other
+        ),
     }
 
     // Invalid email
@@ -100,6 +108,9 @@ async fn test_registration_validation() {
         Err(token_compress_engine::errors::AppError::Validation(msg)) => {
             assert!(msg.contains("email"));
         }
-        other => panic!("Expected validation error for invalid email, got {:?}", other),
+        other => panic!(
+            "Expected validation error for invalid email, got {:?}",
+            other
+        ),
     }
 }

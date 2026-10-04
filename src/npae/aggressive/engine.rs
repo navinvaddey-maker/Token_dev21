@@ -1,13 +1,14 @@
-use crate::npae::compression::types::CompressedRepr;
-use crate::npae::schema::types::{NpaeConfig, StructuredPromptResponse, CompressionMeta, ProcessingMeta};
-use std::time::Instant;
-use super::rag_context::DerivedRagContext;
 use super::grammar::GrammarCorrector;
+use super::rag_context::DerivedRagContext;
+use crate::npae::compression::types::CompressedRepr;
+use crate::npae::schema::types::{
+    CompressionMeta, NpaeConfig, ProcessingMeta, StructuredPromptResponse,
+};
+use std::time::Instant;
 
 pub struct AggressiveEngine;
 
 impl AggressiveEngine {
-
     pub async fn run(
         raw: &str,
         repr: &CompressedRepr,
@@ -33,10 +34,13 @@ impl AggressiveEngine {
         // 1. Ory Engine: Meta-Orchestration and Deep Learning (using corrected prompt)
         let mut ory_lock = ory_engine.lock().await;
         let config_guard = config_handle.read();
-        let ory_result = ory_lock.process(&user_prompt, &config_guard).map_err(|e| e.to_string())?;
-        
-        let mut profile = super::intent::extract_with_config(repr, &user_prompt, Some(&config_guard))?;
-        
+        let ory_result = ory_lock
+            .process(&user_prompt, &config_guard)
+            .map_err(|e| e.to_string())?;
+
+        let mut profile =
+            super::intent::extract_with_config(repr, &user_prompt, Some(&config_guard))?;
+
         // Enhance Aggressive intent with Ory's deep learning
         let domain_agreement = ory_result.intent.inferred_domain == profile.domain;
         let confidence_margin = ory_result.intent.confidence_score - profile.confidence;
@@ -69,7 +73,9 @@ impl AggressiveEngine {
         // 1.5. Dispatch via StructurerRouter
         let resolver = super::resolver::PromptResolver::new(config_handle);
         let mut router = super::resolver::StructurerRouter::new(resolver);
-        let resolved_prompt = router.dispatch(structurer_impl, &profile).map_err(|e| e.to_string())?;
+        let resolved_prompt = router
+            .dispatch(structurer_impl, &profile)
+            .map_err(|e| e.to_string())?;
 
         // 2. Build structured prompt with derived RAG facts in context background
         let structured = super::structurer::build(
@@ -96,12 +102,13 @@ impl AggressiveEngine {
         let aggressive_ms = t_start.elapsed().as_millis() as u64;
 
         // Render final optimized prompt for UI
-        let optimized_prompt = super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
-        
+        let optimized_prompt =
+            super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
+
         // Post-generation validation using Hallucination Guard (including RAG facts as trusted context)
         let guard_cfg = &structured.hallucination_guard;
         let mut final_prompt = optimized_prompt;
-        
+
         let guard_source_text = if let Some(ref rag) = derived_rag {
             if !rag.facts.is_empty() {
                 format!("{}\nContext Facts: {}", raw, rag.facts.join(". "))
@@ -112,58 +119,112 @@ impl AggressiveEngine {
             raw.to_string()
         };
 
-        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg)
-            .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
-                passed: true,
-                layers: [
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 1, passed: true, flags: vec![] },
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 2, passed: true, flags: vec![] },
-                    crate::npae::hallucination::guard::LayerReport { layer_id: 3, passed: true, flags: vec![] },
-                ],
-                remediation: None,
-            });
+        let mut guard_report = crate::npae::hallucination::guard::run_tri_layer(
+            &final_prompt,
+            &guard_source_text,
+            guard_cfg,
+        )
+        .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
+            passed: true,
+            layers: [
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 1,
+                    passed: true,
+                    flags: vec![],
+                },
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 2,
+                    passed: true,
+                    flags: vec![],
+                },
+                crate::npae::hallucination::guard::LayerReport {
+                    layer_id: 3,
+                    passed: true,
+                    flags: vec![],
+                },
+            ],
+            remediation: None,
+        });
 
         // Trigger targeted correction if HallucinationGuard failed
         if !guard_report.passed {
-            final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
-            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg) {
+            final_prompt = crate::npae::hallucination::guard::remediate_hallucination(
+                &final_prompt,
+                &guard_report,
+            );
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(
+                &final_prompt,
+                &guard_source_text,
+                guard_cfg,
+            ) {
                 guard_report = new_report;
             }
         }
-        
+
         let rag_tokens = derived_rag.as_ref().map(|r| r.tokens_added).unwrap_or(0);
         // Initial scoring calculation for Aggressive mode
-        let mut scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions, rag_tokens);
+        let mut scoring_result = compute_aggressive_scoring(
+            raw,
+            &final_prompt,
+            &structured,
+            &amb,
+            &questions,
+            rag_tokens,
+        );
 
         // Stage 6B: Quality Guardrails & Targeted Correction Loop
         let max_correction_cycles = 3;
         let mut cycle_num = 0;
 
-        while (scoring_result.correction_needed || !guard_report.passed) && cycle_num < max_correction_cycles {
+        while (scoring_result.correction_needed || !guard_report.passed)
+            && cycle_num < max_correction_cycles
+        {
             cycle_num += 1;
             if let Some(axis) = &scoring_result.correction_axis {
                 match axis {
                     crate::types::ScoreAxis::TaskEssential => {
                         // TES low: Strip non-essential questions / render crisp compact prompt
-                        final_prompt = super::structurer::render_crisp_prompt(&structured, &[], &user_prompt);
+                        final_prompt =
+                            super::structurer::render_crisp_prompt(&structured, &[], &user_prompt);
                     }
                     crate::types::ScoreAxis::SchemaFidelity => {
                         // SFS low: Remediate structural omissions
-                        final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
+                        final_prompt = crate::npae::hallucination::guard::remediate_hallucination(
+                            &final_prompt,
+                            &guard_report,
+                        );
                     }
                     crate::types::ScoreAxis::SemanticCompleteness => {
                         // SCS low: Ensure questions and constraints are fully rendered
-                        final_prompt = super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
+                        final_prompt = super::structurer::render_crisp_prompt(
+                            &structured,
+                            &questions,
+                            &user_prompt,
+                        );
                     }
                 }
             } else if !guard_report.passed {
-                final_prompt = crate::npae::hallucination::guard::remediate_hallucination(&final_prompt, &guard_report);
+                final_prompt = crate::npae::hallucination::guard::remediate_hallucination(
+                    &final_prompt,
+                    &guard_report,
+                );
             }
 
-            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(&final_prompt, &guard_source_text, guard_cfg) {
+            if let Ok(new_report) = crate::npae::hallucination::guard::run_tri_layer(
+                &final_prompt,
+                &guard_source_text,
+                guard_cfg,
+            ) {
                 guard_report = new_report;
             }
-            scoring_result = compute_aggressive_scoring(raw, &final_prompt, &structured, &amb, &questions, rag_tokens);
+            scoring_result = compute_aggressive_scoring(
+                raw,
+                &final_prompt,
+                &structured,
+                &amb,
+                &questions,
+                rag_tokens,
+            );
         }
 
         // Final token accounting for UI
@@ -198,7 +259,6 @@ impl AggressiveEngine {
         })
     }
 }
-
 
 fn compute_aggressive_scoring(
     raw: &str,
@@ -236,13 +296,29 @@ fn compute_aggressive_scoring(
     let sfs_score = {
         let mut sfs = 0.0_f32;
         let total_checks = 7.0_f32;
-        if !structured.role.primary.is_empty() { sfs += 1.0; }
-        if !structured.role.persona_anchor.is_empty() { sfs += 1.0; }
-        if !structured.context.description.is_empty() { sfs += 1.0; }
-        if !structured.context.background.is_empty() { sfs += 1.0; }
-        if !structured.constraints.required_inclusions.is_empty() || !structured.constraints.forbidden_topics.is_empty() { sfs += 1.0; }
-        if !structured.execution_phases.is_empty() { sfs += 1.0; }
-        if !structured.success_criteria.is_empty() { sfs += 1.0; }
+        if !structured.role.primary.is_empty() {
+            sfs += 1.0;
+        }
+        if !structured.role.persona_anchor.is_empty() {
+            sfs += 1.0;
+        }
+        if !structured.context.description.is_empty() {
+            sfs += 1.0;
+        }
+        if !structured.context.background.is_empty() {
+            sfs += 1.0;
+        }
+        if !structured.constraints.required_inclusions.is_empty()
+            || !structured.constraints.forbidden_topics.is_empty()
+        {
+            sfs += 1.0;
+        }
+        if !structured.execution_phases.is_empty() {
+            sfs += 1.0;
+        }
+        if !structured.success_criteria.is_empty() {
+            sfs += 1.0;
+        }
         (sfs / total_checks * 10.0).clamp(0.0, 10.0)
     };
 
@@ -258,7 +334,9 @@ fn compute_aggressive_scoring(
         if structured.dynamic_instruction.is_empty() {
             score -= 2.0;
         }
-        if structured.constraints.required_inclusions.is_empty() && structured.constraints.forbidden_topics.is_empty() {
+        if structured.constraints.required_inclusions.is_empty()
+            && structured.constraints.forbidden_topics.is_empty()
+        {
             score -= 1.0;
         }
         score.clamp(0.0, 10.0)

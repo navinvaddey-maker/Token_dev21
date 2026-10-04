@@ -1,5 +1,5 @@
 //! Vector Mathematics for Semantic Architecture
-//! 
+//!
 //! Provides lightweight vector operations (cosine similarity, normalization)
 //! without requiring external crates like `ndarray`.
 
@@ -33,7 +33,7 @@ pub fn l2_normalize(vec: &mut [f32]) {
     for val in vec.iter() {
         norm += val * val;
     }
-    
+
     if norm > 0.0 {
         let sqrt_norm = norm.sqrt();
         for val in vec.iter_mut() {

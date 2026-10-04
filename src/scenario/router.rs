@@ -33,6 +33,8 @@ impl ScenarioModeRouter {
         }
     }
 
+    // Router entrypoint accepts distinct scenario parameters, context flags, and orchestrator hook
+    #[allow(clippy::too_many_arguments)]
     pub async fn route_and_execute(
         &self,
         app_mode: &str,
@@ -44,6 +46,7 @@ impl ScenarioModeRouter {
         user_business_type: &str,
         compression_mode: Option<&str>,
         retriever: &DocumentRetriever,
+        orchestrator: Option<&crate::pipeline::orchestrator::PipelineOrchestrator>,
     ) -> Result<ScenarioResponse, String> {
         info!("ScenarioModeRouter processing request: mode='{}', domain={:?}, style={:?}, geography={:?}", app_mode, domain_key, style_key, geography);
 
@@ -53,13 +56,19 @@ impl ScenarioModeRouter {
 
         match app_mode.trim().to_lowercase().as_str() {
             "scenario" => {
-                let d_key = domain_key
-                    .ok_or_else(|| "Validation Error: Domain selection is mandatory in Scenario mode.".to_string())?;
+                let d_key = domain_key.ok_or_else(|| {
+                    "Validation Error: Domain selection is mandatory in Scenario mode.".to_string()
+                })?;
                 if style_key.is_some() && !style_key.unwrap().is_empty() {
-                    return Err("Validation Error: Style selection is invalid when Mode = Scenario.".to_string());
+                    return Err(
+                        "Validation Error: Style selection is invalid when Mode = Scenario."
+                            .to_string(),
+                    );
                 }
 
-                let domain_cfg = self.domain_registry.get_domain(d_key)
+                let domain_cfg = self
+                    .domain_registry
+                    .get_domain(d_key)
                     .ok_or_else(|| format!("Validation Error: Unknown domain '{}'.", d_key))?;
 
                 // Check egress tool allowlist
@@ -79,25 +88,43 @@ impl ScenarioModeRouter {
                 );
 
                 // RAG Retrieval restricted to domain namespace
+                let min_sim = domain_cfg.min_similarity.unwrap_or(0.40);
                 let query = RetrievalQuery {
                     query_text: question.to_string(),
                     user_id: user_id.to_string(),
                     document_ids: None,
                     top_k: 5,
-                    min_similarity: 0.20,
+                    min_similarity: min_sim,
                 };
 
                 let retrieved = retriever.retrieve(&query, None).await.unwrap_or_default();
-                
-                // Filter retrieved chunks via ScenarioNamespaceGuard
+
+                // Filter retrieved chunks via ScenarioNamespaceGuard AND generic topical relevance
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), Some(&res.document_filename), &permitted_ns))
+                    .filter(|res| {
+                        ScenarioNamespaceGuard::is_chunk_permitted(
+                            res.document_domain.as_deref(),
+                            Some(&res.document_filename),
+                            &permitted_ns,
+                        )
+                    })
+                    .filter(|res| {
+                        ScenarioNamespaceGuard::is_chunk_content_relevant(
+                            question,
+                            &res.chunk.content,
+                        )
+                    })
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,
                         metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
+                            page_number: res
+                                .chunk
+                                .metadata
+                                .as_ref()
+                                .and_then(|m| m.page_number)
+                                .map(|p| p as u32),
                             source_file: res.document_filename,
                         }),
                     })
@@ -105,9 +132,9 @@ impl ScenarioModeRouter {
 
                 let parser_summary = ScenarioParser::parse(question, domain_cfg);
                 let (_ok, gap_issues) = ScenarioGapCheck::evaluate(question, domain_cfg);
-                let tool_logs = ScenarioToolRouter::execute_tools(domain_cfg);
+                let tool_logs = ScenarioToolRouter::execute_tools(domain_cfg, question);
 
-                let resp = ScenarioOutputComposer::compose_scenario_result(
+                let mut resp = ScenarioOutputComposer::compose_scenario_result(
                     domain_cfg,
                     &filtered_chunks,
                     &parser_summary,
@@ -116,17 +143,59 @@ impl ScenarioModeRouter {
                     base_namespace.clone(),
                 );
 
-                ScenarioOutputValidator::validate(&resp.output_text, &resp.citations, resp.is_empty_knowledge)?;
+                // GAP-S02 Fix: Wire compression pipeline if compression_mode is specified and orchestrator is available
+                if let (Some(cm), Some(orch)) = (compression_mode, orchestrator) {
+                    if !resp.is_empty_knowledge {
+                        let mut session = crate::session::SessionHistory::new(5);
+                        let enrichment = crate::types::EnrichmentContext {
+                            cluster_vocab: None,
+                            rag_chunks: Some(filtered_chunks.clone()),
+                        };
+                        if let Ok(comp_res) = orch
+                            .process(
+                                question,
+                                &mut session,
+                                None,
+                                Some(cm),
+                                None,
+                                Some(enrichment),
+                            )
+                            .await
+                        {
+                            let compressed_prompt = match comp_res {
+                                crate::types::OrchestratorResponse::Aggressive(r) => {
+                                    r.optimized_prompt
+                                }
+                                crate::types::OrchestratorResponse::Legacy(r) => r.response,
+                            };
+                            resp.output_text
+                                .push_str("\n\n## 7. Compressed Execution Prompt\n");
+                            resp.output_text.push_str(&compressed_prompt);
+                        }
+                    }
+                }
+
+                ScenarioOutputValidator::validate(
+                    &resp.output_text,
+                    &resp.citations,
+                    resp.is_empty_knowledge,
+                )?;
                 Ok(resp)
             }
             "regular" => {
-                let s_key = style_key
-                    .ok_or_else(|| "Validation Error: Style selection is mandatory in Regular mode.".to_string())?;
+                let s_key = style_key.ok_or_else(|| {
+                    "Validation Error: Style selection is mandatory in Regular mode.".to_string()
+                })?;
                 if domain_key.is_some() && !domain_key.unwrap().is_empty() {
-                    return Err("Validation Error: Domain selection is invalid when Mode = Regular.".to_string());
+                    return Err(
+                        "Validation Error: Domain selection is invalid when Mode = Regular."
+                            .to_string(),
+                    );
                 }
 
-                let style_cfg = self.style_registry.get_style(s_key)
+                let style_cfg = self
+                    .style_registry
+                    .get_style(s_key)
                     .ok_or_else(|| format!("Validation Error: Unknown style '{}'.", s_key))?;
 
                 let permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
@@ -147,18 +216,35 @@ impl ScenarioModeRouter {
 
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| ScenarioNamespaceGuard::is_chunk_permitted(res.document_domain.as_deref(), Some(&res.document_filename), &permitted_ns))
+                    .filter(|res| {
+                        ScenarioNamespaceGuard::is_chunk_permitted(
+                            res.document_domain.as_deref(),
+                            Some(&res.document_filename),
+                            &permitted_ns,
+                        )
+                    })
+                    .filter(|res| {
+                        ScenarioNamespaceGuard::is_chunk_content_relevant(
+                            question,
+                            &res.chunk.content,
+                        )
+                    })
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,
                         metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res.chunk.metadata.as_ref().and_then(|m| m.page_number).map(|p| p as u32),
+                            page_number: res
+                                .chunk
+                                .metadata
+                                .as_ref()
+                                .and_then(|m| m.page_number)
+                                .map(|p| p as u32),
                             source_file: res.document_filename,
                         }),
                     })
                     .collect();
 
-                let resp = ScenarioRegularPipeline::run(
+                let mut resp = ScenarioRegularPipeline::run(
                     question,
                     style_cfg,
                     &self.prompts_dir,
@@ -167,7 +253,43 @@ impl ScenarioModeRouter {
                     compression_mode,
                 );
 
-                ScenarioOutputValidator::validate(&resp.output_text, &resp.citations, resp.is_empty_knowledge)?;
+                // GAP-S02 Fix: Wire compression pipeline if compression_mode is specified and orchestrator is available
+                if let (Some(cm), Some(orch)) = (compression_mode, orchestrator) {
+                    if !resp.is_empty_knowledge {
+                        let mut session = crate::session::SessionHistory::new(5);
+                        let enrichment = crate::types::EnrichmentContext {
+                            cluster_vocab: None,
+                            rag_chunks: Some(filtered_chunks.clone()),
+                        };
+                        if let Ok(comp_res) = orch
+                            .process(
+                                question,
+                                &mut session,
+                                None,
+                                Some(cm),
+                                None,
+                                Some(enrichment),
+                            )
+                            .await
+                        {
+                            let compressed_prompt = match comp_res {
+                                crate::types::OrchestratorResponse::Aggressive(r) => {
+                                    r.optimized_prompt
+                                }
+                                crate::types::OrchestratorResponse::Legacy(r) => r.response,
+                            };
+                            resp.output_text
+                                .push_str("\n\n### Compressed Operational Prompt\n");
+                            resp.output_text.push_str(&compressed_prompt);
+                        }
+                    }
+                }
+
+                ScenarioOutputValidator::validate(
+                    &resp.output_text,
+                    &resp.citations,
+                    resp.is_empty_knowledge,
+                )?;
                 Ok(resp)
             }
             _ => Err(format!(

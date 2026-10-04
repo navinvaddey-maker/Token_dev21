@@ -15,9 +15,11 @@ pub fn deserialize_vector_blob(blob: &[u8]) -> Vec<f32> {
 /// This makes batch comparison across all archetypes very fast.
 pub fn cosine_similarity_normalized(query: &[f32], archetype: &[f32]) -> f32 {
     debug_assert_eq!(
-        query.len(), archetype.len(),
+        query.len(),
+        archetype.len(),
         "Vector dimension mismatch: query={} archetype={}",
-        query.len(), archetype.len()
+        query.len(),
+        archetype.len()
     );
     query.iter().zip(archetype.iter()).map(|(a, b)| a * b).sum()
 }
@@ -44,17 +46,22 @@ pub fn select_top_k_archetypes(
 ) -> Vec<RankedScenario> {
     let mut scored: Vec<RankedScenario> = candidates
         .iter()
-        .map(|(vec, domain, task_type, expertise, intent)| RankedScenario {
-            score: cosine_similarity_normalized(query_vec, vec),
-            domain: domain.clone(),
-            task_type: task_type.clone(),
-            expertise: expertise.clone(),
-            intent_class: intent.clone(),
-        })
+        .map(
+            |(vec, domain, task_type, expertise, intent)| RankedScenario {
+                score: cosine_similarity_normalized(query_vec, vec),
+                domain: domain.clone(),
+                task_type: task_type.clone(),
+                expertise: expertise.clone(),
+                intent_class: intent.clone(),
+            },
+        )
         .collect();
 
-    scored.sort_by(|a, b| b.score.partial_cmp(&a.score)
-        .unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     scored.truncate(k);
     scored
 }

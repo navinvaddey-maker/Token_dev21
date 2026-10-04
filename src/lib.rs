@@ -24,8 +24,8 @@ use learning_engine::LearningEngine;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::pipeline::orchestrator::PipelineOrchestrator;
 use crate::npae::aggressive::config::ConfigHandle;
+use crate::pipeline::orchestrator::PipelineOrchestrator;
 
 #[derive(Clone)]
 pub struct AppState {

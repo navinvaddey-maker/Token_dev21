@@ -74,9 +74,7 @@ impl Stage4 {
         out.resolved_schema.constraints = result.constraints;
         out.resolved_schema.output = result.output;
 
-
         out.null_fields = result.null_fields;
         out.task_inferred = result.task_inferred;
-
     }
 }

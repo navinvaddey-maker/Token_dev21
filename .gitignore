@@ -38,6 +38,8 @@ node_modules/
 
 # Localized development scripts and metadata
 /rust-env.sh
+.fastembed_cache/
+
 /CLAUDE.md
 /debug_*.rs
 src/bin/debug_*.rs

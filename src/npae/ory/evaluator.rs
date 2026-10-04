@@ -3,7 +3,7 @@
 //! After a blueprint is executed and scores are produced, the evaluator
 //! assesses how well the blueprint performed and generates improvement notes.
 
-use crate::npae::ory::types::{LearnedIntent, DynamicBlueprint, PatternOutcome};
+use crate::npae::ory::types::{DynamicBlueprint, LearnedIntent, PatternOutcome};
 use crate::types::ScoringResult;
 
 pub struct OutcomeEvaluator;
@@ -52,7 +52,8 @@ impl OutcomeEvaluator {
         if blueprint.phases.len() <= 3 && intent.hidden_dependencies.len() > 2 {
             notes.push(format!(
                 "Only {} phases for {} dependencies — may need more granular breakdown",
-                blueprint.phases.len(), intent.hidden_dependencies.len()
+                blueprint.phases.len(),
+                intent.hidden_dependencies.len()
             ));
         }
 

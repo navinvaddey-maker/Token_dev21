@@ -1,5 +1,4 @@
 use crate::engine::pipeline::PipelineOutput;
-use crate::types::CompressionResponse;
 use crate::models::{
     feedback_signal::FeedbackSignal,
     token_history::TokenHistory,
@@ -7,6 +6,7 @@ use crate::models::{
     user::User,
     verbose::{SqlxEvent, SqlxVerbose},
 };
+use crate::types::CompressionResponse;
 use db::DbPool;
 use serde_json::{json, Value};
 use std::time::Instant;
@@ -304,7 +304,11 @@ impl Repository {
 
     // ── Admin ──────────────────────────────────────────────────────────────
 
-    pub async fn list_all_users(pool: &DbPool, limit: i64, offset: i64) -> Result<Vec<User>, sqlx::Error> {
+    pub async fn list_all_users(
+        pool: &DbPool,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<User>, sqlx::Error> {
         sqlx::query_as::<_, User>(
             "SELECT id, username, password_hash, email, business_type, license, created_at, updated_at
              FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
@@ -316,9 +320,10 @@ impl Repository {
     }
 
     pub async fn count_admins(pool: &DbPool) -> Result<i64, sqlx::Error> {
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE LOWER(business_type) = 'admin'")
-            .fetch_one(pool)
-            .await?;
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM users WHERE LOWER(business_type) = 'admin'")
+                .fetch_one(pool)
+                .await?;
         Ok(count.0)
     }
 
@@ -369,10 +374,11 @@ impl Repository {
             .fetch_one(pool)
             .await?;
 
-        let saved: (i64,) =
-            sqlx::query_as("SELECT COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0) FROM token_history")
-                .fetch_one(pool)
-                .await?;
+        let saved: (i64,) = sqlx::query_as(
+            "SELECT COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0) FROM token_history",
+        )
+        .fetch_one(pool)
+        .await?;
 
         Ok(serde_json::json!({
             "total_users":        users.0,

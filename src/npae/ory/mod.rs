@@ -7,21 +7,19 @@
 //! 4. Remembers successful patterns for reuse
 //! 5. Evaluates outcomes to continuously improve
 
-pub mod types;
-pub mod semantic;
-pub mod learner;
-pub mod domain_mapper;
-pub mod registry;
 pub mod architect;
-pub mod memory;
-pub mod evaluator;
-pub mod math;
+pub mod domain_mapper;
 pub mod embeddings;
+pub mod evaluator;
+pub mod learner;
+pub mod math;
+pub mod memory;
+pub mod registry;
+pub mod semantic;
+pub mod types;
 
-use crate::npae::ory::types::{
-    OryResult, LearnedIntent, DynamicBlueprint, AuditRecommendation,
-};
 use crate::npae::aggressive::config::UnifiedConfig;
+use crate::npae::ory::types::{AuditRecommendation, DynamicBlueprint, LearnedIntent, OryResult};
 use crate::types::ScoringResult;
 use anyhow::Result;
 
@@ -66,7 +64,8 @@ impl OryEngine {
 
         // 2. Check pattern memory — have we seen this before?
         if let Some(cached) = self.memory.find_match(&intent) {
-            let blueprint: Option<DynamicBlueprint> = serde_json::from_str(&cached.blueprint_json).ok();
+            let blueprint: Option<DynamicBlueprint> =
+                serde_json::from_str(&cached.blueprint_json).ok();
             let audit = registry::FlowRegistry::audit(&intent, config)?;
             return Ok(OryResult {
                 intent,

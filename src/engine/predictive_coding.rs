@@ -164,11 +164,7 @@ fn rewrite_verbs(task: &str) -> String {
     optimized_task
 }
 
-pub fn run(
-    chunks: &[String],
-    task: &str,
-    use_case: &str,
-) -> PrincipleResult {
+pub fn run(chunks: &[String], task: &str, use_case: &str) -> PrincipleResult {
     let start = Instant::now();
     let combined_text = chunks.join("\n\n");
 

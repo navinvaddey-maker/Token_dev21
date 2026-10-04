@@ -1,5 +1,5 @@
-use crate::npae::schema::types::HallucinationGuardConfig;
 use crate::npae::hallucination::guard::LayerReport;
+use crate::npae::schema::types::HallucinationGuardConfig;
 
 pub fn check(output: &str, _cfg: &HallucinationGuardConfig) -> Result<LayerReport, String> {
     let mut flags = Vec::new();

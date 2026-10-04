@@ -1,5 +1,5 @@
+use crate::rag::embeddings::{cosine_similarity, EmbeddingEngine};
 use crate::types::WeightedToken;
-use crate::rag::embeddings::{EmbeddingEngine, cosine_similarity};
 use std::collections::HashMap;
 
 pub struct ClusterWeights {
@@ -62,11 +62,23 @@ impl ClusterMapper {
 
         // Define semantic centroids for core slots
         let cluster_definitions = [
-            ("Role", "expert professional specialist consultant authority persona"),
+            (
+                "Role",
+                "expert professional specialist consultant authority persona",
+            ),
             ("Subject", "topic area domain subject entity object focus"),
-            ("Task", "create design build develop generate implement action goal"),
-            ("Constraints", "limit restriction rule boundary requirement constraint forbidden"),
-            ("Output", "format list report table summary result deliverable"),
+            (
+                "Task",
+                "create design build develop generate implement action goal",
+            ),
+            (
+                "Constraints",
+                "limit restriction rule boundary requirement constraint forbidden",
+            ),
+            (
+                "Output",
+                "format list report table summary result deliverable",
+            ),
         ];
 
         for (name, phrases) in cluster_definitions {
@@ -121,4 +133,3 @@ impl ClusterMapper {
         best_cluster
     }
 }
-

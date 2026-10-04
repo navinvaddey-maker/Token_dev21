@@ -4,9 +4,8 @@
 //! domain-specific phase templates, dependency graphs, and resource estimation.
 
 use crate::npae::ory::types::{
-    DynamicBlueprint, BlueprintPhase, BlueprintStrategy, PhaseGraph,
-    ResourceEstimate, ScopeClass, PhaseType, LearnedIntent, FlowAudit,
-    AuditRecommendation,
+    AuditRecommendation, BlueprintPhase, BlueprintStrategy, DynamicBlueprint, FlowAudit,
+    LearnedIntent, PhaseGraph, PhaseType, ResourceEstimate, ScopeClass,
 };
 use anyhow::Result;
 
@@ -14,7 +13,8 @@ pub struct OryArchitect;
 
 impl OryArchitect {
     pub fn design(intent: &LearnedIntent, audit: &FlowAudit) -> Result<DynamicBlueprint> {
-        let arch_id = format!("ORY-{}-{}",
+        let arch_id = format!(
+            "ORY-{}-{}",
             intent.inferred_domain.to_uppercase().replace(' ', "_"),
             uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
         );
@@ -75,7 +75,9 @@ fn strategy_name(s: &BlueprintStrategy) -> &'static str {
 fn select_strategy(audit: &FlowAudit) -> BlueprintStrategy {
     match audit.recommendation {
         AuditRecommendation::AugmentExistingFlow => {
-            let additions: Vec<String> = audit.gap_details.iter()
+            let additions: Vec<String> = audit
+                .gap_details
+                .iter()
                 .map(|g| g.description.clone())
                 .collect();
             BlueprintStrategy::TemplateExtension {
@@ -87,24 +89,30 @@ fn select_strategy(audit: &FlowAudit) -> BlueprintStrategy {
             // Check if we can transfer from a related domain
             if audit.domain_audit.match_confidence > 0.3 {
                 BlueprintStrategy::DomainTransfer {
-                    source_domain: audit.domain_audit.matched_domain.clone().unwrap_or_default(),
-                    adaptations: audit.gap_details.iter()
+                    source_domain: audit
+                        .domain_audit
+                        .matched_domain
+                        .clone()
+                        .unwrap_or_default(),
+                    adaptations: audit
+                        .gap_details
+                        .iter()
                         .map(|g| g.suggested_action.clone())
                         .collect(),
                 }
             } else {
                 BlueprintStrategy::NovelDesign {
-                    reasoning: format!("No existing domain match (confidence: {:.2})",
-                        audit.domain_audit.match_confidence),
+                    reasoning: format!(
+                        "No existing domain match (confidence: {:.2})",
+                        audit.domain_audit.match_confidence
+                    ),
                 }
             }
         }
-        AuditRecommendation::UseExistingFlow => {
-            BlueprintStrategy::TemplateExtension {
-                base_template: audit.existing_domain_match.clone().unwrap_or_default(),
-                additions: vec![],
-            }
-        }
+        AuditRecommendation::UseExistingFlow => BlueprintStrategy::TemplateExtension {
+            base_template: audit.existing_domain_match.clone().unwrap_or_default(),
+            additions: vec![],
+        },
     }
 }
 
@@ -130,77 +138,188 @@ fn generate_phases(
     // Domain-specific phases
     match domain.as_str() {
         "software-engineering" | "devops-infra" => {
-            phases.push(bp("Architecture & Design", "System design and tech selection",
-                vec!["Architecture document"], PhaseType::Design,
-                vec!["verified_intent"], vec!["architecture_doc"], 5.0));
-            phases.push(bp("Implementation", "Core development and testing",
-                vec!["Working codebase", "Test suite"], PhaseType::Implementation,
-                vec!["architecture_doc"], vec!["codebase"], 7.0));
-            phases.push(bp("Deployment & Validation", "Deploy, test, monitor",
-                vec!["Deployed service"], PhaseType::Validation,
-                vec!["codebase"], vec!["deployed_service"], 4.0));
+            phases.push(bp(
+                "Architecture & Design",
+                "System design and tech selection",
+                vec!["Architecture document"],
+                PhaseType::Design,
+                vec!["verified_intent"],
+                vec!["architecture_doc"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Implementation",
+                "Core development and testing",
+                vec!["Working codebase", "Test suite"],
+                PhaseType::Implementation,
+                vec!["architecture_doc"],
+                vec!["codebase"],
+                7.0,
+            ));
+            phases.push(bp(
+                "Deployment & Validation",
+                "Deploy, test, monitor",
+                vec!["Deployed service"],
+                PhaseType::Validation,
+                vec!["codebase"],
+                vec!["deployed_service"],
+                4.0,
+            ));
         }
         "business-strategy" | "finance" => {
-            phases.push(bp("Market Research", "Competitor analysis and market sizing",
-                vec!["Market analysis report"], PhaseType::Analysis,
-                vec!["verified_intent"], vec!["market_data"], 4.0));
-            phases.push(bp("Strategy Design", "Business model and revenue planning",
-                vec!["Business model canvas"], PhaseType::Design,
-                vec!["market_data"], vec!["strategy_doc"], 6.0));
-            phases.push(bp("Execution Plan", "Go-to-market and milestone planning",
-                vec!["Launch roadmap"], PhaseType::Implementation,
-                vec!["strategy_doc"], vec!["execution_plan"], 5.0));
+            phases.push(bp(
+                "Market Research",
+                "Competitor analysis and market sizing",
+                vec!["Market analysis report"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["market_data"],
+                4.0,
+            ));
+            phases.push(bp(
+                "Strategy Design",
+                "Business model and revenue planning",
+                vec!["Business model canvas"],
+                PhaseType::Design,
+                vec!["market_data"],
+                vec!["strategy_doc"],
+                6.0,
+            ));
+            phases.push(bp(
+                "Execution Plan",
+                "Go-to-market and milestone planning",
+                vec!["Launch roadmap"],
+                PhaseType::Implementation,
+                vec!["strategy_doc"],
+                vec!["execution_plan"],
+                5.0,
+            ));
         }
         "ai-ml" | "data-science" => {
-            phases.push(bp("Data Assessment", "Data quality, availability, and preprocessing",
-                vec!["Data quality report"], PhaseType::Analysis,
-                vec!["verified_intent"], vec!["data_assessment"], 4.0));
-            phases.push(bp("Model Design", "Architecture selection and training plan",
-                vec!["Model specification"], PhaseType::Design,
-                vec!["data_assessment"], vec!["model_spec"], 6.0));
-            phases.push(bp("Training & Evaluation", "Model training and benchmarking",
-                vec!["Trained model", "Benchmark results"], PhaseType::Implementation,
-                vec!["model_spec"], vec!["trained_model"], 8.0));
-            phases.push(bp("Safety & Alignment", "Bias testing, safety guardrails",
-                vec!["Safety report"], PhaseType::Validation,
-                vec!["trained_model"], vec!["safe_model"], 5.0));
+            phases.push(bp(
+                "Data Assessment",
+                "Data quality, availability, and preprocessing",
+                vec!["Data quality report"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["data_assessment"],
+                4.0,
+            ));
+            phases.push(bp(
+                "Model Design",
+                "Architecture selection and training plan",
+                vec!["Model specification"],
+                PhaseType::Design,
+                vec!["data_assessment"],
+                vec!["model_spec"],
+                6.0,
+            ));
+            phases.push(bp(
+                "Training & Evaluation",
+                "Model training and benchmarking",
+                vec!["Trained model", "Benchmark results"],
+                PhaseType::Implementation,
+                vec!["model_spec"],
+                vec!["trained_model"],
+                8.0,
+            ));
+            phases.push(bp(
+                "Safety & Alignment",
+                "Bias testing, safety guardrails",
+                vec!["Safety report"],
+                PhaseType::Validation,
+                vec!["trained_model"],
+                vec!["safe_model"],
+                5.0,
+            ));
         }
         "medical" => {
-            phases.push(bp("Evidence Review", "Literature and clinical evidence gathering",
-                vec!["Evidence summary"], PhaseType::Analysis,
-                vec!["verified_intent"], vec!["evidence_base"], 6.0));
-            phases.push(bp("Protocol Design", "Clinical protocol and risk assessment",
-                vec!["Clinical protocol"], PhaseType::Design,
-                vec!["evidence_base"], vec!["protocol"], 7.0));
-            phases.push(bp("Regulatory Check", "FDA/EMA compliance verification",
-                vec!["Compliance report"], PhaseType::Validation,
-                vec!["protocol"], vec!["compliant_protocol"], 5.0));
+            phases.push(bp(
+                "Evidence Review",
+                "Literature and clinical evidence gathering",
+                vec!["Evidence summary"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["evidence_base"],
+                6.0,
+            ));
+            phases.push(bp(
+                "Protocol Design",
+                "Clinical protocol and risk assessment",
+                vec!["Clinical protocol"],
+                PhaseType::Design,
+                vec!["evidence_base"],
+                vec!["protocol"],
+                7.0,
+            ));
+            phases.push(bp(
+                "Regulatory Check",
+                "FDA/EMA compliance verification",
+                vec!["Compliance report"],
+                PhaseType::Validation,
+                vec!["protocol"],
+                vec!["compliant_protocol"],
+                5.0,
+            ));
         }
         "education" => {
-            phases.push(bp("Knowledge Mapping", "Core concepts and learning gaps",
-                vec!["Concept map"], PhaseType::Analysis,
-                vec!["verified_intent"], vec!["knowledge_map"], 3.0));
-            phases.push(bp("Curriculum Design", "Learning path and methodology",
-                vec!["Curriculum plan"], PhaseType::Design,
-                vec!["knowledge_map"], vec!["curriculum"], 5.0));
-            phases.push(bp("Assessment Design", "Mastery checks and feedback loops",
-                vec!["Assessment framework"], PhaseType::Validation,
-                vec!["curriculum"], vec!["assessment"], 4.0));
+            phases.push(bp(
+                "Knowledge Mapping",
+                "Core concepts and learning gaps",
+                vec!["Concept map"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["knowledge_map"],
+                3.0,
+            ));
+            phases.push(bp(
+                "Curriculum Design",
+                "Learning path and methodology",
+                vec!["Curriculum plan"],
+                PhaseType::Design,
+                vec!["knowledge_map"],
+                vec!["curriculum"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Assessment Design",
+                "Mastery checks and feedback loops",
+                vec!["Assessment framework"],
+                PhaseType::Validation,
+                vec!["curriculum"],
+                vec!["assessment"],
+                4.0,
+            ));
         }
         _ => {
             // Generic phases based on intent objective
-            phases.push(bp("Discovery & Research", 
+            phases.push(bp(
+                "Discovery & Research",
                 format!("Investigate requirements for {}", intent.core_objective).as_str(),
-                vec!["Research brief"], PhaseType::Analysis,
-                vec!["verified_intent"], vec!["research"], 4.0));
-            phases.push(bp("Design & Planning",
+                vec!["Research brief"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["research"],
+                4.0,
+            ));
+            phases.push(bp(
+                "Design & Planning",
                 format!("Design solution for {}", intent.core_objective).as_str(),
-                vec!["Solution design"], PhaseType::Design,
-                vec!["research"], vec!["design"], 5.0));
-            phases.push(bp("Execution",
+                vec!["Solution design"],
+                PhaseType::Design,
+                vec!["research"],
+                vec!["design"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Execution",
                 format!("Implement solution for {}", intent.core_objective).as_str(),
-                vec!["Deliverable"], PhaseType::Implementation,
-                vec!["design"], vec!["output"], 6.0));
+                vec!["Deliverable"],
+                PhaseType::Implementation,
+                vec!["design"],
+                vec!["output"],
+                6.0,
+            ));
         }
     }
 
@@ -244,10 +363,18 @@ fn generate_phases(
     phases
 }
 
-fn bp(name: &str, desc: &str, deliverables: Vec<&str>, pt: PhaseType,
-      inputs: Vec<&str>, outputs: Vec<&str>, complexity: f32) -> BlueprintPhase {
+fn bp(
+    name: &str,
+    desc: &str,
+    deliverables: Vec<&str>,
+    pt: PhaseType,
+    inputs: Vec<&str>,
+    outputs: Vec<&str>,
+    complexity: f32,
+) -> BlueprintPhase {
     BlueprintPhase {
-        name: name.into(), description: desc.into(),
+        name: name.into(),
+        description: desc.into(),
         expected_deliverables: deliverables.into_iter().map(|s| s.into()).collect(),
         phase_type: pt,
         inputs: inputs.into_iter().map(|s| s.into()).collect(),
@@ -263,7 +390,9 @@ fn build_phase_graph(phases: &[BlueprintPhase]) -> PhaseGraph {
     // Build edges: phase j depends on phase i if j.inputs ∩ i.outputs ≠ ∅
     for j in 0..phases.len() {
         for i in 0..j {
-            let has_dep = phases[j].inputs.iter()
+            let has_dep = phases[j]
+                .inputs
+                .iter()
                 .any(|inp| phases[i].outputs.contains(inp));
             if has_dep {
                 edges.push((i, j));
@@ -274,37 +403,55 @@ fn build_phase_graph(phases: &[BlueprintPhase]) -> PhaseGraph {
     // Find parallel groups: phases with same prerequisites
     let mut visited = vec![false; phases.len()];
     for i in 0..phases.len() {
-        if visited[i] { continue; }
-        let my_preds: Vec<usize> = edges.iter()
+        if visited[i] {
+            continue;
+        }
+        let my_preds: Vec<usize> = edges
+            .iter()
             .filter(|(_, dep)| *dep == i)
             .map(|(pre, _)| *pre)
             .collect();
         let mut group = vec![i];
         for j in (i + 1)..phases.len() {
-            if visited[j] { continue; }
-            let j_preds: Vec<usize> = edges.iter()
+            if visited[j] {
+                continue;
+            }
+            let j_preds: Vec<usize> = edges
+                .iter()
                 .filter(|(_, dep)| *dep == j)
                 .map(|(pre, _)| *pre)
                 .collect();
-            if my_preds == j_preds { group.push(j); }
+            if my_preds == j_preds {
+                group.push(j);
+            }
         }
         if group.len() > 1 {
-            for &idx in &group { visited[idx] = true; }
+            for &idx in &group {
+                visited[idx] = true;
+            }
             parallel_groups.push(group);
         }
     }
 
-    PhaseGraph { edges, parallel_groups }
+    PhaseGraph {
+        edges,
+        parallel_groups,
+    }
 }
 
 fn estimate_resources(intent: &LearnedIntent, phases: &[BlueprintPhase]) -> ResourceEstimate {
     let total_complexity: f32 = phases.iter().map(|p| p.estimated_complexity).sum();
     let avg = total_complexity / phases.len().max(1) as f32;
 
-    let scope_class = if avg <= 2.0 { ScopeClass::Quick }
-        else if avg <= 4.0 { ScopeClass::Standard }
-        else if avg <= 7.0 { ScopeClass::Deep }
-        else { ScopeClass::Research };
+    let scope_class = if avg <= 2.0 {
+        ScopeClass::Quick
+    } else if avg <= 4.0 {
+        ScopeClass::Standard
+    } else if avg <= 7.0 {
+        ScopeClass::Deep
+    } else {
+        ScopeClass::Research
+    };
 
     let token_budget = match scope_class {
         ScopeClass::Quick => 500,

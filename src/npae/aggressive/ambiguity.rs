@@ -30,8 +30,19 @@ pub fn score(
     }
 
     let lower_raw = raw.to_lowercase();
-    let vague_words = ["stuff", "things", "somehow", "maybe", "whatever", "something", "anyway"];
-    let vague_count = vague_words.iter().filter(|&&w| lower_raw.contains(w)).count();
+    let vague_words = [
+        "stuff",
+        "things",
+        "somehow",
+        "maybe",
+        "whatever",
+        "something",
+        "anyway",
+    ];
+    let vague_count = vague_words
+        .iter()
+        .filter(|&&w| lower_raw.contains(w))
+        .count();
 
     if vague_count > 0 {
         score += 0.25 + (0.05 * vague_count as f32);
@@ -91,4 +102,3 @@ pub fn score(
         gap_zones,
     })
 }
-

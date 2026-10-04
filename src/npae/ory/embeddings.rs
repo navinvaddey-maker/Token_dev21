@@ -1,5 +1,5 @@
 //! Unified Deterministic Embedding Engine
-//! 
+//!
 //! Projects text into a 384-dimensional vector space using deterministic FNV-1a feature hashing
 //! and TF-IDF term weighting. This engine is shared across RAG document storage/retrieval,
 //! ORY semantic classification, and prompt reconstruction to ensure vector index compatibility.

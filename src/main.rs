@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
         .acquire_timeout(std::time::Duration::from_secs(10))
         .connect(&db_url)
         .await?;
-    
+
     // Ensure Ory table exists (standardizing on SQLite for Ory memory)
     sqlx::query(
         r#"
@@ -40,12 +40,14 @@ async fn main() -> anyhow::Result<()> {
             last_used          TIMESTAMP NOT NULL,
             created_at         TIMESTAMP NOT NULL
         )
-        "#
+        "#,
     )
     .execute(&pool)
     .await?;
 
-    let ory_engine = Arc::new(Mutex::new(token_compress_engine::npae::ory::OryEngine::load_from_db(&pool).await?));
+    let ory_engine = Arc::new(Mutex::new(
+        token_compress_engine::npae::ory::OryEngine::load_from_db(&pool).await?,
+    ));
 
     // Run migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
@@ -53,7 +55,8 @@ async fn main() -> anyhow::Result<()> {
     let embedding_engine = Arc::new(token_compress_engine::rag::embeddings::EmbeddingEngine::new());
 
     // Seed ScenarioClassifier archetypes
-    let classifier = token_compress_engine::classifier::ScenarioClassifier::new(&pool, &embedding_engine);
+    let classifier =
+        token_compress_engine::classifier::ScenarioClassifier::new(&pool, &embedding_engine);
     if let Err(e) = classifier.seed_archetype_vectors_on_startup().await {
         tracing::error!("Failed to seed scenario archetypes: {:?}", e);
     }
@@ -61,23 +64,37 @@ async fn main() -> anyhow::Result<()> {
     let engine = Arc::new(Mutex::new(LearningEngine::new(pool.clone())));
 
     // Load NPAE unified config once at startup for high-performance memory access
-    let npae_config_data = token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json")
-        .unwrap_or_else(|e| panic!("Failed to load unified config: {}", e));
-    let npae_config = Arc::new(token_compress_engine::npae::aggressive::config::ConfigHandle::new(npae_config_data));
+    let npae_config_data =
+        token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json")
+            .unwrap_or_else(|e| panic!("Failed to load unified config: {}", e));
+    let npae_config = Arc::new(
+        token_compress_engine::npae::aggressive::config::ConfigHandle::new(npae_config_data),
+    );
 
     // Build the 7-stage pipeline orchestrator with shared schema priors.
     // The DashMap is shared across all requests — enables cross-request schema learning
     // (prediction error drops 20–35% over 10 turns on familiar topics).
     let schema_priors: Arc<DashMap<String, u32>> = Arc::new(DashMap::new());
-    let pipeline = Arc::new(PipelineOrchestrator::build_with_pool(schema_priors, npae_config.clone(), ory_engine.clone(), Some(pool.clone())));
+    let pipeline = Arc::new(PipelineOrchestrator::build_with_pool(
+        schema_priors,
+        npae_config.clone(),
+        ory_engine.clone(),
+        Some(pool.clone()),
+    ));
 
     // Spawn FileWatcher background task
     let watcher_config_handle = npae_config.clone();
     tokio::task::spawn_blocking(move || {
-        if let Ok(mut watcher) = token_compress_engine::npae::aggressive::watcher::FileWatcher::new("config/unified.json") {
+        if let Ok(mut watcher) = token_compress_engine::npae::aggressive::watcher::FileWatcher::new(
+            "config/unified.json",
+        ) {
             loop {
                 if watcher.wait_for_change(2000).is_ok() {
-                    if let Ok(new_config) = token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json") {
+                    if let Ok(new_config) =
+                        token_compress_engine::npae::aggressive::config::ConfigLoader::load(
+                            "config/unified.json",
+                        )
+                    {
                         watcher_config_handle.swap(new_config);
                         tracing::info!("Hot-reloaded unified.json into memory");
                     }
@@ -90,16 +107,23 @@ async fn main() -> anyhow::Result<()> {
     let enricher_config_handle = npae_config.clone();
     tokio::task::spawn_blocking(move || {
         let enricher = token_compress_engine::npae::aggressive::enricher::ConfigEnricher::new(
-            token_compress_engine::npae::aggressive::enricher::ReviewMode::AutoMerge
+            token_compress_engine::npae::aggressive::enricher::ReviewMode::AutoMerge,
         );
         loop {
             std::thread::sleep(std::time::Duration::from_secs(60));
-            if let Ok(mut store) = token_compress_engine::npae::aggressive::feedback::FeedbackStore::load("config/feedback.json") {
+            if let Ok(mut store) =
+                token_compress_engine::npae::aggressive::feedback::FeedbackStore::load(
+                    "config/feedback.json",
+                )
+            {
                 let mut current_config = enricher_config_handle.read();
                 if let Ok(true) = enricher.process(&mut current_config, &mut store, 5) {
                     enricher_config_handle.swap(current_config.clone());
                     let _ = store.save();
-                    let _ = token_compress_engine::npae::aggressive::config::ConfigLoader::save("config/unified.json", &current_config);
+                    let _ = token_compress_engine::npae::aggressive::config::ConfigLoader::save(
+                        "config/unified.json",
+                        &current_config,
+                    );
                     tracing::info!("ConfigEnricher promoted matched feedback to unified.json");
                 }
             }
@@ -124,22 +148,31 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let rag_store = std::sync::Arc::new(token_compress_engine::rag::store::RagStore::new(pool.clone()));
+    let rag_store = std::sync::Arc::new(token_compress_engine::rag::store::RagStore::new(
+        pool.clone(),
+    ));
     let sessions = std::sync::Arc::new(dashmap::DashMap::new());
 
     let domain_registry = Arc::new(
-        token_compress_engine::scenario::ScenarioDomainRegistry::load_from_file("config/scenario/domains.json")
-            .unwrap_or_else(|e| panic!("Failed to load Scenario Domain Registry: {}", e))
+        token_compress_engine::scenario::ScenarioDomainRegistry::load_from_file(
+            "config/scenario/domains.json",
+        )
+        .unwrap_or_else(|e| panic!("Failed to load Scenario Domain Registry: {}", e)),
     );
 
     let style_registry = Arc::new(
-        token_compress_engine::scenario::ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
-            .unwrap_or_else(|e| panic!("Failed to load Scenario Style Registry: {}", e))
+        token_compress_engine::scenario::ScenarioStyleRegistry::load_from_file(
+            "config/scenario/styles.json",
+            "prompts/styles",
+        )
+        .unwrap_or_else(|e| panic!("Failed to load Scenario Style Registry: {}", e)),
     );
 
     let egress_guard = Arc::new(
-        token_compress_engine::scenario::ScenarioEgressGuard::load_from_file("config/scenario/egress.json")
-            .unwrap_or_else(|e| panic!("Failed to load Egress Guard Config: {}", e))
+        token_compress_engine::scenario::ScenarioEgressGuard::load_from_file(
+            "config/scenario/egress.json",
+        )
+        .unwrap_or_else(|e| panic!("Failed to load Egress Guard Config: {}", e)),
     );
 
     let scenario_router = Arc::new(token_compress_engine::scenario::ScenarioModeRouter::new(
@@ -227,7 +260,7 @@ async fn main() -> anyhow::Result<()> {
     // Graceful shutdown with Ory memory persistence
     let final_ory_engine = ory_engine.clone();
     let final_ory_pool = pool.clone();
-    
+
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             tokio::signal::ctrl_c()

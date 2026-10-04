@@ -2,15 +2,11 @@ use crate::{
     algorithms::field_validator::FieldTypeValidator,
     correction::{apply_targeted_correction, MAX_CORRECTION_CYCLES},
     npae::schema::types::HallucinationGuardConfig,
-    pipeline::{
-        stage4::Stage4,
-        stage5::Stage5,
-        stage6a::Stage6a,
-    },
+    pipeline::{stage4::Stage4, stage5::Stage5, stage6a::Stage6a},
     scoring::compute_scoring_result,
     types::{
-        AlgorithmOutput, CorrectionCycle, FieldValidationIssue, ScoreAxis,
-        ScoringResult, TextCorrection,
+        AlgorithmOutput, CorrectionCycle, FieldValidationIssue, ScoreAxis, ScoringResult,
+        TextCorrection,
     },
     utils::tokens::estimate_tokens,
 };
@@ -66,9 +62,8 @@ impl Stage6b {
             scoring_result = compute_scoring_result(output, &field_issues);
             output.scoring_result = Some(scoring_result.clone());
 
-            let scores_ok = scoring_result.tes >= 6.0
-                && scoring_result.sfs >= 6.0
-                && scoring_result.scs >= 6.0;
+            let scores_ok =
+                scoring_result.tes >= 6.0 && scoring_result.sfs >= 6.0 && scoring_result.scs >= 6.0;
 
             if scores_ok || cycle_num >= MAX_CORRECTION_CYCLES {
                 if !scores_ok {
@@ -93,39 +88,38 @@ impl Stage6b {
             }
 
             let new_response = stage6a.run(output)?;
-            let new_report = crate::npae::hallucination::guard::run_tri_layer(
-                &new_response,
-                input,
-                guard_cfg,
-            )
-            .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
-                passed: true,
-                layers: [
-                    crate::npae::hallucination::guard::LayerReport {
-                        layer_id: 1,
+            let new_report =
+                crate::npae::hallucination::guard::run_tri_layer(&new_response, input, guard_cfg)
+                    .unwrap_or_else(|_| crate::npae::hallucination::guard::HallucinationReport {
                         passed: true,
-                        flags: vec![],
-                    },
-                    crate::npae::hallucination::guard::LayerReport {
-                        layer_id: 2,
-                        passed: true,
-                        flags: vec![],
-                    },
-                    crate::npae::hallucination::guard::LayerReport {
-                        layer_id: 3,
-                        passed: true,
-                        flags: vec![],
-                    },
-                ],
-                remediation: None,
-            });
+                        layers: [
+                            crate::npae::hallucination::guard::LayerReport {
+                                layer_id: 1,
+                                passed: true,
+                                flags: vec![],
+                            },
+                            crate::npae::hallucination::guard::LayerReport {
+                                layer_id: 2,
+                                passed: true,
+                                flags: vec![],
+                            },
+                            crate::npae::hallucination::guard::LayerReport {
+                                layer_id: 3,
+                                passed: true,
+                                flags: vec![],
+                            },
+                        ],
+                        remediation: None,
+                    });
 
             final_response = new_response;
             guard_report = new_report;
             cycle_num += 1;
         }
 
-        correction_cycle.corrections_applied.extend(corrections_applied.clone());
+        correction_cycle
+            .corrections_applied
+            .extend(corrections_applied.clone());
         output.correction_cycle = Some(correction_cycle.clone());
 
         Ok(Stage6bOutput {

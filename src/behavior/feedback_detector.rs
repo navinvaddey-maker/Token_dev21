@@ -118,14 +118,14 @@ impl DetectedSignal {
     /// Negative values imply the previous interaction was unsuccessful.
     pub fn map_to_weight(&self) -> f32 {
         match self.signal_type.as_str() {
-            "repetition"      => -0.6 * (self.value as f32),
-            "refinement"      => -0.3 * (self.value as f32),
-            "forgot"          => -1.0,
-            "fast_reprompt"   => -0.8,
+            "repetition" => -0.6 * (self.value as f32),
+            "refinement" => -0.3 * (self.value as f32),
+            "forgot" => -1.0,
+            "fast_reprompt" => -0.8,
             "long_engagement" => 0.5,
-            "thumbs_up"       => 1.0,
-            "thumbs_down"     => -1.0,
-            _                 => 0.0,
+            "thumbs_up" => 1.0,
+            "thumbs_down" => -1.0,
+            _ => 0.0,
         }
     }
 }

@@ -1,23 +1,38 @@
 // Removed unused serde imports
-use chrono::{DateTime, Utc};
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 
-use crate::npae::schema::types::{
-    ClarifyingQuestion, ConstraintsMeta, ExecutionPhase,
-    HallucinationGuardConfig, LengthBound, PromptConstraints,
-    PromptContext, PromptRole, StructuredPrompt, ValidationStep,
-};
 use super::intent::IntentProfile;
+use crate::npae::schema::types::{
+    ClarifyingQuestion, ConstraintsMeta, ExecutionPhase, HallucinationGuardConfig, LengthBound,
+    PromptConstraints, PromptContext, PromptRole, StructuredPrompt, ValidationStep,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PromptSource {
     Cli,
-    Http { remote_addr: String, route: String },
-    File { path: String, line_number: usize },
-    Sdk { api_key_prefix: String, model: String },
-    WebSocket { session_id: String },
-    Queue { topic: String, message_id: String },
-    Internal { caller: String },
+    Http {
+        remote_addr: String,
+        route: String,
+    },
+    File {
+        path: String,
+        line_number: usize,
+    },
+    Sdk {
+        api_key_prefix: String,
+        model: String,
+    },
+    WebSocket {
+        session_id: String,
+    },
+    Queue {
+        topic: String,
+        message_id: String,
+    },
+    Internal {
+        caller: String,
+    },
     Unknown,
 }
 
@@ -26,20 +41,20 @@ pub enum TrustLevel {
     High,
     Medium,
     Low,
-    Untrusted
+    Untrusted,
 }
 
 impl PromptSource {
     pub fn trust_level(&self) -> TrustLevel {
         match self {
-            PromptSource::Internal { .. }                => TrustLevel::High,
-            PromptSource::Sdk { .. }                     => TrustLevel::High,
-            PromptSource::Http { .. }                    => TrustLevel::Medium,
-            PromptSource::WebSocket { .. }               => TrustLevel::Medium,
-            PromptSource::Cli                            => TrustLevel::Low,
-            PromptSource::File { .. }                    => TrustLevel::Low,
-            PromptSource::Queue { .. }                   => TrustLevel::Untrusted,
-            PromptSource::Unknown                        => TrustLevel::Untrusted,
+            PromptSource::Internal { .. } => TrustLevel::High,
+            PromptSource::Sdk { .. } => TrustLevel::High,
+            PromptSource::Http { .. } => TrustLevel::Medium,
+            PromptSource::WebSocket { .. } => TrustLevel::Medium,
+            PromptSource::Cli => TrustLevel::Low,
+            PromptSource::File { .. } => TrustLevel::Low,
+            PromptSource::Queue { .. } => TrustLevel::Untrusted,
+            PromptSource::Unknown => TrustLevel::Untrusted,
         }
     }
 }
@@ -88,10 +103,16 @@ impl Structurer for CliStructurer {
         let mut line = String::new();
         std::io::stdin().read_line(&mut line)?;
         let text = line.trim().to_string();
-        
-        if text.is_empty() { return Err(anyhow::anyhow!("Empty prompt")); }
+
+        if text.is_empty() {
+            return Err(anyhow::anyhow!("Empty prompt"));
+        }
         if text.len() > self.max_length {
-            return Err(anyhow::anyhow!("Prompt too long: {} > {}", text.len(), self.max_length));
+            return Err(anyhow::anyhow!(
+                "Prompt too long: {} > {}",
+                text.len(),
+                self.max_length
+            ));
         }
 
         Ok(RawInput {
@@ -102,7 +123,9 @@ impl Structurer for CliStructurer {
         })
     }
 
-    fn source_name(&self) -> &'static str { "cli" }
+    fn source_name(&self) -> &'static str {
+        "cli"
+    }
 }
 
 pub struct HttpStructurer {
@@ -124,21 +147,34 @@ impl Structurer for HttpStructurer {
         })
     }
 
-    fn source_name(&self) -> &'static str { "http" }
+    fn source_name(&self) -> &'static str {
+        "http"
+    }
 
     fn pre_validate(&self, input: &RawInput) -> Result<()> {
         let lower = input.text.to_lowercase();
         let dangerous_patterns = [
-            "<script", "javascript:", "onerror=", "onload=",
-            "drop table", "delete from", "insert into", "union select",
-            "'; --", "1=1", "or 1=1",
+            "<script",
+            "javascript:",
+            "onerror=",
+            "onload=",
+            "drop table",
+            "delete from",
+            "insert into",
+            "union select",
+            "'; --",
+            "1=1",
+            "or 1=1",
         ];
         if dangerous_patterns.iter().any(|p| lower.contains(p)) {
             return Err(anyhow::anyhow!("Potentially dangerous content detected"));
         }
         // Also check URL-decoded variants
         let decoded = urlencoding::decode(&input.text).unwrap_or_default();
-        if dangerous_patterns.iter().any(|p| decoded.to_lowercase().contains(p)) {
+        if dangerous_patterns
+            .iter()
+            .any(|p| decoded.to_lowercase().contains(p))
+        {
             return Err(anyhow::anyhow!("Encoded dangerous content detected"));
         }
         Ok(())
@@ -163,21 +199,31 @@ pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
 
     if let Some(start_idx) = user_prompt.find("--- Retrieved Knowledge ---") {
         if let Some(end_idx) = user_prompt.find("--- End Retrieved Knowledge ---\n") {
-            rag = Some(user_prompt[start_idx + "--- Retrieved Knowledge ---\n".len()..end_idx].trim().to_string());
-            user_prompt = user_prompt[end_idx + "--- End Retrieved Knowledge ---\n".len()..].trim().to_string();
+            rag = Some(
+                user_prompt[start_idx + "--- Retrieved Knowledge ---\n".len()..end_idx]
+                    .trim()
+                    .to_string(),
+            );
+            user_prompt = user_prompt[end_idx + "--- End Retrieved Knowledge ---\n".len()..]
+                .trim()
+                .to_string();
         }
     }
 
     (context, rag, user_prompt)
 }
 
-pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQuestion], raw_input: &str) -> String {
+pub fn render_crisp_prompt(
+    prompt: &StructuredPrompt,
+    questions: &[ClarifyingQuestion],
+    raw_input: &str,
+) -> String {
     let (context_opt, _rag_opt, user_prompt) = split_raw_input(raw_input);
 
     let mut out = String::new();
-    
+
     // ROLE — High-resolution persona
-    let is_role_valid = !prompt.role.primary.is_empty() 
+    let is_role_valid = !prompt.role.primary.is_empty()
         && prompt.role.primary.to_lowercase() != "unknown"
         && prompt.role.primary.to_lowercase() != "none"
         && prompt.role.primary.to_lowercase() != "default";
@@ -201,14 +247,15 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         }
         out.push('\n');
     }
- 
+
     // CONTEXT — Dense metadata, no redundancy
     let is_ctx_desc_valid = !prompt.context.description.is_empty()
         && prompt.context.description.to_lowercase() != "unknown"
         && prompt.context.description.to_lowercase() != "none"
         && prompt.context.description.to_lowercase() != "default";
 
-    let has_bg = !prompt.context.background.is_empty() && prompt.context.background != prompt.context.description;
+    let has_bg = !prompt.context.background.is_empty()
+        && prompt.context.background != prompt.context.description;
     let has_assumptions = !prompt.context.assumptions.is_empty();
 
     if is_ctx_desc_valid || has_bg || has_assumptions || context_opt.is_some() {
@@ -217,31 +264,51 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         } else {
             out.push_str("# CONTEXT:\n");
         }
-        
+
         let mut meta = Vec::new();
-        let is_knowledge_valid = !prompt.context.user_knowledge_level.is_empty() && prompt.context.user_knowledge_level.to_lowercase() != "unknown";
-        let is_domain_valid = !prompt.context.domain.is_empty() && prompt.context.domain.to_lowercase() != "unknown";
-        
+        let is_knowledge_valid = !prompt.context.user_knowledge_level.is_empty()
+            && prompt.context.user_knowledge_level.to_lowercase() != "unknown";
+        let is_domain_valid =
+            !prompt.context.domain.is_empty() && prompt.context.domain.to_lowercase() != "unknown";
+
         if is_knowledge_valid || is_domain_valid {
-            let knowledge = if is_knowledge_valid { &prompt.context.user_knowledge_level } else { "" };
-            let domain = if is_domain_valid { &prompt.context.domain } else { "" };
-            meta.push(format!("Expertise: {} {}", knowledge, domain).trim().to_string());
+            let knowledge = if is_knowledge_valid {
+                &prompt.context.user_knowledge_level
+            } else {
+                ""
+            };
+            let domain = if is_domain_valid {
+                &prompt.context.domain
+            } else {
+                ""
+            };
+            meta.push(
+                format!("Expertise: {} {}", knowledge, domain)
+                    .trim()
+                    .to_string(),
+            );
         }
-        
-        if prompt.context.temporal_scope != "unspecified" && prompt.context.temporal_scope != "immediate" && !prompt.context.temporal_scope.is_empty() {
+
+        if prompt.context.temporal_scope != "unspecified"
+            && prompt.context.temporal_scope != "immediate"
+            && !prompt.context.temporal_scope.is_empty()
+        {
             meta.push(format!("Scope: {}", prompt.context.temporal_scope));
         }
-        
+
         if !meta.is_empty() {
             out.push_str(&meta.join(" | "));
             out.push('\n');
         }
- 
+
         if has_bg {
             out.push_str(&format!("Details: {}\n", prompt.context.background));
         }
         if has_assumptions {
-            out.push_str(&format!("Assumptions: {}\n", prompt.context.assumptions.join("; ")));
+            out.push_str(&format!(
+                "Assumptions: {}\n",
+                prompt.context.assumptions.join("; ")
+            ));
         }
         if let Some(ctx) = context_opt {
             out.push_str(&format!("Semantic Context: {}\n", ctx));
@@ -253,8 +320,11 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
 
     let has_inclusions = !prompt.constraints.required_inclusions.is_empty();
     let has_exclusions = !prompt.constraints.forbidden_topics.is_empty();
-    let has_custom_format = prompt.constraints.output_format != "markdown" && !prompt.constraints.output_format.is_empty();
-    let has_custom_tone = prompt.constraints.tone.to_lowercase() != "neutral" && !prompt.constraints.tone.is_empty() && prompt.constraints.tone.to_lowercase() != "default";
+    let has_custom_format = prompt.constraints.output_format != "markdown"
+        && !prompt.constraints.output_format.is_empty();
+    let has_custom_tone = prompt.constraints.tone.to_lowercase() != "neutral"
+        && !prompt.constraints.tone.is_empty()
+        && prompt.constraints.tone.to_lowercase() != "default";
 
     if has_inclusions || has_exclusions || has_custom_format || has_custom_tone {
         out.push_str("# CONSTRAINTS:\n");
@@ -264,11 +334,14 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
         for exc in &prompt.constraints.forbidden_topics {
             out.push_str(&format!("- [AVOID]  {}\n", exc));
         }
-        
+
         if has_custom_format || has_custom_tone {
             let mut fmts = Vec::new();
             if has_custom_format {
-                fmts.push(format!("Output Format: {}", prompt.constraints.output_format));
+                fmts.push(format!(
+                    "Output Format: {}",
+                    prompt.constraints.output_format
+                ));
             }
             if has_custom_tone {
                 fmts.push(format!("Tone: {}", prompt.constraints.tone));
@@ -281,13 +354,26 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     // CONSTRAINTS META — geography, risk, business type, team (only if detected)
     if let Some(ref meta) = prompt.constraints_meta {
         let mut meta_parts = Vec::new();
-        if let Some(ref g) = meta.geography { meta_parts.push(format!("Geography: {}", g)); }
-        if let Some(ref r) = meta.risk_tolerance { meta_parts.push(format!("Risk: {}", r)); }
-        if let Some(ref b) = meta.business_type { meta_parts.push(format!("Type: {}", b)); }
-        if let Some(ref t) = meta.team_composition { meta_parts.push(format!("Team: {}", t)); }
-        if let Some(ref rev) = meta.revenue_expectations { meta_parts.push(format!("Revenue: {}", rev)); }
+        if let Some(ref g) = meta.geography {
+            meta_parts.push(format!("Geography: {}", g));
+        }
+        if let Some(ref r) = meta.risk_tolerance {
+            meta_parts.push(format!("Risk: {}", r));
+        }
+        if let Some(ref b) = meta.business_type {
+            meta_parts.push(format!("Type: {}", b));
+        }
+        if let Some(ref t) = meta.team_composition {
+            meta_parts.push(format!("Team: {}", t));
+        }
+        if let Some(ref rev) = meta.revenue_expectations {
+            meta_parts.push(format!("Revenue: {}", rev));
+        }
         if !meta_parts.is_empty() {
-            out.push_str(&format!("# CONTEXT CONSTRAINTS:\n{}\n\n", meta_parts.join(" | ")));
+            out.push_str(&format!(
+                "# CONTEXT CONSTRAINTS:\n{}\n\n",
+                meta_parts.join(" | ")
+            ));
         }
     }
 
@@ -295,8 +381,10 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     if !prompt.execution_phases.is_empty() {
         out.push_str("# EXECUTION PHASES:\n");
         for phase in &prompt.execution_phases {
-            out.push_str(&format!("{}. **{}** ({}): {}\n", 
-                phase.phase_number, phase.name, phase.estimated_duration, phase.description));
+            out.push_str(&format!(
+                "{}. **{}** ({}): {}\n",
+                phase.phase_number, phase.name, phase.estimated_duration, phase.description
+            ));
             for d in &phase.deliverables {
                 out.push_str(&format!("   - {}\n", d));
             }
@@ -308,8 +396,10 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     if !prompt.validation_steps.is_empty() {
         out.push_str("# VALIDATION:\n");
         for step in &prompt.validation_steps {
-            out.push_str(&format!("{}. {} — {} ({})\n", 
-                step.step_number, step.name, step.criteria, step.validation_method));
+            out.push_str(&format!(
+                "{}. {} — {} ({})\n",
+                step.step_number, step.name, step.criteria, step.validation_method
+            ));
         }
         out.push('\n');
     }
@@ -327,7 +417,11 @@ pub fn render_crisp_prompt(prompt: &StructuredPrompt, questions: &[ClarifyingQue
     if !questions.is_empty() {
         out.push_str("# CLARIFYING QUESTIONS:\n");
         for q in questions {
-            out.push_str(&format!("- [{}] {}\n", q.priority.to_string().to_uppercase(), q.question));
+            out.push_str(&format!(
+                "- [{}] {}\n",
+                q.priority.to_string().to_uppercase(),
+                q.question
+            ));
         }
         out.push('\n');
     }
@@ -386,10 +480,17 @@ pub fn build(
         super::intent::KnowledgeLevel::Novice => "novice",
         super::intent::KnowledgeLevel::Intermediate => "intermediate",
         super::intent::KnowledgeLevel::Expert => "expert",
-    }.to_string();
+    }
+    .to_string();
 
     let intent_type = match profile.primary_intent {
-        super::intent::IntentClass::Build => if profile.domain == "software-engineering" || profile.domain == "devops-infra" { "development/construction" } else { "creation/design" },
+        super::intent::IntentClass::Build => {
+            if profile.domain == "software-engineering" || profile.domain == "devops-infra" {
+                "development/construction"
+            } else {
+                "creation/design"
+            }
+        }
         super::intent::IntentClass::Explain => "educational/instructional",
         super::intent::IntentClass::Debug => "troubleshooting/optimization",
         super::intent::IntentClass::Analyze => "analytical/discovery",
@@ -411,7 +512,6 @@ pub fn build(
             }
         }
     }
-
 
     // Infer execution phases based on temporal scope, domain templates, and intent
     let execution_phases = infer_execution_phases(profile, raw, config);
@@ -442,19 +542,36 @@ pub fn build(
     } else {
         derive_persona_anchor(&profile.domain, &role_primary, config)
     };
-    let secondary = rule_verdict.as_ref().and_then(|v| v.display_secondary())
+    let secondary = rule_verdict
+        .as_ref()
+        .and_then(|v| v.display_secondary())
         .or_else(|| profile.vertical.as_deref().map(super::role::to_title_case));
 
     // GAP-13: Derive length bounds from input complexity and intent
     let word_count = raw.split_whitespace().count();
     let length_bound = match (&profile.primary_intent, word_count) {
         (super::intent::IntentClass::Explain, 0..=15) => LengthBound { min: 100, max: 500 },
-        (super::intent::IntentClass::Explain, _)      => LengthBound { min: 200, max: 1000 },
-        (super::intent::IntentClass::Build,   0..=30) => LengthBound { min: 300, max: 1500 },
-        (super::intent::IntentClass::Build,   _)      => LengthBound { min: 500, max: 3000 },
-        (super::intent::IntentClass::Debug,   _)      => LengthBound { min: 150, max: 800 },
-        (super::intent::IntentClass::Analyze, _)      => LengthBound { min: 300, max: 2000 },
-        (super::intent::IntentClass::Transform, _)    => LengthBound { min: 100, max: 1000 },
+        (super::intent::IntentClass::Explain, _) => LengthBound {
+            min: 200,
+            max: 1000,
+        },
+        (super::intent::IntentClass::Build, 0..=30) => LengthBound {
+            min: 300,
+            max: 1500,
+        },
+        (super::intent::IntentClass::Build, _) => LengthBound {
+            min: 500,
+            max: 3000,
+        },
+        (super::intent::IntentClass::Debug, _) => LengthBound { min: 150, max: 800 },
+        (super::intent::IntentClass::Analyze, _) => LengthBound {
+            min: 300,
+            max: 2000,
+        },
+        (super::intent::IntentClass::Transform, _) => LengthBound {
+            min: 100,
+            max: 1000,
+        },
     };
 
     Ok(StructuredPrompt {
@@ -464,28 +581,24 @@ pub fn build(
             expertise_domains: vec![profile.domain.clone()],
             persona_constraints: {
                 let mut constraints = match profile.domain.as_str() {
-                    "software-engineering" | "devops-infra" => vec![
-                        "production_grade_only".into(),
-                        "no_placeholder_code".into(),
-                    ],
+                    "software-engineering" | "devops-infra" => {
+                        vec!["production_grade_only".into(), "no_placeholder_code".into()]
+                    }
                     "medical" | "pharma" => vec![
                         "evidence_based_only".into(),
                         "cite_sources_required".into(),
                         "no_medical_advice_disclaimer".into(),
                     ],
-                    "legal" => vec![
-                        "jurisdiction_aware".into(),
-                        "cite_statutes".into(),
-                    ],
-                    "creative" => vec![
-                        "maintain_narrative_voice".into(),
-                        "show_dont_tell".into(),
-                    ],
-                    _ => vec![
-                        "accurate_and_thorough".into(),
-                    ],
+                    "legal" => vec!["jurisdiction_aware".into(), "cite_statutes".into()],
+                    "creative" => vec!["maintain_narrative_voice".into(), "show_dont_tell".into()],
+                    _ => vec!["accurate_and_thorough".into()],
                 };
-                if profile.legal_as_constraint || rule_verdict.as_ref().map(|v| v.legal_as_constraint).unwrap_or(false) {
+                if profile.legal_as_constraint
+                    || rule_verdict
+                        .as_ref()
+                        .map(|v| v.legal_as_constraint)
+                        .unwrap_or(false)
+                {
                     if !constraints.iter().any(|c| c == "jurisdiction_aware") {
                         constraints.push("jurisdiction_aware".into());
                     }
@@ -534,9 +647,10 @@ pub fn build(
 /// Extract a meaningful task description — summary based, not raw snippet
 fn extract_task_description(raw: &str, intent_type: &str) -> String {
     let (_, _, user_prompt) = split_raw_input(raw);
-    
+
     // Attempt to extract a short summary (first 10 words or first sentence)
-    let summary = user_prompt.split(|c: char| c == '.' || c == '\n')
+    let summary = user_prompt
+        .split(|c: char| c == '.' || c == '\n')
         .next()
         .unwrap_or(&user_prompt)
         .split_whitespace()
@@ -551,7 +665,10 @@ fn extract_task_description(raw: &str, intent_type: &str) -> String {
 fn build_background(profile: &IntentProfile, user_level: &str, raw: &str) -> String {
     let mut parts = Vec::new();
 
-    parts.push(format!("Domain: {} | Audience: {}", profile.domain, user_level));
+    parts.push(format!(
+        "Domain: {} | Audience: {}",
+        profile.domain, user_level
+    ));
 
     if let Some(ref baseline) = profile.baseline_knowledge {
         parts.push(format!("User Baseline: {}", baseline));
@@ -574,13 +691,25 @@ fn build_background(profile: &IntentProfile, user_level: &str, raw: &str) -> Str
     if let Some(ref biz) = profile.detected_biz_type {
         parts.push(format!("Business type: {}", biz));
     }
-    
+
     parts.join(". ")
 }
 
-fn naturalize_subject(subject: &str, intent: &crate::npae::aggressive::intent::IntentClass) -> String {
+fn naturalize_subject(
+    subject: &str,
+    intent: &crate::npae::aggressive::intent::IntentClass,
+) -> String {
     let lower = subject.to_lowercase();
-    let abstract_terms = ["industry", "domain", "sector", "field", "tech", "technology", "business", "market"];
+    let abstract_terms = [
+        "industry",
+        "domain",
+        "sector",
+        "field",
+        "tech",
+        "technology",
+        "business",
+        "market",
+    ];
 
     let is_abstract = abstract_terms.iter().any(|&term| lower.contains(term))
         || lower.split_whitespace().count() <= 2;
@@ -598,11 +727,16 @@ fn naturalize_subject(subject: &str, intent: &crate::npae::aggressive::intent::I
 }
 
 /// Infer execution phases from temporal scope, config templates, and raw prompt
-fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&super::config::UnifiedConfig>) -> Vec<ExecutionPhase> {
+fn infer_execution_phases(
+    profile: &IntentProfile,
+    raw: &str,
+    config: Option<&super::config::UnifiedConfig>,
+) -> Vec<ExecutionPhase> {
     if !profile.has_phases && !profile.has_timeline {
         // No temporal signals — check if this is a build/planning task
-        if profile.primary_intent != super::intent::IntentClass::Build 
-            && profile.primary_intent != super::intent::IntentClass::Transform {
+        if profile.primary_intent != super::intent::IntentClass::Build
+            && profile.primary_intent != super::intent::IntentClass::Transform
+        {
             return vec![];
         }
     }
@@ -750,7 +884,8 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
             phases.push(ExecutionPhase {
                 phase_number: 1,
                 name: "Research & Validation".into(),
-                description: "Market research, competitor analysis, target audience identification".into(),
+                description: "Market research, competitor analysis, target audience identification"
+                    .into(),
                 estimated_duration: "1-2 weeks".into(),
                 deliverables: vec!["Market analysis report".into(), "Competitor matrix".into()],
             });
@@ -850,7 +985,8 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                 phases.push(ExecutionPhase {
                     phase_number: 1,
                     name: "Assessment".into(),
-                    description: "Current state analysis, goal setting, constraint identification".into(),
+                    description: "Current state analysis, goal setting, constraint identification"
+                        .into(),
                     estimated_duration: "Day 1".into(),
                     deliverables: vec!["Baseline assessment".into(), "Goal targets".into()],
                 });
@@ -874,23 +1010,38 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
             phases.push(ExecutionPhase {
                 phase_number: 1,
                 name: "Data Collection & Audit".into(),
-                description: "Gather quantitative (output, hours) and qualitative (surveys, sentiment) data".into(),
+                description:
+                    "Gather quantitative (output, hours) and qualitative (surveys, sentiment) data"
+                        .into(),
                 estimated_duration: "1 week".into(),
-                deliverables: vec!["Data collection framework".into(), "Initial sentiment report".into()],
+                deliverables: vec![
+                    "Data collection framework".into(),
+                    "Initial sentiment report".into(),
+                ],
             });
             phases.push(ExecutionPhase {
                 phase_number: 2,
                 name: "Comparative Analysis".into(),
-                description: "Compare remote vs in-office benchmarks, analyze 'perception vs reality' gap".into(),
+                description:
+                    "Compare remote vs in-office benchmarks, analyze 'perception vs reality' gap"
+                        .into(),
                 estimated_duration: "1 week".into(),
-                deliverables: vec!["Productivity gap analysis".into(), "Variable correlation matrix".into()],
+                deliverables: vec![
+                    "Productivity gap analysis".into(),
+                    "Variable correlation matrix".into(),
+                ],
             });
             phases.push(ExecutionPhase {
                 phase_number: 3,
                 name: "Strategic Recommendation".into(),
-                description: "Propose hybrid/remote optimizations, cultural adjustments, and KPI realignment".into(),
+                description:
+                    "Propose hybrid/remote optimizations, cultural adjustments, and KPI realignment"
+                        .into(),
                 estimated_duration: "1 week".into(),
-                deliverables: vec!["Strategic optimization roadmap".into(), "Policy adjustment guide".into()],
+                deliverables: vec![
+                    "Strategic optimization roadmap".into(),
+                    "Policy adjustment guide".into(),
+                ],
             });
         }
         "education" => {
@@ -918,57 +1069,104 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
         }
         _ => {
             // INTENT-DRIVEN TEMPLATES for unknown domains (All-Type Prompt Support)
-            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "Project".into());
-            
+            let subject = profile
+                .dynamic_subject
+                .clone()
+                .unwrap_or_else(|| "Project".into());
+
             match profile.primary_intent {
                 super::intent::IntentClass::Analyze => {
                     phases.push(ExecutionPhase {
                         phase_number: 1,
                         name: format!("{} Discovery", subject),
-                        description: format!("Identify key variables, stakeholders, and data sources for {}.", subject).into(),
+                        description: format!(
+                            "Identify key variables, stakeholders, and data sources for {}.",
+                            subject
+                        )
+                        .into(),
                         estimated_duration: "Phase 1".into(),
-                        deliverables: vec![format!("{} assessment report", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                        deliverables: vec![format!(
+                            "{} assessment report",
+                            naturalize_subject(&subject, &profile.primary_intent)
+                        )
+                        .into()],
                     });
                     phases.push(ExecutionPhase {
                         phase_number: 2,
                         name: format!("{} Deep Dive", subject),
-                        description: format!("Perform detailed analytical investigation into {} dynamics.", subject).into(),
+                        description: format!(
+                            "Perform detailed analytical investigation into {} dynamics.",
+                            subject
+                        )
+                        .into(),
                         estimated_duration: "Phase 2".into(),
-                        deliverables: vec![format!("{} analytical model", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                        deliverables: vec![format!(
+                            "{} analytical model",
+                            naturalize_subject(&subject, &profile.primary_intent)
+                        )
+                        .into()],
                     });
                     phases.push(ExecutionPhase {
                         phase_number: 3,
                         name: "Insights & Strategy".into(),
-                        description: format!("Synthesize findings into actionable recommendations for {}.", subject).into(),
+                        description: format!(
+                            "Synthesize findings into actionable recommendations for {}.",
+                            subject
+                        )
+                        .into(),
                         estimated_duration: "Phase 3".into(),
                         deliverables: vec!["Strategic recommendation brief".into()],
                     });
                 }
                 super::intent::IntentClass::Build => {
-                    let is_software_like = matches!(resolved_domain.as_str(),
-                        "software" | "devops" | "ai-ml");
+                    let is_software_like =
+                        matches!(resolved_domain.as_str(), "software" | "devops" | "ai-ml");
 
                     if is_software_like {
                         phases.push(ExecutionPhase {
                             phase_number: 1,
                             name: "Architecture & Design".into(),
-                            description: format!("Define structural requirements and design for {}.", subject).into(),
+                            description: format!(
+                                "Define structural requirements and design for {}.",
+                                subject
+                            )
+                            .into(),
                             estimated_duration: "Design Phase".into(),
-                            deliverables: vec![format!("{} blueprint", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                            deliverables: vec![format!(
+                                "{} blueprint",
+                                naturalize_subject(&subject, &profile.primary_intent)
+                            )
+                            .into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 2,
                             name: "Core Implementation".into(),
-                            description: format!("Construct the functional components of {}.", subject).into(),
+                            description: format!(
+                                "Construct the functional components of {}.",
+                                subject
+                            )
+                            .into(),
                             estimated_duration: "Build Phase".into(),
-                            deliverables: vec![format!("Functional {} prototype", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                            deliverables: vec![format!(
+                                "Functional {} prototype",
+                                naturalize_subject(&subject, &profile.primary_intent)
+                            )
+                            .into()],
                         });
                         phases.push(ExecutionPhase {
                             phase_number: 3,
                             name: "Validation & Polish".into(),
-                            description: format!("Test, refine, and finalize {} for production.", subject).into(),
+                            description: format!(
+                                "Test, refine, and finalize {} for production.",
+                                subject
+                            )
+                            .into(),
                             estimated_duration: "Final Phase".into(),
-                            deliverables: vec![format!("Optimized {}", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                            deliverables: vec![format!(
+                                "Optimized {}",
+                                naturalize_subject(&subject, &profile.primary_intent)
+                            )
+                            .into()],
                         });
                     } else {
                         phases.push(ExecutionPhase {
@@ -999,7 +1197,8 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                     phases.push(ExecutionPhase {
                         phase_number: 1,
                         name: "Preparation".into(),
-                        description: format!("Set up environment and context for {}.", subject).into(),
+                        description: format!("Set up environment and context for {}.", subject)
+                            .into(),
                         estimated_duration: "Start".into(),
                         deliverables: vec!["Initial setup".into()],
                     });
@@ -1008,7 +1207,11 @@ fn infer_execution_phases(profile: &IntentProfile, raw: &str, config: Option<&su
                         name: "Execution".into(),
                         description: format!("Execute core {} tasks.", subject).into(),
                         estimated_duration: "Execution".into(),
-                        deliverables: vec![format!("{} core output", naturalize_subject(&subject, &profile.primary_intent)).into()],
+                        deliverables: vec![format!(
+                            "{} core output",
+                            naturalize_subject(&subject, &profile.primary_intent)
+                        )
+                        .into()],
                     });
                 }
             }
@@ -1026,18 +1229,58 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
 
     match profile.domain.as_str() {
         "software-engineering" | "devops-infra" => vec![
-            ValidationStep { step_number: 1, name: "Unit Tests".into(), criteria: "All unit tests pass".into(), validation_method: "Automated test suite".into() },
-            ValidationStep { step_number: 2, name: "Integration Test".into(), criteria: "End-to-end flow verified".into(), validation_method: "Integration test suite".into() },
-            ValidationStep { step_number: 3, name: "Performance Check".into(), criteria: "Meets latency/throughput targets".into(), validation_method: "Load testing".into() },
+            ValidationStep {
+                step_number: 1,
+                name: "Unit Tests".into(),
+                criteria: "All unit tests pass".into(),
+                validation_method: "Automated test suite".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Integration Test".into(),
+                criteria: "End-to-end flow verified".into(),
+                validation_method: "Integration test suite".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Performance Check".into(),
+                criteria: "Meets latency/throughput targets".into(),
+                validation_method: "Load testing".into(),
+            },
         ],
         "business-strategy" => vec![
-            ValidationStep { step_number: 1, name: "Market Fit".into(), criteria: "Target market size validated".into(), validation_method: "TAM/SAM/SOM analysis".into() },
-            ValidationStep { step_number: 2, name: "Financial Viability".into(), criteria: "Unit economics positive".into(), validation_method: "Financial model review".into() },
-            ValidationStep { step_number: 3, name: "Competitive Position".into(), criteria: "Clear differentiation identified".into(), validation_method: "Competitor analysis".into() },
+            ValidationStep {
+                step_number: 1,
+                name: "Market Fit".into(),
+                criteria: "Target market size validated".into(),
+                validation_method: "TAM/SAM/SOM analysis".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Financial Viability".into(),
+                criteria: "Unit economics positive".into(),
+                validation_method: "Financial model review".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Competitive Position".into(),
+                criteria: "Clear differentiation identified".into(),
+                validation_method: "Competitor analysis".into(),
+            },
         ],
         _ => vec![
-            ValidationStep { step_number: 1, name: "Completeness".into(), criteria: "All deliverables produced".into(), validation_method: "Checklist review".into() },
-            ValidationStep { step_number: 2, name: "Quality".into(), criteria: "Meets stated requirements".into(), validation_method: "Peer review".into() },
+            ValidationStep {
+                step_number: 1,
+                name: "Completeness".into(),
+                criteria: "All deliverables produced".into(),
+                validation_method: "Checklist review".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Quality".into(),
+                criteria: "Meets stated requirements".into(),
+                validation_method: "Peer review".into(),
+            },
         ],
     }
 }
@@ -1046,8 +1289,22 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
 fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut criteria = Vec::new();
     let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
-    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+    let is_financial = profile.domain == "finance"
+        || lower.contains("earn")
+        || lower.contains("wealth")
+        || lower.contains("million")
+        || lower.contains("billion")
+        || lower.contains("rich")
+        || lower.contains("financial freedom")
+        || lower.contains("money")
+        || lower.contains("passive income")
+        || lower.contains("retire early")
+        || lower.contains("make $");
+    let is_business = profile.domain == "business"
+        || lower.contains("business")
+        || lower.contains("startup")
+        || lower.contains("company")
+        || lower.contains("enterprise");
 
     if is_financial && !profile.domain.starts_with("workplace") {
         criteria.push("Target is clearly defined with explicit amount ($), currency, time horizon, and target type (Distinguish: Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth)".into());
@@ -1066,8 +1323,11 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
         criteria.push("Business model defines clear revenue streams, pricing tiers, and positive unit economics (LTV/CAC, gross margin)".into());
         criteria.push("Scalability vectors (distribution channels, technology leverage, team delegation) are explicitly mapped".into());
         criteria.push("Valuation roadmap differentiates annual revenue/EBITDA from enterprise valuation multiples".into());
-        criteria.push("Capital requirements and cash flow runway are modeled across growth phases".into());
-        criteria.push("Includes measurable revenue, customer acquisition, and retention KPIs".into());
+        criteria.push(
+            "Capital requirements and cash flow runway are modeled across growth phases".into(),
+        );
+        criteria
+            .push("Includes measurable revenue, customer acquisition, and retention KPIs".into());
         return criteria;
     }
 
@@ -1076,53 +1336,94 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
         (super::intent::IntentClass::Build, "career-growth") => {
             criteria.push("Comprehensive skills gap analysis completed and validated against industry benchmarks".into());
             criteria.push("Target certifications or credentials acquired and verified".into());
-            criteria.push("Professional portfolio demonstrates competency in target role core requirements".into());
+            criteria.push(
+                "Professional portfolio demonstrates competency in target role core requirements"
+                    .into(),
+            );
             criteria.push("Market positioning aligned with target role expectations".into());
         }
-        (super::intent::IntentClass::Build, "software") | (super::intent::IntentClass::Build, "software-engineering") | (super::intent::IntentClass::Build, "devops") | (super::intent::IntentClass::Build, "devops-infra") => {
+        (super::intent::IntentClass::Build, "software")
+        | (super::intent::IntentClass::Build, "software-engineering")
+        | (super::intent::IntentClass::Build, "devops")
+        | (super::intent::IntentClass::Build, "devops-infra") => {
             criteria.push("Functional, bug-free implementation with optimized performance".into());
-            criteria.push("Adheres to industry-standard architectural patterns and best practices".into());
+            criteria.push(
+                "Adheres to industry-standard architectural patterns and best practices".into(),
+            );
             criteria.push("Includes necessary technical documentation and test coverage".into());
         }
-        (super::intent::IntentClass::Build, "ai-ml") | (super::intent::IntentClass::Build, "data-science") => {
+        (super::intent::IntentClass::Build, "ai-ml")
+        | (super::intent::IntentClass::Build, "data-science") => {
             criteria.push("Model performance meets or exceeds stated benchmarks".into());
-            criteria.push("Alignment, safety, and ethical considerations are explicitly addressed".into());
+            criteria.push(
+                "Alignment, safety, and ethical considerations are explicitly addressed".into(),
+            );
             criteria.push("Data handling and inference pipelines are robust and scalable".into());
         }
-        (super::intent::IntentClass::Build, "health") | (super::intent::IntentClass::Build, "medical") | (super::intent::IntentClass::Build, "pharma") => {
-            criteria.push("Clinically accurate protocols grounded in peer-reviewed evidence".into());
+        (super::intent::IntentClass::Build, "health")
+        | (super::intent::IntentClass::Build, "medical")
+        | (super::intent::IntentClass::Build, "pharma") => {
+            criteria
+                .push("Clinically accurate protocols grounded in peer-reviewed evidence".into());
             criteria.push("Strict adherence to regulatory (FDA/EMA) and ethical guidelines".into());
             criteria.push("Risk-benefit analysis is comprehensive and clearly stated".into());
         }
-        (super::intent::IntentClass::Build, "nutrition") | (super::intent::IntentClass::Build, "sports-nutrition") | (super::intent::IntentClass::Build, "health-fitness") => {
+        (super::intent::IntentClass::Build, "nutrition")
+        | (super::intent::IntentClass::Build, "sports-nutrition")
+        | (super::intent::IntentClass::Build, "health-fitness") => {
             criteria.push("Plan is physiologically sound and tailored to specific goals".into());
-            criteria.push("Macros and micronutrients are balanced according to activity level".into());
+            criteria
+                .push("Macros and micronutrients are balanced according to activity level".into());
             criteria.push("Includes clear instructions for tracking and adjustment".into());
         }
         (_, "workplace-productivity") => {
-            criteria.push("Differentiates between objective output and subjective sentiment".into());
+            criteria
+                .push("Differentiates between objective output and subjective sentiment".into());
             criteria.push("Identifies hidden bottlenecks in distributed collaboration".into());
-            criteria.push("Provides actionable recommendations for burnout prevention and engagement".into());
+            criteria.push(
+                "Provides actionable recommendations for burnout prevention and engagement".into(),
+            );
             criteria.push("Aligns productivity metrics with organizational culture goals".into());
         }
         (_, "education") => {
             criteria.push("Learning objectives are clearly defined and measurable".into());
             criteria.push("Techniques used are evidence-based and optimized for retention".into());
-            criteria.push("Roadmap addresses both theoretical understanding and practical application".into());
+            criteria.push(
+                "Roadmap addresses both theoretical understanding and practical application".into(),
+            );
             criteria.push("Progress can be tracked through objective mastery checks".into());
         }
         (super::intent::IntentClass::Build, _) => {
-            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "deliverable".into());
-            criteria.push(format!("Functional, high-quality {} is produced with modular design.", naturalize_subject(&subject, &profile.primary_intent)).into());
+            let subject = profile
+                .dynamic_subject
+                .clone()
+                .unwrap_or_else(|| "deliverable".into());
+            criteria.push(
+                format!(
+                    "Functional, high-quality {} is produced with modular design.",
+                    naturalize_subject(&subject, &profile.primary_intent)
+                )
+                .into(),
+            );
             criteria.push("Strict adherence to specified requirements and best practices.".into());
         }
 
         // EXPLAIN Intent (Domain-Agnostic but pedagogical)
         (super::intent::IntentClass::Explain, _) => {
-            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "concept".into());
-            criteria.push(format!("Conceptually clear explanation of {} at the target audience level.", subject).into());
+            let subject = profile
+                .dynamic_subject
+                .clone()
+                .unwrap_or_else(|| "concept".into());
+            criteria.push(
+                format!(
+                    "Conceptually clear explanation of {} at the target audience level.",
+                    subject
+                )
+                .into(),
+            );
             criteria.push("Balances technical depth with intuitive clarity.".into());
-            criteria.push("Covers all major dimensions (capabilities, risks, and implications)".into());
+            criteria
+                .push("Covers all major dimensions (capabilities, risks, and implications)".into());
         }
 
         // DEBUG Intent
@@ -1134,8 +1435,17 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
 
         // ANALYZE Intent
         (super::intent::IntentClass::Analyze, _) => {
-            let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "data".into());
-            criteria.push(format!("Deep insights and actionable patterns are extracted for {}.", subject).into());
+            let subject = profile
+                .dynamic_subject
+                .clone()
+                .unwrap_or_else(|| "data".into());
+            criteria.push(
+                format!(
+                    "Deep insights and actionable patterns are extracted for {}.",
+                    subject
+                )
+                .into(),
+            );
             criteria.push("Reasoning is clear, logical, and supported by evidence.".into());
             criteria.push("Conclusions are prioritized by impact and feasibility".into());
         }
@@ -1169,7 +1479,11 @@ fn build_constraints_meta(profile: &IntentProfile) -> Option<ConstraintsMeta> {
     };
 
     // Only include if at least one field is populated
-    if meta.geography.is_some() || meta.risk_tolerance.is_some() || meta.business_type.is_some() || meta.team_composition.is_some() {
+    if meta.geography.is_some()
+        || meta.risk_tolerance.is_some()
+        || meta.business_type.is_some()
+        || meta.team_composition.is_some()
+    {
         Some(meta)
     } else {
         None
@@ -1181,7 +1495,9 @@ fn derive_tone(profile: &IntentProfile) -> String {
     match (profile.domain.as_str(), &profile.user_knowledge) {
         ("business" | "business-strategy", _) => "strategic-actionable-direct".to_string(),
         ("creative" | "creative-writing", _) => "creative-expressive-engaging".to_string(),
-        ("education", super::intent::KnowledgeLevel::Novice) => "clear-supportive-step-by-step".to_string(),
+        ("education", super::intent::KnowledgeLevel::Novice) => {
+            "clear-supportive-step-by-step".to_string()
+        }
         ("legal", _) => "precise-formal-referenced".to_string(),
         ("marketing", _) => "persuasive-data-driven-concise".to_string(),
         (_, super::intent::KnowledgeLevel::Expert) => "technical-precise-concise".to_string(),
@@ -1192,11 +1508,28 @@ fn derive_tone(profile: &IntentProfile) -> String {
 
 /// Vagueness Resolution: Unpacks generic requests into structured roadmaps
 fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
-    let subject = profile.dynamic_subject.clone().unwrap_or_else(|| "the core topic".into());
+    let subject = profile
+        .dynamic_subject
+        .clone()
+        .unwrap_or_else(|| "the core topic".into());
     let naturalized = naturalize_subject(&subject, &profile.primary_intent);
     let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
-    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+    let is_financial = profile.domain == "finance"
+        || lower.contains("earn")
+        || lower.contains("wealth")
+        || lower.contains("million")
+        || lower.contains("billion")
+        || lower.contains("rich")
+        || lower.contains("financial freedom")
+        || lower.contains("money")
+        || lower.contains("passive income")
+        || lower.contains("retire early")
+        || lower.contains("make $");
+    let is_business = profile.domain == "business"
+        || lower.contains("business")
+        || lower.contains("startup")
+        || lower.contains("company")
+        || lower.contains("enterprise");
 
     if is_financial && !profile.domain.starts_with("workplace") {
         return Some(format!(
@@ -1227,11 +1560,27 @@ fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
 fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut assumptions = Vec::new();
     let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
-    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+    let is_financial = profile.domain == "finance"
+        || lower.contains("earn")
+        || lower.contains("wealth")
+        || lower.contains("million")
+        || lower.contains("billion")
+        || lower.contains("rich")
+        || lower.contains("financial freedom")
+        || lower.contains("money")
+        || lower.contains("passive income")
+        || lower.contains("retire early")
+        || lower.contains("make $");
+    let is_business = profile.domain == "business"
+        || lower.contains("business")
+        || lower.contains("startup")
+        || lower.contains("company")
+        || lower.contains("enterprise");
 
     if is_financial && !profile.domain.starts_with("workplace") {
-        assumptions.push("Assume Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth".into());
+        assumptions.push(
+            "Assume Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth".into(),
+        );
         assumptions.push("Assume unstated financial baselines (income, expenses, assets, liabilities) must be explicitly framed with transparent assumptions rather than arbitrary invention".into());
         assumptions.push("Assume mathematical consistency: calculate required CAGR and savings rate; flag any feasibility mismatch rather than fabricating unrealistic returns".into());
         assumptions.push("Assume primary income engine and skill/business leverage must precede passive portfolio compounding for zero-to-wealth trajectories".into());
@@ -1239,58 +1588,100 @@ fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
     } else if is_business {
         assumptions.push("Assume business enterprise valuation is separate from personal liquid net worth and depends on revenue multiples and profit margins".into());
         assumptions.push("Assume focus on sustainable unit economics (LTV/CAC > 3), gross margin health, and capital efficiency".into());
-        assumptions.push("Assume scalable operational infrastructure, defensible moat, and equity retention".into());
+        assumptions.push(
+            "Assume scalable operational infrastructure, defensible moat, and equity retention"
+                .into(),
+        );
     } else {
         // Domain assumptions
         match profile.domain.as_str() {
             "computers" => {
-                assumptions.push("Assume standard system architecture and memory hierarchy unless specified".into());
-                assumptions.push("Assume high efficiency, reliability, and correctness requirements".into());
-            },
+                assumptions.push(
+                    "Assume standard system architecture and memory hierarchy unless specified"
+                        .into(),
+                );
+                assumptions.push(
+                    "Assume high efficiency, reliability, and correctness requirements".into(),
+                );
+            }
             "science" | "scientific-research" => {
-                assumptions.push("Assume adherence to the scientific method and empirical reproducibility".into());
+                assumptions.push(
+                    "Assume adherence to the scientific method and empirical reproducibility"
+                        .into(),
+                );
                 assumptions.push("Assume peer-reviewed standards for statistical validity".into());
-            },
+            }
             "health" | "medical" | "pharma" => {
-                assumptions.push("Assume evidence-based clinical practices and safety-first protocols".into());
-                assumptions.push("Assume compliance with relevant healthcare regulations and ethics".into());
-            },
+                assumptions.push(
+                    "Assume evidence-based clinical practices and safety-first protocols".into(),
+                );
+                assumptions.push(
+                    "Assume compliance with relevant healthcare regulations and ethics".into(),
+                );
+            }
             "software" | "software-engineering" | "devops" | "devops-infra" => {
                 if !lower.contains("legacy") && !lower.contains("old") {
-                    assumptions.push("Assume modern, idiomatic technology stack and best practices".into());
+                    assumptions.push(
+                        "Assume modern, idiomatic technology stack and best practices".into(),
+                    );
                 }
-                assumptions.push("Assume production-grade requirements (security, logging, error handling)".into());
-            },
+                assumptions.push(
+                    "Assume production-grade requirements (security, logging, error handling)"
+                        .into(),
+                );
+            }
             "data-science" | "ai-ml" => {
-                assumptions.push("Assume data is imperfect and requires preprocessing/cleaning".into());
-                assumptions.push("Assume model scalability and ethical considerations are paramount".into());
-            },
+                assumptions
+                    .push("Assume data is imperfect and requires preprocessing/cleaning".into());
+                assumptions.push(
+                    "Assume model scalability and ethical considerations are paramount".into(),
+                );
+            }
             _ => {}
         }
     }
-    
+
     // Intent-based assumptions
     match profile.primary_intent {
         super::intent::IntentClass::Build => {
-            assumptions.push("Assume output should be immediately actionable and structured".into());
-        },
+            assumptions
+                .push("Assume output should be immediately actionable and structured".into());
+        }
         super::intent::IntentClass::Explain => {
-            assumptions.push("Assume the audience needs foundational concepts clarified before deep dives".into());
-        },
+            assumptions.push(
+                "Assume the audience needs foundational concepts clarified before deep dives"
+                    .into(),
+            );
+        }
         super::intent::IntentClass::Debug => {
-            assumptions.push("Assume underlying systems are standard unless otherwise specified".into());
-        },
+            assumptions
+                .push("Assume underlying systems are standard unless otherwise specified".into());
+        }
         _ => {}
     }
-    
+
     assumptions
 }
 
 /// Derive dynamic final instruction based on intent and goal engineering
 fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
     let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance" || lower.contains("earn") || lower.contains("wealth") || lower.contains("million") || lower.contains("billion") || lower.contains("rich") || lower.contains("financial freedom") || lower.contains("money") || lower.contains("passive income") || lower.contains("retire early") || lower.contains("make $");
-    let is_business = profile.domain == "business" || lower.contains("business") || lower.contains("startup") || lower.contains("company") || lower.contains("enterprise");
+    let is_financial = profile.domain == "finance"
+        || lower.contains("earn")
+        || lower.contains("wealth")
+        || lower.contains("million")
+        || lower.contains("billion")
+        || lower.contains("rich")
+        || lower.contains("financial freedom")
+        || lower.contains("money")
+        || lower.contains("passive income")
+        || lower.contains("retire early")
+        || lower.contains("make $");
+    let is_business = profile.domain == "business"
+        || lower.contains("business")
+        || lower.contains("startup")
+        || lower.contains("company")
+        || lower.contains("enterprise");
 
     if is_financial && !profile.domain.starts_with("workplace") {
         return "Execute the comprehensive Goal-Decomposition and Wealth-Engineering plan detailed in the Roadmap section, ensuring each of the 8 quantitative milestones is addressed with mathematical rigor.".into();
@@ -1301,22 +1692,34 @@ fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
     }
 
     match profile.primary_intent {
-        super::intent::IntentClass::Explain => "Provide a well-structured explanation that balances simplicity with depth.".into(),
+        super::intent::IntentClass::Explain => {
+            "Provide a well-structured explanation that balances simplicity with depth.".into()
+        }
         super::intent::IntentClass::Build => {
             if profile.domain == "software-engineering" || profile.domain == "devops-infra" {
                 "Implement the requested solution with modular, high-quality code.".into()
             } else {
                 "Implement the requested solution with a comprehensive and actionable plan.".into()
             }
-        },
-        super::intent::IntentClass::Debug => "Identify and resolve the issue while explaining the underlying cause.".into(),
-        super::intent::IntentClass::Analyze => "Provide deep insights and actionable recommendations based on the analysis.".into(),
-        super::intent::IntentClass::Transform => "Efficiently transform the input while maintaining data integrity and accuracy.".into(),
+        }
+        super::intent::IntentClass::Debug => {
+            "Identify and resolve the issue while explaining the underlying cause.".into()
+        }
+        super::intent::IntentClass::Analyze => {
+            "Provide deep insights and actionable recommendations based on the analysis.".into()
+        }
+        super::intent::IntentClass::Transform => {
+            "Efficiently transform the input while maintaining data integrity and accuracy.".into()
+        }
     }
 }
 
 /// Derive a high-resolution persona anchor for the role
-fn derive_persona_anchor(domain: &str, role: &str, config: Option<&super::config::UnifiedConfig>) -> String {
+fn derive_persona_anchor(
+    domain: &str,
+    role: &str,
+    config: Option<&super::config::UnifiedConfig>,
+) -> String {
     if let Some(cfg) = config {
         if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == domain) {
             if let Some(ref template) = tax.persona_template {
@@ -1382,7 +1785,11 @@ mod tests {
                 trust_level: TrustLevel::Medium,
                 metadata: InputMetadata::new(),
             };
-            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for: {}", text);
+            assert!(
+                structurer.pre_validate(&input).is_err(),
+                "Expected rejection for: {}",
+                text
+            );
         }
 
         let sqli_inputs = [
@@ -1406,7 +1813,11 @@ mod tests {
                 trust_level: TrustLevel::Medium,
                 metadata: InputMetadata::new(),
             };
-            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for: {}", text);
+            assert!(
+                structurer.pre_validate(&input).is_err(),
+                "Expected rejection for: {}",
+                text
+            );
         }
     }
 
@@ -1438,7 +1849,11 @@ mod tests {
                 trust_level: TrustLevel::Medium,
                 metadata: InputMetadata::new(),
             };
-            assert!(structurer.pre_validate(&input).is_err(), "Expected rejection for URL encoded: {}", text);
+            assert!(
+                structurer.pre_validate(&input).is_err(),
+                "Expected rejection for URL encoded: {}",
+                text
+            );
         }
     }
 }

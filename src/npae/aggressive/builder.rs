@@ -1,20 +1,17 @@
-use super::parser::ParsedPrompt;
 use super::config::UnifiedConfig;
+use super::parser::ParsedPrompt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CandidateRule {
     pub trigger_words: Vec<String>,
     pub inferred_domain: String,
-    pub inferred_intent: String,   // "inclusion" | "forbidden"
-    pub confidence: f32,           // initially 0.0, set by builder's heuristics or left for verifier
+    pub inferred_intent: String, // "inclusion" | "forbidden"
+    pub confidence: f32,         // initially 0.0, set by builder's heuristics or left for verifier
 }
 
-pub fn build_candidate_rules(
-    parsed: &ParsedPrompt,
-    config: &UnifiedConfig,
-) -> Vec<CandidateRule> {
+pub fn build_candidate_rules(parsed: &ParsedPrompt, config: &UnifiedConfig) -> Vec<CandidateRule> {
     let mut candidates = Vec::new();
 
     // Single token candidates
@@ -47,7 +44,11 @@ pub fn build_candidate_rules(
 fn infer_domain(word: &str, config: &UnifiedConfig) -> Option<String> {
     // Check if the word appears in any taxonomy keywords
     for tax in &config.domain_taxonomy {
-        if tax.keywords.iter().any(|kw| kw.to_lowercase() == word.to_lowercase()) {
+        if tax
+            .keywords
+            .iter()
+            .any(|kw| kw.to_lowercase() == word.to_lowercase())
+        {
             return Some(tax.domain.clone());
         }
     }
@@ -61,9 +62,8 @@ fn infer_domain_pair(a: &str, b: &str, config: &UnifiedConfig) -> Option<String>
 
 fn infer_intent(word: &str) -> String {
     match word {
-        "no" | "avoid" | "without" | "exclude" | "free"
-            => "forbidden".to_string(),
-        _   => "inclusion".to_string(),
+        "no" | "avoid" | "without" | "exclude" | "free" => "forbidden".to_string(),
+        _ => "inclusion".to_string(),
     }
 }
 

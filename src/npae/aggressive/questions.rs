@@ -16,7 +16,8 @@ pub fn generate_with_domain(
     max_q: u8,
     domain: &str,
 ) -> Result<Vec<ClarifyingQuestion>, String> {
-    let mut candidates: Vec<ClarifyingQuestion> = amb.gap_zones
+    let mut candidates: Vec<ClarifyingQuestion> = amb
+        .gap_zones
         .iter()
         .enumerate()
         .map(|(i, gap)| score_gap(gap, repr, i as u8 + 1, domain))
@@ -92,16 +93,26 @@ fn score_gap(gap: &str, _repr: &CompressedRepr, id: u8, domain: &str) -> Clarify
         // --- Generic fallbacks (domain-agnostic) ---
         ("output_format_ambiguous", _) => 
             ("What format would be most useful: structured plan, detailed analysis, or actionable checklist?".into(), 0.70),
-        ("domain_context_missing", _) => 
-            ("What is the primary domain or industry context for this request?".into(), 0.65),
-        ("intent_unclear", _) => 
-            ("What is the primary goal: build something new, analyze existing, or fix a problem?".into(), 0.60),
-        ("constraint_incomplete", _) => 
-            ("Are there specific constraints on budget, timeline, or resources?".into(), 0.55),
-        ("vague_language_detected", _) => 
-            ("Could you provide more specific details about the expected outcome?".into(), 0.50),
-        _ => 
-            (format!("Could you clarify the gap concerning {}?", gap), 0.40),
+        ("domain_context_missing", _) => (
+            "What is the primary domain or industry context for this request?".into(),
+            0.65,
+        ),
+        ("intent_unclear", _) => (
+            "What is the primary goal: build something new, analyze existing, or fix a problem?".into(),
+            0.60,
+        ),
+        ("constraint_incomplete", _) => (
+            "Are there specific constraints on budget, timeline, or resources?".into(),
+            0.55,
+        ),
+        ("vague_language_detected", _) => (
+            "Could you provide more specific details about the expected outcome?".into(),
+            0.50,
+        ),
+        _ => (
+            format!("Could you clarify the gap concerning {}?", gap),
+            0.40,
+        ),
     };
 
     let priority = if information_gain > 0.8 {

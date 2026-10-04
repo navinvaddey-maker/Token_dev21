@@ -75,10 +75,7 @@ pub const EMBEDDING_DIM: usize = 384;
 
 /// Serializes a Vec<f32> embedding to bytes for SQLite BLOB storage.
 pub fn embedding_to_bytes(embedding: &[f32]) -> Vec<u8> {
-    embedding
-        .iter()
-        .flat_map(|f| f.to_le_bytes())
-        .collect()
+    embedding.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
 
 /// Deserializes bytes from SQLite BLOB back to Vec<f32>.
