@@ -87,7 +87,7 @@ impl ScenarioModeRouter {
                     user_business_type,
                 );
 
-                // RAG Retrieval restricted to domain namespace
+                // RAG Retrieval restricted to domain namespace with pre-truncation filtering (D2)
                 let min_sim = domain_cfg.min_similarity.unwrap_or(0.40);
                 let query = RetrievalQuery {
                     query_text: question.to_string(),
@@ -97,24 +97,25 @@ impl ScenarioModeRouter {
                     min_similarity: min_sim,
                 };
 
-                let retrieved = retriever.retrieve(&query, None).await.unwrap_or_default();
+                let filter_fn = |res: &crate::rag::types::SearchResult| {
+                    ScenarioNamespaceGuard::is_chunk_permitted(
+                        res.document_domain.as_deref(),
+                        Some(&res.document_filename),
+                        &permitted_ns,
+                    ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
+                        question,
+                        &res.chunk.content,
+                    )
+                };
 
-                // Filter retrieved chunks via ScenarioNamespaceGuard AND generic topical relevance
+                // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
+                let retrieved = retriever
+                    .retrieve_filtered(&query, None, &filter_fn)
+                    .await
+                    .map_err(|e| format!("Retrieval Error: {}", e))?;
+
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| {
-                        ScenarioNamespaceGuard::is_chunk_permitted(
-                            res.document_domain.as_deref(),
-                            Some(&res.document_filename),
-                            &permitted_ns,
-                        )
-                    })
-                    .filter(|res| {
-                        ScenarioNamespaceGuard::is_chunk_content_relevant(
-                            question,
-                            &res.chunk.content,
-                        )
-                    })
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,
@@ -212,23 +213,25 @@ impl ScenarioModeRouter {
                     min_similarity: 0.20,
                 };
 
-                let retrieved = retriever.retrieve(&query, None).await.unwrap_or_default();
+                let filter_fn = |res: &crate::rag::types::SearchResult| {
+                    ScenarioNamespaceGuard::is_chunk_permitted(
+                        res.document_domain.as_deref(),
+                        Some(&res.document_filename),
+                        &permitted_ns,
+                    ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
+                        question,
+                        &res.chunk.content,
+                    )
+                };
+
+                // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
+                let retrieved = retriever
+                    .retrieve_filtered(&query, None, &filter_fn)
+                    .await
+                    .map_err(|e| format!("Retrieval Error: {}", e))?;
 
                 let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
                     .into_iter()
-                    .filter(|res| {
-                        ScenarioNamespaceGuard::is_chunk_permitted(
-                            res.document_domain.as_deref(),
-                            Some(&res.document_filename),
-                            &permitted_ns,
-                        )
-                    })
-                    .filter(|res| {
-                        ScenarioNamespaceGuard::is_chunk_content_relevant(
-                            question,
-                            &res.chunk.content,
-                        )
-                    })
                     .map(|res| crate::types::RagChunk {
                         domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
                         content: res.chunk.content,

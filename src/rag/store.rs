@@ -213,6 +213,37 @@ impl RagStore {
         top_k: usize,
         min_similarity: f32,
     ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        self.search_filtered(
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            &|_: &SearchResult| true,
+        )
+        .await
+    }
+
+    /// Dense top-K search where `filter` is applied to every candidate BEFORE ranking/truncation.
+    ///
+    /// Because this is a full scan, a candidate that passes `filter` and `min_similarity`
+    /// is never lost to higher-ranked candidates that `filter` rejects.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure (e.g. missing tables).
+    pub async fn search_filtered<F>(
+        &self,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
+        // Sync: `&F` is held across `.await`, so it must be Send for Axum's Send futures.
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
         // Load candidate chunks with their embeddings + document metadata
         let rows = if let Some(doc_ids) = document_ids {
             if doc_ids.is_empty() {
@@ -280,6 +311,9 @@ impl RagStore {
                     document_domain: row.domain,
                 })
             })
+            // FIX: D2 — caller filters (e.g. scenario namespace guard) must run before
+            // truncation; filtering after top_k let other domains crowd out valid chunks.
+            .filter(|r| filter(r))
             .collect();
 
         // Sort by similarity descending, take top_k
@@ -386,19 +420,94 @@ impl RagStore {
         top_k: usize,
         min_similarity: f32,
     ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        // Unfiltered: sparse fetch window stays top_k * 2, identical to pre-D2 behaviour.
+        self.hybrid_inner(
+            query_text,
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            top_k * 2,
+            &|_: &SearchResult| true,
+        )
+        .await
+    }
+
+    /// Hybrid (dense + BM25, RRF) search where `filter` is applied before ranking/truncation.
+    ///
+    /// The dense side is a full scan, so filtering there is exact. The sparse side has a SQL
+    /// `LIMIT`, so it over-fetches `top_k * SPARSE_FILTER_OVERFETCH` rows before filtering;
+    /// that side is best-effort for very skewed corpora.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on dense-search database failure.
+    #[allow(clippy::too_many_arguments)] // mirrors search_hybrid + filter; a params struct is P2 scope.
+    pub async fn search_hybrid_filtered<F>(
+        &self,
+        query_text: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
+        /// Sparse over-fetch multiplier when a filter is active. UNVERIFIED: not tuned;
+        /// chosen as a bounded cost (50 rows at top_k = 5) pending P4 golden-set evaluation.
+        const SPARSE_FILTER_OVERFETCH: usize = 10;
+        self.hybrid_inner(
+            query_text,
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            top_k * SPARSE_FILTER_OVERFETCH,
+            filter,
+        )
+        .await
+    }
+
+    /// Shared RRF implementation for filtered and unfiltered hybrid search.
+    #[allow(clippy::too_many_arguments)] // private helper; see search_hybrid_filtered.
+    async fn hybrid_inner<F>(
+        &self,
+        query_text: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        sparse_fetch_limit: usize,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
         let dense_results = self
-            .search(
+            .search_filtered(
                 query_embedding,
                 user_id,
                 document_ids,
                 top_k * 2,
                 min_similarity,
+                filter,
             )
             .await?;
-        let sparse_results = self
-            .search_fts(query_text, user_id, top_k * 2)
+        // UNVERIFIED/pre-existing: sparse errors are downgraded to "no sparse hits" here and in
+        // search_fts (FTS table may be absent on old DBs). Left unchanged in P0; dense errors propagate.
+        let sparse_results: Vec<SearchResult> = self
+            .search_fts(query_text, user_id, sparse_fetch_limit)
             .await
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|r| filter(r))
+            .take(top_k * 2)
+            .collect();
 
         if sparse_results.is_empty() {
             let mut res = dense_results;

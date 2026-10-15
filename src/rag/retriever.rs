@@ -29,21 +29,39 @@ impl DocumentRetriever {
         query: &RetrievalQuery,
         history_id: Option<&str>,
     ) -> Result<Vec<SearchResult>, String> {
+        self.retrieve_filtered(query, history_id, &|_: &SearchResult| true)
+            .await
+    }
+
+    /// Retrieve top-K relevant chunks matching query and passing a custom filter predicate.
+    ///
+    /// The predicate is applied before truncation and sorting, preventing out-of-namespace chunks
+    /// from crowding out valid documents.
+    pub async fn retrieve_filtered<F>(
+        &self,
+        query: &RetrievalQuery,
+        history_id: Option<&str>,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, String>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
         let start = Instant::now();
 
         // Generate query embedding
         let query_vector = self.embeddings.embed(&query.query_text);
 
-        // Perform hybrid cosine similarity + BM25 search in database
+        // Perform hybrid cosine similarity + BM25 search in database with pre-truncation filtering
         let results = self
             .store
-            .search_hybrid(
+            .search_hybrid_filtered(
                 &query.query_text,
                 &query_vector,
                 &query.user_id,
                 query.document_ids.as_deref(),
                 query.top_k,
                 query.min_similarity,
+                filter,
             )
             .await
             .map_err(|e| format!("Database error during hybrid search: {}", e))?;

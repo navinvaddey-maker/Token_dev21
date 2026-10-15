@@ -909,7 +909,8 @@ async fn scenario_ask(
     let mode_str = req.mode.as_deref().unwrap_or_else(|| &req.app_mode);
     let warnings_json = serde_json::to_string(&resp.warnings).unwrap_or_else(|_| "[]".to_string());
 
-    let _ = sqlx::query(
+    // FIX: D4 — do not silently swallow DB write failure with `let _ =`; log and return typed database error
+    sqlx::query(
         "INSERT INTO token_history (id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, warnings)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
     )
@@ -925,7 +926,11 @@ async fn scenario_ask(
     .bind("3.1.0")
     .bind(&warnings_json)
     .execute(&state.pool)
-    .await;
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to record scenario interaction in token_history: {}", e);
+        AppError::Database(e)
+    })?;
 
     Ok((StatusCode::OK, Json(resp)).into_response())
 }

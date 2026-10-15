@@ -198,9 +198,11 @@ async fn test_empty_knowledge_not_found_response() {
 
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_string());
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
         .connect(&db_url)
         .await
         .unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     let store = token_compress_engine::rag::store::RagStore::new(pool);
     let retriever = token_compress_engine::rag::retriever::DocumentRetriever::new(store);
 

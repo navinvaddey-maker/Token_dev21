@@ -131,10 +131,10 @@ impl ScenarioNamespaceGuard {
                 return true;
             }
 
-            if p_lower.starts_with(&domain) || domain.starts_with(&p_lower) {
-                if filename.is_empty() || filename.contains(&p_lower) || !p_lower.contains('_') {
-                    return true;
-                }
+            if (p_lower.starts_with(&domain) || domain.starts_with(&p_lower))
+                && (filename.is_empty() || filename.contains(&p_lower) || !p_lower.contains('_'))
+            {
+                return true;
             }
             false
         })
@@ -199,8 +199,14 @@ impl ScenarioNamespaceGuard {
 
         // Must match at least one significant query term or stem
         query_terms.iter().any(|&term| {
-            let stem = if term.len() > 5 {
-                &term[..term.len() - 1]
+            // FIX: D1 — the stem was `&term[..term.len() - 1]`, a BYTE slice that panics when
+            // the last char is multi-byte (Devanagari, Telugu, accented Latin). Dropping the last
+            // *char* via `char_indices` always lands on a char boundary. For ASCII terms the
+            // result is identical to the old behaviour.
+            let stem = if term.chars().count() > 5 {
+                term.char_indices()
+                    .last()
+                    .map_or(term, |(last_char_start, _)| &term[..last_char_start])
             } else {
                 term
             };
