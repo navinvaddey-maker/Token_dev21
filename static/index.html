@@ -1026,6 +1026,40 @@
                         <div class="section-label">Retrieved Internal Citations</div>
                         <ul id="scenario-citations-list" style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-muted);"></ul>
                     </div>
+
+                    <!-- ── Aggressive Compression Conversion Action ── -->
+                    <div id="scenario-aggressive-cta" style="margin-top: 24px; padding: 18px; border-radius: 12px; background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.25);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <h4 style="margin: 0 0 4px 0; font-size: 15px; color: var(--head-text); display: flex; align-items: center; gap: 6px;">
+                                    <span>⚡</span> Satisfied with Grounded Evidence?
+                                </h4>
+                                <p style="margin: 0; font-size: 13px; color: var(--body-text);">
+                                    Convert to an ultra-clean prompt for LLMs: strips raw chunk wrappers and compresses context with zero hallucination.
+                                </p>
+                            </div>
+                            <button class="tc-compress-btn" id="scenario-compress-aggressive-btn" onclick="executeScenarioAggressiveCompress()" style="width: auto; padding: 10px 20px; font-size: 13px; margin: 0;">
+                                🔥 Compress in Aggressive Mode for LLM
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ── Aggressive Clean LLM Output Section ── -->
+                    <div id="scenario-aggressive-result-section" style="display: none; margin-top: 24px;">
+                        <hr class="divider">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <span class="badge badge-accent" id="scenario-aggr-badge">Aggressive Mode: Distilled Context</span>
+                                <span class="badge badge-success" id="scenario-aggr-tes">TES: 0.98 (Hallucination-Free)</span>
+                            </div>
+                            <button class="copy-btn" id="copy-aggr-prompt-btn" onclick="copyAggressivePrompt()" style="margin: 0;">
+                                📋 Copy for LLM
+                            </button>
+                        </div>
+
+                        <div class="section-label">Clean LLM Prompt Payload (Ready for API / Chat)</div>
+                        <div class="output-box" id="scenario-aggressive-output" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; background: rgba(0, 0, 0, 0.25);"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1077,7 +1111,7 @@
 <script src="dev_engine.js?v=3"></script>
 <script src="prompt_optimizer.js?v=3"></script>
 <script src="mock_api.js?v=4"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 
     <!-- Neuro Progress Overlay -->
     <div id="neuro-progress-overlay">

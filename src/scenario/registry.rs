@@ -16,6 +16,14 @@ pub struct ScenarioDomainConfig {
     pub tool_allowlist: Vec<String>,
     pub output_contract: String,
     pub disclaimer_text: String,
+    /// `rag_documents.domain` values (as written by `rag::ingest::detect_domain` from the
+    /// `config/unified.json` taxonomy) that belong to this scenario domain's `rag_namespace`.
+    ///
+    /// FIX: D6 — ingestion never writes `legal_docs`/`financial_records`/`business_strategy`; it
+    /// writes `legal`/`finance`/`business`. Without this explicit mapping the namespace guard
+    /// dropped every normally ingested document. Defaults to empty (legacy behaviour).
+    #[serde(default)]
+    pub document_domain_aliases: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

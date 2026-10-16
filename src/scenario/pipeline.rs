@@ -306,6 +306,31 @@ impl ScenarioOutputValidator {
 
 pub struct ScenarioOutputComposer;
 impl ScenarioOutputComposer {
+    /// Composes a production-grade, structured prompt contract for an LLM based on
+    /// the verified scenario domain, retrieved internal knowledge chunks, completeness gaps,
+    /// deterministic tool registrations, and deterministic model tier selection.
+    ///
+    /// # Arguments
+    /// - `domain`: Scenario domain configuration containing schema, namespace, and tool rules.
+    /// - `rag_chunks`: Verified grounding evidence chunks retrieved from internal knowledge base.
+    /// - `parser_summary`: Intent and key token extraction summary.
+    /// - `gap_issues`: List of domain completeness violations and missing constraints.
+    /// - `tool_logs`: List of deterministic tool dispatches and signatures.
+    /// - `searched_namespace`: Namespace that was queried for document retrieval.
+    /// - `question`: Original user intake query.
+    /// - `geography`: Optional region filter (e.g. "india", "us") for jurisdictional grounding.
+    ///
+    /// # Errors
+    /// Never returns `Err`.
+    ///
+    /// # Panics
+    /// Never panics.
+    ///
+    /// # Invariants
+    /// - When `rag_chunks` is empty, returns canonical `"Not found in the internal knowledge base"`.
+    /// - When `rag_chunks` is non-empty, emits an 8-part structured prompt contract adhering to
+    ///   the deterministic schema specification without calling external LLMs.
+    #[allow(clippy::too_many_arguments)]
     pub fn compose_scenario_result(
         domain: &ScenarioDomainConfig,
         rag_chunks: &[RagChunk],
@@ -313,7 +338,10 @@ impl ScenarioOutputComposer {
         gap_issues: &[String],
         tool_logs: &[String],
         searched_namespace: String,
+        question: &str,
+        geography: Option<&str>,
     ) -> ScenarioResponse {
+        // ARCH: §1.4 — deterministic prompt composition across intent and industry verticals.
         let searched_ns = vec![searched_namespace];
 
         if rag_chunks.is_empty() {
@@ -349,41 +377,120 @@ impl ScenarioOutputComposer {
             })
             .collect();
 
-        let mut body = String::new();
-        body.push_str(&format!(
-            "## 1. Domain & Intent Context\nDomain: {}\n{}\n\n",
-            domain.label, parser_summary
-        ));
-
-        body.push_str("## 2. Retrieved Internal Knowledge\n");
-        for (i, c) in rag_chunks.iter().enumerate() {
-            body.push_str(&format!("### Key Evidence [{}]\n{}\n\n", i + 1, c.content));
-        }
-
-        body.push_str("## 3. Gap Check Assessment\n");
-        if gap_issues.is_empty() {
-            body.push_str("All domain schema completeness rules passed cleanly.\n\n");
+        // Deterministic Model Tier Arbiter (Rules §1.4 & §9)
+        // High-stakes domains (legal, financial risk) or unresolved scenario gaps require deep reasoning.
+        let (model_tier, tier_rationale) = if domain.key.eq_ignore_ascii_case("legal")
+            || !gap_issues.is_empty()
+        {
+            (
+                "Tier 3 (High-Capacity Frontier Reasoning: e.g. Claude 3.5 Sonnet / OpenAI o1/o3 / Gemini Pro)",
+                "Complex domain context with flagged gap constraints requiring rigorous cross-clause synthesis and zero assumption tolerance.",
+            )
+        } else if rag_chunks.len() > 3 {
+            (
+                "Tier 2 (Balanced Reasoning: e.g. GPT-4o-mini / Gemini Flash / Claude Haiku)",
+                "Multi-chunk evidence synthesis with clean schema completeness checks.",
+            )
         } else {
+            (
+                "Tier 1 (Fast & Cost-Efficient SLM: e.g. Gemini 3.8 Flash / Llama-3-8B)",
+                "High-confidence direct evidence retrieval with complete scenario parameters.",
+            )
+        };
+
+        let geo_suffix = geography
+            .map(|g| format!(" (Jurisdiction / Region: {})", g.to_uppercase()))
+            .unwrap_or_default();
+
+        let mut body = String::new();
+
+        // ── SYSTEM PROMPT BLOCK ───────────────────────────────────────────
+        body.push_str("=== SYSTEM PROMPT ===\n");
+
+        // 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE
+        body.push_str("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE\n");
+        body.push_str(&format!(
+            "You are an expert {} advisor specializing in {} analysis{}.\n",
+            domain.label, domain.key, geo_suffix
+        ));
+        body.push_str("Your directive is to evaluate the user's scenario with absolute precision, grounded strictly in the verified internal documents provided below.\n");
+        body.push_str(&format!("{}\n\n", parser_summary));
+
+        // 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS
+        body.push_str("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS\n");
+        body.push_str("- Grounding Constraint: Rely exclusively on the cited internal evidence. Do not extrapolate external unverified facts or assumptions.\n");
+        if gap_issues.is_empty() {
+            body.push_str(
+                "- Completeness: All domain completeness validation checks passed cleanly.\n\n",
+            );
+        } else {
+            body.push_str("- Identified Completeness Gaps (You must explicitly highlight these missing parameters to the user):\n");
             for issue in gap_issues {
-                body.push_str(&format!("- Warning: {}\n", issue));
+                body.push_str(&format!("  * [GAP WARNING]: {}\n", issue));
             }
             body.push('\n');
         }
 
-        body.push_str("## 4. Deterministic Tool Operations\n");
-        for tool in tool_logs {
-            body.push_str(&format!("- {}\n", tool));
+        // 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES
+        body.push_str("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES\n");
+        if tool_logs.is_empty() {
+            body.push_str(
+                "No external tools permitted. Standard internal knowledge lookup only.\n\n",
+            );
+        } else {
+            body.push_str(
+                "The following internal tools are registered and permitted for this scenario:\n",
+            );
+            for tool in tool_logs {
+                body.push_str(&format!("- {}\n", tool));
+            }
+            body.push('\n');
         }
-        body.push('\n');
 
-        body.push_str("## 5. Output Contract Synthesis\n");
+        // 6. TARGET RESPONSE SCHEMA CONTRACT
+        body.push_str("# 6. TARGET RESPONSE SCHEMA CONTRACT\n");
         body.push_str(&format!(
-            "Contract Format: {}\nInternal knowledge verification complete ({} relevant evidence excerpt(s) mapped).\n\n",
+            "Contract Format: {}\nInternal knowledge verification complete ({} relevant evidence excerpt(s) mapped).\n",
             domain.output_contract, rag_chunks.len()
         ));
+        body.push_str(&format!(
+            "Strictly structure the final response according to the '{}' specification.\n\n",
+            domain.output_contract
+        ));
 
-        body.push_str("## 6. Regulatory & Compliance Disclaimer\n");
+        // 7. RECOMMENDED EXECUTION MODEL
+        body.push_str("# 7. RECOMMENDED EXECUTION MODEL\n");
+        body.push_str(&format!("Model Tier: {}\n", model_tier));
+        body.push_str(&format!("Selection Rationale: {}\n\n", tier_rationale));
+
+        // 8. REGULATORY & COMPLIANCE DISCLAIMER
+        body.push_str("# 8. REGULATORY & COMPLIANCE DISCLAIMER\n");
         body.push_str(&domain.disclaimer_text);
+        body.push_str("\n\n");
+
+        // ── USER PROMPT BLOCK ─────────────────────────────────────────────
+        body.push_str("=== USER PROMPT ===\n");
+
+        // 2. USER SCENARIO OBJECTIVE
+        body.push_str("# 2. USER SCENARIO OBJECTIVE\n");
+        body.push_str(question.trim());
+        body.push_str("\n\n");
+
+        // 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)
+        body.push_str("# 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)\n");
+        for (i, c) in rag_chunks.iter().enumerate() {
+            let doc_ref = c
+                .metadata
+                .as_ref()
+                .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
+                .unwrap_or_else(|| format!("Document-{}", i + 1));
+            body.push_str(&format!(
+                "### Key Evidence [{}] (from {})\n{}\n\n",
+                i + 1,
+                doc_ref,
+                c.content
+            ));
+        }
 
         ScenarioResponse {
             mode: "Scenario".to_string(),

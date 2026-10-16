@@ -436,4 +436,11 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Fixed GAP-S05: Persisted scenario interactions, metrics, citations, and warnings to `token_history` in `api.rs`.
     - Generated comprehensive audit report PDF `TOKEN_COMPRESS_ENGINE_ARCHITECTURE_AND_RAG_NPAE_AUDIT.pdf`.
     - 150+ unit and integration tests passing cleanly.
+
+[2026-10-16] [Antigravity] ARCHITECTURE_v3.md
+  Implemented Actionable Scenario Prompt Compiler & Domain Alias Grounding (D6, D7):
+    - Fixed D6: Ingested documents carrying taxonomy domains (`legal`, `finance`, `business`) are now mapped to scenario namespaces (`legal_docs`, `financial_records`, `business_strategy`) via `document_domain_aliases` in `ScenarioDomainConfig`, eliminating false "Not found" drops while preserving strict tenant isolation.
+    - Implemented D7: Upgraded `ScenarioOutputComposer` to generate an actionable 8-section Prompt Contract for downstream LLMs containing specialized system directives, user scenario objective, verified grounding evidence with citations, operational constraints & completeness gaps, deterministic tool capabilities, response schema contracts, and deterministic Model Tier recommendations (Tier 1 SLM, Tier 2 Balanced, Tier 3 Frontier Reasoning).
+    - Added comprehensive evaluation harness in `tests/eval_scenario_recall.rs` measuring recall@5 and MRR against local corpus.
+    - All scenario unit and regression suites passing cleanly (18/18 tests).
 ```

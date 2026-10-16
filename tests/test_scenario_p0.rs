@@ -299,3 +299,180 @@ async fn d5_retrieved_evidence_clean_markdown_no_xml_tags() {
         "Output must NOT contain </evidence_chunk> XML tags"
     );
 }
+
+// ── D6 ────────────────────────────────────────────────────────────────────
+
+/// Runs a Scenario query for `domain_key` against one document stored under `doc_domain`.
+/// Returns the response so callers can assert on retrieval outcome.
+async fn scenario_with_doc_domain(
+    domain_key: &str,
+    business_type: &str,
+    doc_domain: &str,
+    filename: &str,
+    content: &str,
+    question: &str,
+) -> token_compress_engine::scenario::ScenarioResponse {
+    let pool = migrated_pool().await;
+    let engine = EmbeddingEngine::new();
+    insert_doc_with_chunk(&pool, &engine, "d6-doc", filename, doc_domain, content).await;
+    let retriever = DocumentRetriever::new(RagStore::new(pool));
+    router()
+        .route_and_execute(
+            "Scenario",
+            Some(domain_key),
+            None,
+            None,
+            question,
+            USER,
+            business_type,
+            None,
+            &retriever,
+            None,
+        )
+        .await
+        .expect("scenario request must succeed")
+}
+
+/// D6: ingestion (`rag::ingest::detect_domain`) stores taxonomy values such as `legal`, but the
+/// scenario namespace is `legal_docs`. The guard required the filename to contain `legal_docs`,
+/// so every normally ingested legal document was dropped → false "Not found".
+#[tokio::test]
+async fn d6_ingested_legal_domain_is_retrievable_in_legal_scenario() {
+    let question = "Tenant eviction notice period under the rental agreement termination clause";
+    let resp = scenario_with_doc_domain(
+        "legal",
+        "legal",
+        "legal", // exactly what ingest writes for a legal PDF
+        "master_agreement.pdf",
+        "Tenant eviction notice period under the rental agreement termination clause. \
+         Section 106 requires fifteen days notice.",
+        question,
+    )
+    .await;
+    assert!(
+        !resp.is_empty_knowledge,
+        "ingested `legal` doc was dropped by namespace guard: {}",
+        resp.output_text
+    );
+    assert!(resp
+        .citations
+        .iter()
+        .any(|c| c.contains("master_agreement.pdf")));
+}
+
+/// D6 (finance): `financial_records` does not even share a prefix with `finance`, so the guard's
+/// prefix rule can never match; an explicit alias is required.
+#[tokio::test]
+async fn d6_ingested_finance_domain_is_retrievable_in_finance_scenario() {
+    let question = "Quarterly ledger reconciliation audit trail for invoice receipts";
+    let resp = scenario_with_doc_domain(
+        "finance",
+        "finance",
+        "finance", // exactly what ingest writes for a finance PDF
+        "q3_ledger.pdf",
+        "Quarterly ledger reconciliation audit trail for invoice receipts is maintained by treasury.",
+        question,
+    )
+    .await;
+    assert!(
+        !resp.is_empty_knowledge,
+        "ingested `finance` doc was dropped by namespace guard: {}",
+        resp.output_text
+    );
+}
+
+/// D6 isolation guard: aliasing must not weaken domain isolation. A `legal`-domain document
+/// must never be served to a Finance scenario.
+#[tokio::test]
+async fn d6_alias_does_not_leak_legal_doc_into_finance_scenario() {
+    let question = "Tenant eviction notice period under the rental agreement termination clause";
+    let resp = scenario_with_doc_domain(
+        "finance",
+        "finance",
+        "legal",
+        "master_agreement.pdf",
+        "Tenant eviction notice period under the rental agreement termination clause.",
+        question,
+    )
+    .await;
+    assert!(
+        resp.is_empty_knowledge,
+        "legal doc leaked into finance scenario: {:?}",
+        resp.citations
+    );
+}
+
+// ── D7 ────────────────────────────────────────────────────────────────────
+
+/// D7: Scenario output must be an actionable, structured prompt contract for an LLM
+/// rather than an internal QA debug dump. Verifies all required directive sections,
+/// grounded evidence formatting, tool schemas, and model tier selection.
+#[tokio::test]
+async fn d7_scenario_prompt_contract_has_actionable_prompt_structure() {
+    let question =
+        "Tenant eviction notice period under the rental agreement termination clause in Telangana";
+    let resp = scenario_with_doc_domain(
+        "legal",
+        "legal",
+        "legal_docs",
+        "tenancy_act.pdf",
+        "Section 106 of the Transfer of Property Act requires fifteen days notice for tenancy termination.",
+        question,
+    )
+    .await;
+
+    assert!(!resp.is_empty_knowledge);
+    let out = &resp.output_text;
+
+    // Must contain demarcated API-ready blocks
+    assert!(
+        out.contains("=== SYSTEM PROMPT ==="),
+        "Missing system prompt block header"
+    );
+    assert!(
+        out.contains("=== USER PROMPT ==="),
+        "Missing user prompt block header"
+    );
+
+    // Must contain actionable prompt contract sections
+    assert!(
+        out.contains("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE"),
+        "Missing role directive section"
+    );
+    assert!(
+        out.contains("# 2. USER SCENARIO OBJECTIVE"),
+        "Missing user scenario objective section"
+    );
+    assert!(
+        out.contains("# 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)"),
+        "Missing grounded evidence section"
+    );
+    assert!(
+        out.contains("### Key Evidence [1]"),
+        "Must preserve Key Evidence [1] header (d5 invariant)"
+    );
+    assert!(
+        out.contains("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS"),
+        "Missing constraints & gap section"
+    );
+    assert!(
+        out.contains("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES"),
+        "Missing deterministic tools section"
+    );
+    assert!(
+        out.contains("# 6. TARGET RESPONSE SCHEMA CONTRACT"),
+        "Missing target schema section"
+    );
+    assert!(
+        out.contains("# 7. RECOMMENDED EXECUTION MODEL"),
+        "Missing recommended execution model section"
+    );
+    assert!(
+        out.contains("Model Tier:"),
+        "Missing model tier classification"
+    );
+    assert!(
+        out.contains("# 8. REGULATORY & COMPLIANCE DISCLAIMER"),
+        "Missing compliance disclaimer section"
+    );
+}

@@ -81,11 +81,16 @@ impl ScenarioModeRouter {
                     base_namespace = format!("{}_{}", base_namespace, geo.to_lowercase());
                 }
 
-                let permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
+                let mut permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
                     "scenario",
                     Some(&base_namespace),
                     user_business_type,
                 );
+                // FIX: D6 — accept documents whose ingested `domain` is one of this scenario
+                // domain's declared aliases (e.g. `legal` for `legal_docs`). Exact-match only, so
+                // other domains (e.g. a `legal` doc in a Finance scenario) stay isolated.
+                // ARCH: §1.4 — scenario domains isolate retrieval by namespace.
+                permitted_ns.extend(domain_cfg.document_domain_aliases.iter().cloned());
 
                 // RAG Retrieval restricted to domain namespace with pre-truncation filtering (D2)
                 let min_sim = domain_cfg.min_similarity.unwrap_or(0.40);
@@ -142,9 +147,11 @@ impl ScenarioModeRouter {
                     &gap_issues,
                     &tool_logs,
                     base_namespace.clone(),
+                    question,
+                    geography,
                 );
 
-                // GAP-S02 Fix: Wire compression pipeline if compression_mode is specified and orchestrator is available
+                // GAP-S02 / GAP-42 Fix: In Aggressive mode, synthesize grounded evidence and strip raw chunk wrappers
                 if let (Some(cm), Some(orch)) = (compression_mode, orchestrator) {
                     if !resp.is_empty_knowledge {
                         let mut session = crate::session::SessionHistory::new(5);
@@ -169,9 +176,67 @@ impl ScenarioModeRouter {
                                 }
                                 crate::types::OrchestratorResponse::Legacy(r) => r.response,
                             };
-                            resp.output_text
-                                .push_str("\n\n## 7. Compressed Execution Prompt\n");
-                            resp.output_text.push_str(&compressed_prompt);
+
+                            if cm.eq_ignore_ascii_case("aggressive") {
+                                // ARCH: §12.3 & §4 — Extract clean system prompt contract and combine with condensed aggressive user prompt
+                                if let Some(sys_start) =
+                                    resp.output_text.find("=== SYSTEM PROMPT ===")
+                                {
+                                    if let Some(user_start) =
+                                        resp.output_text.find("=== USER PROMPT ===")
+                                    {
+                                        let system_part =
+                                            resp.output_text[sys_start..user_start].trim_end();
+
+                                        // Extract derived facts cleanly
+                                        let derived_rag = crate::npae::aggressive::rag_context::DerivedRagContext::derive(
+                                            &filtered_chunks,
+                                            question,
+                                            250,
+                                        );
+
+                                        let mut fact_bullets = String::new();
+                                        if !derived_rag.facts.is_empty() {
+                                            for (idx, fact) in derived_rag.facts.iter().enumerate()
+                                            {
+                                                fact_bullets.push_str(&format!(
+                                                    "{}. {}\n",
+                                                    idx + 1,
+                                                    fact.trim()
+                                                ));
+                                            }
+                                        } else {
+                                            for (idx, c) in filtered_chunks.iter().enumerate() {
+                                                fact_bullets.push_str(&format!(
+                                                    "{}. {}\n",
+                                                    idx + 1,
+                                                    c.content.trim()
+                                                ));
+                                            }
+                                        }
+
+                                        let clean_aggressive = format!(
+                                            "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}\n\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
+                                            system_part,
+                                            question.trim(),
+                                            fact_bullets.trim()
+                                        );
+                                        resp.output_text = clean_aggressive;
+                                    } else {
+                                        resp.output_text
+                                            .push_str("\n\n=== COMPRESSED USER PROMPT ===\n");
+                                        resp.output_text.push_str(&compressed_prompt);
+                                    }
+                                } else {
+                                    resp.output_text
+                                        .push_str("\n\n=== COMPRESSED USER PROMPT ===\n");
+                                    resp.output_text.push_str(&compressed_prompt);
+                                }
+                            } else {
+                                resp.output_text
+                                    .push_str("\n\n## 7. Compressed Execution Prompt\n");
+                                resp.output_text.push_str(&compressed_prompt);
+                            }
                         }
                     }
                 }

@@ -289,3 +289,118 @@ fn test_scenario_pipeline_components_generic() {
     assert!(tools[0].contains("target_terms:"));
     assert!(tools[0].contains("context_bytes:"));
 }
+
+#[tokio::test]
+async fn test_scenario_aggressive_mode_strips_raw_evidence_and_preserves_contract() {
+    use sqlx::sqlite::SqlitePoolOptions;
+    use token_compress_engine::rag::embeddings::EmbeddingEngine;
+    use token_compress_engine::rag::retriever::DocumentRetriever;
+    use token_compress_engine::rag::store::RagStore;
+    use token_compress_engine::rag::types::embedding_to_bytes;
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+
+    sqlx::query("INSERT INTO users (id, username, password_hash, email) VALUES ('u1', 'u1', 'x', 'u1@test.local')")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let doc_content = "Under Section 43A of the Information Technology Act 2000, body corporate possessing sensitive personal data must maintain reasonable security practices. Failure to maintain security practices results in liability to pay compensation to affected persons.";
+    sqlx::query(
+        "INSERT INTO rag_documents (id, user_id, filename, domain, content_hash, status)
+         VALUES ('d1', 'u1', 'it_act.txt', 'legal', 'h1', 'ready')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let engine = EmbeddingEngine::new();
+    let blob = embedding_to_bytes(&engine.embed(doc_content));
+    sqlx::query(
+        "INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count)
+         VALUES ('d1-c0', 'd1', 0, $1, $2, '{\"page_number\":1}', 30)",
+    )
+    .bind(doc_content)
+    .bind(blob)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let store = RagStore::new(pool.clone());
+    let retriever = DocumentRetriever::new(store);
+
+    let router = ScenarioModeRouter::new(
+        Arc::new(ScenarioDomainRegistry::load_from_file("config/scenario/domains.json").unwrap()),
+        Arc::new(
+            ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
+                .unwrap(),
+        ),
+        Arc::new(ScenarioEgressGuard::load_from_file("config/scenario/egress.json").unwrap()),
+        "prompts/styles".to_string(),
+    );
+
+    // Set up orchestrator with priors
+    let priors = Arc::new(dashmap::DashMap::new());
+    let config_handle = Arc::new(
+        token_compress_engine::npae::aggressive::config::ConfigHandle::new(
+            token_compress_engine::npae::aggressive::config::UnifiedConfig {
+                domain_taxonomy: vec![],
+                roles: vec![],
+                constraints: vec![],
+            },
+        ),
+    );
+    let ory_engine = Arc::new(tokio::sync::Mutex::new(
+        token_compress_engine::npae::ory::OryEngine::new(),
+    ));
+    let orchestrator =
+        token_compress_engine::pipeline::orchestrator::PipelineOrchestrator::build_with_pool(
+            priors,
+            config_handle,
+            ory_engine,
+            Some(pool.clone()),
+        );
+
+    let resp = router
+        .route_and_execute(
+            "Scenario",
+            Some("legal"),
+            None,
+            Some("india"),
+            "What is Section 43A compensation liability for body corporate sensitive data?",
+            "u1",
+            "legal",
+            Some("aggressive"),
+            &retriever,
+            Some(&orchestrator),
+        )
+        .await
+        .unwrap();
+
+    println!("\n================ ACTUAL OUTPUT TEXT ================\n{}\n==================================================\n", resp.output_text);
+
+    // Invariants:
+    // 1. Must preserve the System Prompt Contract
+    assert!(resp.output_text.contains("=== SYSTEM PROMPT ==="));
+    assert!(resp
+        .output_text
+        .contains("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE"));
+    assert!(resp
+        .output_text
+        .contains("# 6. TARGET RESPONSE SCHEMA CONTRACT"));
+
+    // 2. Must contain User Prompt with Compressed Fact Matrix
+    assert!(resp.output_text.contains("=== USER PROMPT ==="));
+    assert!(resp.output_text.contains("# 2. USER SCENARIO OBJECTIVE"));
+    assert!(resp
+        .output_text
+        .contains("# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)"));
+
+    // 3. Raw chunk markup `### Key Evidence [` must be removed from User Prompt
+    assert!(!resp.output_text.contains("### Key Evidence ["));
+}

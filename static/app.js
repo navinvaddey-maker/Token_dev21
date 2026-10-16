@@ -510,7 +510,7 @@ async function executeScenarioAsk() {
             style: appMode === 'Regular' ? styleVal : null,
             geography: appMode === 'Scenario' && geoVal ? geoVal : null,
             question: question,
-            mode: modeOpt,
+            mode: null,
         });
 
         renderScenarioResult(resp);
@@ -549,6 +549,87 @@ function renderScenarioResult(resp) {
     if (resp.warnings && resp.warnings.length > 0) {
         resp.warnings.forEach(w => showToast(w, 'error'));
     }
+
+    // Reset aggressive result section when new query arrives
+    const aggrSec = document.getElementById('scenario-aggressive-result-section');
+    if (aggrSec) aggrSec.style.display = 'none';
+
+    const aggrCta = document.getElementById('scenario-aggressive-cta');
+    if (aggrCta) {
+        aggrCta.style.display = resp.is_empty_knowledge ? 'none' : 'block';
+    }
 }
 
+// ── Aggressive Scenario Prompt Compression Workflow ─────────────────────────
+let lastAggressivePromptText = '';
+
+async function executeScenarioAggressiveCompress() {
+    console.log('[Scenario] executeScenarioAggressiveCompress triggered');
+    const appModeEl = document.getElementById('scenario-mode-select');
+    const appMode   = appModeEl ? appModeEl.value : 'Scenario';
+    const domainVal = document.getElementById('scenario-domain-select')?.value;
+    const styleVal  = document.getElementById('scenario-style-select')?.value;
+    const geoVal    = document.getElementById('scenario-geography-select')?.value;
+    const question  = document.getElementById('scenario-query-input')?.value?.trim();
+
+    if (!question) {
+        showToast('Question text is required', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('scenario-compress-aggressive-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Compressing with Zero Hallucination...';
+    }
+
+    try {
+        const payload = {
+            app_mode: appMode,
+            domain: appMode === 'Scenario' ? domainVal : null,
+            style: appMode === 'Regular' ? styleVal : null,
+            geography: appMode === 'Scenario' && geoVal ? geoVal : null,
+            question: question,
+            mode: 'aggressive',
+        };
+        console.log('[Scenario] Sending aggressive compression request:', payload);
+        const resp = await API.scenarioAsk(payload);
+        console.log('[Scenario] Aggressive compression response received:', resp);
+
+        const aggrSec = document.getElementById('scenario-aggressive-result-section');
+        const aggrOutput = document.getElementById('scenario-aggressive-output');
+
+        if (aggrSec && aggrOutput) {
+            aggrSec.style.display = 'block';
+            aggrOutput.textContent = resp.output_text;
+            lastAggressivePromptText = resp.output_text;
+            aggrSec.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        showToast('Prompt compressed into clean LLM contract!', 'success');
+    } catch (err) {
+        console.error('[Scenario] Aggressive compression error:', err);
+        showToast('Compression failed: ' + (err.message || err), 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '🔥 Compress in Aggressive Mode for LLM';
+        }
+    }
+}
+
+function copyAggressivePrompt() {
+    if (!lastAggressivePromptText) {
+        return showToast('No compressed prompt to copy', 'error');
+    }
+    navigator.clipboard.writeText(lastAggressivePromptText).then(() => {
+        showToast('Clean LLM Prompt copied to clipboard!', 'success');
+    }).catch(err => {
+        showToast('Failed to copy: ' + err.message, 'error');
+    });
+}
+
+// Explicit global attachment for inline onclick handlers
+window.executeScenarioAggressiveCompress = executeScenarioAggressiveCompress;
+window.copyAggressivePrompt = copyAggressivePrompt;
 
