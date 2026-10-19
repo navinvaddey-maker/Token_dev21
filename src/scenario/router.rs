@@ -195,31 +195,59 @@ impl ScenarioModeRouter {
                                             250,
                                         );
 
-                                        let mut fact_bullets = String::new();
+                                        let mut fact_chunks_xml = String::new();
+                                        fact_chunks_xml.push_str("<context>\n");
                                         if !derived_rag.facts.is_empty() {
                                             for (idx, fact) in derived_rag.facts.iter().enumerate()
                                             {
-                                                fact_bullets.push_str(&format!(
-                                                    "{}. {}\n",
+                                                let src = filtered_chunks
+                                                    .get(idx)
+                                                    .and_then(|c| c.metadata.as_ref())
+                                                    .map(|m| m.source_file.clone())
+                                                    .unwrap_or_else(|| domain_cfg.label.clone());
+                                                fact_chunks_xml.push_str(&format!(
+                                                    "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
+                                                    idx + 1,
+                                                    src,
                                                     idx + 1,
                                                     fact.trim()
                                                 ));
                                             }
                                         } else {
                                             for (idx, c) in filtered_chunks.iter().enumerate() {
-                                                fact_bullets.push_str(&format!(
-                                                    "{}. {}\n",
+                                                let src = c
+                                                    .metadata
+                                                    .as_ref()
+                                                    .map(|m| m.source_file.clone())
+                                                    .unwrap_or_else(|| domain_cfg.label.clone());
+                                                fact_chunks_xml.push_str(&format!(
+                                                    "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
+                                                    idx + 1,
+                                                    src,
                                                     idx + 1,
                                                     c.content.trim()
                                                 ));
                                             }
                                         }
+                                        fact_chunks_xml.push_str("</context>");
+
+                                        let mut gaps_xml = String::new();
+                                        gaps_xml.push_str("=== AUTOMATED PARAMETER ANALYSIS ===\n<metadata_gaps>\n");
+                                        if gap_issues.is_empty() {
+                                            gaps_xml.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
+                                        } else {
+                                            for issue in &gap_issues {
+                                                gaps_xml.push_str(&format!("  [GAP WARNING]: {}\n", issue));
+                                            }
+                                        }
+                                        gaps_xml.push_str("</metadata_gaps>\n");
 
                                         let clean_aggressive = format!(
-                                            "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}\n\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
+                                            "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}\n\n{}\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
                                             system_part,
                                             question.trim(),
-                                            fact_bullets.trim()
+                                            fact_chunks_xml.trim(),
+                                            gaps_xml.trim()
                                         );
                                         resp.output_text = clean_aggressive;
                                     } else {

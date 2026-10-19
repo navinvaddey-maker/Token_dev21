@@ -416,20 +416,40 @@ impl ScenarioOutputComposer {
         body.push_str("Your directive is to evaluate the user's scenario with absolute precision, grounded strictly in the verified internal documents provided below.\n");
         body.push_str(&format!("{}\n\n", parser_summary));
 
+        // Extract explicit VERIFY markers from retrieved chunks programmatically
+        let mut verify_markers = Vec::new();
+        for chunk in rag_chunks {
+            for line in chunk.content.lines() {
+                let trimmed = line.trim();
+                if let Some(pos) = trimmed.find("VERIFY ") {
+                    let item = trimmed[pos + 7..].trim();
+                    if !item.is_empty() && !verify_markers.contains(&item.to_string()) {
+                        verify_markers.push(item.to_string());
+                    }
+                }
+            }
+        }
+
         // 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS
         body.push_str("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS\n");
         body.push_str("- Grounding Constraint: Rely exclusively on the cited internal evidence. Do not extrapolate external unverified facts or assumptions.\n");
         if gap_issues.is_empty() {
             body.push_str(
-                "- Completeness: All domain completeness validation checks passed cleanly.\n\n",
+                "- Completeness: All domain completeness validation checks passed cleanly.\n",
             );
         } else {
             body.push_str("- Identified Completeness Gaps (You must explicitly highlight these missing parameters to the user):\n");
             for issue in gap_issues {
                 body.push_str(&format!("  * [GAP WARNING]: {}\n", issue));
             }
-            body.push('\n');
         }
+        if !verify_markers.is_empty() {
+            body.push_str("- Flagged Internal Verification Items (Defect 5 Protocol): The retrieved knowledge base contains explicit flags requiring external validation:\n");
+            for item in &verify_markers {
+                body.push_str(&format!("  * [VERIFY ITEM]: {}\n", item));
+            }
+        }
+        body.push('\n');
 
         // 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES
         body.push_str("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES\n");
@@ -454,9 +474,34 @@ impl ScenarioOutputComposer {
             domain.output_contract, rag_chunks.len()
         ));
         body.push_str(&format!(
-            "Strictly structure the final response according to the '{}' specification.\n\n",
+            "Strictly structure the final response according to the '{}' specification below. Do not change section titles or add introductory filler text:\n\n",
             domain.output_contract
         ));
+        body.push_str("### Section 1: Introduction and Scope\n");
+        body.push_str("- State the context of the evaluation and explicitly identify the domain/geography.\n");
+        body.push_str("- Rely solely on the provided materials to define the operational boundary.\n\n");
+        body.push_str("### Section 2: Flagged Data Gaps and Missing Parameters\n");
+        body.push_str("- Enumerate any missing user facts or critical parameters that restrict complete evaluation.\n");
+        body.push_str("- Explicitly map any inputs passed via the backend `metadata_gaps` configuration.\n\n");
+        body.push_str("### Section 3: Core Framework and Rules\n");
+        body.push_str("- Detail the foundational principles, operational rules, or regulations derived from the documentation that govern the scenario.\n");
+        body.push_str("- Specify exact requirements or penalties linked to failures or rule violations.\n\n");
+        body.push_str("### Section 4: Strict Statutory/Operational Timelines\n");
+        body.push_str("- Provide a clean Markdown table summarizing all operational phases, strict deadlines, and their specific starting triggers.\n\n");
+        body.push_str("### Section 5: Matrix, Evidence, and Presumptions\n");
+        body.push_str("- Outline the operational forum, execution environments, baseline definitions, or evidentiary shifts highlighted in the texts.\n");
+        body.push_str("- State explicitly how the burden of proof or operational weight is allocated.\n\n");
+        body.push_str("### Section 6: Actionable Compliance and Verifications\n");
+        body.push_str("- List mandatory steps for execution.\n");
+        body.push_str("- Executable Verification Mechanism (Defect 5 Protocol):\n");
+        body.push_str("  Merely repeating a 'VERIFY' marker does not resolve the issue. For each flagged item or 'VERIFY' marker in the retrieved texts, you MUST specify:\n");
+        body.push_str("  1. The exact question to verify\n");
+        body.push_str("  2. The authoritative primary source to consult (e.g., official gazette, RBI notification, SEC filings, statutory registry)\n");
+        body.push_str("  3. The current result or position derived from the corpus\n");
+        body.push_str("  4. The date checked / corpus baseline\n");
+        body.push_str("  5. Any remaining uncertainty and required human legal/financial action\n");
+        body.push_str("  Summarize these in an Executable Verification Table:\n");
+        body.push_str("  | Verification Item | Question to Verify | Authoritative Source to Consult | Result / Current Position | Date Checked | Remaining Uncertainty & Action |\n\n");
 
         // 7. RECOMMENDED EXECUTION MODEL
         body.push_str("# 7. RECOMMENDED EXECUTION MODEL\n");
@@ -478,6 +523,7 @@ impl ScenarioOutputComposer {
 
         // 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)
         body.push_str("# 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)\n");
+        body.push_str("<context>\n");
         for (i, c) in rag_chunks.iter().enumerate() {
             let doc_ref = c
                 .metadata
@@ -485,12 +531,28 @@ impl ScenarioOutputComposer {
                 .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
                 .unwrap_or_else(|| format!("Document-{}", i + 1));
             body.push_str(&format!(
-                "### Key Evidence [{}] (from {})\n{}\n\n",
+                "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n### Key Evidence [{}] (from {})\n{}\n    </content>\n  </chunk>\n",
                 i + 1,
                 doc_ref,
-                c.content
+                i + 1,
+                doc_ref,
+                c.content.trim()
             ));
         }
+        body.push_str("</context>\n\n");
+
+        // AUTOMATED PARAMETER ANALYSIS (METADATA GAPS)
+        body.push_str("=== AUTOMATED PARAMETER ANALYSIS ===\n");
+        body.push_str("<metadata_gaps>\n");
+        if gap_issues.is_empty() {
+            body.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
+        } else {
+            for issue in gap_issues {
+                body.push_str(&format!("  [GAP WARNING]: {}\n", issue));
+            }
+        }
+        body.push_str("</metadata_gaps>\n\n");
+        body.push_str("# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n");
 
         ScenarioResponse {
             mode: "Scenario".to_string(),

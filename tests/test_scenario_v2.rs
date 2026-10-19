@@ -403,4 +403,152 @@ async fn test_scenario_aggressive_mode_strips_raw_evidence_and_preserves_contrac
 
     // 3. Raw chunk markup `### Key Evidence [` must be removed from User Prompt
     assert!(!resp.output_text.contains("### Key Evidence ["));
+
+    // 4. Defect 5 Protocol: Executable Verification Mechanism must be explicitly specified in contract
+    assert!(resp.output_text.contains("Executable Verification Mechanism (Defect 5 Protocol)"));
+    assert!(resp.output_text.contains("Authoritative Source to Consult"));
+    assert!(resp.output_text.contains("Remaining Uncertainty & Action"));
 }
+
+#[tokio::test]
+async fn test_cheque_bounce_grounding_has_no_divorce_or_corpus_metadata() {
+    use sqlx::sqlite::SqlitePoolOptions;
+    use token_compress_engine::rag::embeddings::EmbeddingEngine;
+    use token_compress_engine::rag::retriever::DocumentRetriever;
+    use token_compress_engine::rag::store::RagStore;
+    use token_compress_engine::rag::types::embedding_to_bytes;
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect("sqlite::memory:")
+        .await
+        .unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+
+    sqlx::query("INSERT INTO users (id, username, password_hash, email) VALUES ('u1', 'u1', 'x', 'u1@test.local')")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    sqlx::query(
+        "INSERT INTO rag_documents (id, user_id, filename, domain, content_hash, status)
+         VALUES ('d_chq', 'u1', 'legal_docs_india.pdf', 'legal', 'h_chq', 'ready')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let engine = EmbeddingEngine::new();
+
+    // Chunk 0: Corpus Index & Scaffolding
+    let c0 = "legal_docs_india | v0.1 | Reference corpus for retrieval. Page 1 legal_docs_india Legal Sections Reference Corpus for RAG - India Version v0.1 (draft corpus) Compiled 4 October 2026 Scenarios Cheque bounce, property and land, civil, criminal, divorce and family, cross-cutting tables Chunks 79 section chunks plus 3 reference tables Purpose Source corpus for the scenario engine.";
+    let blob0 = embedding_to_bytes(&engine.embed(c0));
+    sqlx::query(
+        "INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count)
+         VALUES ('d_chq-c0', 'd_chq', 0, $1, $2, '{\"page_number\":1}', 50)",
+    )
+    .bind(c0)
+    .bind(blob0)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Chunk 1: Substantive Cheque bounce details
+    let c1 = "Offence arises when a cheque issued for a legally enforceable debt is returned unpaid for insufficient funds. Within 30 days of receiving bank dishonour information, payee must send written demand notice. Drawer has 15 days from receipt of demand notice to pay the amount. If drawer fails to pay, complaint must be filed within 1 month before the Judicial Magistrate.";
+    let blob1 = embedding_to_bytes(&engine.embed(c1));
+    sqlx::query(
+        "INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count)
+         VALUES ('d_chq-c1', 'd_chq', 1, $1, $2, '{\"page_number\":3}', 65)",
+    )
+    .bind(c1)
+    .bind(blob1)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Chunk 2: Cross-cutting reference table with Divorce
+    let c2 = "Part F - Cross-cutting reference XCT-01 - Master time-limit table. Cheque bounce demand notice period 30 days from dishonour memo. Divorce second motion mutual consent takes 6 to 18 months from first motion. Divorce no petition allowed within 1 year of marriage.";
+    let blob2 = embedding_to_bytes(&engine.embed(c2));
+    sqlx::query(
+        "INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count)
+         VALUES ('d_chq-c2', 'd_chq', 2, $1, $2, '{\"page_number\":21}', 55)",
+    )
+    .bind(c2)
+    .bind(blob2)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let store = RagStore::new(pool.clone());
+    let retriever = DocumentRetriever::new(store);
+
+    let domain_reg =
+        Arc::new(ScenarioDomainRegistry::load_from_file("config/scenario/domains.json").unwrap());
+    let style_reg = Arc::new(
+        ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
+            .unwrap(),
+    );
+    let egress_guard =
+        Arc::new(ScenarioEgressGuard::load_from_file("config/scenario/egress.json").unwrap());
+
+    let router = ScenarioModeRouter::new(
+        domain_reg,
+        style_reg,
+        egress_guard,
+        "prompts/styles".to_string(),
+    );
+
+    let priors = Arc::new(dashmap::DashMap::new());
+    let config_handle = Arc::new(
+        token_compress_engine::npae::aggressive::config::ConfigHandle::new(
+            token_compress_engine::npae::aggressive::config::UnifiedConfig {
+                domain_taxonomy: vec![],
+                roles: vec![],
+                constraints: vec![],
+            },
+        ),
+    );
+    let ory_engine = Arc::new(tokio::sync::Mutex::new(
+        token_compress_engine::npae::ory::OryEngine::new(),
+    ));
+    let orchestrator =
+        token_compress_engine::pipeline::orchestrator::PipelineOrchestrator::build_with_pool(
+            priors,
+            config_handle,
+            ory_engine,
+            Some(pool.clone()),
+        );
+
+    let resp = router
+        .route_and_execute(
+            "Scenario",
+            Some("legal"),
+            None,
+            Some("india"),
+            "I need cheque bounce case details",
+            "u1",
+            "legal",
+            Some("aggressive"),
+            &retriever,
+            Some(&orchestrator),
+        )
+        .await
+        .unwrap();
+
+    println!("\n=== CHEQUE BOUNCE TEST OUTPUT ===\n{}\n=================================\n", resp.output_text);
+
+    // Assert fact matrix is present
+    assert!(resp.output_text.contains("# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)"));
+
+    // Assert NO divorce leakage into cheque bounce query
+    assert!(!resp.output_text.to_lowercase().contains("divorce"), "Grounding must not leak divorce into cheque bounce");
+
+    // Assert NO draft corpus metadata leakage
+    assert!(!resp.output_text.to_lowercase().contains("draft corpus"), "Grounding must not leak corpus metadata");
+    assert!(!resp.output_text.to_lowercase().contains("79 section chunks"), "Grounding must not leak index chunks");
+
+    // Assert substantive cheque bounce facts ARE present
+    assert!(resp.output_text.to_lowercase().contains("cheque"));
+    assert!(resp.output_text.to_lowercase().contains("dishonour") || resp.output_text.to_lowercase().contains("notice"));
+}
+

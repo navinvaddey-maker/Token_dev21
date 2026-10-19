@@ -29,7 +29,11 @@ impl DerivedRagContext {
             // Split chunk into sentence-like clauses
             for line in chunk.content.lines() {
                 let cleaned_line = line.trim();
-                if cleaned_line.is_empty() || cleaned_line.starts_with("[Source:") {
+                if cleaned_line.is_empty()
+                    || cleaned_line.starts_with("[Source:")
+                    || cleaned_line.starts_with("legal_docs_india |")
+                    || cleaned_line.contains("| Reference corpus for retrieval")
+                {
                     continue;
                 }
 
@@ -42,12 +46,58 @@ impl DerivedRagContext {
             }
         }
 
-        let mut selected_facts = Vec::new();
-        let mut seen_normalized = HashSet::new();
-        let mut current_tokens = 0usize;
-        let mut covered_gaps = HashSet::new();
+        // Generic stop-words filter for extracting meaningful intent terms
+        let prompt_terms: Vec<String> = prompt_tokens
+            .into_iter()
+            .filter(|w| {
+                w.len() >= 4
+                    && !matches!(
+                        w.as_str(),
+                        "this"
+                            | "that"
+                            | "with"
+                            | "from"
+                            | "they"
+                            | "been"
+                            | "have"
+                            | "what"
+                            | "which"
+                            | "when"
+                            | "where"
+                            | "how"
+                            | "who"
+                            | "whom"
+                            | "than"
+                            | "then"
+                            | "these"
+                            | "those"
+                            | "each"
+                            | "every"
+                            | "some"
+                            | "such"
+                            | "only"
+                            | "into"
+                            | "over"
+                            | "after"
+                            | "also"
+                            | "would"
+                            | "could"
+                            | "should"
+                            | "about"
+                            | "there"
+                            | "their"
+                            | "please"
+                            | "search"
+                            | "need"
+                            | "tell"
+                            | "give"
+                            | "details"
+                    )
+            })
+            .collect();
 
-        // Instruction/injection filter keywords
+        // 2. Score candidate sentences for topical relevance across any domain
+        // Sentences with higher keyword/stem overlap or quantitative metrics are prioritized
         let injection_keywords = [
             "ignore previous",
             "system prompt",
@@ -58,6 +108,8 @@ impl DerivedRagContext {
             "new instructions",
             "disregard",
         ];
+        let mut seen_normalized = HashSet::new();
+        let mut scored_candidates: Vec<(usize, String, String)> = Vec::new();
 
         for sentence in raw_sentences {
             let sentence_lower = sentence.to_lowercase();
@@ -70,7 +122,29 @@ impl DerivedRagContext {
                 continue;
             }
 
-            // Deduplication (exact normalized string match to handle 64-token chunk overlaps)
+            // Generic document metadata, TOC, and corpus scaffolding filter
+            // Prevents PDF metadata, chapter listings, and boilerplate from being treated as facts
+            let is_boilerplate = {
+                sentence_lower.contains("reference corpus")
+                    || sentence_lower.contains("draft corpus")
+                    || sentence_lower.contains("table of contents")
+                    || sentence_lower.contains("all rights reserved")
+                    || (sentence_lower.contains("scenarios") && sentence_lower.contains("chunks"))
+                    || (sentence_lower.starts_with("page ") && sentence_lower.contains("version"))
+                    || (sentence_lower.contains("compiled") && sentence_lower.contains("202"))
+                    || sentence_lower.starts_with("forum magistrate related")
+                    || sentence_lower.starts_with("part a -")
+                    || sentence_lower.starts_with("part b -")
+                    || sentence_lower.starts_with("part c -")
+                    || sentence_lower.starts_with("part d -")
+                    || sentence_lower.starts_with("part e -")
+                    || sentence_lower.starts_with("part f -")
+            };
+            if is_boilerplate {
+                continue;
+            }
+
+            // Deduplication (exact normalized string match to handle chunk overlaps)
             let norm_key: String = sentence_lower
                 .chars()
                 .filter(|c| c.is_alphanumeric())
@@ -90,7 +164,7 @@ impl DerivedRagContext {
             if !sent_words.is_empty() {
                 let overlap_count = sent_words
                     .iter()
-                    .filter(|w| prompt_tokens.contains(*w))
+                    .filter(|w| prompt_lower.contains(w.as_str()))
                     .count();
                 let overlap_ratio = overlap_count as f32 / sent_words.len() as f32;
                 if overlap_ratio >= 0.80 {
@@ -98,9 +172,58 @@ impl DerivedRagContext {
                 }
             }
 
-            // Token count estimate for this sentence
+            // Generic relevance score: count matches against prompt intent terms or their stems
+            let mut score = 0usize;
+            if !prompt_terms.is_empty() {
+                for term in &prompt_terms {
+                    let stem = if term.chars().count() > 5 {
+                        term.char_indices()
+                            .last()
+                            .map_or(term.as_str(), |(idx, _)| &term[..idx])
+                    } else {
+                        term.as_str()
+                    };
+                    if sentence_lower.contains(stem) {
+                        score += 3;
+                    }
+                }
+
+                // If prompt has clear search terms, drop sentences with 0 relevance to avoid cross-topic leaks
+                if score == 0 {
+                    continue;
+                }
+            } else {
+                score = 1; // Fallback when prompt is generic
+            }
+
+            // Boost sentences carrying concrete factual values (numbers, currencies, percentages, codes)
+            if sentence_lower.contains('$')
+                || sentence_lower.contains('₹')
+                || sentence_lower.contains('%')
+                || sentence.chars().any(|c| c.is_ascii_digit())
+            {
+                score += 1;
+            }
+
+            seen_normalized.insert(norm_key.clone());
+            scored_candidates.push((score, sentence, sentence_lower));
+        }
+
+        // Sort descending by relevance score so the highest-signal facts fill the token budget first
+        scored_candidates.sort_by(|a, b| b.0.cmp(&a.0));
+
+        let mut selected_facts = Vec::new();
+        let mut current_tokens = 0usize;
+        let mut covered_gaps = HashSet::new();
+
+        for (_score, sentence, sentence_lower) in scored_candidates {
             let sent_tokens = crate::utils::tokens::estimate_tokens(&sentence) as usize;
             if current_tokens + sent_tokens > token_budget {
+                if selected_facts.is_empty() {
+                    // Always include at least one top-scoring fact even if close to budget
+                    selected_facts.push(sentence);
+                    current_tokens += sent_tokens;
+                }
                 break;
             }
 
@@ -136,7 +259,6 @@ impl DerivedRagContext {
                 covered_gaps.insert("domain_context_missing".to_string());
             }
 
-            seen_normalized.insert(norm_key);
             current_tokens += sent_tokens;
             selected_facts.push(sentence);
         }

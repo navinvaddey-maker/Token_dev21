@@ -13,12 +13,17 @@
 //! Run: `cargo test --test eval_scenario_recall -- --ignored --nocapture`
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use token_compress_engine::rag::retriever::DocumentRetriever;
 use token_compress_engine::rag::store::RagStore;
 use token_compress_engine::rag::types::{RetrievalQuery, SearchResult};
-use token_compress_engine::scenario::ScenarioNamespaceGuard;
+use token_compress_engine::scenario::{
+    ScenarioDomainRegistry, ScenarioEgressGuard, ScenarioModeRouter, ScenarioNamespaceGuard,
+    ScenarioStyleRegistry,
+};
+use token_compress_engine::utils::tokens::estimate_tokens;
 
 const SRC_DB: &str = "token_compress.db";
 const COPY_DB: &str = "target/eval_scenario_copy.db";
@@ -302,3 +307,209 @@ fn relevant(query: &str, chunk: &str, mode: Mode) -> bool {
         }
     }
 }
+
+/// Evaluates prompt compression ratio, schema contract preservation, and reasoning grounding
+/// across domains in Scenario Mode.
+///
+/// Rules §2 ("Do not fabricate benchmarks") & §9 ("Evaluation before claims").
+///
+/// Run: `cargo test --test eval_scenario_recall -- eval_scenario_compression_benchmark --ignored --nocapture`
+#[tokio::test]
+#[ignore = "needs local token_compress.db; run explicitly for scenario compression evaluation"]
+async fn eval_scenario_compression_benchmark() {
+    let Some(pool) = open_copy().await else {
+        return;
+    };
+    let retriever = DocumentRetriever::new(RagStore::new(pool.clone()));
+
+    // Load domain, style, and egress registries
+    let domain_reg =
+        Arc::new(ScenarioDomainRegistry::load_from_file("config/scenario/domains.json").expect("load domains.json"));
+    let style_reg = Arc::new(
+        ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
+            .expect("load styles.json"),
+    );
+    let egress_guard =
+        Arc::new(ScenarioEgressGuard::load_from_file("config/scenario/egress.json").expect("load egress.json"));
+
+    let router = ScenarioModeRouter::new(
+        domain_reg,
+        style_reg,
+        egress_guard,
+        "prompts/styles".to_string(),
+    );
+
+    // Build orchestrator with local database pool
+    let priors = Arc::new(dashmap::DashMap::new());
+    let config_handle = Arc::new(
+        token_compress_engine::npae::aggressive::config::ConfigHandle::new(
+            token_compress_engine::npae::aggressive::config::UnifiedConfig {
+                domain_taxonomy: vec![],
+                roles: vec![],
+                constraints: vec![],
+            },
+        ),
+    );
+    let ory_engine = Arc::new(tokio::sync::Mutex::new(
+        token_compress_engine::npae::ory::OryEngine::new(),
+    ));
+    let orchestrator =
+        token_compress_engine::pipeline::orchestrator::PipelineOrchestrator::build_with_pool(
+            priors,
+            config_handle,
+            ory_engine,
+            Some(pool.clone()),
+        );
+
+    // Test across distinct scenarios in legal domain with local corpus
+    let benchmark_queries = [
+        (
+            "What is Section 43A compensation liability for body corporate sensitive data?",
+            "legal",
+            Some("india"),
+        ),
+        (
+            "Does insufficient funds count as dishonour of a cheque under section 138?",
+            "legal",
+            Some("india"),
+        ),
+        (
+            "Can a cheque bounce case be settled between the parties at any stage?",
+            "legal",
+            Some("india"),
+        ),
+        (
+            "Does a lease of more than one year need to be registered under Transfer of Property Act?",
+            "legal",
+            Some("india"),
+        ),
+        (
+            "My client's cheque for Rs 5 lakh was returned by the bank because the account was closed, and the payee wants to know if section 138 applies and what notice must be sent.",
+            "legal",
+            Some("india"),
+        ),
+    ];
+
+    println!("\n=== Scenario Mode Prompt Compression & Contract Integrity Benchmark ===");
+    println!(
+        "{:<45} | {:>10} | {:>12} | {:>11} | {:>13} | {:>12}",
+        "Query (truncated)", "Raw Tokens", "Comp. Tokens", "Compression", "Contract Int.", "Fact Matrix"
+    );
+    println!("{:-<116}", "");
+
+    let mut total_raw_tokens: u64 = 0;
+    let mut total_comp_tokens: u64 = 0;
+    let mut all_contracts_valid = true;
+    let mut all_matrices_present = true;
+
+    for (query, domain, geo) in &benchmark_queries {
+        // 1. Raw prompt execution (compression_mode = None)
+        let raw_resp = router
+            .route_and_execute(
+                "Scenario",
+                Some(domain),
+                None,
+                *geo,
+                query,
+                OWNER,
+                domain,
+                None,
+                &retriever,
+                None,
+            )
+            .await
+            .expect("raw scenario execution must succeed");
+
+        // 2. Aggressive compressed prompt execution
+        let comp_resp = router
+            .route_and_execute(
+                "Scenario",
+                Some(domain),
+                None,
+                *geo,
+                query,
+                OWNER,
+                domain,
+                Some("aggressive"),
+                &retriever,
+                Some(&orchestrator),
+            )
+            .await
+            .expect("compressed scenario execution must succeed");
+
+        let raw_tokens = estimate_tokens(&raw_resp.output_text);
+        let comp_tokens = estimate_tokens(&comp_resp.output_text);
+
+        total_raw_tokens += raw_tokens as u64;
+        total_comp_tokens += comp_tokens as u64;
+
+        // Verify Contract Integrity: all 8 sections must exist in both
+        let contract_valid = comp_resp.output_text.contains("=== SYSTEM PROMPT ===")
+            && comp_resp.output_text.contains("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE")
+            && comp_resp.output_text.contains("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS")
+            && comp_resp.output_text.contains("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES")
+            && comp_resp.output_text.contains("# 6. TARGET RESPONSE SCHEMA CONTRACT")
+            && comp_resp.output_text.contains("# 7. RECOMMENDED EXECUTION MODEL")
+            && comp_resp.output_text.contains("# 8. REGULATORY & COMPLIANCE DISCLAIMER")
+            && comp_resp.output_text.contains("=== USER PROMPT ===")
+            && comp_resp.output_text.contains("# 2. USER SCENARIO OBJECTIVE");
+
+        if !contract_valid {
+            all_contracts_valid = false;
+        }
+
+        // Verify Aggressive Compressed Fact Matrix clean synthesis (no raw scaffold markers)
+        let fact_matrix_clean = comp_resp
+            .output_text
+            .contains("# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)")
+            && !comp_resp.output_text.contains("### Key Evidence [");
+
+        if !fact_matrix_clean {
+            all_matrices_present = false;
+        }
+
+        let ratio_pct = if raw_tokens > 0 {
+            100.0 * (1.0 - (comp_tokens as f64 / raw_tokens as f64))
+        } else {
+            0.0
+        };
+
+        let display_q: String = if query.chars().count() > 45 {
+            query.chars().take(42).collect::<String>() + "..."
+        } else {
+            query.to_string()
+        };
+
+        println!(
+            "{:<45} | {:>10} | {:>12} | {:>10.1}% | {:>13} | {:>12}",
+            display_q,
+            raw_tokens,
+            comp_tokens,
+            ratio_pct,
+            if contract_valid { "PRESERVED" } else { "BROKEN" },
+            if fact_matrix_clean { "CLEAN" } else { "DIRTY" }
+        );
+    }
+
+    let net_savings_pct = if total_raw_tokens > 0 {
+        100.0 * (1.0 - (total_comp_tokens as f64 / total_raw_tokens as f64))
+    } else {
+        0.0
+    };
+
+    println!("{:-<116}", "");
+    println!(
+        "{:<45} | {:>10} | {:>12} | {:>10.1}% | {:>13} | {:>12}",
+        "TOTAL AGGREGATE",
+        total_raw_tokens,
+        total_comp_tokens,
+        net_savings_pct,
+        if all_contracts_valid { "100% PASS" } else { "FAIL" },
+        if all_matrices_present { "100% PASS" } else { "FAIL" }
+    );
+
+    assert!(all_contracts_valid, "All prompt contracts must be preserved");
+    assert!(all_matrices_present, "Fact matrices must be synthesized cleanly");
+    assert!(total_comp_tokens <= total_raw_tokens, "Compressed tokens should not exceed raw tokens");
+}
+
