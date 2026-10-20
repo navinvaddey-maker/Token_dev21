@@ -26,6 +26,7 @@ impl DerivedRagContext {
 
         // 1. Extract sentences across all chunks
         for chunk in chunks {
+            let domain_tag_lower = chunk.domain_tag.to_lowercase();
             // Split chunk into sentence-like clauses
             for line in chunk.content.lines() {
                 let cleaned_line = line.trim();
@@ -40,7 +41,7 @@ impl DerivedRagContext {
                 for sentence in cleaned_line.split(&['.', '!', '?'][..]) {
                     let s = sentence.trim();
                     if s.len() >= 10 && s.split_whitespace().count() >= 3 {
-                        raw_sentences.push(s.to_string());
+                        raw_sentences.push((s.to_string(), domain_tag_lower.clone()));
                     }
                 }
             }
@@ -111,7 +112,7 @@ impl DerivedRagContext {
         let mut seen_normalized = HashSet::new();
         let mut scored_candidates: Vec<(usize, String, String)> = Vec::new();
 
-        for sentence in raw_sentences {
+        for (sentence, chunk_domain) in raw_sentences {
             let sentence_lower = sentence.to_lowercase();
 
             // Injection safety check
@@ -186,6 +187,11 @@ impl DerivedRagContext {
                     if sentence_lower.contains(stem) {
                         score += 3;
                     }
+                }
+
+                // If chunk belongs to a domain explicitly mentioned in the user prompt, boost domain facts
+                if !chunk_domain.is_empty() && prompt_lower.contains(&chunk_domain) {
+                    score += 2;
                 }
 
                 // If prompt has clear search terms, drop sentences with 0 relevance to avoid cross-topic leaks

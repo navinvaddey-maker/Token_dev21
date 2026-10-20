@@ -20,6 +20,7 @@ pub trait SchemaExtractor {
     }
 }
 
+#[derive(Debug)]
 pub struct RuleBasedExtractor;
 
 impl SchemaExtractor for RuleBasedExtractor {
@@ -45,7 +46,7 @@ fn tokenize(prompt: &str) -> Vec<String> {
         "no", "yes", "so", "as", "than", "more", "most", "some", "any", "all", "each", "every",
     ]
     .iter()
-    .cloned()
+    .copied()
     .collect();
 
     prompt

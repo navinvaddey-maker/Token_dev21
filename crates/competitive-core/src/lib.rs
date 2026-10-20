@@ -11,6 +11,7 @@ pub struct ClusterAssignment {
     pub is_new_cluster: bool,
 }
 
+#[derive(Debug)]
 pub struct CompetitiveNet {
     pub centroids: Vec<Centroid>,
     pub learning_rate: f32,
@@ -63,7 +64,8 @@ impl CompetitiveNet {
             return vec![];
         };
         let mut pairs: Vec<_> = c.vector.iter().map(|(k, v)| (k.clone(), *v)).collect();
-        pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        // ARCH: Competitive clustering — robust ordering without unwrap panic
+        pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         pairs.truncate(top_n);
         pairs
     }
@@ -74,7 +76,7 @@ impl CompetitiveNet {
             .iter()
             .map(|c| {
                 let mut top: Vec<_> = c.vector.iter().map(|(k, v)| (k.clone(), *v)).collect();
-                top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+                top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
                 top.truncate(30);
                 CentroidSnapshot {
                     id: c.id,
@@ -91,7 +93,7 @@ impl CompetitiveNet {
             .iter()
             .enumerate()
             .map(|(i, c)| (i, c.similarity(tokens)))
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, 0.0))
     }
 

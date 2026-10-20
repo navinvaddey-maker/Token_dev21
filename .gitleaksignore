@@ -1,0 +1,5 @@
+# Gitleaks ignore file for known historical test fixtures
+db1bab3d84fe427ab10651db729c809ec5f5ac20:test_admin.html:jwt:27
+db1bab3d84fe427ab10651db729c809ec5f5ac20:test_admin_fixed.html:jwt:27
+3a7daf00264c8d920863db444f285df950dddf40:test_admin.html:jwt:27
+3a7daf00264c8d920863db444f285df950dddf40:test_admin_fixed.html:jwt:27
