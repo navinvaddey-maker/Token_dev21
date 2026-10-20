@@ -3,6 +3,9 @@ name    = "learning-engine"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 schema-engine    = { path = "../schema-engine" }
 hebbian-core     = { path = "../hebbian-core" }
