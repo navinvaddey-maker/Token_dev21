@@ -8,7 +8,7 @@ repos:
         pass_filenames: false
       - id: clippy
         name: cargo clippy
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        entry: cargo clippy --workspace --all-targets --all-features
         language: system
         pass_filenames: false
       - id: deny

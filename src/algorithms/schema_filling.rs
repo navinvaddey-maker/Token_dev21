@@ -422,7 +422,7 @@ mod tests {
     fn make_slot(content: &str, salience: f32) -> WmSlot {
         WmSlot {
             content: content.to_string(),
-            salience: salience,
+            salience,
             source: crate::types::SlotSource::Delta,
             is_protected: false,
             last_accessed: std::time::Instant::now(),

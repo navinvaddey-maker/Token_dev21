@@ -478,19 +478,29 @@ impl ScenarioOutputComposer {
             domain.output_contract
         ));
         body.push_str("### Section 1: Introduction and Scope\n");
-        body.push_str("- State the context of the evaluation and explicitly identify the domain/geography.\n");
-        body.push_str("- Rely solely on the provided materials to define the operational boundary.\n\n");
+        body.push_str(
+            "- State the context of the evaluation and explicitly identify the domain/geography.\n",
+        );
+        body.push_str(
+            "- Rely solely on the provided materials to define the operational boundary.\n\n",
+        );
         body.push_str("### Section 2: Flagged Data Gaps and Missing Parameters\n");
         body.push_str("- Enumerate any missing user facts or critical parameters that restrict complete evaluation.\n");
-        body.push_str("- Explicitly map any inputs passed via the backend `metadata_gaps` configuration.\n\n");
+        body.push_str(
+            "- Explicitly map any inputs passed via the backend `metadata_gaps` configuration.\n\n",
+        );
         body.push_str("### Section 3: Core Framework and Rules\n");
         body.push_str("- Detail the foundational principles, operational rules, or regulations derived from the documentation that govern the scenario.\n");
-        body.push_str("- Specify exact requirements or penalties linked to failures or rule violations.\n\n");
+        body.push_str(
+            "- Specify exact requirements or penalties linked to failures or rule violations.\n\n",
+        );
         body.push_str("### Section 4: Strict Statutory/Operational Timelines\n");
         body.push_str("- Provide a clean Markdown table summarizing all operational phases, strict deadlines, and their specific starting triggers.\n\n");
         body.push_str("### Section 5: Matrix, Evidence, and Presumptions\n");
         body.push_str("- Outline the operational forum, execution environments, baseline definitions, or evidentiary shifts highlighted in the texts.\n");
-        body.push_str("- State explicitly how the burden of proof or operational weight is allocated.\n\n");
+        body.push_str(
+            "- State explicitly how the burden of proof or operational weight is allocated.\n\n",
+        );
         body.push_str("### Section 6: Actionable Compliance and Verifications\n");
         body.push_str("- List mandatory steps for execution.\n");
         body.push_str("- Executable Verification Mechanism (Defect 5 Protocol):\n");

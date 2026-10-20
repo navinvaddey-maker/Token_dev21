@@ -405,7 +405,9 @@ async fn test_scenario_aggressive_mode_strips_raw_evidence_and_preserves_contrac
     assert!(!resp.output_text.contains("### Key Evidence ["));
 
     // 4. Defect 5 Protocol: Executable Verification Mechanism must be explicitly specified in contract
-    assert!(resp.output_text.contains("Executable Verification Mechanism (Defect 5 Protocol)"));
+    assert!(resp
+        .output_text
+        .contains("Executable Verification Mechanism (Defect 5 Protocol)"));
     assert!(resp.output_text.contains("Authoritative Source to Consult"));
     assert!(resp.output_text.contains("Remaining Uncertainty & Action"));
 }
@@ -535,20 +537,39 @@ async fn test_cheque_bounce_grounding_has_no_divorce_or_corpus_metadata() {
         .await
         .unwrap();
 
-    println!("\n=== CHEQUE BOUNCE TEST OUTPUT ===\n{}\n=================================\n", resp.output_text);
+    println!(
+        "\n=== CHEQUE BOUNCE TEST OUTPUT ===\n{}\n=================================\n",
+        resp.output_text
+    );
 
     // Assert fact matrix is present
-    assert!(resp.output_text.contains("# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)"));
+    assert!(resp
+        .output_text
+        .contains("# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)"));
 
     // Assert NO divorce leakage into cheque bounce query
-    assert!(!resp.output_text.to_lowercase().contains("divorce"), "Grounding must not leak divorce into cheque bounce");
+    assert!(
+        !resp.output_text.to_lowercase().contains("divorce"),
+        "Grounding must not leak divorce into cheque bounce"
+    );
 
     // Assert NO draft corpus metadata leakage
-    assert!(!resp.output_text.to_lowercase().contains("draft corpus"), "Grounding must not leak corpus metadata");
-    assert!(!resp.output_text.to_lowercase().contains("79 section chunks"), "Grounding must not leak index chunks");
+    assert!(
+        !resp.output_text.to_lowercase().contains("draft corpus"),
+        "Grounding must not leak corpus metadata"
+    );
+    assert!(
+        !resp
+            .output_text
+            .to_lowercase()
+            .contains("79 section chunks"),
+        "Grounding must not leak index chunks"
+    );
 
     // Assert substantive cheque bounce facts ARE present
     assert!(resp.output_text.to_lowercase().contains("cheque"));
-    assert!(resp.output_text.to_lowercase().contains("dishonour") || resp.output_text.to_lowercase().contains("notice"));
+    assert!(
+        resp.output_text.to_lowercase().contains("dishonour")
+            || resp.output_text.to_lowercase().contains("notice")
+    );
 }
-

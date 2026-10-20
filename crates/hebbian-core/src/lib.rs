@@ -7,6 +7,7 @@ pub struct WeightDelta {
     pub new_weight: f32,
 }
 
+#[derive(Debug)]
 pub struct HebbianNet {
     pub weights: HashMap<(String, String), f32>,
     pub learning_rate: f32,
@@ -54,7 +55,11 @@ impl HebbianNet {
                 new_weight: *v,
             })
             .collect();
-        pairs.sort_by(|a, b| b.new_weight.partial_cmp(&a.new_weight).unwrap());
+        pairs.sort_by(|a, b| {
+            b.new_weight
+                .partial_cmp(&a.new_weight)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         pairs.truncate(n);
         pairs
     }

@@ -237,7 +237,10 @@ impl ScenarioModeRouter {
                                             gaps_xml.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
                                         } else {
                                             for issue in &gap_issues {
-                                                gaps_xml.push_str(&format!("  [GAP WARNING]: {}\n", issue));
+                                                gaps_xml.push_str(&format!(
+                                                    "  [GAP WARNING]: {}\n",
+                                                    issue
+                                                ));
                                             }
                                         }
                                         gaps_xml.push_str("</metadata_gaps>\n");

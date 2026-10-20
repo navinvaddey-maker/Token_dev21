@@ -191,21 +191,15 @@ async function compress() {
     const subtext = document.querySelector('.progress-subtext');
     
     if (overlay) {
-        console.log("Displaying progress overlay");
         overlay.style.display = 'flex';
-    } else {
-        console.error("Progress overlay element not found!");
     }
 
     const phases = [
-        { s: "Initializing Neuro-Engine...", sub: "Calibrating neural activation thresholds" },
-        { s: "Mapping prompt topology...", sub: "Analyzing semantic clusters and activation peaks" },
-        { s: "Deconstructing raw syntax...", sub: "Identifying high-entropy token sequences" },
-        { s: "Instantiating neuro-fields...", sub: "Applying CRISP framework constraints" },
-        { s: "Extracting fidelity markers...", sub: "Validating intent retention across layers" },
-        { s: "Optimizing token weights...", sub: "Refining fidelity coefficients via Hebbian loop" },
-        { s: "Rendering neuro-ambient result...", sub: "Injecting scope-optimized deltas" },
-        { s: "Finalizing optimization...", sub: "Encoding high-fidelity compression output" }
+        { s: "Initializing CRISP Neuro-Engine...", sub: "Calibrating neural activation thresholds" },
+        { s: "Mapping Prompt Topology...", sub: "Analyzing semantic clusters and entropy peaks" },
+        { s: "Deconstructing Syntax Delimiters...", sub: "Pruning low-information redundancy" },
+        { s: "Enforcing CRISP Invariants...", sub: "Preserving factual integrity & constraints" },
+        { s: "Synthesizing Distilled Payload...", sub: "Generating clean LLM-optimized prompt" }
     ];
 
     let phaseIdx = 0;
@@ -213,7 +207,7 @@ async function compress() {
         phaseIdx = (phaseIdx + 1) % phases.length;
         if (status) status.textContent = phases[phaseIdx].s;
         if (subtext) subtext.textContent = phases[phaseIdx].sub;
-    }, 1800);
+    }, 600);
 
     // detect use_case from DevEngine if not manually set
     const detectedUseCase = useCase || (typeof DevEngine !== 'undefined' ? DevEngine.detectUseCase(raw) : useCase);
@@ -221,7 +215,7 @@ async function compress() {
     const btn = document.getElementById('compress-btn');
     if (btn) btn.disabled = true;
 
-    // Initialize Neuron Animation
+    // Optional lightweight Neuron Animation (14 particles max, zero memory leaks)
     let neuronAnim = null;
     const canvas = document.getElementById('neuron-canvas');
     if (canvas && typeof NeuronAnimation !== 'undefined') {
@@ -229,30 +223,28 @@ async function compress() {
         neuronAnim.start();
     }
 
-    const delayPromise = new Promise(resolve => setTimeout(resolve, 15000));
+    // Ergonomic 350ms transition so state change is perceptible without artificial 15s freeze
+    const minTransition = new Promise(resolve => setTimeout(resolve, 350));
 
     try {
         console.log("Calling API.compress...");
-        const result = await API.compress({
-            raw_text:  raw,
-            task:      task || 'Optimize prompt',
-            use_case:  detectedUseCase,
-            mode:      mode,
-        });
-
-        // Ensure we wait AT LEAST 15 seconds for "brain attraction" regardless of API speed
-        console.log("API returned. Maintaining neuro-ambient phase until 15s mark...");
-        await delayPromise;
+        const [result] = await Promise.all([
+            API.compress({
+                raw_text:  raw,
+                task:      task || 'Optimize prompt',
+                use_case:  detectedUseCase,
+                mode:      mode,
+            }),
+            minTransition
+        ]);
 
         console.log("Compression successful");
         State.lastResult = result;
         State.lastTs     = Date.now();
         renderResult(result);
-        showToast('Neural optimization complete', 'success');
+        showToast('Prompt compressed successfully', 'success');
     } catch (err) {
         console.error("Compression error:", err);
-        // Even on error, we wait for the 15s attraction phase
-        await delayPromise;
         showToast(err.message, 'error');
     } finally {
         clearInterval(phaseTimer);
@@ -263,11 +255,30 @@ async function compress() {
 }
 
 function renderResult(result) {
-    document.getElementById('result-section').style.display = 'block';
-    document.getElementById('stat-original').textContent = result.token_original;
-    document.getElementById('stat-final').textContent    = result.token_final;
-    document.getElementById('stat-saved').textContent    = result.token_saved;
-    document.getElementById('result-output').textContent = result.optimized_prompt;
+    const resSec = document.getElementById('result-section');
+    if (resSec) {
+        resSec.style.display = 'block';
+        resSec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    const orig = result.token_original || 0;
+    const final = result.token_final || 0;
+    const saved = result.token_saved || 0;
+    const pct = orig > 0 ? Math.round((saved / orig) * 100) : 0;
+
+    const elOrig = document.getElementById('stat-original');
+    const elFinal = document.getElementById('stat-final');
+    const elSaved = document.getElementById('stat-saved');
+    const elOutput = document.getElementById('result-output');
+    const elBar = document.getElementById('token-progress-bar');
+    const elPct = document.getElementById('token-saving-pct');
+
+    if (elOrig) elOrig.textContent = orig.toLocaleString();
+    if (elFinal) elFinal.textContent = final.toLocaleString();
+    if (elSaved) elSaved.textContent = saved.toLocaleString();
+    if (elOutput) elOutput.textContent = result.optimized_prompt;
+    if (elBar) elBar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
+    if (elPct) elPct.textContent = `${pct}% saved`;
 }
 
 async function submitFeedback(rating) {
@@ -281,8 +292,23 @@ async function submitFeedback(rating) {
 }
 
 function copyResult() {
-    const text = document.getElementById('result-output').textContent;
-    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!', 'success'));
+    const text = document.getElementById('result-output')?.textContent;
+    if (!text) return showToast('No output to copy', 'error');
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard!', 'success');
+        const btn = document.getElementById('copy-result-btn');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '✓ Copied';
+            btn.classList.add('btn-copied');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('btn-copied');
+            }, 2000);
+        }
+    }).catch(err => {
+        showToast('Failed to copy: ' + err.message, 'error');
+    });
 }
 
 // ── History ─────────────────────────────────────────────────────────────────
@@ -359,6 +385,7 @@ function validatePromptLength() {
     const promptInput = document.getElementById('prompt-input');
     const compressBtn = document.getElementById('compress-btn');
     const errorDiv = document.getElementById('prompt-error');
+    const wordBadge = document.getElementById('prompt-word-counter');
     if (!compressBtn) return;
 
     if (!promptInput) {
@@ -368,15 +395,25 @@ function validatePromptLength() {
 
     const raw = promptInput.value.trim();
     const words = raw ? raw.split(/\s+/).filter(Boolean) : [];
+    const count = words.length;
+
+    if (wordBadge) {
+        wordBadge.textContent = `${count} word${count === 1 ? '' : 's'}${count < 8 ? ' (min 8)' : ''}`;
+        if (count >= 8) {
+            wordBadge.classList.add('badge-valid');
+        } else {
+            wordBadge.classList.remove('badge-valid');
+        }
+    }
     
-    if (words.length >= 8) {
+    if (count >= 8) {
         compressBtn.disabled = false;
         if (errorDiv) errorDiv.style.display = 'none';
     } else {
         compressBtn.disabled = true;
         if (errorDiv) {
             if (raw.length > 0) {
-                errorDiv.textContent = `Prompt must be at least 8 words (currently ${words.length} / 8).`;
+                errorDiv.textContent = `Prompt must be at least 8 words (currently ${count} / 8).`;
                 errorDiv.style.display = 'block';
             } else {
                 errorDiv.style.display = 'none';
@@ -407,8 +444,16 @@ document.addEventListener('DOMContentLoaded', () => {
         promptInput.addEventListener('change', validatePromptLength);
         promptInput.addEventListener('paste', () => setTimeout(validatePromptLength, 20));
         promptInput.addEventListener('keyup', validatePromptLength);
+        promptInput.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                const btn = document.getElementById('compress-btn');
+                if (btn && !btn.disabled) {
+                    e.preventDefault();
+                    compress();
+                }
+            }
+        });
     }
-    // Button starts disabled and only enables when >= 120 words
     validatePromptLength();
 });
 

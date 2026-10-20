@@ -3,229 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Token Compress Engine — CRISP framework powered token optimization">
-    <title>Oryx Intelligence</title>
+    <meta name="description" content="Oryx Intelligence Engine — CRISP framework powered prompt & token optimization">
+    <title>Oryx Intelligence Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
     
     <style>
-        /* Base / Morning Theme */
-        :root, body.theme-morning {
-            --page-bg: #f0f0ec;
-            --glass-bg: rgba(255, 255, 255, 0.62);
-            --glass-border: rgba(255, 255, 255, 0.82);
+        /* ── Design Tokens & Themes ───────────────────────── */
+        :root, body.theme-night {
+            --page-bg: #070a12;
+            --glass-bg: rgba(13, 19, 33, 0.78);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-card-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+            --btn-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --btn-text: #051329;
+            --accent-text: #00f2fe;
+            --accent-glow: rgba(0, 242, 254, 0.25);
+            --head-text: #f8fafc;
+            --body-text: #94a3b8;
+            --text-muted: #64748b;
+            --stat-pos: #10b981;
+            --inp-bg: rgba(8, 13, 24, 0.65);
+            --inp-border: rgba(255, 255, 255, 0.1);
+            --inp-focus: #00f2fe;
+            --inp-ring: rgba(0, 242, 254, 0.18);
+            --prog-fill: linear-gradient(90deg, #00f2fe, #10b981);
+            --prog-track: rgba(255, 255, 255, 0.06);
+            --tag-bg: rgba(0, 242, 254, 0.12);
+            --tag-text: #38bdf8;
+            --divider: rgba(255, 255, 255, 0.08);
+            --copy-bg: rgba(0, 242, 254, 0.1);
+            --copy-border: rgba(0, 242, 254, 0.25);
+            --card-sub-bg: rgba(255, 255, 255, 0.03);
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body.theme-morning {
+            --page-bg: #f5f4ef;
+            --glass-bg: rgba(255, 255, 255, 0.82);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --glass-card-shadow: 0 24px 64px -12px rgba(180, 140, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
             --btn-grad: linear-gradient(135deg, #ffd740, #f5a800);
             --btn-text: #2a1a00;
-            --accent-text: #9a7c00;
-            --head-text: #111111;
-            --body-text: #6b6b6b;
-            --stat-pos: #b07a00;
-            --inp-border: rgba(200, 170, 0, 0.28);
-            --inp-focus: rgba(200, 140, 0, 0.60);
-            --inp-ring: rgba(255, 210, 0, 0.12);
+            --accent-text: #b47a00;
+            --accent-glow: rgba(245, 168, 0, 0.25);
+            --head-text: #111827;
+            --body-text: #4b5563;
+            --text-muted: #6b7280;
+            --stat-pos: #059669;
+            --inp-bg: rgba(255, 255, 255, 0.9);
+            --inp-border: rgba(200, 160, 0, 0.28);
+            --inp-focus: #f5a800;
+            --inp-ring: rgba(255, 215, 0, 0.2);
             --prog-fill: linear-gradient(90deg, #ffd740, #f5a800);
             --prog-track: rgba(200, 170, 0, 0.15);
-            --tag-bg: rgba(255, 210, 0, 0.18);
-            --tag-text: #9a7000;
-            --divider: rgba(200, 170, 0, 0.15);
-            --copy-bg: rgba(255, 220, 0, 0.12);
-            --copy-border: rgba(200, 170, 0, 0.25);
-            --danger: #e63946;
-            --success: #2a9d8f;
+            --tag-bg: rgba(245, 168, 0, 0.14);
+            --tag-text: #b47a00;
+            --divider: rgba(0, 0, 0, 0.08);
+            --copy-bg: rgba(255, 220, 0, 0.14);
+            --copy-border: rgba(200, 160, 0, 0.3);
+            --card-sub-bg: rgba(0, 0, 0, 0.02);
         }
 
-        /* Afternoon Theme */
         body.theme-afternoon {
-            --page-bg: #e6f2f5;
-            --glass-bg: rgba(255, 255, 255, 0.70);
-            --glass-border: rgba(255, 255, 255, 0.90);
-            --btn-grad: linear-gradient(135deg, #4facfe, #00f2fe);
-            --btn-text: #003a55;
-            --accent-text: #007bb5;
-            --head-text: #0f172a;
-            --body-text: #475569;
-            --stat-pos: #0284c7;
-            --inp-border: rgba(0, 150, 255, 0.28);
-            --inp-focus: rgba(0, 150, 255, 0.60);
-            --inp-ring: rgba(0, 150, 255, 0.12);
-            --prog-fill: linear-gradient(90deg, #4facfe, #00f2fe);
-            --prog-track: rgba(0, 150, 255, 0.15);
-            --tag-bg: rgba(0, 150, 255, 0.15);
-            --tag-text: #0284c7;
-            --divider: rgba(0, 150, 255, 0.15);
-            --copy-bg: rgba(0, 150, 255, 0.10);
-            --copy-border: rgba(0, 150, 255, 0.25);
-        }
-
-        /* Night Theme */
-        body.theme-night {
-            --page-bg: #0f172a;
-            --glass-bg: rgba(30, 41, 59, 0.75);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --btn-grad: linear-gradient(135deg, #818cf8, #c084fc);
-            --btn-text: #ffffff;
-            --accent-text: #a78bfa;
-            --head-text: #f8fafc;
-            --body-text: #cbd5e1;
-            --stat-pos: #34d399;
-            --inp-border: rgba(255, 255, 255, 0.15);
-            --inp-focus: rgba(167, 139, 250, 0.60);
-            --inp-ring: rgba(167, 139, 250, 0.15);
-            --prog-fill: linear-gradient(90deg, #818cf8, #c084fc);
-            --prog-track: rgba(255, 255, 255, 0.05);
-            --tag-bg: rgba(167, 139, 250, 0.15);
-            --tag-text: #ddd6fe;
-            --divider: rgba(255, 255, 255, 0.1);
-            --copy-bg: rgba(255, 255, 255, 0.05);
-            --copy-border: rgba(255, 255, 255, 0.15);
-        }
-
-        /* Climate Modifiers */
-        body.theme-rain {
-            --page-bg: #1e293b;
-            --glass-bg: rgba(15, 23, 42, 0.85);
+            --page-bg: #0b1526;
+            --glass-bg: rgba(15, 28, 51, 0.8);
+            --glass-border: rgba(56, 189, 248, 0.12);
+            --glass-card-shadow: 0 24px 64px -12px rgba(2, 132, 199, 0.25), 0 0 0 1px rgba(56, 189, 248, 0.1);
+            --btn-grad: linear-gradient(135deg, #38bdf8, #0284c7);
+            --btn-text: #04192b;
+            --accent-text: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --head-text: #f0f9ff;
             --body-text: #94a3b8;
+            --text-muted: #64748b;
+            --stat-pos: #34d399;
+            --inp-bg: rgba(10, 20, 38, 0.7);
+            --inp-border: rgba(56, 189, 248, 0.22);
+            --inp-focus: #38bdf8;
+            --inp-ring: rgba(56, 189, 248, 0.2);
+            --prog-fill: linear-gradient(90deg, #38bdf8, #0284c7);
+            --prog-track: rgba(56, 189, 248, 0.1);
+            --tag-bg: rgba(56, 189, 248, 0.15);
+            --tag-text: #38bdf8;
+            --divider: rgba(255, 255, 255, 0.08);
+            --copy-bg: rgba(56, 189, 248, 0.12);
+            --copy-border: rgba(56, 189, 248, 0.25);
+            --card-sub-bg: rgba(255, 255, 255, 0.03);
+        }
+
+        body.theme-rain {
+            --page-bg: #090e17;
+            --glass-bg: rgba(13, 20, 32, 0.85);
         }
 
         body.theme-snow {
             --page-bg: #f8fafc;
-            --glass-bg: rgba(255, 255, 255, 0.90);
+            --glass-bg: rgba(255, 255, 255, 0.92);
         }
 
+        /* ── Base Setup ───────────────────────────────────── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--page-bg);
             color: var(--body-text);
             min-height: 100vh;
             overflow-x: hidden;
-            transition: background 1s ease, color 1s ease;
+            transition: background 0.6s ease, color 0.6s ease;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* ── Page Layout ──────────────────────── */
+        /* ── High-Efficiency Ambient Background (0 CPU Churn) ── */
         .tc-root {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            padding: 48px 24px 64px;
+            padding: 40px 20px 80px;
             position: relative;
             overflow: hidden;
         }
 
-        /* ── Decorative Bubbles ───────────────── */
+        /* Static GPU-accelerated ambient glows (no continuous blur recalculations) */
         .bubble {
             position: absolute;
             border-radius: 50%;
-            filter: blur(2px);
-            z-index: 0;
             pointer-events: none;
+            z-index: 0;
+            transform: translateZ(0);
         }
         .bubble-1 {
-            width: 340px;
-            height: 340px;
-            top: -100px;
-            left: -100px;
-            opacity: 0.82;
-            background: radial-gradient(circle at 35% 35%, #ffe066, #f5a800cc);
-            animation: floatA 8s ease-in-out infinite;
+            width: 520px;
+            height: 520px;
+            top: -180px;
+            left: 50%;
+            transform: translateX(-50%) translateZ(0);
+            background: radial-gradient(circle at center, rgba(0, 242, 254, 0.12) 0%, rgba(79, 172, 254, 0.04) 50%, transparent 75%);
         }
         .bubble-2 {
-            width: 260px;
-            height: 260px;
-            bottom: -80px;
-            right: -60px;
-            opacity: 0.75;
-            background: radial-gradient(circle at 40% 30%, #ffd740, #f59e00bb);
-            animation: floatB 10s ease-in-out infinite;
+            width: 440px;
+            height: 440px;
+            bottom: -120px;
+            right: 5%;
+            background: radial-gradient(circle at center, rgba(139, 92, 246, 0.1) 0%, rgba(0, 242, 254, 0.02) 50%, transparent 75%);
         }
 
-        @keyframes floatA {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(18px, 24px) scale(1.04); }
-        }
-        @keyframes floatB {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(-14px, -20px) scale(1.06); }
-        }
-
-        /* ── Glass Card ───────────────────────── */
+        /* ── Glass Workbench Card ─────────────────────────── */
         .glass-card {
             background: var(--glass-bg);
-            backdrop-filter: blur(28px) saturate(1.6);
-            -webkit-backdrop-filter: blur(28px) saturate(1.6);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
             border: 1px solid var(--glass-border);
-            border-radius: 28px;
-            padding: 40px 44px;
-            box-shadow:
-                0 4px 32px rgba(180, 140, 0, 0.08),
-                0 1px 4px rgba(0, 0, 0, 0.04);
-            max-width: 720px;
+            border-radius: 24px;
+            padding: 36px 40px;
+            box-shadow: var(--glass-card-shadow);
+            max-width: 860px;
             width: 100%;
             position: relative;
             z-index: 2;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
-        /* ── Logo ─────────────────────────────── */
+        /* ── Header & Branding ────────────────────────────── */
+        .tc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
         .tc-logo {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 24px;
+            gap: 12px;
         }
         .tc-logo-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--btn-grad);
-            border-radius: 10px;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            box-shadow: 0 2px 12px rgba(245, 168, 0, 0.35);
+            box-shadow: 0 4px 16px rgba(0, 242, 254, 0.15);
         }
         .tc-logo-text {
             font-family: 'Syne', sans-serif;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             color: var(--head-text);
-            letter-spacing: -0.3px;
-            transition: color 1s ease;
+            letter-spacing: -0.4px;
         }
         .tc-logo-text span {
             color: var(--accent-text);
-            transition: color 1s ease;
+        }
+        .engine-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            border: 1px solid var(--glass-border);
+        }
+        .engine-pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulseLight 2s infinite ease-in-out;
+        }
+        @keyframes pulseLight {
+            0%, 100% { opacity: 0.6; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.2); }
         }
 
-        /* ── Typography ───────────────────────── */
         .tc-headline {
             font-family: 'Syne', sans-serif;
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 700;
             color: var(--head-text);
             letter-spacing: -0.5px;
-            line-height: 1.2;
-            margin: 0 0 6px;
+            line-height: 1.25;
+            margin: 0 0 4px;
         }
         .tc-sub {
-            font-size: 14px;
+            font-size: 13.5px;
             font-weight: 400;
             color: var(--body-text);
             margin: 0 0 28px;
         }
+
         .section-label {
-            display: block;
-            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1.4px;
+            letter-spacing: 1.1px;
             color: var(--accent-text);
             margin-bottom: 8px;
-            margin-top: 16px;
+            margin-top: 14px;
         }
+        .word-counter-pill {
+            font-size: 11px;
+            font-weight: 500;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            text-transform: none;
+            letter-spacing: 0;
+            transition: color 0.2s, border-color 0.2s;
+        }
+        .word-counter-pill.badge-valid {
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+
         .tag {
             display: inline-block;
             padding: 3px 10px;
@@ -237,9 +287,9 @@
             margin-bottom: 16px;
         }
 
-        /* ── Forms, Inputs, Textareas ─────────── */
+        /* ── Input & Form Elements ────────────────────────── */
         form { margin-bottom: 0; }
-        .form-row { margin-bottom: 16px; }
+        .form-row { margin-bottom: 16px; position: relative; }
         .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -247,47 +297,30 @@
             margin-bottom: 16px;
         }
 
-        .tc-input {
+        .tc-input, .tc-textarea {
             width: 100%;
-            padding: 12px 16px;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             font-size: 14px;
-            color: #1a1a1a;
-            background: rgba(255, 255, 255, 0.75);
+            color: var(--head-text);
+            background: var(--inp-bg);
             border: 1px solid var(--inp-border);
-            border-radius: 10px;
+            border-radius: 12px;
             outline: none;
             box-sizing: border-box;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
         }
-        .tc-input:focus {
-            border-color: var(--inp-focus);
-            box-shadow: 0 0 0 3px var(--inp-ring);
-        }
-        .tc-input::placeholder { color: #aaa; }
-
+        .tc-input { padding: 12px 16px; }
         .tc-textarea {
-            width: 100%;
-            min-height: 100px;
+            min-height: 130px;
             padding: 14px 16px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            line-height: 1.65;
-            color: #1a1a1a;
-            background: rgba(255, 255, 255, 0.75);
-            border: 1px solid var(--inp-border);
-            border-radius: 14px;
+            line-height: 1.6;
             resize: vertical;
-            outline: none;
-            box-sizing: border-box;
-            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .tc-textarea:focus {
+        .tc-input:focus, .tc-textarea:focus {
             border-color: var(--inp-focus);
             box-shadow: 0 0 0 3px var(--inp-ring);
         }
-        .tc-textarea::placeholder { color: #bbb; }
-        #prompt-input { min-height: 140px; }
+        .tc-input::placeholder, .tc-textarea::placeholder { color: var(--text-muted); }
 
         .select-wrap {
             position: relative;
@@ -298,13 +331,13 @@
             width: 100%;
             appearance: none;
             padding: 12px 36px 12px 16px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
             font-weight: 500;
-            color: #333;
-            background: rgba(255, 255, 255, 0.80);
+            color: var(--head-text);
+            background: var(--inp-bg);
             border: 1px solid var(--inp-border);
-            border-radius: 10px;
+            border-radius: 12px;
             outline: none;
             cursor: pointer;
             transition: border-color 0.2s, box-shadow 0.2s;
@@ -319,33 +352,34 @@
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
-            color: #bba000;
+            color: var(--accent-text);
             font-size: 10px;
         }
 
-        /* ── Buttons ──────────────────────────── */
+        /* ── Action Buttons ───────────────────────────────── */
         .tc-compress-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
             width: 100%;
             padding: 14px 28px;
             font-family: 'Syne', sans-serif;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.2px;
             color: var(--btn-text);
             background: var(--btn-grad);
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 2px 16px rgba(245, 168, 0, 0.32);
-            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 4px 20px var(--accent-glow);
+            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1);
             margin-top: 10px;
         }
         .tc-compress-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(245, 168, 0, 0.42);
+            box-shadow: 0 6px 24px var(--accent-glow);
         }
         .tc-compress-btn:active {
             transform: scale(0.98);
@@ -354,318 +388,348 @@
         .tc-compress-btn[disabled] {
             opacity: 0.45 !important;
             cursor: not-allowed !important;
-            filter: grayscale(80%) !important;
+            filter: grayscale(60%) !important;
             pointer-events: none !important;
             box-shadow: none !important;
             transform: none !important;
         }
+        .shortcut-hint {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 8px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+        }
+        .shortcut-hint kbd {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            color: var(--head-text);
+        }
 
-        .clear-btn {
-            padding: 10px 16px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 13px;
-            color: #888;
-            background: rgba(255, 255, 255, 0.60);
-            border: 1px solid rgba(0, 0, 0, 0.10);
-            border-radius: 10px;
+        .clear-btn, .copy-btn, .btn-ghost {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12.5px;
+            font-weight: 500;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s;
+            transition: all 0.15s ease;
+        }
+        .clear-btn {
+            color: var(--body-text);
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
         }
         .clear-btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-            color: #444;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--head-text);
         }
-
         .copy-btn {
-            padding: 7px 16px;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
             color: var(--accent-text);
             background: var(--copy-bg);
             border: 1px solid var(--copy-border);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
         }
         .copy-btn:hover {
-            background: rgba(255, 210, 0, 0.22);
+            background: rgba(0, 242, 254, 0.2);
+            color: #fff;
+        }
+        .copy-btn.btn-copied {
+            background: rgba(16, 185, 129, 0.2) !important;
+            border-color: rgba(16, 185, 129, 0.4) !important;
+            color: #10b981 !important;
         }
         .btn-success-sm {
             padding: 7px 16px;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             font-size: 12px;
             font-weight: 500;
             color: #fff;
-            background: #2a9d8f;
+            background: rgba(16, 185, 129, 0.85);
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.15s;
         }
-        .btn-success-sm:hover { background: #21867a; }
-        
+        .btn-success-sm:hover { background: #10b981; }
         .btn-danger-sm {
             padding: 7px 16px;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             font-size: 12px;
             font-weight: 500;
             color: #fff;
-            background: #e76f51;
+            background: rgba(239, 68, 68, 0.8);
             border: none;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.15s;
         }
-        .btn-danger-sm:hover { background: #d65b3f; }
-
+        .btn-danger-sm:hover { background: #ef4444; }
         .btn-ghost {
             background: transparent;
-            border: 1px solid rgba(200, 170, 0, 0.3);
-            color: #888;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
+            border: 1px solid var(--glass-border);
+            color: var(--body-text);
         }
         .btn-ghost:hover {
-            background: rgba(200, 170, 0, 0.1);
-            color: #222;
+            background: var(--card-sub-bg);
+            color: var(--head-text);
+            border-color: rgba(255, 255, 255, 0.15);
         }
 
-
-        /* ── Auth Tabs ────────────────────────── */
+        /* ── Tabs & Nav ───────────────────────────────────── */
         .auth-tabs {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             margin-bottom: 24px;
-            background: rgba(255, 210, 0, 0.1);
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
             padding: 4px;
             border-radius: 12px;
         }
         .auth-tab {
             flex: 1;
-            padding: 10px;
+            padding: 9px;
             text-align: center;
             border: none;
             background: transparent;
-            color: #888;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
+            color: var(--body-text);
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
             font-weight: 500;
             border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s;
+            transition: all 0.2s;
         }
         .auth-tab.active {
-            background: #fff;
+            background: var(--glass-bg);
             color: var(--head-text);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+            border: 1px solid var(--glass-border);
         }
-        .auth-form { display: none; animation: fadeIn 0.3s ease; }
+        .auth-form { display: none; animation: fadeIn 0.25s ease; }
         .auth-form.active { display: block; }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Nav Tabs ─────────────────────────── */
-        .nav-bar {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 24px;
-            border-bottom: 1px solid var(--divider);
-            padding-bottom: 12px;
-            overflow: visible;
-        }
-        .nav-tab {
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            color: #888;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            position: relative;
-            transition: color 0.2s;
-        }
-        .nav-tab:hover { color: #444; }
-        .nav-tab.active {
-            color: var(--accent-text);
-            font-weight: 600;
-        }
-        .nav-tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -13px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--btn-grad);
-            border-radius: 2px 2px 0 0;
-        }
-        .tab-content { display: none; animation: fadeIn 0.3s ease; }
-        .tab-content.active { display: block; }
-
-        /* ── User Bar ─────────────────────────── */
         .user-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
-            padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 12px;
-            border: 1px solid rgba(200, 170, 0, 0.15);
+            padding: 12px 18px;
+            background: var(--card-sub-bg);
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
         }
-        .user-info {
-            font-size: 13px;
-            color: #666;
-        }
-        .user-info strong {
-            color: #1a1a1a;
-            font-weight: 600;
-        }
+        .user-info { font-size: 13px; color: var(--body-text); }
+        .user-info strong { color: var(--head-text); font-weight: 600; }
 
-        /* ── Stat Cards ───────────────────────── */
+        .nav-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--divider);
+            padding-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .nav-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .nav-tab:hover { color: var(--head-text); background: var(--card-sub-bg); }
+        .nav-tab.active {
+            color: var(--accent-text);
+            font-weight: 600;
+            background: var(--tag-bg);
+        }
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -9px;
+            left: 15%;
+            width: 70%;
+            height: 2px;
+            background: var(--accent-text);
+            border-radius: 2px;
+            box-shadow: 0 0 8px var(--accent-text);
+        }
+        .tab-content { display: none; animation: fadeIn 0.25s ease; }
+        .tab-content.active { display: block; }
+
+        /* ── Metric Cards ─────────────────────────────────── */
         .stats-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 12px;
-            margin: 24px 0;
+            margin: 20px 0 16px;
         }
         .stat-card {
-            background: rgba(255, 255, 255, 0.58);
-            border: 1px solid rgba(255, 220, 0, 0.22);
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 14px;
-            padding: 16px;
+            padding: 16px 14px;
             text-align: center;
+            transition: border-color 0.2s;
         }
+        .stat-card:hover { border-color: rgba(255, 255, 255, 0.16); }
         .stat-val {
             font-family: 'Syne', sans-serif;
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 700;
-            color: #1a1a1a;
-            line-height: 1;
+            color: var(--head-text);
+            line-height: 1.1;
             margin-bottom: 6px;
         }
-        .stat-val.positive {
-            color: var(--stat-pos);
-        }
+        .stat-val.positive { color: var(--stat-pos); }
         .stat-lbl {
             font-size: 11px;
-            color: #888;
+            color: var(--text-muted);
             font-weight: 600;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
             text-transform: uppercase;
         }
 
-        /* ── Progress Bar ─────────────────────── */
+        /* ── Progress Bar ─────────────────────────────────── */
         .progress-bar-wrap {
             height: 6px;
             background: var(--prog-track);
             border-radius: 99px;
             overflow: hidden;
-            margin: 10px 0 4px;
+            margin: 12px 0 6px;
         }
         .progress-bar-fill {
             height: 100%;
             background: var(--prog-fill);
             border-radius: 99px;
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
             width: 0%;
         }
         .progress-label {
             display: flex;
             justify-content: space-between;
-            font-size: 11px;
-            color: #999;
+            font-size: 11.5px;
+            color: var(--text-muted);
             margin-bottom: 16px;
         }
 
-        /* ── Output Box ───────────────────────── */
+        /* ── Output Box ───────────────────────────────────── */
         .output-box {
-            background: rgba(255, 255, 255, 0.62);
-            border: 1px solid rgba(200, 170, 0, 0.22);
+            background: var(--inp-bg);
+            border: 1px solid var(--inp-border);
             border-radius: 14px;
-            padding: 20px;
-            font-size: 13.5px;
-            line-height: 1.7;
-            color: #2a2a2a;
+            padding: 18px 20px;
+            font-size: 13px;
+            line-height: 1.65;
+            color: var(--head-text);
             min-height: 80px;
             font-family: 'JetBrains Mono', monospace;
             word-break: break-word;
             white-space: pre-wrap;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
-        }
-        .output-box.empty {
-            color: #ccc;
-            font-family: 'DM Sans', sans-serif;
-            font-style: italic;
-            font-size: 13px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
         }
         .feedback-row {
             display: flex;
+            align-items: center;
+            justify-content: flex-end;
             gap: 10px;
-            margin-top: 16px;
+            margin-top: 14px;
+            flex-wrap: wrap;
         }
 
-        /* ── Divider ──────────────────────────── */
         hr.divider {
             border: none;
             border-top: 1px solid var(--divider);
-            margin: 24px 0;
+            margin: 22px 0;
         }
 
-        /* ── History Items ────────────────────── */
+        /* ── Badges ───────────────────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+        }
+        .badge-accent {
+            background: rgba(0, 242, 254, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(0, 242, 254, 0.25);
+        }
+        .badge-success {
+            background: rgba(16, 185, 129, 0.14);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        /* ── History Items ────────────────────────────────── */
         .history-item {
             padding: 16px;
-            background: rgba(255, 255, 255, 0.6);
-            border: 1px solid var(--divider);
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
             border-radius: 12px;
-            margin-bottom: 12px;
-            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 10px;
+            transition: transform 0.15s, border-color 0.15s;
             cursor: pointer;
         }
         .history-item:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(200, 170, 0, 0.1);
-            border-color: rgba(200, 140, 0, 0.4);
+            border-color: rgba(0, 242, 254, 0.3);
         }
         .history-meta {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
-            color: #777;
+            font-size: 11.5px;
+            color: var(--text-muted);
             margin-top: 8px;
         }
 
-        /* ── Toast ────────────────────────────── */
+        /* ── Toast Notifications ──────────────────────────── */
         .toast {
             position: fixed;
             top: 24px;
             right: 24px;
-            padding: 16px 24px;
+            padding: 14px 22px;
             border-radius: 12px;
-            font-size: 14px;
+            font-size: 13.5px;
             font-weight: 500;
-            z-index: 1000;
-            animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10000;
+            animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             max-width: 380px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-            backdrop-filter: blur(10px);
+            box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+            backdrop-filter: blur(12px);
         }
         .toast-error { 
-            background: rgba(230, 57, 70, 0.9);
-            color: white;
+            background: rgba(220, 38, 38, 0.92);
+            color: #fff;
             border: 1px solid rgba(255,255,255,0.2);
         }
         .toast-success { 
-            background: rgba(42, 157, 143, 0.9);
-            color: white;
+            background: rgba(16, 185, 129, 0.92);
+            color: #fff;
             border: 1px solid rgba(255,255,255,0.2);
         }
         @keyframes slideIn {
@@ -673,77 +737,86 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* Loading */
-        .loading { opacity: 0.7; pointer-events: none; }
-        
-        /* ── Neuro Progress ──────────────────── */
+        /* ── Zero-RAM Vector Neural HUD Overlay ──────────── */
         #neuro-progress-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(15px);
+            background: rgba(7, 10, 18, 0.88);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 9999;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             color: #fff;
             font-family: 'Syne', sans-serif;
+            text-align: center;
+            padding: 20px;
         }
         .brain-loader {
-            width: 140px;
-            height: 140px;
+            width: 100px;
+            height: 100px;
             position: relative;
-            margin-bottom: 40px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .brain-pulse {
+        /* Lightweight SVG Neural Ring Loader (Zero Bitmap Memory) */
+        .vector-neural-ring {
+            width: 90px;
+            height: 90px;
+            animation: ringSpin 2.2s linear infinite;
+            will-change: transform;
+        }
+        @keyframes ringSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .vector-neural-ring circle {
+            fill: none;
+            stroke-width: 3.5;
+            stroke-linecap: round;
+        }
+        .ring-bg {
+            stroke: rgba(255, 255, 255, 0.08);
+        }
+        .ring-pulse {
+            stroke: var(--accent-text);
+            stroke-dasharray: 140, 200;
+            stroke-dashoffset: 0;
+            animation: ringDash 1.6s ease-in-out infinite;
+        }
+        @keyframes ringDash {
+            0% { stroke-dashoffset: 0; }
+            50% { stroke-dashoffset: -70; }
+            100% { stroke-dashoffset: -140; }
+        }
+        .brain-center-icon {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle, var(--accent-text) 0%, transparent 70%);
-            animation: neuro-pulse 2.5s infinite ease-in-out;
-            opacity: 0.5;
-        }
-        @keyframes neuro-pulse {
-            0% { transform: scale(0.8); opacity: 0.2; }
-            50% { transform: scale(1.3); opacity: 0.7; }
-            100% { transform: scale(0.8); opacity: 0.2; }
-        }
-        .neural-lines {
-            position: absolute;
-            width: 100%; height: 100%;
-            border: 2px dashed var(--accent-text);
-            border-radius: 50%;
-            animation: neuro-rotate 15s linear infinite;
-            opacity: 0.4;
-        }
-        @keyframes neuro-rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         #progress-status {
-            font-size: 1.4rem;
+            font-size: 1.15rem;
             font-weight: 700;
-            letter-spacing: 1.5px;
+            letter-spacing: 0.8px;
             text-transform: uppercase;
-            text-align: center;
-            max-width: 500px;
-            background: linear-gradient(90deg, #fff, var(--accent-text), #fff);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            animation: text-shine 3s linear infinite;
-        }
-        @keyframes text-shine {
-            to { background-position: 200% center; }
+            max-width: 480px;
+            color: #f8fafc;
+            margin-bottom: 8px;
         }
         .progress-subtext {
-            margin-top: 15px;
-            font-size: 1rem;
-            color: rgba(255,255,255,0.5);
+            font-size: 0.88rem;
+            color: var(--text-muted);
             font-family: 'Inter', sans-serif;
             font-weight: 400;
+            max-width: 420px;
         }
         #neuron-canvas {
             position: absolute;
@@ -756,48 +829,36 @@
         }
     </style>
 </head>
-<body class="morning">
+<body class="theme-night">
 <div class="tc-root">
-    <!-- Decorative background elements -->
+    <!-- Zero-RAM ambient background gradients -->
     <div class="bubble bubble-1"></div>
     <div class="bubble bubble-2"></div>
 
     <div class="glass-card">
         
         <!-- Header -->
-        <div class="tc-logo" style="margin-bottom: 20px;">
-            <div class="tc-logo-icon" style="background: transparent; box-shadow: none; width: 44px; height: 44px;">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 12px rgba(0,242,254,0.15));">
-                    <defs>
-                        <linearGradient id="bodyGrad" x1="4" y1="2" x2="20" y2="22">
-                            <stop offset="0%" stop-color="#075985" />
-                            <stop offset="50%" stop-color="#0284c7" />
-                            <stop offset="100%" stop-color="#00f2fe" />
-                        </linearGradient>
-                        <filter id="eyeGlow">
-                            <feGaussianBlur stdDeviation="1.5" result="blur" />
-                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                        </filter>
-                    </defs>
-                    <!-- Body -->
-                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" fill="url(#bodyGrad)" fill-opacity="0.9" />
-                    <!-- Geometric segments -->
-                    <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="white" fill-opacity="0.1" />
-                    <path d="M4 6V12L12 10V2L4 6Z" fill="black" fill-opacity="0.1" />
-                    <!-- Eyes -->
-                    <circle cx="8.5" cy="11" r="2.2" fill="#00f2fe" filter="url(#eyeGlow)" />
-                    <circle cx="15.5" cy="11" r="2.2" fill="#00f2fe" filter="url(#eyeGlow)" />
-                    <!-- Beak -->
-                    <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="#fbbf24" />
-                    <!-- Ears/Tufts -->
-                    <path d="M4 6L2 3L7 5" stroke="#00f2fe" stroke-width="1.2" stroke-linecap="round" />
-                    <path d="M20 6L22 3L17 5" stroke="#00f2fe" stroke-width="1.2" stroke-linecap="round" />
-                </svg>
+        <div class="tc-header">
+            <div class="tc-logo">
+                <div class="tc-logo-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="#00f2fe" stroke-width="1.8" />
+                        <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="#00f2fe" fill-opacity="0.25" />
+                        <circle cx="8.5" cy="11" r="1.8" fill="#00f2fe" />
+                        <circle cx="15.5" cy="11" r="1.8" fill="#00f2fe" />
+                        <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="#38bdf8" />
+                    </svg>
+                </div>
+                <div class="tc-logo-text">Oryx<span>Intel</span></div>
             </div>
-            <div class="tc-logo-text" style="font-size: 24px;">Oryx<span>Intel</span></div>
+            <div class="engine-badge">
+                <span class="engine-pulse-dot"></span>
+                <span>CRISP v3 Active</span>
+            </div>
         </div>
+
         <h1 class="tc-headline">Oryx Intelligence Engine</h1>
-        <p class="tc-sub">CRISP framework · Six neuroscience principles · Feedback learning</p>
+        <p class="tc-sub">CRISP framework · Semantic compression · Zero-hallucination retention</p>
 
         <!-- ── Auth Section ──────────────────────────────── -->
         <div id="auth-section">
@@ -865,7 +926,7 @@
                 <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask">Ask (RAG)</button>
                 <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
                 <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
-                <button class="nav-tab" id="btn-custom-skin" style="margin-left: auto;">🎨 Customize</button>
+                <button class="nav-tab" id="btn-custom-skin" style="margin-left: auto;">🎨 Skin</button>
             </div>
 
             <!-- ── Compress Tab ── -->
@@ -873,9 +934,12 @@
                 <div class="tag">CRISP Optimization</div>
                 
                 <div class="form-row">
-                    <label for="prompt-input" class="section-label">Raw Prompt</label>
-                    <textarea id="prompt-input" class="tc-textarea" placeholder="Paste your lengthy prompt here..."></textarea>
-                    <div id="prompt-error" style="color: #ff4444; font-size: 12px; margin-top: 5px; display: none;">Prompt must be at least 8 words.</div>
+                    <label for="prompt-input" class="section-label">
+                        <span>Raw Prompt</span>
+                        <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
+                    </label>
+                    <textarea id="prompt-input" class="tc-textarea" placeholder="Paste your lengthy prompt here to compress tokens without losing meaning..."></textarea>
+                    <div id="prompt-error" style="color: #ef4444; font-size: 12px; margin-top: 5px; display: none;">Prompt must be at least 8 words.</div>
                 </div>
                 
                 <div class="form-row" style="display: none;">
@@ -883,14 +947,13 @@
                     <input type="text" id="task-input" class="tc-input" placeholder="What should the AI do with this prompt?" value="Optimize prompt">
                 </div>
 
-
                 <div class="form-row">
                     <label for="mode" class="section-label">Compression Mode</label>
                     <div class="select-wrap">
                         <select id="mode" class="tc-select">
-                            <option value="balanced">Balanced</option>
-                            <option value="gentle">Gentle</option>
-                            <option value="aggressive">Aggressive</option>
+                            <option value="balanced">Balanced — Measured pruning with full context fidelity</option>
+                            <option value="gentle">Gentle — Minimal trimming, preserves exact phrase phrasing</option>
+                            <option value="aggressive">Aggressive — Maximum token reduction & structural distillation</option>
                         </select>
                         <div class="select-chevron">▼</div>
                     </div>
@@ -914,6 +977,9 @@
                 <button class="tc-compress-btn" onclick="compress()" id="compress-btn" disabled>
                     ⚡ Compress Prompt
                 </button>
+                <div class="shortcut-hint">
+                    Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress
+                </div>
 
                 <!-- Result Section -->
                 <div id="result-section" style="display:none;">
@@ -933,14 +999,22 @@
                             <div class="stat-lbl">Tokens Saved</div>
                         </div>
                     </div>
+
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" id="token-progress-bar"></div>
+                    </div>
+                    <div class="progress-label">
+                        <span>Efficiency Ratio</span>
+                        <span id="token-saving-pct" style="color: var(--accent-text); font-weight: 600;">0% saved</span>
+                    </div>
                     
-                    <div class="section-label">Optimized Prompt (CRISP)</div>
+                    <div class="section-label">Optimized Prompt (CRISP Engine Output)</div>
                     <div class="output-box" id="result-output"></div>
                     
                     <div class="feedback-row">
                         <button class="btn-success-sm" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
                         <button class="btn-danger-sm" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
-                        <button class="copy-btn" onclick="copyResult()">📋 Copy</button>
+                        <button class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
                     </div>
                 </div>
             </div>
@@ -1014,13 +1088,13 @@
 
                 <div id="scenario-result-section" style="display:none; margin-top: 20px;">
                     <hr class="divider">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                         <span class="badge badge-accent" id="scenario-badge-source">Source: internal knowledge base only</span>
                         <span class="badge badge-success" id="scenario-badge-ns">Namespace: general</span>
                     </div>
 
                     <div class="section-label" id="scenario-result-header">Response Output</div>
-                    <div class="output-box" id="scenario-result-output" style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;"></div>
+                    <div class="output-box" id="scenario-result-output" style="white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.6;"></div>
 
                     <div id="scenario-citations-box" style="margin-top: 16px; display: none;">
                         <div class="section-label">Retrieved Internal Citations</div>
@@ -1028,7 +1102,7 @@
                     </div>
 
                     <!-- ── Aggressive Compression Conversion Action ── -->
-                    <div id="scenario-aggressive-cta" style="margin-top: 24px; padding: 18px; border-radius: 12px; background: rgba(255, 215, 0, 0.08); border: 1px solid rgba(255, 215, 0, 0.25);">
+                    <div id="scenario-aggressive-cta" style="margin-top: 24px; padding: 18px; border-radius: 12px; background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2);">
                         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
                             <div>
                                 <h4 style="margin: 0 0 4px 0; font-size: 15px; color: var(--head-text); display: flex; align-items: center; gap: 6px;">
@@ -1058,7 +1132,7 @@
                         </div>
 
                         <div class="section-label">Clean LLM Prompt Payload (Ready for API / Chat)</div>
-                        <div class="output-box" id="scenario-aggressive-output" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; background: rgba(0, 0, 0, 0.25);"></div>
+                        <div class="output-box" id="scenario-aggressive-output" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;"></div>
                     </div>
                 </div>
             </div>
@@ -1081,53 +1155,55 @@
 </div>
 
 <!-- ── Custom Skin Modal ── -->
-<div id="skin-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
-    <div class="glass-card" style="max-width: 400px; padding: 24px;">
+<div id="skin-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(6px);">
+    <div class="glass-card" style="max-width: 420px; padding: 28px;">
         <h2 class="tc-headline" style="font-size: 20px; margin-bottom: 16px;">Customize UI Skin</h2>
         <div class="form-row">
             <label class="section-label">Background Base</label>
             <div class="select-wrap">
                 <select id="skin-bg-type" class="tc-select">
-                    <option value="light">Light Mode</option>
-                    <option value="dark">Dark Mode</option>
+                    <option value="dark">Dark Obsidian</option>
+                    <option value="light">Light Minimal</option>
                 </select>
                 <div class="select-chevron">▼</div>
             </div>
         </div>
         <div class="form-row">
             <label class="section-label">Primary Color</label>
-            <input type="color" id="skin-primary" value="#4facfe" style="width: 100%; height: 40px; border: none; cursor: pointer; border-radius: 8px;">
+            <input type="color" id="skin-primary" value="#00f2fe" style="width: 100%; height: 42px; border: 1px solid var(--inp-border); cursor: pointer; border-radius: 10px; background: transparent;">
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 24px;">
+        <div style="display: flex; gap: 10px; margin-top: 24px;">
             <button class="tc-compress-btn" id="skin-modal-apply" style="flex: 1; margin: 0; padding: 10px;">Apply Skin</button>
-            <button class="clear-btn" id="skin-modal-reset" style="flex: 1; margin: 0; padding: 10px;">Reset Dynamic</button>
+            <button class="clear-btn" id="skin-modal-reset" style="flex: 1; margin: 0; padding: 10px;">Reset Default</button>
         </div>
         <button class="btn-ghost" id="skin-modal-close" style="width: 100%; margin-top: 12px; border: none;">Cancel</button>
     </div>
 </div>
 
-<script src="neuro_ambient.js?v=3"></script>
-<script src="neuron_animation.js?v=3"></script>
-<script src="dev_engine.js?v=3"></script>
-<script src="prompt_optimizer.js?v=3"></script>
+<script src="neuro_ambient.js?v=4"></script>
+<script src="neuron_animation.js?v=4"></script>
+<script src="dev_engine.js?v=4"></script>
+<script src="prompt_optimizer.js?v=4"></script>
 <script src="mock_api.js?v=4"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 
-    <!-- Neuro Progress Overlay -->
+    <!-- Zero-RAM Vector Neural Progress Overlay -->
     <div id="neuro-progress-overlay">
         <canvas id="neuron-canvas"></canvas>
         <div class="brain-loader">
-            <div class="brain-pulse"></div>
-            <div class="neural-lines"></div>
-            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);">
-                <svg width="50" height="50" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="white" stroke-width="1.5" />
-                    <circle cx="12" cy="11" r="4" fill="white" fill-opacity="0.2" stroke="white" />
+            <svg class="vector-neural-ring" viewBox="0 0 100 100">
+                <circle class="ring-bg" cx="50" cy="50" r="42" />
+                <circle class="ring-pulse" cx="50" cy="50" r="42" />
+            </svg>
+            <div class="brain-center-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="#00f2fe" stroke-width="1.8" />
+                    <circle cx="12" cy="11" r="3.5" fill="#00f2fe" fill-opacity="0.3" stroke="#00f2fe" stroke-width="1.2" />
                 </svg>
             </div>
         </div>
-        <div id="progress-status">Initializing Neuro-Engine...</div>
-        <div class="progress-subtext">Mapping prompt topology based on raw input</div>
+        <div id="progress-status">Initializing CRISP Neuro-Engine...</div>
+        <div class="progress-subtext">Calibrating semantic entropy & token pruning thresholds</div>
     </div>
 </body>
 </html>

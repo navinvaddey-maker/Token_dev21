@@ -323,14 +323,18 @@ async fn eval_scenario_compression_benchmark() {
     let retriever = DocumentRetriever::new(RagStore::new(pool.clone()));
 
     // Load domain, style, and egress registries
-    let domain_reg =
-        Arc::new(ScenarioDomainRegistry::load_from_file("config/scenario/domains.json").expect("load domains.json"));
+    let domain_reg = Arc::new(
+        ScenarioDomainRegistry::load_from_file("config/scenario/domains.json")
+            .expect("load domains.json"),
+    );
     let style_reg = Arc::new(
         ScenarioStyleRegistry::load_from_file("config/scenario/styles.json", "prompts/styles")
             .expect("load styles.json"),
     );
-    let egress_guard =
-        Arc::new(ScenarioEgressGuard::load_from_file("config/scenario/egress.json").expect("load egress.json"));
+    let egress_guard = Arc::new(
+        ScenarioEgressGuard::load_from_file("config/scenario/egress.json")
+            .expect("load egress.json"),
+    );
 
     let router = ScenarioModeRouter::new(
         domain_reg,
@@ -393,7 +397,12 @@ async fn eval_scenario_compression_benchmark() {
     println!("\n=== Scenario Mode Prompt Compression & Contract Integrity Benchmark ===");
     println!(
         "{:<45} | {:>10} | {:>12} | {:>11} | {:>13} | {:>12}",
-        "Query (truncated)", "Raw Tokens", "Comp. Tokens", "Compression", "Contract Int.", "Fact Matrix"
+        "Query (truncated)",
+        "Raw Tokens",
+        "Comp. Tokens",
+        "Compression",
+        "Contract Int.",
+        "Fact Matrix"
     );
     println!("{:-<116}", "");
 
@@ -445,14 +454,28 @@ async fn eval_scenario_compression_benchmark() {
 
         // Verify Contract Integrity: all 8 sections must exist in both
         let contract_valid = comp_resp.output_text.contains("=== SYSTEM PROMPT ===")
-            && comp_resp.output_text.contains("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE")
-            && comp_resp.output_text.contains("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS")
-            && comp_resp.output_text.contains("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES")
-            && comp_resp.output_text.contains("# 6. TARGET RESPONSE SCHEMA CONTRACT")
-            && comp_resp.output_text.contains("# 7. RECOMMENDED EXECUTION MODEL")
-            && comp_resp.output_text.contains("# 8. REGULATORY & COMPLIANCE DISCLAIMER")
+            && comp_resp
+                .output_text
+                .contains("# 1. SYSTEM DIRECTIVE & SPECIALIZED ROLE")
+            && comp_resp
+                .output_text
+                .contains("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS")
+            && comp_resp
+                .output_text
+                .contains("# 5. DETERMINISTIC TOOLS & RESOURCE CAPABILITIES")
+            && comp_resp
+                .output_text
+                .contains("# 6. TARGET RESPONSE SCHEMA CONTRACT")
+            && comp_resp
+                .output_text
+                .contains("# 7. RECOMMENDED EXECUTION MODEL")
+            && comp_resp
+                .output_text
+                .contains("# 8. REGULATORY & COMPLIANCE DISCLAIMER")
             && comp_resp.output_text.contains("=== USER PROMPT ===")
-            && comp_resp.output_text.contains("# 2. USER SCENARIO OBJECTIVE");
+            && comp_resp
+                .output_text
+                .contains("# 2. USER SCENARIO OBJECTIVE");
 
         if !contract_valid {
             all_contracts_valid = false;
@@ -486,7 +509,11 @@ async fn eval_scenario_compression_benchmark() {
             raw_tokens,
             comp_tokens,
             ratio_pct,
-            if contract_valid { "PRESERVED" } else { "BROKEN" },
+            if contract_valid {
+                "PRESERVED"
+            } else {
+                "BROKEN"
+            },
             if fact_matrix_clean { "CLEAN" } else { "DIRTY" }
         );
     }
@@ -504,12 +531,28 @@ async fn eval_scenario_compression_benchmark() {
         total_raw_tokens,
         total_comp_tokens,
         net_savings_pct,
-        if all_contracts_valid { "100% PASS" } else { "FAIL" },
-        if all_matrices_present { "100% PASS" } else { "FAIL" }
+        if all_contracts_valid {
+            "100% PASS"
+        } else {
+            "FAIL"
+        },
+        if all_matrices_present {
+            "100% PASS"
+        } else {
+            "FAIL"
+        }
     );
 
-    assert!(all_contracts_valid, "All prompt contracts must be preserved");
-    assert!(all_matrices_present, "Fact matrices must be synthesized cleanly");
-    assert!(total_comp_tokens <= total_raw_tokens, "Compressed tokens should not exceed raw tokens");
+    assert!(
+        all_contracts_valid,
+        "All prompt contracts must be preserved"
+    );
+    assert!(
+        all_matrices_present,
+        "Fact matrices must be synthesized cleanly"
+    );
+    assert!(
+        total_comp_tokens <= total_raw_tokens,
+        "Compressed tokens should not exceed raw tokens"
+    );
 }
-

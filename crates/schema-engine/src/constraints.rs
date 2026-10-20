@@ -9,6 +9,7 @@ pub struct ConstraintSet {
 }
 
 impl ConstraintSet {
+    #[must_use]
     pub fn default_rust() -> Self {
         Self {
             blocked_tokens: vec!["unsafe".into(), ".unwrap()".into()],
@@ -18,6 +19,7 @@ impl ConstraintSet {
         }
     }
 
+    #[must_use]
     pub fn validate(&self, schema: &PromptSchema, tokens: &[String]) -> ConstraintResult {
         if let Some(max) = self.max_tokens {
             if schema.token_count > max {
