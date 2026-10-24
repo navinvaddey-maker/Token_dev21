@@ -96,11 +96,18 @@ pub fn generate_role(
         extract_domain_noun(raw).unwrap_or_else(|| "Systems".to_string())
     };
 
-    let base_role = if base_title.contains(&domain_name) {
-        base_title.to_string()
-    } else {
-        format!("{} {}", domain_name, base_title)
-    };
+    let is_self_contained_role = base_title.split_whitespace().count() >= 2
+        || base_title.ends_with("er")
+        || base_title.ends_with("or")
+        || base_title.ends_with("ist")
+        || base_title.ends_with("ian");
+
+    let base_role =
+        if base_title.contains(&domain_name) || is_self_contained_role || domain_name.is_empty() {
+            base_title.to_string()
+        } else {
+            format!("{} {}", domain_name, base_title)
+        };
 
     // Step 5: Focus extraction
     let mut topics = extract_focus_topics(raw, domain_taxonomy, canonical_domain);
@@ -263,6 +270,12 @@ fn domain_anchored_fallback(domain: &str, intent: &IntentClass) -> &'static str 
         ("real-estate", IntentClass::Analyze) => "Property Analyst",
         ("real-estate", IntentClass::Build) => "Real Estate Strategist",
         ("real-estate", _) => "Real Estate Professional",
+
+        // Travel & Hospitality
+        ("travel", IntentClass::Build) => "Travel Planner",
+        ("travel", IntentClass::Analyze) => "Travel & Tourism Analyst",
+        ("travel", IntentClass::Explain) => "Travel Guide & Advisor",
+        ("travel", _) => "Itinerary Specialist",
 
         // Workplace Productivity
         ("workplace-productivity", IntentClass::Analyze) => "Organizational Analyst",

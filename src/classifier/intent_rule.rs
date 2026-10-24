@@ -335,6 +335,22 @@ const VERTICALS: &[(&str, &[&str])] = &[
             "retail tech",
         ],
     ),
+    (
+        "travel",
+        &[
+            "itinerary",
+            "trip",
+            "travel",
+            "vacation",
+            "holiday",
+            "sightseeing",
+            "tourism",
+            "hotel",
+            "tourist",
+            "flight booking",
+            "resort",
+        ],
+    ),
 ];
 
 const HASH_MARGIN_GAP: f32 = 0.05;

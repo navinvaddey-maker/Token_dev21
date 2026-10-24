@@ -440,6 +440,42 @@
       "domain": "customer-support",
       "keywords": ["support", "ticket", "customer-service", "helpdesk", "zendesk", "sla", "satisfaction", "csat", "onboarding", "churn-prevention", "resolution"],
       "boost": 2
+    },
+    {
+      "domain": "travel",
+      "aliases": ["lifestyle-travel", "tourism", "itinerary-planning"],
+      "boost": 3,
+      "keywords": [
+        "itinerary", "trip", "travel", "vacation", "holiday", "destination",
+        "hotel", "flight", "tour", "sightseeing", "goa", "booking", "tourism",
+        "resort", "homestay", "excursion", "backpacking", "roadtrip"
+      ],
+      "persona_template": "Experienced {role} specializing in bespoke itinerary planning, destination logistics, and travel budget optimization.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Destination Logistics & Route Planning",
+            "description": "Establish travel transit, lodging hubs, arrival schedules, and geographic cluster routes.",
+            "estimated_duration": "Day 1",
+            "deliverables": ["Route & Transit Logistics Map", "Lodging & Hub Selection"]
+          },
+          {
+            "phase_number": 2,
+            "name": "Daily Activity & Dining Scheduling",
+            "description": "Schedule morning/afternoon/evening activities, attractions, and dietary-compliant dining options.",
+            "estimated_duration": "Day 2-3",
+            "deliverables": ["Hour-by-Hour Activity Schedule", "Curated Dining & Dietary Recommendations"]
+          },
+          {
+            "phase_number": 3,
+            "name": "Cost Optimization & Contingency Blueprint",
+            "description": "Itemize cost estimates across lodging, transit, food, and activities to enforce budget ceiling.",
+            "estimated_duration": "Ongoing",
+            "deliverables": ["Itemized Budget & Expense Allocation", "Cost-Saving Alternatives & Contingencies"]
+          }
+        ]
+      }
     }
   ],
   "roles": [
@@ -759,6 +795,30 @@
         { "word": "burnout",          "weight": 9 },
         { "word": "metrics",          "weight": 8 }
       ]
+    },
+    {
+      "priority": 6,
+      "domain": "travel",
+      "base_title": "Travel Planner",
+      "verbs": [
+        { "word": "itinerary", "weight": 10 },
+        { "word": "trip",      "weight": 9 },
+        { "word": "vacation",  "weight": 9 },
+        { "word": "travel",    "weight": 8 },
+        { "word": "tour",      "weight": 8 },
+        { "word": "holiday",   "weight": 8 }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "travel",
+      "base_title": "Itinerary Specialist",
+      "verbs": [
+        { "word": "itinerary",   "weight": 10 },
+        { "word": "sightseeing", "weight": 9 },
+        { "word": "destination", "weight": 8 },
+        { "word": "schedule",    "weight": 7 }
+      ]
     }
   ],
   "constraints": [
@@ -873,6 +933,29 @@
       "trigger": [
         [{ "word": "gdpr", "weight": 10 }],
         [{ "word": "data", "weight": 6 }, { "word": "privacy", "weight": 9 }]
+      ]
+    },
+    {
+      "id": "vegetarian_only",
+      "domain": "travel",
+      "priority": 4,
+      "is_forbidden": false,
+      "description": "Strictly vegetarian dining options and meal recommendations only",
+      "trigger": [
+        [{ "word": "vegetarian", "weight": 10 }],
+        [{ "word": "veg", "weight": 8 }, { "word": "only", "weight": 6 }]
+      ]
+    },
+    {
+      "id": "travel_budget_bound",
+      "domain": "travel",
+      "priority": 4,
+      "is_forbidden": false,
+      "description": "Strict budget ceiling optimization across transit, lodging, and activities",
+      "trigger": [
+        [{ "word": "under", "weight": 6 }, { "word": "inr", "weight": 9 }],
+        [{ "word": "under", "weight": 6 }, { "word": "budget", "weight": 8 }],
+        [{ "word": "optimize", "weight": 7 }, { "word": "cost", "weight": 8 }]
       ]
     }
   ]

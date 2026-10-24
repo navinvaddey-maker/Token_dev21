@@ -486,6 +486,22 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "mindfulness",
             ],
         },
+        DomainScore {
+            domain: "travel",
+            keywords: &[
+                "itinerary",
+                "trip",
+                "travel",
+                "vacation",
+                "holiday",
+                "sightseeing",
+                "tourism",
+                "hotel",
+                "resort",
+                "flight",
+                "destination",
+            ],
+        },
     ];
 
     let mut best_domain = "general";

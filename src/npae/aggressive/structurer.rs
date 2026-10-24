@@ -1403,6 +1403,19 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
                 .push("Macros and micronutrients are balanced according to activity level".into());
             criteria.push("Includes clear instructions for tracking and adjustment".into());
         }
+        (super::intent::IntentClass::Build, "travel") => {
+            criteria.push(
+                "Itinerary schedule is geographically logical and optimizes transit times".into(),
+            );
+            criteria.push("All activities, accommodations, and dining options adhere to specified budget limits".into());
+            criteria.push(
+                "Dietary preferences and family group constraints are fully satisfied".into(),
+            );
+            criteria.push(
+                "Includes actionable booking recommendations and cost-optimization alternatives"
+                    .into(),
+            );
+        }
         (_, "workplace-productivity") => {
             criteria
                 .push("Differentiates between objective output and subjective sentiment".into());
@@ -1764,6 +1777,7 @@ fn derive_persona_anchor(
         "finance" => format!("Senior {} focused on quantitative analysis, risk management, and financial modeling.", role),
         "cybersecurity" => format!("Security {} specializing in threat detection, vulnerability research, and incident response.", role),
         "legal" => format!("Senior {} with expertise in regulatory compliance, contract law, and strategic advisory.", role),
+        "travel" => format!("Experienced {} specializing in bespoke itinerary planning, destination logistics, and travel budget optimization.", role),
         "workplace-productivity" => format!("Senior {} specializing in organizational dynamics, distributed team performance, and workplace culture.", role),
         _ => format!("Professional {} with deep expertise in the {} domain and related methodologies.", role, domain),
     }

@@ -243,6 +243,7 @@ fn lookup_synonym(domain: &str) -> Option<&'static str> {
             Some("workplace-productivity")
         }
         "real estate" | "property management" | "housing" => Some("real-estate"),
+        "travel" | "tourism" | "itinerary" | "vacation" | "holiday planning" => Some("travel"),
         _ => None,
     }
 }

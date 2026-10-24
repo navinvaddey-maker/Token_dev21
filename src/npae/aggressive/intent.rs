@@ -382,6 +382,21 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
             &["productivity", "culture", "collaboration", "burnout"],
         ),
         (
+            "travel",
+            &[
+                "itinerary",
+                "trip",
+                "travel",
+                "vacation",
+                "holiday",
+                "sightseeing",
+                "tourism",
+                "hotel",
+                "resort",
+                "tour",
+            ],
+        ),
+        (
             "career-growth",
             &[
                 "career",
@@ -519,11 +534,27 @@ fn extract_subject(raw: &str) -> Option<String> {
         return None;
     }
 
-    // Strategy: find the first contiguous run of non-stop, non-verb words
-    // that represents the noun phrase (the "what" of the prompt).
+    // Strategy: find noun phrases.
+    // Prioritize the first valid phrase immediately following an action verb (the direct object/target),
+    // then fall back to the longest non-empty candidate.
+    let mut first_post_verb: Option<Vec<String>> = None;
     let mut best_phrase: Vec<String> = Vec::new();
     let mut current_phrase: Vec<String> = Vec::new();
     let mut past_first_verb = false;
+
+    let is_valid_candidate = |phrase: &[String]| -> bool {
+        if phrase.is_empty() {
+            return false;
+        }
+        !phrase.iter().all(|w| {
+            w.chars()
+                .all(|c| c.is_numeric() || c == '$' || c == '%' || !c.is_alphanumeric())
+                || w.eq_ignore_ascii_case("no")
+                || w.eq_ignore_ascii_case("not")
+                || w.eq_ignore_ascii_case("without")
+                || w.len() <= 1
+        })
+    };
 
     for word in &words {
         let clean = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '$');
@@ -532,11 +563,15 @@ fn extract_subject(raw: &str) -> Option<String> {
         }
         let lower = clean.to_lowercase();
 
-        // Skip stop words and action verbs — they precede the subject
+        // Skip stop words and action verbs — they delimit noun phrases
         if stop_words.contains(lower.as_str()) {
-            // If we were building a phrase, save it as candidate
-            if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
-                best_phrase = current_phrase.clone();
+            if is_valid_candidate(&current_phrase) {
+                if past_first_verb && first_post_verb.is_none() {
+                    first_post_verb = Some(current_phrase.clone());
+                }
+                if current_phrase.len() >= best_phrase.len() {
+                    best_phrase = current_phrase.clone();
+                }
             }
             current_phrase.clear();
             continue;
@@ -544,32 +579,42 @@ fn extract_subject(raw: &str) -> Option<String> {
 
         if action_verbs.contains(lower.as_str()) {
             past_first_verb = true;
-            if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
-                best_phrase = current_phrase.clone();
+            if is_valid_candidate(&current_phrase) {
+                if first_post_verb.is_none() {
+                    first_post_verb = Some(current_phrase.clone());
+                }
+                if current_phrase.len() >= best_phrase.len() {
+                    best_phrase = current_phrase.clone();
+                }
             }
             current_phrase.clear();
             continue;
         }
 
-        // After an action verb, accumulate noun-phrase words
+        // Accumulate noun-phrase words
         if past_first_verb || current_phrase.is_empty() {
-            // Title-case the word
             let titled = title_case_word(clean);
             current_phrase.push(titled);
         }
     }
 
     // Final flush
-    if current_phrase.len() >= best_phrase.len() && !current_phrase.is_empty() {
-        best_phrase = current_phrase;
+    if is_valid_candidate(&current_phrase) {
+        if past_first_verb && first_post_verb.is_none() {
+            first_post_verb = Some(current_phrase.clone());
+        }
+        if current_phrase.len() >= best_phrase.len() {
+            best_phrase = current_phrase;
+        }
     }
 
-    // Cap at 4 words to keep subject concise
-    if best_phrase.is_empty() {
+    // Prefer the first noun phrase right after the verb (the core subject)
+    let chosen = first_post_verb.unwrap_or(best_phrase);
+    if chosen.is_empty() {
         return None;
     }
     // Filter out invalid phrases that are pure numbers, pure currency, or pure punctuation
-    let is_pure_numbers_or_invalid = best_phrase.iter().all(|w| {
+    let is_pure_numbers_or_invalid = chosen.iter().all(|w| {
         w.chars()
             .all(|c| c.is_numeric() || c == '$' || c == '%' || !c.is_alphanumeric())
             || w.eq_ignore_ascii_case("no")
@@ -580,7 +625,7 @@ fn extract_subject(raw: &str) -> Option<String> {
     if is_pure_numbers_or_invalid {
         return None;
     }
-    let result: Vec<String> = best_phrase.into_iter().take(4).collect();
+    let result: Vec<String> = chosen.into_iter().take(4).collect();
     Some(result.join(" "))
 }
 

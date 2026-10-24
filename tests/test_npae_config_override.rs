@@ -96,3 +96,65 @@ fn test_compress_request_deserialization_with_npae_fields() {
     assert_eq!(req.npae_max_questions, Some(2));
     assert_eq!(req.npae_confidence_threshold, Some(0.85));
 }
+
+#[tokio::test]
+async fn test_itinerary_travel_domain_and_role_accuracy() {
+    let config = ConfigLoader::load("config/unified.json").expect("Failed to load unified.json");
+    let npae_config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(tokio::sync::Mutex::new(OryEngine::new()));
+    let schema_priors = Arc::new(DashMap::new());
+
+    let orchestrator = PipelineOrchestrator::build(schema_priors, npae_config_handle, ory_engine);
+    let mut session = SessionHistory::new(10);
+
+    let prompt = "Plan a 3-day itinerary in Goa for a family of 4 under 30000 INR, vegetarian food only, then optimize it for cost";
+
+    let resp = orchestrator
+        .process(prompt, &mut session, None, Some("aggressive"), None, None)
+        .await
+        .expect("Process should succeed");
+
+    if let OrchestratorResponse::Aggressive(aggressive_resp) = resp {
+        let sp = &aggressive_resp.structured_prompt;
+        println!("ROLE: {}", sp.role.primary);
+        println!("DOMAIN: {}", sp.context.domain);
+        println!("PERSONA ANCHOR: {}", sp.role.persona_anchor);
+        println!(
+            "PHASES: {:?}",
+            sp.execution_phases
+                .iter()
+                .map(|p| &p.name)
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(
+            sp.context.domain, "travel",
+            "Domain must be travel, not nutrition"
+        );
+        assert!(
+            sp.role.primary.contains("Travel") || sp.role.primary.contains("Itinerary"),
+            "Role must be a Travel/Itinerary specialist, got: {}",
+            sp.role.primary
+        );
+        assert!(
+            !sp.role.primary.to_lowercase().contains("dietician"),
+            "Role must not hallucinate Dietician"
+        );
+        assert!(
+            !sp.role
+                .persona_anchor
+                .to_lowercase()
+                .contains("dietary programming"),
+            "Persona must not hallucinate clinical nutrition"
+        );
+        assert!(
+            sp.execution_phases
+                .iter()
+                .any(|p| p.name.to_lowercase().contains("logistics")
+                    || p.name.to_lowercase().contains("activity")),
+            "Execution phases must be travel/itinerary logistics"
+        );
+    } else {
+        panic!("Expected OrchestratorResponse::Aggressive");
+    }
+}
