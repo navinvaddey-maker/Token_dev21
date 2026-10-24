@@ -289,7 +289,8 @@ fn domain_anchored_fallback(domain: &str, intent: &IntentClass) -> &'static str 
 fn extract_domain_noun(raw: &str) -> Option<String> {
     let stop_words: HashSet<&str> = [
         "The", "A", "An", "This", "That", "It", "I", "You", "He", "She", "We", "They", "Is", "Are",
-        "Was", "Were", "Will", "Would", "Can", "Could", "To", "And", "Or",
+        "Was", "Were", "Will", "Would", "Can", "Could", "To", "And", "Or", "No", "Not", "Never",
+        "Without", "Avoid", "Since", "Under", "Over", "Only", "Day", "Days", "Year", "Years",
     ]
     .iter()
     .copied()
@@ -301,7 +302,11 @@ fn extract_domain_noun(raw: &str) -> Option<String> {
             let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
             if !clean_word.is_empty() {
                 let first_char = clean_word.chars().next().unwrap();
-                if first_char.is_uppercase() && !stop_words.contains(clean_word) {
+                if first_char.is_uppercase()
+                    && !clean_word.chars().any(|c| c.is_numeric())
+                    && !stop_words.contains(clean_word)
+                    && clean_word.len() > 2
+                {
                     return Some(clean_word.to_string());
                 }
             }

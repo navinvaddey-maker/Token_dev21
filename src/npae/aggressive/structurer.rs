@@ -644,19 +644,26 @@ pub fn build(
     })
 }
 
-/// Extract a meaningful task description — summary based, not raw snippet
+/// Extract a meaningful task description — summary based, not raw snippet.
+/// Preserves complete clauses and avoids breaking off mid-phrase.
 fn extract_task_description(raw: &str, intent_type: &str) -> String {
     let (_, _, user_prompt) = split_raw_input(raw);
+    let trimmed = user_prompt.trim();
 
-    // Attempt to extract a short summary (first 10 words or first sentence)
-    let summary = user_prompt
-        .split(|c: char| c == '.' || c == '\n')
-        .next()
-        .unwrap_or(&user_prompt)
-        .split_whitespace()
-        .take(12)
-        .collect::<Vec<_>>()
-        .join(" ");
+    // Prefer first full sentence or first complete clause up to punctuation
+    let first_line = trimmed.lines().next().unwrap_or(trimmed).trim();
+    let sentence = first_line
+        .split(&['.', '?', '!', ';'][..])
+        .map(|s| s.trim())
+        .find(|s| !s.is_empty())
+        .unwrap_or(first_line);
+
+    let words: Vec<&str> = sentence.split_whitespace().collect();
+    let summary = if words.len() <= 20 {
+        sentence.to_string()
+    } else {
+        format!("{}...", words[..18].join(" "))
+    };
 
     format!("{} [Type: {}]", summary, intent_type)
 }
@@ -700,6 +707,26 @@ fn naturalize_subject(
     intent: &crate::npae::aggressive::intent::IntentClass,
 ) -> String {
     let lower = subject.to_lowercase();
+    let is_garbage = lower.contains("no ")
+        || lower == "no"
+        || lower.contains("not ")
+        || lower == "not"
+        || lower.contains("without ")
+        || lower == "without"
+        || lower.contains("under ")
+        || lower
+            .chars()
+            .all(|c| c.is_numeric() || !c.is_alphanumeric());
+
+    if is_garbage {
+        return match intent {
+            crate::npae::aggressive::intent::IntentClass::Build => "system".to_string(),
+            crate::npae::aggressive::intent::IntentClass::Analyze => "framework".to_string(),
+            crate::npae::aggressive::intent::IntentClass::Explain => "concept".to_string(),
+            _ => "solution".to_string(),
+        };
+    }
+
     let abstract_terms = [
         "industry",
         "domain",

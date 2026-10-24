@@ -451,7 +451,8 @@ fn extract_subject(raw: &str) -> Option<String> {
         "would", "could", "should", "can", "may", "might", "have", "has", "had", "to", "for", "of",
         "in", "on", "at", "by", "with", "from", "and", "or", "but", "not", "if", "so", "just",
         "also", "more", "most", "very", "about", "into", "some", "want", "need", "like",
-        "actually", "really",
+        "actually", "really", "no", "non", "never", "without", "avoid", "exclude", "except",
+        "please", "only", "days", "day", "hours", "hour", "since", "under", "over",
     ]
     .iter()
     .copied()
@@ -565,6 +566,18 @@ fn extract_subject(raw: &str) -> Option<String> {
 
     // Cap at 4 words to keep subject concise
     if best_phrase.is_empty() {
+        return None;
+    }
+    // Filter out invalid phrases that are pure numbers, pure currency, or pure punctuation
+    let is_pure_numbers_or_invalid = best_phrase.iter().all(|w| {
+        w.chars()
+            .all(|c| c.is_numeric() || c == '$' || c == '%' || !c.is_alphanumeric())
+            || w.eq_ignore_ascii_case("no")
+            || w.eq_ignore_ascii_case("not")
+            || w.eq_ignore_ascii_case("without")
+            || w.len() <= 1
+    });
+    if is_pure_numbers_or_invalid {
         return None;
     }
     let result: Vec<String> = best_phrase.into_iter().take(4).collect();
