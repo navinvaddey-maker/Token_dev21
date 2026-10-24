@@ -234,10 +234,10 @@ User compresses prompt
 | GAP-014 / GAP-34 | CorrectionCycle placeholder | ✅ **RESOLVED** | `types.rs` — Replaced with `calculate_improvement_delta()` |
 | GAP-040 | Un-wired legacy pipeline drafts | ✅ **RESOLVED** | `orchestrator.rs` marked canonical engine; drafts deprecated |
 | GAP-41 | Role mismatch across vertical boundaries (e.g. venture asks in pharma mapped to dev roles) | ✅ **RESOLVED** | `classifier/intent_rule.rs`, `npae/aggressive/role.rs`, `structurer.rs` |
-| GAP-35 | OryEngine.process() called on Aggressive path but result not used for output routing | 🟠 High | `npae/aggressive/engine.rs` |
+| GAP-35 | OryEngine.process() called on Aggressive path but result not used for output routing | ✅ **RESOLVED** | `npae/aggressive/engine.rs` & `structurer.rs` — DynamicBlueprint phases, validation steps, and rationale wired into StructuredPrompt |
 | GAP-36 | HallucinationGuard remediation is hardcoded string replacement, not semantic | 🟠 High | `npae/hallucination/guard.rs:62-78` |
 | GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | 🟡 Medium | `rag/ingest.rs:240` |
-| GAP-38 | PatternMemory lost on restart unless `save_to_db()` explicitly called | 🟡 Medium | `npae/ory/memory.rs` |
+| GAP-38 | PatternMemory lost on restart unless `save_to_db()` explicitly called | ✅ **RESOLVED** | `main.rs` & `npae/ory/memory.rs` — Background periodic flush (every 5 min) + graceful shutdown hook |
 | GAP-39 | No ANN index — full-table cosine scan degrades beyond 10K chunks | 🟡 Medium | `rag/store.rs:212` |
 
 ---

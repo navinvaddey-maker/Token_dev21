@@ -291,6 +291,38 @@ fn generate_phases(
                 4.0,
             ));
         }
+        "travel" => {
+            phases.push(bp(
+                "Destination Logistics & Route Planning",
+                "Establish transit, lodging hubs, arrival schedules, and geographic routes",
+                vec!["Route & Transit Logistics Map", "Lodging & Hub Selection"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["logistics_plan"],
+                4.0,
+            ));
+            phases.push(bp(
+                "Daily Activity & Dining Scheduling",
+                "Schedule daily activities, attractions, and dietary-compliant dining options",
+                vec![
+                    "Hour-by-Hour Activity Schedule",
+                    "Curated Dining Recommendations",
+                ],
+                PhaseType::Design,
+                vec!["logistics_plan"],
+                vec!["itinerary_schedule"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Cost Optimization & Contingency Blueprint",
+                "Itemize cost estimates across lodging, transit, food, and activities under budget ceiling",
+                vec!["Itemized Budget Allocation", "Cost-Saving Alternatives"],
+                PhaseType::Validation,
+                vec!["itinerary_schedule"],
+                vec!["final_itinerary"],
+                4.0,
+            ));
+        }
         _ => {
             // Generic phases based on intent objective
             phases.push(bp(

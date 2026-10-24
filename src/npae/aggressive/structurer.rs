@@ -465,6 +465,39 @@ pub fn build(
     reconstructed: &crate::types::ReconstructedInput,
     derived_rag: Option<&DerivedRagContext>,
 ) -> std::result::Result<StructuredPrompt, String> {
+    build_with_blueprint(
+        profile,
+        raw,
+        resolved,
+        config,
+        reconstructed,
+        derived_rag,
+        None,
+    )
+}
+
+/// Builds a structured prompt, incorporating an optional dynamic blueprint from OryEngine.
+///
+/// # Arguments
+/// * `profile` - Intent profile derived from classification
+/// * `raw` - Raw prompt text
+/// * `resolved` - Pre-resolved persona and inclusions
+/// * `config` - Optional unified config
+/// * `reconstructed` - Tokens and constraint locks from Stage -1
+/// * `derived_rag` - Optional extracted RAG facts
+/// * `blueprint` - Optional dynamic blueprint synthesized by OryArchitect
+///
+/// # Errors
+/// Returns error string on formatting or structure build failure.
+pub fn build_with_blueprint(
+    profile: &IntentProfile,
+    raw: &str,
+    resolved: &super::resolver::ResolvedPrompt,
+    config: Option<&super::config::UnifiedConfig>,
+    reconstructed: &crate::types::ReconstructedInput,
+    derived_rag: Option<&DerivedRagContext>,
+    blueprint: Option<&crate::npae::ory::types::DynamicBlueprint>,
+) -> std::result::Result<StructuredPrompt, String> {
     let role_primary = resolved.role.clone();
     let mut inclusions = resolved.inclusions.clone();
     let forbidden = resolved.forbidden.clone();
@@ -513,11 +546,41 @@ pub fn build(
         }
     }
 
-    // Infer execution phases based on temporal scope, domain templates, and intent
-    let execution_phases = infer_execution_phases(profile, raw, config);
+    // ARCH: GAP-35 — If a dynamic blueprint was architected by OryEngine, use its phases and validation steps.
+    // Otherwise fallback to static domain/template inference.
+    let (execution_phases, validation_steps) = if let Some(bp) = blueprint {
+        let phases: Vec<ExecutionPhase> = bp
+            .phases
+            .iter()
+            .enumerate()
+            .map(|(idx, p)| ExecutionPhase {
+                phase_number: (idx + 1) as u8,
+                name: p.name.clone(),
+                description: p.description.clone(),
+                estimated_duration: format!("Complexity {:.1}/10", p.estimated_complexity),
+                deliverables: p.expected_deliverables.clone(),
+            })
+            .collect();
 
-    // Infer validation steps if validation signals detected
-    let validation_steps = infer_validation_steps(profile, raw);
+        let val_steps: Vec<ValidationStep> = bp
+            .validation_checklist
+            .iter()
+            .enumerate()
+            .map(|(idx, check)| ValidationStep {
+                step_number: (idx + 1) as u8,
+                name: format!("Verification Step {}", idx + 1),
+                criteria: check.clone(),
+                validation_method: "Automated & Human Review".to_string(),
+            })
+            .collect();
+
+        (phases, val_steps)
+    } else {
+        (
+            infer_execution_phases(profile, raw, config),
+            infer_validation_steps(profile, raw),
+        )
+    };
 
     // Infer success criteria (Intent-driven)
     let success_criteria = infer_success_criteria(profile, raw);
@@ -526,7 +589,19 @@ pub fn build(
     let assumptions = infer_assumptions(profile, raw);
 
     // Build dynamic instruction
-    let dynamic_instruction = derive_dynamic_instruction(profile, raw);
+    let mut dynamic_instruction = derive_dynamic_instruction(profile, raw);
+    if let Some(bp) = blueprint {
+        if !bp.rationale.is_empty() {
+            if dynamic_instruction.is_empty() {
+                dynamic_instruction = format!("Architecture Strategy: {}", bp.rationale);
+            } else {
+                dynamic_instruction = format!(
+                    "{}\nArchitecture Strategy: {}",
+                    dynamic_instruction, bp.rationale
+                );
+            }
+        }
+    }
 
     // Build constraints meta from detected signals
     let constraints_meta = build_constraints_meta(profile);

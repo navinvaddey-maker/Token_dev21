@@ -159,3 +159,107 @@ impl PatternMemory {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::npae::ory::types::{
+        BlueprintPhase, BlueprintStrategy, DynamicBlueprint, LearnedIntent, PatternOutcome,
+        PhaseGraph, PhaseType, ResourceEstimate, ScopeClass,
+    };
+    use chrono::Utc;
+
+    #[tokio::test]
+    async fn test_pattern_memory_dirty_and_persistence() -> Result<()> {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .connect("sqlite::memory:")
+            .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS learned_patterns (
+                pattern_id         TEXT PRIMARY KEY,
+                domain_fingerprint TEXT NOT NULL,
+                intent_fingerprint TEXT NOT NULL,
+                blueprint_json     TEXT NOT NULL,
+                usage_count        INTEGER NOT NULL,
+                success_rate       REAL NOT NULL,
+                last_used          TIMESTAMP NOT NULL,
+                created_at         TIMESTAMP NOT NULL
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await?;
+
+        let mut mem = PatternMemory::new();
+        assert!(!mem.is_dirty());
+
+        let intent = LearnedIntent {
+            raw_prompt: "Test prompt".into(),
+            core_objective: "Build test".into(),
+            inferred_domain: "software".into(),
+            novel_signals: vec![],
+            hidden_dependencies: vec![],
+            confidence_score: 0.9,
+            audience_level: None,
+            temporal_markers: vec![],
+            constraint_phrases: vec![],
+            meta_instructions: vec![],
+            complexity_score: 3.0,
+            intent_fingerprint: "test-fp-123".into(),
+        };
+
+        let bp = DynamicBlueprint {
+            architecture_id: "ORY-TEST".into(),
+            strategy: BlueprintStrategy::NovelDesign {
+                reasoning: "Test".into(),
+            },
+            rationale: "Rationale".into(),
+            phases: vec![BlueprintPhase {
+                name: "Phase 1".into(),
+                description: "Desc".into(),
+                expected_deliverables: vec!["D1".into()],
+                phase_type: PhaseType::Design,
+                inputs: vec![],
+                outputs: vec![],
+                estimated_complexity: 2.0,
+            }],
+            phase_graph: PhaseGraph {
+                edges: vec![],
+                parallel_groups: vec![],
+            },
+            resource_estimate: ResourceEstimate {
+                complexity_score: 2.0,
+                estimated_token_budget: 100,
+                suggested_phases: 1,
+                scope_class: ScopeClass::Quick,
+            },
+            validation_checklist: vec!["Verify 1".into()],
+            developer_notes: "Notes".into(),
+            reuse_patterns: vec![],
+        };
+
+        let outcome = PatternOutcome {
+            pattern_id: "pat-1".into(),
+            quality_score: 8.5,
+            success: true,
+            improvement_notes: vec![],
+        };
+
+        mem.record(&intent, &bp, &outcome)?;
+        assert!(mem.is_dirty());
+
+        // Persist to database
+        mem.persist(&pool).await?;
+        assert!(!mem.is_dirty());
+
+        // Reload from database
+        let loaded = PatternMemory::load_from_db(&pool).await?;
+        assert_eq!(loaded.len(), 1);
+        let _found = loaded.find_match(&intent);
+        assert!(loaded.patterns.contains_key(&intent.intent_fingerprint));
+
+        Ok(())
+    }
+}

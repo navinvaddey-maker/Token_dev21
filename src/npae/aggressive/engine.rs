@@ -77,14 +77,16 @@ impl AggressiveEngine {
             .dispatch(structurer_impl, &profile)
             .map_err(|e| e.to_string())?;
 
-        // 2. Build structured prompt with derived RAG facts in context background
-        let structured = super::structurer::build(
+        // 2. Build structured prompt with derived RAG facts and optional Ory DynamicBlueprint
+        // ARCH: GAP-35 — Forward Ory blueprint into structurer to honor dynamic execution roadmap.
+        let structured = super::structurer::build_with_blueprint(
             &profile,
             &user_prompt,
             &resolved_prompt,
             Some(&config_guard),
             reconstructed,
             derived_rag.as_ref(),
+            ory_result.blueprint.as_ref(),
         )?;
 
         // 3. Score ambiguity (accounting for gaps resolved by RAG facts)
