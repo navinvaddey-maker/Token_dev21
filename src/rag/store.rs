@@ -172,8 +172,8 @@ impl RagStore {
                 .map(|m| serde_json::to_string(m).unwrap_or_default());
 
             sqlx::query(
-                r#"INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+                r#"INSERT INTO rag_chunks (id, document_id, chunk_index, content, embedding, metadata, token_count, created_at, embedding_model, model_version)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
             )
             .bind(&chunk.id)
             .bind(&chunk.document_id)
@@ -183,6 +183,8 @@ impl RagStore {
             .bind(&metadata_json)
             .bind(chunk.token_count)
             .bind(chunk.created_at)
+            .bind(&chunk.embedding_model)
+            .bind(&chunk.model_version)
             .execute(&self.pool)
             .await?;
         }
@@ -255,7 +257,7 @@ impl RagStore {
             let in_clause = placeholders.join(", ");
             let query_str = format!(
                 "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
-                        d.filename, d.domain
+                        d.filename, d.domain, c.embedding_model, c.model_version
                  FROM rag_chunks c
                  JOIN rag_documents d ON c.document_id = d.id
                  WHERE d.user_id = $1 AND d.id IN ({}) AND d.status = 'ready' AND c.embedding IS NOT NULL",
@@ -269,7 +271,7 @@ impl RagStore {
         } else {
             sqlx::query_as::<_, ChunkSearchRow>(
                 "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
-                        d.filename, d.domain
+                        d.filename, d.domain, c.embedding_model, c.model_version
                  FROM rag_chunks c
                  JOIN rag_documents d ON c.document_id = d.id
                  WHERE d.user_id = $1 AND d.status = 'ready' AND c.embedding IS NOT NULL",
@@ -305,6 +307,8 @@ impl RagStore {
                         metadata,
                         token_count: row.token_count,
                         created_at: row.created_at,
+                        embedding_model: row.embedding_model,
+                        model_version: row.model_version,
                     },
                     similarity_score: score,
                     document_filename: row.filename,
@@ -352,7 +356,7 @@ impl RagStore {
 
         let match_expr = words.join(" OR ");
         let query_str = "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
-                                d.filename, d.domain
+                                d.filename, d.domain, c.embedding_model, c.model_version
                          FROM rag_chunks_fts f
                          JOIN rag_chunks c ON f.chunk_id = c.id
                          JOIN rag_documents d ON c.document_id = d.id
@@ -396,6 +400,8 @@ impl RagStore {
                         metadata,
                         token_count: row.token_count,
                         created_at: row.created_at,
+                        embedding_model: row.embedding_model,
+                        model_version: row.model_version,
                     },
                     similarity_score: score,
                     document_filename: row.filename,
@@ -624,4 +630,6 @@ struct ChunkSearchRow {
     created_at: chrono::DateTime<chrono::Utc>,
     filename: String,
     domain: Option<String>,
+    embedding_model: String,
+    model_version: String,
 }

@@ -121,13 +121,14 @@ impl<'a> ScenarioClassifier<'a> {
         })
     }
 
-    /// Seeds the scenario_index table by embedding all unseeded archetype example queries.
+    /// Seeds the scenario_index table by embedding all unseeded or mismatched archetype example queries.
     pub async fn seed_archetype_vectors_on_startup(
         &self,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let unseeded_rows = sqlx::query_as::<_, (i64, String)>(
-            "SELECT id, example_query FROM scenario_index WHERE length(vector_blob) = 0",
+            "SELECT id, example_query FROM scenario_index WHERE length(vector_blob) = 0 OR embedding_model != $1",
         )
+        .bind(crate::rag::types::DEFAULT_EMBEDDING_MODEL)
         .fetch_all(self.pool)
         .await?;
 
@@ -135,14 +136,24 @@ impl<'a> ScenarioClassifier<'a> {
         for (id, example_query) in unseeded_rows {
             let vector = self.engine.embed(&example_query);
             let blob = crate::rag::types::embedding_to_bytes(&vector);
-            sqlx::query("UPDATE scenario_index SET vector_blob = ?1 WHERE id = ?2")
-                .bind(blob)
-                .bind(id)
-                .execute(self.pool)
-                .await?;
+            sqlx::query(
+                "UPDATE scenario_index SET vector_blob = ?1, embedding_model = ?2, model_version = ?3 WHERE id = ?4",
+            )
+            .bind(blob)
+            .bind(crate::rag::types::DEFAULT_EMBEDDING_MODEL)
+            .bind(crate::rag::types::DEFAULT_MODEL_VERSION)
+            .bind(id)
+            .execute(self.pool)
+            .await?;
         }
 
-        tracing::info!("ScenarioClassifier: seeded {} archetype vectors", count);
+        if count > 0 {
+            tracing::info!(
+                model = crate::rag::types::DEFAULT_EMBEDDING_MODEL,
+                "ScenarioClassifier: seeded/updated {} archetype vectors",
+                count
+            );
+        }
         Ok(())
     }
 
@@ -150,8 +161,9 @@ impl<'a> ScenarioClassifier<'a> {
         let rows = sqlx::query_as::<_, (String, String, String, String, String, Vec<u8>)>(
             "SELECT label, domain, task_type, expertise, intent_class, vector_blob
              FROM scenario_index
-             WHERE length(vector_blob) > 0",
+             WHERE length(vector_blob) > 0 AND embedding_model = $1",
         )
+        .bind(crate::rag::types::DEFAULT_EMBEDDING_MODEL)
         .fetch_all(self.pool)
         .await?;
 

@@ -104,6 +104,53 @@
             </div>
         </section>
 
+        <section id="feedback-section">
+            <div class="stats-grid">
+                <div class="stat-card glass">
+                    <h3>Total Feedback Signals</h3>
+                    <p id="stat-total-feedback">0</p>
+                </div>
+            </div>
+
+            <div class="table-container glass" style="margin-bottom: 2rem;">
+                <div class="table-header">
+                    <h2>Feedback Signals By Type</h2>
+                    <button class="btn-refresh" onclick="loadFeedback()">↻ Refresh</button>
+                </div>
+                <table id="feedback-type-table">
+                    <thead>
+                        <tr>
+                            <th>Signal Type</th>
+                            <th>Count</th>
+                            <th>Avg Sentiment / Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedback-type-tbody">
+                        <tr><td colspan="3" class="empty-row">Loading feedback signals...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-container glass">
+                <div class="table-header">
+                    <h2>Feedback By Use Case</h2>
+                </div>
+                <table id="feedback-usecase-table">
+                    <thead>
+                        <tr>
+                            <th>Use Case</th>
+                            <th>Signal Type</th>
+                            <th>Count</th>
+                            <th>Avg Sentiment / Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedback-usecase-tbody">
+                        <tr><td colspan="4" class="empty-row">Loading feedback by use case...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- ── RAG Knowledge Base Section ─────────────────────────────── -->
         <section id="rag-section">
 

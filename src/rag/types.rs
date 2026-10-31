@@ -56,6 +56,8 @@ pub struct RagChunk {
     pub metadata: Option<ChunkMetadata>,
     pub token_count: Option<i64>,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    pub embedding_model: String,
+    pub model_version: String,
 }
 
 /// Metadata attached to each chunk for provenance tracking.
@@ -68,6 +70,12 @@ pub struct ChunkMetadata {
 }
 
 // ── Embedding ──────────────────────────────────────────────────────────────
+
+/// Canonical model name in use for neural vector embeddings.
+pub const DEFAULT_EMBEDDING_MODEL: &str = "all-MiniLM-L6-v2";
+
+/// Canonical version string for the active embedding model.
+pub const DEFAULT_MODEL_VERSION: &str = "1.0";
 
 /// The dimensionality of embeddings produced by the local model.
 /// Using 384 for MiniLM-L6-v2 compatibility.
@@ -125,6 +133,10 @@ impl Default for RetrievalQuery {
 // ── Ingestion ──────────────────────────────────────────────────────────────
 
 /// Configuration for the PDF chunking strategy.
+///
+/// Calibrated for `all-MiniLM-L6-v2`:
+/// - 200 words (~250-260 word-pieces) fits comfortably inside the 256/512 token context window.
+/// - 32 words overlap ensures semantic continuity across chunk boundaries without truncation.
 #[derive(Debug, Clone)]
 pub struct ChunkingConfig {
     pub chunk_size_tokens: usize,
@@ -136,8 +148,8 @@ pub struct ChunkingConfig {
 impl Default for ChunkingConfig {
     fn default() -> Self {
         Self {
-            chunk_size_tokens: 512,
-            overlap_tokens: 64,
+            chunk_size_tokens: 200,
+            overlap_tokens: 32,
             max_pages: 500,
             max_file_size_bytes: 50 * 1024 * 1024, // 50 MB
         }

@@ -279,13 +279,49 @@ function renderResult(result) {
     if (elOutput) elOutput.textContent = result.optimized_prompt;
     if (elBar) elBar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
     if (elPct) elPct.textContent = `${pct}% saved`;
+
+    // Reset feedback buttons and status for new result
+    const btnUp = document.getElementById('btn-feedback-up');
+    const btnDown = document.getElementById('btn-feedback-down');
+    const fbStatus = document.getElementById('feedback-status');
+    if (btnUp) {
+        btnUp.disabled = false;
+        btnUp.style.opacity = '1';
+        btnUp.style.outline = 'none';
+    }
+    if (btnDown) {
+        btnDown.disabled = false;
+        btnDown.style.opacity = '1';
+        btnDown.style.outline = 'none';
+    }
+    if (fbStatus) fbStatus.style.display = 'none';
 }
 
 async function submitFeedback(rating) {
     if (!State.lastResult) return;
+    const btnUp = document.getElementById('btn-feedback-up');
+    const btnDown = document.getElementById('btn-feedback-down');
+    const fbStatus = document.getElementById('feedback-status');
+
     try {
         await API.feedback({ history_id: State.lastResult.id, rating });
         showToast(rating === 'thumbs_up' ? 'Thanks for the feedback! 👍' : 'Feedback recorded 👎', 'success');
+
+        if (btnUp && btnDown) {
+            btnUp.disabled = true;
+            btnDown.disabled = true;
+            if (rating === 'thumbs_up') {
+                btnUp.style.outline = '2px solid #fff';
+                btnDown.style.opacity = '0.4';
+            } else {
+                btnDown.style.outline = '2px solid #fff';
+                btnUp.style.opacity = '0.4';
+            }
+        }
+        if (fbStatus) {
+            fbStatus.textContent = rating === 'thumbs_up' ? '✓ Marked as Useful' : '✓ Marked as Not Useful';
+            fbStatus.style.display = 'inline-block';
+        }
     } catch (err) {
         showToast(err.message, 'error');
     }

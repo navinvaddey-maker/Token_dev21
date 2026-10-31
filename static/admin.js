@@ -77,6 +77,8 @@ function switchSection(sectionId) {
         document.getElementById('section-title').textContent = 'RAG Knowledge Base';
     } else if (sectionId === 'ask') {
         document.getElementById('section-title').textContent = 'Ask (RAG)';
+    } else if (sectionId === 'feedback') {
+        document.getElementById('section-title').textContent = 'Feedback Signals';
     } else {
         document.getElementById('section-title').textContent = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
     }
@@ -85,6 +87,7 @@ function switchSection(sectionId) {
     if (sectionId === 'overview') loadOverview();
     else if (sectionId === 'users') loadUsers();
     else if (sectionId === 'history') loadHistory();
+    else if (sectionId === 'feedback') loadFeedback();
     else if (sectionId === 'rag') loadRag();
 }
 
@@ -252,6 +255,70 @@ function renderHistory() {
             <td>${new Date(h.created_at).toLocaleString()}</td>
         </tr>
     `).join('');
+}
+
+// ── Feedback Signals Section ─────────────────────────────────────────────────
+
+async function loadFeedback() {
+    const tbodyType = document.getElementById('feedback-type-tbody');
+    const tbodyUseCase = document.getElementById('feedback-usecase-tbody');
+    try {
+        if (tbodyType) tbodyType.innerHTML = '<tr><td colspan="3" class="empty-row">Loading feedback signals...</td></tr>';
+        if (tbodyUseCase) tbodyUseCase.innerHTML = '<tr><td colspan="4" class="empty-row">Loading feedback by use case...</td></tr>';
+
+        const data = await apiFetch('/api/admin/feedback-analysis');
+        renderFeedback(data);
+    } catch (err) {
+        console.error('Failed to load feedback analysis:', err);
+        if (tbodyType) tbodyType.innerHTML = `<tr><td colspan="3" class="empty-row" style="color: #f87171;">Failed: ${err.message}</td></tr>`;
+        if (tbodyUseCase) tbodyUseCase.innerHTML = `<tr><td colspan="4" class="empty-row" style="color: #f87171;">Failed: ${err.message}</td></tr>`;
+    }
+}
+
+function renderFeedback(data) {
+    if (!data) return;
+
+    const totalEl = document.getElementById('stat-total-feedback');
+    if (totalEl) totalEl.textContent = data.total_feedback_signals || 0;
+
+    const tbodyType = document.getElementById('feedback-type-tbody');
+    if (tbodyType) {
+        if (!data.feedback_by_type || data.feedback_by_type.length === 0) {
+            tbodyType.innerHTML = '<tr><td colspan="3" class="empty-row">No feedback signals recorded yet.</td></tr>';
+        } else {
+            tbodyType.innerHTML = data.feedback_by_type.map(item => {
+                const avg = Number(item.avg_value || 0).toFixed(2);
+                const avgColor = avg > 0 ? '#4ade80' : (avg < 0 ? '#f87171' : '#94a3b8');
+                return `
+                    <tr>
+                        <td><span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">${item.signal_type}</span></td>
+                        <td>${item.signal_count}</td>
+                        <td style="color: ${avgColor}; font-weight: 600;">${avg > 0 ? '+' + avg : avg}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    const tbodyUseCase = document.getElementById('feedback-usecase-tbody');
+    if (tbodyUseCase) {
+        if (!data.feedback_by_use_case || data.feedback_by_use_case.length === 0) {
+            tbodyUseCase.innerHTML = '<tr><td colspan="4" class="empty-row">No use case feedback recorded yet.</td></tr>';
+        } else {
+            tbodyUseCase.innerHTML = data.feedback_by_use_case.map(item => {
+                const avg = Number(item.avg_value || 0).toFixed(2);
+                const avgColor = avg > 0 ? '#4ade80' : (avg < 0 ? '#f87171' : '#94a3b8');
+                return `
+                    <tr>
+                        <td><strong>${item.use_case || 'general'}</strong></td>
+                        <td><span class="badge">${item.signal_type}</span></td>
+                        <td>${item.signal_count}</td>
+                        <td style="color: ${avgColor}; font-weight: 600;">${avg > 0 ? '+' + avg : avg}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
 }
 
 // ── RAG Knowledge Base Section ───────────────────────────────────────────────
@@ -506,3 +573,9 @@ async function deleteRagDoc(id) {
         alert('Failed to delete document: ' + err.message);
     }
 }
+
+// Expose functions called by HTML onclick handlers
+window.loadFeedback = loadFeedback;
+window.openEditModal = openEditModal;
+window.deleteUser = deleteUser;
+window.deleteRagDoc = deleteRagDoc;

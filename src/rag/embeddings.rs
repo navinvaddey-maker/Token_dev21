@@ -1,20 +1,70 @@
 use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use super::types::EMBEDDING_DIM;
 
+/// Resolves the FastEmbed cache directory deterministically, checking:
+/// 1. `FASTEMBED_CACHE_DIR` environment variable
+/// 2. `CARGO_MANIFEST_DIR/.fastembed_cache`
+/// 3. Current directory or parent directories containing `.fastembed_cache`
+/// 4. Default fallback to `.fastembed_cache`
+fn resolve_fastembed_cache_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("FASTEMBED_CACHE_DIR") {
+        if !dir.trim().is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
+
+    if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+        let manifest_cache = PathBuf::from(manifest_dir).join(".fastembed_cache");
+        if manifest_cache.exists() {
+            return manifest_cache;
+        }
+    }
+
+    // Check current working directory and walk up parents
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = cwd.as_path();
+        loop {
+            let candidate = curr.join(".fastembed_cache");
+            if candidate.exists() {
+                return candidate;
+            }
+            match curr.parent() {
+                Some(parent) => curr = parent,
+                None => break,
+            }
+        }
+    }
+
+    PathBuf::from(".fastembed_cache")
+}
+
 /// Globally shared in-process neural embedding model loaded once.
 static FASTEMBED_MODEL: Lazy<Option<Mutex<TextEmbedding>>> = Lazy::new(|| {
-    let mut options = TextInitOptions::default();
+    let cache_dir = resolve_fastembed_cache_dir();
+    let mut options = TextInitOptions::default().with_cache_dir(cache_dir.clone());
     options.model_name = EmbeddingModel::AllMiniLML6V2;
     options.show_download_progress = false;
 
     match TextEmbedding::try_new(options) {
-        Ok(model) => Some(Mutex::new(model)),
+        Ok(model) => {
+            tracing::info!(
+                cache_dir = %cache_dir.display(),
+                model = "all-MiniLM-L6-v2",
+                "FastEmbed neural embedding model initialized successfully"
+            );
+            Some(Mutex::new(model))
+        }
         Err(e) => {
-            tracing::debug!("FastEmbed local initialization deferred/offline ({}). Using deterministic feature hash fallback.", e);
+            tracing::error!(
+                cache_dir = %cache_dir.display(),
+                error = %e,
+                "CRITICAL: FastEmbed neural model failed to initialize. Falling back to FNV-1a feature hashing. Semantic vector search is degraded!"
+            );
             None
         }
     }
@@ -30,6 +80,7 @@ static FASTEMBED_MODEL: Lazy<Option<Mutex<TextEmbedding>>> = Lazy::new(|| {
 ///
 /// # Invariants
 /// The returned embedding is always of length `EMBEDDING_DIM` (384) and L2-normalized.
+#[derive(Debug, Clone, Copy)]
 pub struct EmbeddingEngine {
     dim: usize,
 }
@@ -46,6 +97,12 @@ impl EmbeddingEngine {
         // Force lazy initialization on startup
         let _ = &*FASTEMBED_MODEL;
         Self { dim: EMBEDDING_DIM }
+    }
+
+    /// Returns `true` if the underlying neural model (`all-MiniLM-L6-v2`) is active,
+    /// or `false` if currently falling back to deterministic FNV-1a feature hashing.
+    pub fn is_neural(&self) -> bool {
+        FASTEMBED_MODEL.is_some()
     }
 
     /// Embed a single text string into a fixed-dimension f32 vector.
@@ -310,5 +367,25 @@ mod tests {
         let v = engine.embed("test sentence for similarity");
         let sim = cosine_similarity(&v, &v);
         assert!((sim - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_is_neural_engine_active() {
+        let engine = EmbeddingEngine::new();
+        // Since .fastembed_cache exists in the workspace, neural model must initialize
+        assert!(
+            engine.is_neural(),
+            "Expected FastEmbed neural model to be active"
+        );
+    }
+
+    #[test]
+    fn test_cache_dir_resolution_finds_cache() {
+        let cache_dir = resolve_fastembed_cache_dir();
+        assert!(
+            cache_dir.exists(),
+            "Expected resolved cache dir {:?} to exist",
+            cache_dir
+        );
     }
 }

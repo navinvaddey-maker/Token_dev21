@@ -1012,8 +1012,9 @@
                     <div class="output-box" id="result-output"></div>
                     
                     <div class="feedback-row">
-                        <button class="btn-success-sm" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
-                        <button class="btn-danger-sm" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
+                        <span id="feedback-status" style="font-size: 12px; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
+                        <button class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
+                        <button class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
                         <button class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
                     </div>
                 </div>

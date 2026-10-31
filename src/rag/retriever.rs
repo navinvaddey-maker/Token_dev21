@@ -48,8 +48,13 @@ impl DocumentRetriever {
     {
         let start = Instant::now();
 
-        // Generate query embedding
-        let query_vector = self.embeddings.embed(&query.query_text);
+        // ARCH: §6 Async Rules — CPU-bound ONNX neural inference must not run on async Tokio worker threads.
+        let embeddings_engine = self.embeddings;
+        let query_text_cloned = query.query_text.clone();
+        let query_vector =
+            tokio::task::spawn_blocking(move || embeddings_engine.embed(&query_text_cloned))
+                .await
+                .map_err(|e| format!("Worker thread error generating query embedding: {}", e))?;
 
         // Perform hybrid cosine similarity + BM25 search in database with pre-truncation filtering
         let results = self

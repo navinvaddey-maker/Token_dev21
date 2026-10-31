@@ -10,6 +10,7 @@ use super::embeddings::EmbeddingEngine;
 use super::store::RagStore;
 use super::types::{
     ChunkMetadata, ChunkingConfig, DocumentStatus, IngestionResult, RagChunk, RagDocument,
+    DEFAULT_EMBEDDING_MODEL, DEFAULT_MODEL_VERSION,
 };
 
 /// PDF Ingestion Pipeline
@@ -345,6 +346,8 @@ fn chunk_text(pages: &[String], config: &ChunkingConfig) -> Vec<RagChunk> {
                 metadata: Some(metadata),
                 token_count: Some(chunk_words.len() as i64),
                 created_at: chrono::Utc::now(),
+                embedding_model: DEFAULT_EMBEDDING_MODEL.to_string(),
+                model_version: DEFAULT_MODEL_VERSION.to_string(),
             };
 
             chunks.push(chunk);
