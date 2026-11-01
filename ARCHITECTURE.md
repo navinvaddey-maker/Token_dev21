@@ -1,200 +1,452 @@
-# Token Compress Engine Architecture
-
-## Project Identity
+# token_compress_engine — Canonical Architecture
 
 ```
-Project  : token_compress_engine
-Stack    : Rust | Axum | SQLite
-Scale    : Monolithic service, designed for millions of records
-Owner    : navinvaddey
-Last updated : 2026-03-29 by kilo/nvidia/nemotron-3-super-120b-a12b:free
+Project      : token_compress_engine
+Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
+Scale        : Monolithic service, designed for millions of records
+Owner        : navinvaddey
+Version      : 3.2.0 (Unified Canonical Spec, Reality Audit & Ory/Memory Integration)
+Last updated : 2026-10-31 by Antigravity (Gemini 3.8 Flash)
+Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
-## Architecture Overview
-> **Scale Contract (GAP-15):** The engine currently utilizes SQLite in WAL mode with a busy timeout. This architecture has a strict write-concurrency ceiling. **If concurrent active sessions exceed 100K, SQLite is mathematically disqualified as the storage layer.** At that scale threshold, the system must migrate to PostgreSQL (or TiKV for write-heavy paths) and introduce an in-memory staging cache (e.g., `moka` or Redis) to decouple read paths from the append-only logs.
+---
 
-The Token Compress Engine is a monolithic Rust application built with the Axum web framework and backed by SQLite. It implements a high-fidelity, 7-stage token compression pipeline designed to optimize prompt efficiency through adaptive learning, structural analysis, and continuous feedback loops.
+## Purpose of This Document
 
-### High-Level Component Diagram
-```mermaid
-graph TD
-    User((User/Client)) --> API["API Layer (Axum)"]
-    API --> Domain["Domain Layer (Orchestration)"]
-    Domain --> Pipeline["7-Stage Pipeline (engine/)"]
-    Pipeline --> Algorithms["Algorithms (lexical, sparse, predictive)"]
-    Pipeline --> Learning["Learning Engine (Hebbian/Competitive)"]
-    Pipeline --> DB[(SQLite Database)]
-    Learning --> DB
-    Domain --> Behavior["Behavior Layer (Feedback/Analysis)"]
-    Behavior --> Learning
-```
+v1 and v2 architecture documents describe **what was designed**.
+This document captures **what actually exists in code**, the gaps between spec and implementation,
+a precise audit of whether RAG is used correctly, and a fine-tuning strategy to eliminate
+hallucination risk.
 
-### The 7-Stage Compression Pipeline
-The core of the engine is a strictly sequenced 7-stage pipeline (0A through 6B) as specified in the Refinements Guide:
+---
 
-```mermaid
-graph LR
-    S0A[Stage 0A: Normalization] --> S0B[Stage 0B: Topology]
-    S0B --> S1[Stage 1: Signal Reduction]
-    S1 --> S2[Stage 2: Boundary/Mode]
-    S2 --> S3[Stage 3: Context Mgmt]
-    S3 --> S4[Stage 4: Schema Filling]
-    S4 --> S4B[Stage 4B: Field Validation]
-    S4B --> S5[Stage 5: Scope Injection]
-    S5 --> S6A[Stage 6A: Generation]
-    S6A -- "TES/SFS < 6" --> S6B[Stage 6B: Correction Cycle]
-    S6B --> S6A
-```
+## 1. Reality Check: What Actually Exists in Code
 
-### Directory Structure
+### 1.1 Three Parallel Pipeline Implementations (The Biggest Structural Gap)
+
+The codebase has **three distinct pipeline systems** — all partially wired, none of them the sole authority:
+
+| Implementation | File | Status |
+|---|---|---|
+| `PipelineOrchestrator` | `src/pipeline/orchestrator.rs` | **Active Canonical Engine** — used in `/api/compress` |
+| `engine/pipeline.rs::run()` | `src/engine/pipeline.rs` | **Legacy (Deprecated)** — 5-stage predecessor |
+| `engine/neuro/` | `src/engine/neuro/` | **Internal Subroutines** — topology routing used by Stage 1 |
+
+`PipelineOrchestrator` is the single canonical active execution engine across all modes.
+
+### 1.2 Actual Pipeline Stages Implemented
+
+The active `PipelineOrchestrator` implements the following real stages:
 
 ```
-src/
-├── api/              # HTTP controllers and route definitions
-├── data/             # Database access layer (repositories)
-├── domain/           # Business logic and use cases
-├── engine/           # Core compression algorithms and learning engine
-├── behavior/         # User behavior analysis and feedback processing
-├── models/           # Data models and database schema
-├── algorithms/       # Specific compression algorithm implementations
-├── pipeline/         # Data processing pipeline orchestration
-├── session/          # User session management
-├── types.rs          # Shared types and constants
-└── lib.rs            # Library exports and shared state (AppState)
+Stage -1  : TokenReconstructor         → src/engine/reconstruction/
+Stage 0A  : NormalizationPrePass       → src/pipeline/stage0_normalize.rs
+Stage 0B  : TopologyClassifier        → src/pipeline/stage0b_topology.rs
+Stage 1   : Stage1 (Signal Reduction) → src/pipeline/stage1.rs
+Stage 2   : Stage2 (Mode Routing)     → src/pipeline/stage2.rs
+Stage 3   : Stage3 (Context Mgmt)     → src/pipeline/stage3.rs
+Stage 4   : Stage4 (Schema Filling)   → src/pipeline/stage4.rs
+Stage 4B  : FieldTypeValidator        → src/algorithms/field_validator.rs
+Stage 5   : Stage5 (Scope Injection)  → src/pipeline/stage5.rs
+Stage 6A  : Stage6a (Generation)      → src/pipeline/stage6a.rs
+Stage 6B  : Stage6b (Correction Loop) → src/pipeline/stage6b.rs
+Guard     : HallucinationGuard        → src/npae/hallucination/guard.rs
+OryEngine : Pattern Memory Orchestrator→ src/npae/ory/
 ```
 
-## Component Details
+**Stage 6B is implemented in `src/pipeline/stage6b.rs`** as a dedicated modular correction loop used by the orchestrator.
 
-### 1. API Layer (`src/api/`)
-Handles HTTP requests and responses, routing, and middleware.
-- Defines API endpoints using Axum
-- Handles request validation and response formatting
-- Contains authentication and authorization logic
+### 1.3 The Dual Routing Split (Critical Architecture Reality)
 
-### 2. Data Layer (`src/data/`)
-Database access layer implementing the repository pattern.
-- Contains database connection and query logic
-- Implements CRUD operations for all entities
-- Uses SQLx for database interactions
+The orchestrator has a **binary routing fork at Stage 3** output:
 
-### 3. Domain Layer (`src/domain/`)
-Contains business logic and application use cases.
-- Orchestrates data flow between repositories and engines
-- Implements core application logic (user registration, compression, etc.)
-- Coordinates with the learning engine for adaptive behavior
+```
+Mode = Aggressive → NPAE path (Fully Guarded & Scored)
+  ├─ npae::compression::pipeline::run_parallel_pipeline()
+  ├─ AggressiveEngine::run()
+  ├─ OryEngine (meta-orchestrator with pattern memory)
+  ├─ HallucinationGuard (tri-layer) + Stage 6B Correction Loop (up to 3 cycles)
+  ├─ Scoring (TES + SFS + SCS computed)
+  └─ Returns OrchestratorResponse::Aggressive
 
-### 4. Engine Layer (`src/engine/`)
-Implements the core token compression algorithms and learning capabilities.
-- **LearningEngine**: Integrates Hebbian and Competitive learning for adaptive modeling.
-- **PipelineOrchestrator**: Manages the strict 7-stage compression flow and data routing.
-- **Dual-Scoring**: Calculates Task-Essential (TES) and Schema Fidelity (SFS) scores.
-- **Evaluation**: Quantifies lexical overlap, semantic similarity, and fact recall.
+Mode = Balanced | Gentle → Legacy path
+  ├─ Stage 4 → 4B → 5 → 6A
+  ├─ HallucinationGuard (tri-layer)
+  ├─ Scoring (TES + SFS + SCS)
+  ├─ Correction loop (6B, inline)
+  └─ Returns OrchestratorResponse::Legacy
+```
 
-### 5. Behavior Layer (`src/behavior/`)
-Analyzes user behavior and feedback to improve compression effectiveness.
-- **FeedbackDetector**: Captures explicit (thumbs up/down) and implicit signals.
-- **Adaptive Tuning**: Triggers learning updates based on user interaction success.
+**Both paths enforce identical quality guardrails, Scoring (TES, SFS, SCS), HallucinationGuard, and Stage 6B correction iterations.**
 
-### 6. Models Layer (`src/models/`)
-Defines the strictly enforced domain models and schema definitions.
-- **Entity Definitions**: User, TokenHistory, FeedbackSignal, UseCase, etc.
-- **Version Tracking**: Maintains version history for use-case prompt frames.
+### 1.4 Scenario Classification & Intent × Vertical Role Composition (Deterministic Rules & Gated Fallback)
 
-### 7. Algorithms Layer (`src/algorithms/`)
-The specialized components used within the pipeline stages.
-- **Language Analysis**: Lexical compression and phrase-aware sparse coding.
-- **Cognitive Modeling**: Working memory slots, predictive coding, and topology classification.
-- **Structural Tools**: Schema filling, field type validation, and scope injection.
+To eliminate domain and role hallucination (e.g. classifying venture building in pharma as software/finance development, or personal wealth asks as generic builders), a deterministic Intent × Vertical rule layer executes prior to and inside NPAE / Pipeline processing:
 
-### 8. Pipeline Layer (`src/pipeline/`)
-Orchestrates the sequence of execution for all compression stages.
-- **Stage Management**: Individual modules (Stage 0 through 6) that perform atomic operations.
-- **Data Continuity**: Maintains the `AlgorithmOutput` state across the pipeline.
+```
+raw prompt
+    │
+    ├─ 1. Intent detect (rules, synonym classes: GoalIntent::WealthBuild, GoalIntent::LegalQuery)
+    ├─ 2. Vertical detect (rules, synonym classes: pharma, fintech, energy, real-estate, software, ecommerce)
+    ├─ 3. Role compose: generic primary = f(intent), secondary = vertical
+    │       - primary: "Business Strategist" (WealthBuild), "Legal Advisor" (LegalQuery)
+    │       - secondary: "Pharma", "Fintech", "Real Estate", etc.
+    ├─ 4. Precedence: legal owns role only if question is legal; regulations on wealth paths act as constraints
+    │       - wealth + FDA/licensing → primary="Business Strategist", legal_as_constraint=true
+    └─ 5. Fallback: hash/embedding classifier + margin gate (HASH_MARGIN_GAP = 0.05)
+            → emit domain  OR  abstain (None / "general")
+```
 
-### 9. Scoring & Analytics Layer (`src/scoring/` & Admin)
-New high-fidelity monitoring and performance calibration system.
-- **Dual-Score Logic**: 0-10 scaled scoring for TES (Efficiency) and SFS (Fidelity).
-- **Admin Dashboard**: Real-time monitoring of system throughput, cluster hits, and error metrics.
+The resulting `ScenarioSignal` and NPAE rule profile inject:
+- **`primary_role`**: Generic intent-driven role scaling across N verticals.
+- **`secondary`**: Title-cased industry vertical (surfaced in `PromptRole.secondary` and `# ROLE:` rendering).
+- **`persona_anchor`**: Specialized vertical persona anchor (e.g. `"Senior Business Strategist specializing in Pharma venture building, capital strategy, and industry structure. Finance is a sub-skill, not the owning frame."`).
+- **`legal_as_constraint`**: Keeps legal/regulatory lenses as constraints without hijacking the primary role.
+- **Fast-path stage routing**:
+  - `Stage 0B`: Uses `(domain, task_type)` to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
+  - `Stage 4`: Injects composed primary role, secondary domain, and constraint locks.
 
-## Data Flow
+---
 
-## Detailed Pipeline Stages
+## 2. Full Component Map (What Really Exists)
 
-The orchestration of `PipelineInput` to `CompressionResponse` follows a refined 7-stage process:
+```
+User → API (Axum) → Auth+RateLimit → Domain
+                                       ├─ RAG Retrieval (when rag_enabled)
+                                       ├─ ScenarioClassifier (Intent × Vertical Rule + Hash/Margin)
+                                       │    └─ ScenarioSignal (domain, task_type, primary_role, secondary, rule_locked)
+                                       └─ PipelineOrchestrator
+                                             │
+                                       Stage -1: TokenReconstructor
+                                       Stage 0A: Normalization
+                                       Stage 0B: Topology (fast-path via ScenarioSignal)
+                                       Stage 1: Signal Reduction
+                                       Stage 2: Mode Router ──────────────────────┐
+                                             │                                    │
+                                       Mode: Balanced/Gentle               Mode: Aggressive
+                                       Stage 3: Context Mgmt               NPAE path:
+                                       Stage 4: Schema Filling               compression::pipeline
+                                       Stage 4B: Field Validation            AggressiveEngine::run()
+                                       Stage 5: Scope Injection              OryEngine (pattern memory)
+                                       Stage 6A: Generation                  ↓
+                                       HallucinationGuard (tri-layer)   AggressiveResponse
+                                       Scoring: TES+SFS+SCS             (fully guarded & scored)
+                                       Stage 6B: Correction (inline)
+                                             │
+                                       LearningEngine.update()
+                                       OryEngine.record_outcome()
+                                       SQLite write
+```
 
-1.  **Stage 0A/0B: Normalization & Topology**: Corrects typos against `DOMAIN_VOCAB` and classifies the prompt structure (e.g., "Instructional", "Creative", "Data-Heavy") to set processing priors.
-2.  **Stage 1: Signal Reduction**: Performs lexical compression and phrase-aware sparse coding to remove redundant tokens while preserving domain-specific terminology.
-3.  **Stage 2: Boundary Detection**: Uses predictive coding and `SessionHistory` to decide between "Gentle", "Balanced", and "Aggressive" modes based on entropy thresholds.
-4.  **Stage 3: Context Management**: Leverages Hebbian-derived working memory slots to ensure high-priority context is protected during high-ratio compression.
-5.  **Stage 4/4B: Schema Filling & Validation**: Infers roles, fills missing task fields, and validates the resulting schema (deliverables, constraints) for structural integrity.
-6.  **Stage 5: Scope Injection**: For "Aggressive" mode, injects deterministic scope suggestions to guide the model towards efficient execution.
-7.  **Stage 6A/6B: Generation & Correction**: Generates the final optimized prompt. If the calculated Dual-Score (TES/SFS) falls below 6.0, an auto-correction cycle is triggered.
+---
 
-## Scoring & Monitoring
+## 3. RAG Correctness Audit
 
-### Dual-Scoring System
-The engine evaluates every compression using two primary metrics, mapped to a 0-10 scale:
-- **Task-Essential Score (TES)**: Measures token efficiency and the preservation of critical task instructions.
-- **Schema Fidelity Score (SFS)**: Measures how well the output adheres to the expected structural requirements and constraints.
+### 3.1 RAG Module Summary
 
-### Admin Monitoring
-The administrative dashboard provides real-time visibility into:
-- **System Performance**: p99 latency and throughput.
-- **Cluster Distribution**: Visual mapping of learned user domains and cluster "hits".
-- **Feedback Analysis**: Correlation between algorithm modes and user thumbs-up/down signals.
+| Component | File | What it does |
+|---|---|---|
+| `EmbeddingEngine` | `src/rag/embeddings.rs` | FNV-1a hash projection (NOT neural). Deterministic TF-IDF feature hashing. |
+| `DocumentIngester` | `src/rag/ingest.rs` | PDF → text (pdf-extract crate) → sliding window chunks → hash embed → SQLite BLOB |
+| `RagStore` | `src/rag/store.rs` | CRUD for `rag_documents` + `rag_chunks`. Full-table cosine scan in Rust. |
+| `DocumentRetriever` | `src/rag/retriever.rs` | Embed query → cosine search → log metrics to `rag_retrieval_logs` |
 
-## Data Flow
+### 3.2 Is RAG Used Correctly? VERDICT: NO — It Is an Isolated Silo
 
-1. **Request Handling**: HTTP requests arrive at the API layer.
-2. **Session Identification**: System retrieves `SessionHistory` for context-aware mode decisions.
-3. **Pipeline Execution**: The `PipelineOrchestrator` runs stages 0A through 6B.
-4. **Learning Update**: Regardless of the outcome, the session-wide schema is updated, and results are fed back into the Learning Engine.
-5. **Analytics Logging**: Detailed metrics are recorded for administrator monitoring.
-6. **Response**: The optimized prompt is returned along with detailed fidelity metadata.
+#### ✅ What RAG Does Correctly
 
-## Configuration
+| Criterion | Status | Evidence |
+|---|---|---|
+| Chunking with overlap | ✅ | `chunk_text()` sliding window, configurable overlap (default 64 tokens) |
+| Content deduplication | ✅ | SHA-256 hash on upload prevents duplicate ingestion |
+| Embedding storage | ✅ | L2-normalized f32 BLOB, deserializes correctly for cosine search |
+| Retrieval logging | ✅ | Every query logs time, count, top_similarity to `rag_retrieval_logs` |
+| User-scoping | ✅ | All queries filter by `user_id`; admin sees all |
+| Document lifecycle | ✅ | Processing → Ready → Failed state machine with error handling |
+| Security | ✅ | `HttpStructurer::pre_validate()` blocks XSS/SQLi patterns |
 
-- Environment variables loaded via `dotenvy`
-- Database connection configured through `DATABASE_URL`
-- Admin credentials set via `ADMIN_PASSWORD`
-- Logging configured with `tracing` and `tracing-subscriber`
+#### ❌ What RAG Does INCORRECTLY or Is Missing
 
-## Updated Gap Registry
+| Gap | Severity | Details |
+|---|---|---|
+| **RAG not wired into pipeline** | ✅ **FIXED (GAP-31)** | `EnrichmentContext` is populated in `domain.rs`/`api.rs`, passed to `orchestrator.process()` & `AggressiveEngine::run()`. In Gentle/Balanced mode, chunks render in Stage 6A. In Aggressive mode, `DerivedRagContext` derives clean, non-repetitive facts (250-token budget) into `context.background` without raw source citations, resolving gap zones and hallucination checks. |
 
-| Gap ID | Description | Status | Introduced |
+| **Hash-based embeddings, not semantic** | 🟠 Medium | FNV-1a hash projection. Paraphrases and synonyms produce lower similarity than neural models. Comment in code: "For production, replace with sentence-transformers or fastembed-rs." |
+| **Two incompatible embedding spaces** | ✅ **FIXED (GAP-32)** | Both RAG and ORY now share `crate::rag::embeddings::EmbeddingEngine` (384-dim FNV-1a feature hashing + TF-IDF term weighting). Vectors across RAG & ORY are 100% compatible. |
+| **Full-table cosine scan** | 🟠 High | `RagStore::search()` loads ALL user embeddings into memory. Self-documented limit: <10K chunks. No ANN index. |
+| **RAG injection is caller-side only** | ✅ **FIXED (GAP-31)** | RAG chunks are automatically retrieved in `domain.rs` when `rag_enabled` is true, and automatically injected into prompt context during Stage 6A output generation. |
+| **No re-ranking** | 🟡 Medium | Top-K by cosine similarity only. No cross-encoder, no BM25 hybrid, no diversity filter. |
+| **No chunk quality filter** | 🟡 Medium | Very short chunks and near-empty pages are not filtered during ingestion. |
+| **Config re-read on every ingest** | 🟡 Medium | `detect_domain()` opens and parses `config/unified.json` on every PDF ingest. No caching. |
+
+### 3.3 RAG Data Flow (Current vs Required)
+
+**CURRENT (broken):**
+```
+User uploads PDF → Ingest → Chunk → Hash-embed → SQLite BLOB
+                                                        ↑
+                                               (isolated silo — pipeline never calls this)
+
+User compresses prompt → Pipeline → [RAG.retrieve() never called]
+```
+
+**REQUIRED (GAP-31 fix):**
+```
+User compresses prompt
+  → RAG.retrieve(input, top_k=5)  ← call BEFORE Stage -1
+  → EnrichmentContext { chunks: Vec<SearchResult> }
+  → Stage -1: Reconstruction (constraint clustering)
+  → Stage 0A: Normalization uses RAG facts for ambiguity expansion
+  → Stage 4:  Schema filling grounded in RAG facts (not LLM priors)
+  → Stage 6A: Generation uses RAG-grounded schema
+  → HallucinationGuard: validates claims against RAG source chunks
+```
+
+---
+
+## 4. v1 → v2 → v3 Comparison Table
+
+| Component | v1 (Spec) | v2 (Spec) | v3 (Reality - Updated) |
 |---|---|---|---|
-| GAP-15 | SQLite ceiling at 100K concurrent sessions → PostgreSQL + cache | Open | v1 |
-| GAP-16 | Stage 2 mode routing dead code for unstructured inputs | Fixed in v2 | v1 |
-| GAP-17 | No pre-pipeline reconstruction layer for token-soup inputs | Fixed in v2 | v1 |
-| GAP-18 | Constraint tokens had no immunity from lexical compression | Fixed in v2 | v1 |
-| GAP-19 | `deliverables[]` not a first-class schema field | Fixed in v2 | v1 |
-| GAP-20 | No implicit deliverable inference pass | Fixed in v2 | v1 |
-| GAP-21 | Incomplete phrases passed Stage 0A silently | Fixed in v2 | v1 |
-| GAP-22 | No semantic completeness axis in scoring | Fixed in v2 | v1 |
-| GAP-23 | WM slots seeded from frequency, not schema clusters | Fixed in v2 | v1 |
-| GAP-24 | Correction cycle regenerated full output regardless of axis | Fixed in v2 | v1 |
-| GAP-25 | No semantic embedding module in codebase (`semantic.rs`) | Fixed (Implemented) | NPAE |
-| GAP-26 | No standalone hallucination validation endpoint | Fixed (Implemented) | NPAE |
-| GAP-27 | Ambiguity scoring not exposed as a scored signal outside pipeline | Fixed (Implemented) | NPAE |
-| GAP-28 | No information-gain ranking for ambiguity resolution questions | Fixed (Implemented) | NPAE |
-| GAP-29 | Tri-layer conflict resolution policy not defined | Fixed (Implemented) | NPAE |
-| GAP-30 | NPAE routes share SQLite write path — at 100K sessions, subject to GAP-15 ceiling | Open — blocked on GAP-15 | NPAE |
+| Pipeline stages | 7 (0A–6B) | 8 (−1, 0A–6B) | 8 stages present; dual paths share identical scoring and quality guardrails |
+| Embedding model | None | None mentioned | Unified 384-dim FNV-1a feature hashing engine shared between RAG and ORY classification |
+| RAG integration | Not present | Not present | **Wired (GAP-31 Fixed)**: `EnrichmentContext` retrieved in `domain.rs` & rendered in Stage 6A |
+| Mode differentiation | Dead code (v1 bug) | Fixed via composite routing | Aggressive→NPAE path; Gentle/Balanced→Legacy path. Both fully guarded. |
+| Scoring | TES + SFS | TES + SFS + SCS | **Unified (GAP-33 Fixed)**: TES + SFS + SCS computed on both Aggressive and Legacy paths |
+| HallucinationGuard | Not present | Not present | **Unified (GAP-33 Fixed)**: Tri-layer guard + Stage 6B correction loop run on ALL paths |
+| OryEngine | Not present | Not present | Exists in `src/npae/ory/` — meta-orchestrator with PatternMemory. Unified with RAG embeddings. |
+| Stage 6B | `stage6b.rs` (spec) | `stage6b.rs` (spec) | **Implemented (`src/pipeline/stage6b.rs`)**: Dedicated modular correction loop for quality guardrails. |
+| CorrectionCycle | Real correction | Targeted per-axis | **Implemented (GAP-014 Fixed)**: `calculate_improvement_delta()` calculates empirical pre- vs post-correction score deltas. |
+| Learning loop | Hebbian/Competitive | Same | FeedbackDetector wired (GAP-017 fixed). LearningEngine functional. |
+| CONSTRAINT_LOCK | Stage 1 | All stages | Stored in `output.constraint_locks`. Enforced in Stage 1 & validated downstream. |
+| Role & Domain Classification | None / Heuristic | Stage 0B Pattern | **Implemented (GAP-41)**: 5-Layer Intent × Vertical composition (`intent_rule.rs`) + Gated Centroid Embedding Fallback (`detect_domain` + `ScenarioClassifier`) |
 
-## Change Log (Architectural Changes)
+---
+
+## 5. New Gaps (v3 Audit Findings)
+
+| Gap ID | Description | Severity | Location / Status |
+|---|---|---|---|
+| GAP-31 | RAG EnrichmentContext always None — zero retrieval grounding | ✅ **RESOLVED** | `domain.rs` & `orchestrator.rs` — Wired into Stage 6A |
+| GAP-32 | Two incompatible hash-embedding spaces (rag vs ory) | ✅ **RESOLVED** | `npae/ory/embeddings.rs` — Unified on `EmbeddingEngine` |
+| GAP-33 | Aggressive path exits before Scoring, HallucinationGuard, SCS | ✅ **RESOLVED** | `npae/aggressive/engine.rs` — Guardrails & 6B loop added |
+| GAP-014 / GAP-34 | CorrectionCycle placeholder | ✅ **RESOLVED** | `types.rs` — Replaced with `calculate_improvement_delta()` |
+| GAP-040 | Un-wired legacy pipeline drafts | ✅ **RESOLVED** | `orchestrator.rs` marked canonical engine; drafts deprecated |
+| GAP-41 | Role mismatch across vertical boundaries (e.g. venture asks in pharma mapped to dev roles) | ✅ **RESOLVED** | `classifier/intent_rule.rs`, `npae/aggressive/role.rs`, `structurer.rs` |
+| GAP-35 | OryEngine.process() called on Aggressive path but result not used for output routing | ✅ **RESOLVED** | `npae/aggressive/engine.rs` & `structurer.rs` — DynamicBlueprint phases, validation steps, and rationale wired into StructuredPrompt |
+| GAP-36 | HallucinationGuard remediation is hardcoded string replacement, not semantic | 🟠 High | `npae/hallucination/guard.rs:62-78` |
+| GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | 🟡 Medium | `rag/ingest.rs:240` |
+| GAP-38 | PatternMemory lost on restart unless `save_to_db()` explicitly called | ✅ **RESOLVED** | `main.rs` & `npae/ory/memory.rs` — Background periodic flush (every 5 min) + graceful shutdown hook |
+| GAP-39 | No ANN index — full-table cosine scan degrades beyond 10K chunks | 🟡 Medium | `rag/store.rs:212` |
+
+---
+
+## 6. Target Architecture (Unified v3)
+
+### Key Architectural Changes Required
+
+1. **Wire RAG before Stage -1** — Call `RAGRetriever.retrieve()` before the pipeline starts. Pass result as `EnrichmentContext` to Stage 0A and Stage 4.
+
+2. **Move NPAE to Stage 6A renderer, not exit point** — `AggressiveEngine` becomes the rendering engine called from Stage 6A, not an alternative pipeline exit. All modes go through Stage 4, 4B, 5, 6A, HallucinationGuard, Scoring.
+
+3. **Single unified embedding model** — Replace both hash engines with `fastembed-rs` or `ort` + `all-MiniLM-L6-v2`. One model, shared between RAG retrieval and OryEngine pattern matching.
+
+4. **Extract Stage 6B** — Move inline correction loop from orchestrator to `src/pipeline/stage6b.rs`. Implement real `analyze_corrections()` using CONSTRAINT_LOCK coverage as the correction signal.
+
+5. **Semantic HallucinationGuard** — Replace string-literal L1/L2/L3 checks with:
+   - L1: Cosine similarity between output claims and RAG source chunks (contradiction = low similarity to any source)
+   - L2: Hedge detector using lexical patterns on factual claims without RAG backing
+   - L3: CONSTRAINT_LOCK token coverage check on output
+
+---
+
+## 7. Fine-Tuning Strategy (Anti-Hallucination)
+
+### 7.1 Why the Engine Hallucinates Today
+
+This is a compression engine, not a generative LLM. "Hallucination" here means:
+
+1. **Schema hallucination** — Stage 4 infers fields (role, task, constraints) from limited input. Ambiguous inputs produce wrong inferences silently.
+2. **Scope injection hallucination** — Stage 5 inserts "Consider X" hints from keyword tables. These can be domain-irrelevant.
+3. **Guard miss** — HallucinationGuard uses string-literal patterns; misses semantic contradictions.
+4. **RAG hallucination** — When wired to downstream LLM, retrieved chunks that are lexically similar but semantically irrelevant cause the LLM to generate false facts.
+
+### 7.2 In-System Hallucination Prevention (No LLM Involved)
+
+#### Layer 1 — Input Fidelity
+
+| Action | Stage | Impact |
+|---|---|---|
+| Surface AMBIGUITY_REGISTER to API caller as warnings | Stage 0A | Stops silent wrong slot assignment |
+| Minimum confidence 0.7 for slot inference | Stage -1 | Unfilled slots better than wrongly filled |
+| CONSTRAINT_LOCK enforcement audit at Stage 4B | Stage 4B | Constraints must all appear in schema.constraints |
+
+#### Layer 2 — Schema Grounding via RAG
+
+| Action | Stage | Impact |
+|---|---|---|
+| Use top-3 RAG chunks as slot anchors | Stage 4 | Role/task grounded in user's documents |
+| RAG similarity gate: min_similarity = 0.5 | Retriever | Irrelevant chunks excluded from context |
+| Flag schema slots inferred from RAG vs input | Stage 4 | Provenance tracking for every inferred field |
+
+#### Layer 3 — Output Verification
+
+Replace string-literal guard with semantic guard:
 
 ```
-[2026-03-29] [Model: kilo/nvidia/nemotron-3-super-120b-a12b:free] [File: ARCHITECTURE.md]
-What changed : Created initial architecture documentation with component diagrams and details
-Why          : Provide clear architectural overview for development and maintenance
-Impact       : Establishes baseline for tracking future architectural decisions
+L1 Contradiction: cosine_similarity(output_claim, rag_source_chunks) < 0.4
+                  → flag as potential hallucination, add [UNCERTAIN] marker
 
-[2026-04-02] [Model: Antigravity] [File: ARCHITECTURE.md]
-What changed : Updated to 7-stage pipeline architecture (Stages 0A-6B), added Mermaid diagrams, and documented the Dual-Scoring (TES/SFS) and Admin Monitoring systems.
-Why          : Reflect the major architectural refactoring and modernization of the engine to meet the high-fidelity refinement specs.
-Impact       : ARCHITECTURE.md now serve as a ground-truth document for the current high-complexity state of the engine.
+L2 Confidence:    output contains factual claim without any RAG backing
+                  → detect using: no source chunk with similarity > 0.5 for this claim
+                  → wrap claim with [UNVERIFIED: no source]
 
-[2026-04-17] [Model: Antigravity] [File: ARCHITECTURE.md]
-What changed : Refined NPAE Structurer logic to support dynamic domain detection (e.g., Sports Nutrition), heuristic constraint extraction (high carb, low fiber, exclusions), and enhanced PromptContext schema with a `description` field.
-Why          : Fix the issue where optimized prompts were displaying raw input text and resolve hard-coded domain limitations.
-Impact       : Enables the CRISP UI to display specialized expert roles and summarizes inferred intent correctly.
+L3 Constraint:    CONSTRAINT_LOCK tokens from Stage -1 missing from final output
+                  → this is a definitive error, not a warning
+                  → trigger Stage 6B correction on SemanticCompleteness axis
+```
+
+### 7.3 Fine-Tuning a Learned Model (If Replacing/Augmenting the Engine)
+
+#### Dataset Construction
+
+```
+POSITIVE training examples:
+  Input:  raw_prompt + CONSTRAINT_LOCK_list + AMBIGUITY_REGISTER
+  Output: CRISP prompt where:
+          - ALL CONSTRAINT_LOCK tokens appear verbatim
+          - All schema slots traceable to input tokens
+          - AMBIGUITY_REGISTER items surfaced as [CLARIFY: X] markers
+
+NEGATIVE training examples (what to penalize):
+  - Output invents constraints not in input
+  - Output uses generic language where CONSTRAINT_LOCK is specific
+    (e.g., "dietary restrictions" instead of "no dairy, no nightshades, low fiber")
+  - Output resolves AMBIGUITY_REGISTER silently without flagging
+```
+
+#### Training Objectives
+
+| Loss | Formula | Weight |
+|---|---|---|
+| Constraint Coverage Loss | `1 - (constraints_in_output / constraints_in_input)` | **3×** |
+| Schema Fidelity Loss | `1 - (correct_slots / total_slots)` | 2× |
+| Token Efficiency Reward | `-log(output_tokens / input_tokens)` when SCS ≥ 8.0 | 1× |
+| Ambiguity Preservation Penalty | If AMBIGUITY_REGISTER items resolved without [CLARIFY] marker | 2× |
+
+#### DPO (Direct Preference Optimization) Approach
+
+```
+PREFERRED response: Keeps "no dairy, no nightshades, low fiber" verbatim as constraints
+REJECTED response:  Collapses to "dietary restrictions apply" (information loss)
+
+PREFERRED response: "# CONTEXT: Marathon runner training for race week [CLARIFY: high-altitude conditions?]"
+REJECTED response:  "# CONTEXT: Elite athlete with high conditions" (silent wrong resolution)
+```
+
+#### Evaluation Metrics for Fine-Tuned Model
+
+| Metric | Target |
+|---|---|
+| Constraint Recall (`constraints_output / constraints_input`) | ≥ 0.98 |
+| Schema Slot Accuracy | ≥ 0.90 |
+| Hallucination Rate (human eval: invented facts / total claims) | ≤ 0.02 |
+| Semantic Completeness Score (SCS) | ≥ 8.0 |
+| Token Compression Ratio | ≤ 0.70 |
+
+---
+
+## 8. Migration Plan
+
+```
+PRIORITY 1 — Fix Critical Gaps (blocks correctness)
+─────────────────────────────────────────────────────
+GAP-31 (2 days): Wire RAG retrieval before Stage -1
+  orchestrator.rs: replace None with actual retriever call
+  Thread EnrichmentContext to Stage 0A and Stage 4
+
+GAP-33 (0.5 days): Move HallucinationGuard outside the Legacy-only block
+  Run guard AFTER AggressiveEngine too
+  Ensure SCS computed for all modes
+
+GAP-32 (3 days): Unify embedding model
+  Add fastembed-rs dependency
+  Replace both hash engines with MiniLM-L6-v2
+  Regenerate existing chunk embeddings
+
+PRIORITY 2 — Fix Correctness Gaps
+────────────────────────────────────
+GAP-34 (1 day): Implement real CorrectionCycle.analyze_corrections()
+  Use CONSTRAINT_LOCK coverage as primary signal
+  Use SCS < 6.0 as trigger, per-axis correction
+
+GAP-36 (2 days): Semantic HallucinationGuard
+  L1: cosine similarity to RAG source
+  L2: unverified factual claims
+  L3: CONSTRAINT_LOCK coverage check
+
+GAP-40 (0.5 days): Remove engine/pipeline.rs and neuro/ stubs
+
+PRIORITY 3 — Scale and Quality
+────────────────────────────────
+GAP-39 (2 days): Add usearch ANN index
+GAP-38 (0.5 days): Auto-persist OryEngine PatternMemory on shutdown
+GAP-37 (0.5 days): Cache config in detect_domain()
+GAP-15 (1 week): PostgreSQL migration when sessions > 50K
+```
+
+---
+
+## 9. Change Log
+
+```
+[2026-03-29] [kilo/nvidia/nemotron-3-super-120b-a12b:free] ARCHITECTURE.md
+  Created initial architecture documentation
+
+[2026-04-02] [Antigravity] ARCHITECTURE.md
+  7-stage pipeline, Dual-Scoring TES/SFS, Admin Monitoring
+
+[2026-04-14] [navinvaddey] ARCHITECTURE_v2.md
+  Stage -1, CONSTRAINT_LOCK, five-field schema, SCS, targeted 6B correction
+
+[2026-09-24] [Antigravity / Claude Sonnet 4.6 Thinking & Gemini 3.6 Flash] ARCHITECTURE_v3.md
+  Full code audit vs v1/v2 spec & Implementation of Critical Fixes:
+    - GAP-31 FIXED: RAG `EnrichmentContext` retrieved in `domain.rs`, passed through orchestrator, and rendered in Stage 6A.
+    - GAP-32 FIXED: Replaced non-deterministic `DefaultHasher` in `npae/ory/embeddings.rs` with `crate::rag::embeddings::EmbeddingEngine` (shared 384-dim vector space).
+    - GAP-33 FIXED: Implemented TES/SFS/SCS scoring, tri-layer `HallucinationGuard`, and Stage 6B correction loop for Aggressive mode in `engine.rs` & `orchestrator.rs`.
+  All 130+ unit and integration tests passing cleanly.
+
+[2026-10-02] [Antigravity / Gemini 3.8 Flash] ARCHITECTURE_v3.md
+  Implemented & Audited Deterministic Intent × Vertical Role Composition & Scenario Classifier (GAP-41):
+    - 5-Layer Intent × Vertical pipeline implemented in `src/classifier/intent_rule.rs` and `src/classifier/mod.rs`.
+    - Wired `ScenarioClassifier` into `domain.rs`, feeding `ScenarioSignal` into `PipelineOrchestrator`.
+    - Threaded `ScenarioSignal` through Stage 0B (topology fast-path) and Stage 4 (schema filling).
+    - Integrated rule-based role composition into NPAE `extract_with_config`, `generate_role`, and `structurer.rs` with `PromptRole.secondary` and `persona_anchor`.
+    - Gated centroid embedding fallback in `detect_domain` with `HASH_MARGIN_GAP = 0.05` preserving canonical domain fallback tables.
+    - All unit and integration tests passing cleanly.
+
+[2026-10-04] [Antigravity / Gemini 3.8 Flash] ARCHITECTURE_v3.md
+  Implemented FAANG-Grade Hybrid RAG Retrieval (Dense + Sparse FTS5) & Scenario Mode Integration (GAP-S01, GAP-S02, GAP-S05):
+    - Upgraded `EmbeddingEngine` with `fastembed-rs` ONNX runtime (`AllMiniLML6V2`, 384-dim) with deterministic fallback.
+    - Added SQLite FTS5 migration (`0014_add_rag_chunks_fts.sql`) with automatic trigger synchronization.
+    - Added Reciprocal Rank Fusion (RRF, k=60.0) hybrid search across cosine vector similarity and BM25 lexical rank.
+    - Fixed GAP-S01: Loaded scenario `style_instructions` now active in prompt generation.
+    - Fixed GAP-S02: Threaded `PipelineOrchestrator` into `ScenarioModeRouter` with `EnrichmentContext` when `compression_mode` requested.
+    - Fixed GAP-S05: Persisted scenario interactions, metrics, citations, and warnings to `token_history` in `api.rs`.
+    - Generated comprehensive audit report PDF `TOKEN_COMPRESS_ENGINE_ARCHITECTURE_AND_RAG_NPAE_AUDIT.pdf`.
+    - 150+ unit and integration tests passing cleanly.
+
+[2026-10-16] [Antigravity] ARCHITECTURE_v3.md
+  Implemented Actionable Scenario Prompt Compiler & Domain Alias Grounding (D6, D7):
+    - Fixed D6: Ingested documents carrying taxonomy domains (`legal`, `finance`, `business`) are now mapped to scenario namespaces (`legal_docs`, `financial_records`, `business_strategy`) via `document_domain_aliases` in `ScenarioDomainConfig`, eliminating false "Not found" drops while preserving strict tenant isolation.
+    - Implemented D7: Upgraded `ScenarioOutputComposer` to generate an actionable 8-section Prompt Contract for downstream LLMs containing specialized system directives, user scenario objective, verified grounding evidence with citations, operational constraints & completeness gaps, deterministic tool capabilities, response schema contracts, and deterministic Model Tier recommendations (Tier 1 SLM, Tier 2 Balanced, Tier 3 Frontier Reasoning).
+    - Added comprehensive evaluation harness in `tests/eval_scenario_recall.rs` measuring recall@5 and MRR against local corpus.
+    - All scenario unit and regression suites passing cleanly (18/18 tests).
+
+[2026-10-31] [Antigravity / Gemini 3.8 Flash] ARCHITECTURE.md
+  Consolidated Single Source of Truth & Resolved GAP-35 / GAP-38:
+    - Resolved GAP-35: Integrated `DynamicBlueprint` from `OryEngine.process()` directly into `npae/aggressive/structurer.rs`, wiring phases, validation checks, and blueprint rationale into `StructuredPrompt`.
+    - Resolved GAP-38: Implemented auto-persistence of `OryEngine` `PatternMemory` to SQLite (`pattern_memory` table) with a 5-minute background flush and graceful shutdown hook in `main.rs`.
+    - Consolidated all previous architecture documentation (`ARCHITECTURE.md`, `ARCHITECTURE_v2.md`, `Tce_ARCHITECTURE_v3.md`, `architecture_pitch.md`) into a single, unified canonical `ARCHITECTURE.md`. Removed obsolete versions.
 ```
