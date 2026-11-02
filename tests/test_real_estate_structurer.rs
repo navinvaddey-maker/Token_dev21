@@ -31,6 +31,7 @@ fn test_real_estate_prompt_structuring() {
         baseline_knowledge: None,
         goal_intent: None,
         vertical: None,
+        secondary_domains: vec![],
         rule_locked: false,
         legal_as_constraint: false,
         composed_primary_role: None,

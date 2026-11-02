@@ -829,8 +829,8 @@
       "is_forbidden": true,
       "description": "Gluten containing grains",
       "trigger": [
-        [{ "word": "avoid", "weight": 6 }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "avoid", "weight": 6, "synonyms": ["avoiding", "exclude", "excluding"] }, { "word": "gluten", "weight": 10 }],
+        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "avoiding", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
         [{ "word": "gluten", "weight": 8 }, { "word": "free", "weight": 6 }]
       ]
     },

@@ -620,7 +620,28 @@ pub fn build_with_blueprint(
     let secondary = rule_verdict
         .as_ref()
         .and_then(|v| v.display_secondary())
-        .or_else(|| profile.vertical.as_deref().map(super::role::to_title_case));
+        .or_else(|| profile.vertical.as_deref().map(super::role::to_title_case))
+        .or_else(|| {
+            if profile.secondary_domains.is_empty() {
+                None
+            } else {
+                Some(
+                    profile
+                        .secondary_domains
+                        .iter()
+                        .map(|d| super::role::to_title_case(d))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
+            }
+        });
+
+    let mut expertise_domains = vec![profile.domain.clone()];
+    for sec in &profile.secondary_domains {
+        if !expertise_domains.contains(sec) {
+            expertise_domains.push(sec.clone());
+        }
+    }
 
     // GAP-13: Derive length bounds from input complexity and intent
     let word_count = raw.split_whitespace().count();
@@ -653,21 +674,30 @@ pub fn build_with_blueprint(
         role: PromptRole {
             primary: role_primary,
             secondary,
-            expertise_domains: vec![profile.domain.clone()],
+            expertise_domains,
             persona_constraints: {
-                let mut constraints = match profile.domain.as_str() {
-                    "software-engineering" | "devops-infra" => {
-                        vec!["production_grade_only".into(), "no_placeholder_code".into()]
+                let mut constraints = Vec::new();
+                for dom in std::iter::once(&profile.domain).chain(profile.secondary_domains.iter())
+                {
+                    let dom_c: &[&str] = match dom.as_str() {
+                        "software-engineering" | "devops-infra" | "software" | "devops" => {
+                            &["production_grade_only", "no_placeholder_code"]
+                        }
+                        "medical" | "pharma" | "health" => &[
+                            "evidence_based_only",
+                            "cite_sources_required",
+                            "no_medical_advice_disclaimer",
+                        ],
+                        "legal" => &["jurisdiction_aware", "cite_statutes"],
+                        "creative" => &["maintain_narrative_voice", "show_dont_tell"],
+                        _ => &["accurate_and_thorough"],
+                    };
+                    for &c in dom_c {
+                        if !constraints.iter().any(|existing| existing == c) {
+                            constraints.push(c.to_string());
+                        }
                     }
-                    "medical" | "pharma" => vec![
-                        "evidence_based_only".into(),
-                        "cite_sources_required".into(),
-                        "no_medical_advice_disclaimer".into(),
-                    ],
-                    "legal" => vec!["jurisdiction_aware".into(), "cite_statutes".into()],
-                    "creative" => vec!["maintain_narrative_voice".into(), "show_dont_tell".into()],
-                    _ => vec!["accurate_and_thorough".into()],
-                };
+                }
                 if profile.legal_as_constraint
                     || rule_verdict
                         .as_ref()

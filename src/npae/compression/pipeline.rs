@@ -37,41 +37,73 @@ pub fn run_parallel_pipeline(raw: &str) -> Result<CompressedRepr, String> {
     let (s2_sem, s2_prd) = rayon::join(
         || semantic::compress(&s1),
         || {
+            // FIX: Step 1.2 & 1.4 — Match on whole words (not substrings like "prefix" -> "fix"
+            // or "anyhow" -> "why") and normalize `intent_vec` so it is a proper probability
+            // distribution summing to 1.0 as documented in `CompressedRepr`.
             let lower = lower_raw_clone;
-            let mut dist = vec![0.1; 5];
+            let words: std::collections::HashSet<&str> = lower
+                .split(|c: char| !c.is_alphanumeric() && c != '-')
+                .filter(|s| !s.is_empty())
+                .collect();
+            let has_word = |w: &str| -> bool {
+                if w.contains(' ') {
+                    lower.contains(w)
+                } else {
+                    words.contains(w)
+                }
+            };
 
-            if lower.contains("create") || lower.contains("build") || lower.contains("make") {
+            let mut dist = vec![0.1_f32; 5];
+
+            if [
+                "create", "build", "make", "design", "develop", "plan", "draft",
+            ]
+            .iter()
+            .any(|w| has_word(w))
+            {
                 dist[0] += 0.5; // Build
             }
-            if lower.contains("explain") || lower.contains("how to") || lower.contains("what is") {
+            if [
+                "explain", "how to", "what is", "describe", "clarify", "teach",
+            ]
+            .iter()
+            .any(|w| has_word(w))
+            {
                 dist[1] += 0.6; // Explain
             }
-            if lower.contains("fix") || lower.contains("bug") || lower.contains("error") {
+            if ["fix", "bug", "error", "debug", "troubleshoot", "patch"]
+                .iter()
+                .any(|w| has_word(w))
+            {
                 dist[2] += 0.7; // Debug
             }
-            if lower.contains("analyze") || lower.contains("why") || lower.contains("compare") {
-                dist[3] += 0.5; // Analyze
+            if [
+                "analyze", "why", "compare", "evaluate", "review", "assess", "audit",
+            ]
+            .iter()
+            .any(|w| has_word(w))
+            {
+                dist[3] += 0.6; // Analyze (on par with Explain; slightly above incidental "design"/"build" nouns)
             }
-            if lower.contains("refactor")
-                || lower.contains("rewrite")
-                || lower.contains("transform")
+            if ["refactor", "rewrite", "transform", "convert", "migrate"]
+                .iter()
+                .any(|w| has_word(w))
             {
                 dist[4] += 0.6; // Transform
             }
 
-            // Knowledge level boosts
-            if lower.contains("architecture")
-                || lower.contains("optimize")
-                || lower.contains("scale")
-            {
-                for v in dist.iter_mut() {
-                    *v += 0.25;
-                }
+            // Ensure at least one intent is dominant if no verb matched
+            let no_match = dist.iter().all(|&x| (x - 0.1).abs() < f32::EPSILON);
+            if no_match {
+                dist[0] = 0.6; // Default to Build
             }
 
-            // Ensure at least one intent gets selected over 0.2 if nothing matched
-            if dist.iter().all(|&x| x == 0.1) {
-                dist[0] = 0.6; // Default to Build > 0.5 (Intermediate)
+            // Normalize to a probability distribution summing to 1.0
+            let sum: f32 = dist.iter().sum();
+            if sum > 0.0 {
+                for v in &mut dist {
+                    *v /= sum;
+                }
             }
 
             Ok::<Vec<f32>, String>(dist)

@@ -40,6 +40,8 @@ pub struct IntentProfile {
     pub goal_intent: Option<String>,
     /// Industry vertical, independent of primary role.
     pub vertical: Option<String>,
+    /// Secondary domains detected in multi-domain prompts (Step 2.3).
+    pub secondary_domains: Vec<String>,
     /// When true, hash/Ory classifiers must not override domain or role.
     pub rule_locked: bool,
     /// Legal/regulatory is a constraint lens, not the owning role.
@@ -73,12 +75,16 @@ pub fn extract_with_config(
 
     let lower = raw.to_lowercase();
 
-    // Rule layer first: intent × vertical. Hash domain is fallback only.
+    // Rule layer first: intent × vertical. Hash/embedding domain is fallback only.
     let rule = crate::classifier::intent_rule::resolve_prompt_rules(raw);
-    let domain = if let Some(ref verdict) = rule {
-        verdict.pipeline_domain().to_string()
+    let (domain, domain_confidence, secondary_domains) = if let Some(ref verdict) = rule {
+        let mut secs = Vec::new();
+        if let Some(v) = verdict.vertical {
+            secs.push(v.to_string());
+        }
+        (verdict.pipeline_domain().to_string(), 0.95, secs)
     } else {
-        detect_domain(raw, config)
+        detect_domain_with_confidence(raw, config)
     };
 
     // Simplistic mapping: locate max in intent_vec
@@ -105,12 +111,16 @@ pub fn extract_with_config(
         _ => IntentClass::Transform,
     };
 
-    // Heuristic: questions about "is X better" or "why X" are usually Analytical
-    if lower.contains("is ")
-        || lower.contains("why ")
-        || lower.contains("actually")
+    // FIX: Step 1.4 — Match whole words instead of substrings ("is " / "why ") to avoid
+    // false triggers on words like "anyhow" or "this ".
+    let words: std::collections::HashSet<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '-')
+        .filter(|s| !s.is_empty())
+        .collect();
+    if words.contains("why")
+        || words.contains("actually")
         || lower.contains("feels like")
-        || lower.ends_with('?')
+        || lower.trim_end().ends_with('?')
     {
         if primary_intent == IntentClass::Build || primary_intent == IntentClass::Transform {
             primary_intent = IntentClass::Analyze;
@@ -153,6 +163,8 @@ pub fn extract_with_config(
         primary_intent = IntentClass::Build;
     }
 
+    // FIX: Step 1.2 — Use calibrated `domain_confidence` (not `max_val` from `intent_vec`)
+    // so downstream domain comparisons against Ory operate on domain signal strength.
     Ok(IntentProfile {
         primary_intent,
         deliverable_type,
@@ -160,7 +172,7 @@ pub fn extract_with_config(
         user_knowledge,
         temporal_scope,
         output_preference,
-        confidence: if rule.is_some() { 0.95 } else { max_val },
+        confidence: domain_confidence,
         has_timeline,
         has_phases,
         has_validation,
@@ -174,6 +186,7 @@ pub fn extract_with_config(
         vertical: rule
             .as_ref()
             .and_then(|v| v.vertical.map(|s| s.to_string())),
+        secondary_domains,
         rule_locked: rule.is_some(),
         legal_as_constraint: rule
             .as_ref()
@@ -211,24 +224,113 @@ fn extract_baseline(raw: &str) -> Option<String> {
 
 use crate::npae::ory::embeddings::embed_text;
 use crate::npae::ory::math::cosine_similarity;
+use once_cell::sync::Lazy;
 
-/// Dynamic domain detection — Uses Vector Space Modeling (VSM) and Cosine Similarity
-/// Replaces heuristic keyword matching with semantic centroid comparison.
-fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> String {
+/// Cached embedding vectors for individual keywords and exemplar sentences so that
+/// `centroid_similarity` and exemplar prototype matching never re-run ONNX inference
+/// for static taxonomy keywords across requests (Step 2.2 / GAP-37).
+static EMBED_CACHE: Lazy<dashmap::DashMap<String, Vec<f32>>> = Lazy::new(dashmap::DashMap::new);
+
+fn embed_cached(text: &str) -> Vec<f32> {
+    if let Some(entry) = EMBED_CACHE.get(text) {
+        return entry.value().clone();
+    }
+    let vec = embed_text(text);
+    EMBED_CACHE.insert(text.to_string(), vec.clone());
+    vec
+}
+
+/// Curated sentence-level exemplars per canonical domain (Step 2.1).
+/// `all-MiniLM-L6-v2` is a sentence transformer; comparing against natural sentences
+/// captures paraphrases that single-keyword centroids miss.
+fn domain_exemplars(domain: &str) -> &'static [&'static str] {
+    match domain {
+        "finance" => &[
+            "Build a diversified investment portfolio for retirement and passive income",
+            "Analyze monthly cashflow, savings rate, debt payoff, and tax allocation",
+            "Compare equity index funds, bonds, and fixed deposits for wealth preservation",
+        ],
+        "medical" | "health" => &[
+            "Clinical diagnosis and treatment protocol for a hospital patient with symptoms",
+            "Analyze pathology, radiology, and biomarkers before surgical intervention",
+            "Preventative healthcare screening and medical rehabilitation plan",
+        ],
+        "nutrition" => &[
+            "Create a high protein vegetarian meal plan with calorie and macro targets",
+            "Design a keto or vegan diet protocol avoiding gluten, dairy, and allergens",
+            "Nutritional supplements, hydration, and carbohydrate loading for endurance",
+        ],
+        "legal" => &[
+            "Review commercial contract clauses for liability, IP, and regulatory compliance",
+            "Trademark, patent litigation, and statutory obligations under jurisdiction",
+            "Draft an NDA or legal data privacy checklist compliant with GDPR",
+        ],
+        "education" => &[
+            "Design a university course syllabus, curriculum pedagogy, and student assessment",
+            "Explain active recall teaching strategies for an academic lecture or tutor",
+            "Compare classroom instruction with self-paced e-learning modules",
+        ],
+        "travel" => &[
+            "Plan a multi-day travel itinerary, sightseeing schedule, and hotel booking",
+            "Compare flight transit routes, resort lodging, and vacation budget costs",
+            "Backpacking roadtrip and destination tourism excursion under budget",
+        ],
+        _ => &[],
+    }
+}
+
+/// Dynamic domain detection — Uses cached Vector Space Modeling (VSM), sentence-level
+/// exemplar prototypes, whole-word lexical tie-breaking, and multi-label secondary domain
+/// extraction (Steps 2.1, 2.2, 2.3).
+fn detect_domain_with_confidence(
+    raw: &str,
+    config: Option<&super::config::UnifiedConfig>,
+) -> (String, f32, Vec<String>) {
     let prompt_vec = embed_text(raw);
-    let mut scored: Vec<(String, f32)> = Vec::new();
+    let lower = raw.to_lowercase();
+    let words: std::collections::HashSet<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '-')
+        .filter(|s| !s.is_empty())
+        .collect();
+    let has_kw = |kw: &str| -> bool {
+        let k = kw.to_lowercase();
+        if k.contains(' ') {
+            lower.contains(&k)
+        } else {
+            words.contains(k.as_str())
+        }
+    };
+
+    // Each entry: (domain, effective_score_in_0_to_1, lexical_hit_count, boost)
+    let mut scored: Vec<(String, f32, usize, u32)> = Vec::new();
 
     if let Some(cfg) = config {
         for tax in &cfg.domain_taxonomy {
             if tax.keywords.is_empty() {
                 continue;
             }
-            let score = centroid_similarity(&prompt_vec, &tax.keywords) * (tax.boost.max(1) as f32);
-            scored.push((tax.domain.clone(), score));
+            let kw_cos = centroid_similarity(&prompt_vec, &tax.keywords).clamp(0.0, 1.0);
+            let ex_cos = exemplar_similarity(&prompt_vec, domain_exemplars(&tax.domain));
+            let raw_cos = kw_cos.max(ex_cos);
+            let hits = tax.keywords.iter().filter(|kw| has_kw(kw)).count();
+            let boost = tax.boost.max(1);
+            let hit_bonus = if hits > 0 {
+                (hits as f32 * 0.08).min(0.32) + ((boost.saturating_sub(1)) as f32 * 0.015)
+            } else {
+                0.0
+            };
+            let eff = (raw_cos + hit_bonus).clamp(0.0, 0.99);
+            scored.push((tax.domain.clone(), eff, hits, boost));
         }
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let picked = pick_hash_domain(&scored);
-        return super::config::normalize_domain(&picked, &cfg.domain_taxonomy).to_string();
+        let (picked, conf, secondaries) = pick_hash_domain_with_confidence(&scored);
+        let canonical = super::config::normalize_domain(&picked, &cfg.domain_taxonomy).to_string();
+        let norm_secs: Vec<String> = secondaries
+            .into_iter()
+            .map(|s| super::config::normalize_domain(&s, &cfg.domain_taxonomy).to_string())
+            .filter(|s| s != &canonical)
+            .collect();
+        return (canonical, conf, norm_secs);
     }
 
     let domains: &[(&str, &[&str])] = &[
@@ -416,16 +518,36 @@ fn detect_domain(raw: &str, config: Option<&super::config::UnifiedConfig>) -> St
 
     for (name, keywords) in domains {
         let kw: Vec<String> = keywords.iter().map(|s| (*s).to_string()).collect();
-        scored.push(((*name).to_string(), centroid_similarity(&prompt_vec, &kw)));
+        let kw_cos = centroid_similarity(&prompt_vec, &kw).clamp(0.0, 1.0);
+        let ex_cos = exemplar_similarity(&prompt_vec, domain_exemplars(name));
+        let raw_cos = kw_cos.max(ex_cos);
+        let hits = keywords.iter().filter(|k| has_kw(k)).count();
+        let hit_bonus = (hits as f32 * 0.08).min(0.32);
+        scored.push((
+            (*name).to_string(),
+            (raw_cos + hit_bonus).clamp(0.0, 0.99),
+            hits,
+            1,
+        ));
     }
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    pick_hash_domain(&scored)
+    pick_hash_domain_with_confidence(&scored)
+}
+
+fn exemplar_similarity(prompt_vec: &[f32], exemplars: &[&str]) -> f32 {
+    exemplars
+        .iter()
+        .map(|ex| {
+            let v = embed_cached(ex);
+            cosine_similarity(prompt_vec, &v).clamp(0.0, 1.0)
+        })
+        .fold(0.0_f32, f32::max)
 }
 
 fn centroid_similarity(prompt_vec: &[f32], keywords: &[String]) -> f32 {
     let mut centroid = vec![0.0f32; crate::npae::ory::embeddings::EMBEDDING_DIM];
     for kw in keywords {
-        let kw_vec = embed_text(kw);
+        let kw_vec = embed_cached(kw);
         for i in 0..centroid.len() {
             centroid[i] += kw_vec[i];
         }
@@ -440,17 +562,59 @@ fn centroid_similarity(prompt_vec: &[f32], keywords: &[String]) -> f32 {
     cosine_similarity(prompt_vec, &centroid)
 }
 
-fn pick_hash_domain(scored: &[(String, f32)]) -> String {
+fn pick_hash_domain_with_confidence(
+    scored: &[(String, f32, usize, u32)],
+) -> (String, f32, Vec<String>) {
     if scored.is_empty() {
-        return "general".to_string();
+        return ("general".to_string(), 0.30, Vec::new());
     }
     let top = scored[0].1;
+    let top_hits = scored[0].2;
     let second = scored.get(1).map(|s| s.1);
-    if crate::classifier::intent_rule::hash_margin_allows(top, second, 0.05) {
-        scored[0].0.clone()
+    let second_hits = scored.get(1).map(|s| s.2).unwrap_or(0);
+
+    // Accept top domain if it passes the 0.05 similarity margin gate OR has strictly more
+    // whole-word keyword hits than the runner-up (with at least 2 hits), OR has a strong
+    // co-domain tie where both top and second have >= 2 explicit keyword hits.
+    let margin_ok = crate::classifier::intent_rule::hash_margin_allows(top, second, 0.05);
+    let lexical_clear_winner = top_hits >= 2 && top_hits > second_hits;
+    let multi_domain_strong = top_hits >= 2 && second_hits >= 2 && top >= 0.45;
+
+    if margin_ok || lexical_clear_winner || multi_domain_strong {
+        let margin = second.map(|s| (top - s).max(0.0)).unwrap_or(top);
+        let conf = (0.55 + (top * 0.25) + (margin * 0.8) + (top_hits.min(4) as f32 * 0.04))
+            .clamp(0.55, 0.95);
+
+        // Step 2.3: Collect secondary domains that have explicit keyword hits and score within
+        // 0.15 of the primary domain (up to 2 secondary domains).
+        let primary = &scored[0].0;
+        let secondaries: Vec<String> = scored
+            .iter()
+            .skip(1)
+            .filter(|(dom, sc, hits, _)| {
+                dom != primary
+                    && !is_redundant_domain_pair(primary, dom)
+                    && *hits >= 1
+                    && (top - *sc) <= 0.15
+            })
+            .take(2)
+            .map(|(dom, _, _, _)| dom.clone())
+            .collect();
+
+        (scored[0].0.clone(), conf, secondaries)
     } else {
-        "general".to_string()
+        ("general".to_string(), 0.35, Vec::new())
     }
+}
+
+fn is_redundant_domain_pair(a: &str, b: &str) -> bool {
+    matches!(
+        (a, b),
+        ("medical", "health")
+            | ("health", "medical")
+            | ("science", "scientific-research")
+            | ("scientific-research", "science")
+    )
 }
 
 /// Multi-word noun-phrase extraction — extracts the most specific subject from ANY domain.

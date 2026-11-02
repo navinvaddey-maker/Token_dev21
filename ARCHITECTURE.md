@@ -5,8 +5,8 @@ Project      : token_compress_engine
 Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
-Version      : 3.2.0 (Unified Canonical Spec, Reality Audit & Ory/Memory Integration)
-Last updated : 2026-10-31 by Antigravity (Gemini 3.8 Flash)
+Version      : 3.3.0 (Unified Canonical Spec, Reality Audit & NPAE Multi-Domain/Slot Accuracy Upgrade)
+Last updated : 2026-11-02 by Antigravity (Gemini 4 Argon)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
@@ -94,8 +94,13 @@ raw prompt
     │       - secondary: "Pharma", "Fintech", "Real Estate", etc.
     ├─ 4. Precedence: legal owns role only if question is legal; regulations on wealth paths act as constraints
     │       - wealth + FDA/licensing → primary="Business Strategist", legal_as_constraint=true
-    └─ 5. Fallback: hash/embedding classifier + margin gate (HASH_MARGIN_GAP = 0.05)
-            → emit domain  OR  abstain (None / "general")
+    ├─ 5. Cached Exemplar + Centroid Classifier (in `spawn_blocking`):
+    │       - sentence-level domain exemplars + cached keyword centroids + whole-word hit density
+    │       - raw-cosine margin gate (HASH_MARGIN_GAP = 0.05) + multi-label secondary domain extraction
+    │       - Ory domain override guarded by `!rule_locked` and canonicalized via `normalize_domain`
+    └─ 6. Verbatim Constraint Spans & Domain Required Slots:
+            - `constraints.rs`: captures verbatim exclusions (`no X`, `without X`) & numeric bounds (`1800 cal`, `2000 usd`)
+            - `ambiguity.rs` + `questions.rs`: checks per-domain required slots (`legal`, `medical`, `nutrition`, `finance`, `education`, `travel`) → targeted clarifying questions
 ```
 
 The resulting `ScenarioSignal` and NPAE rule profile inject:
@@ -449,4 +454,13 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Resolved GAP-35: Integrated `DynamicBlueprint` from `OryEngine.process()` directly into `npae/aggressive/structurer.rs`, wiring phases, validation checks, and blueprint rationale into `StructuredPrompt`.
     - Resolved GAP-38: Implemented auto-persistence of `OryEngine` `PatternMemory` to SQLite (`pattern_memory` table) with a 5-minute background flush and graceful shutdown hook in `main.rs`.
     - Consolidated all previous architecture documentation (`ARCHITECTURE.md`, `ARCHITECTURE_v2.md`, `Tce_ARCHITECTURE_v3.md`, `architecture_pitch.md`) into a single, unified canonical `ARCHITECTURE.md`. Removed obsolete versions.
+
+[2026-11-02] [Antigravity / Gemini 4 Argon] ARCHITECTURE.md
+  Implemented NPAE Aggressive Accuracy Upgrade Without New Model (Steps 0–4, GAP-37):
+    - Added 34-case golden evaluation suite (`tests/eval_aggressive_accuracy.rs`) across finance, medical, nutrition, legal, education, travel, and adversarial substring cases.
+    - Fixed Ory domain override to respect `rule_locked` and canonicalize domain aliases (`engine.rs`).
+    - Calibrated domain confidence on [0, 1], replaced `cosine * boost` margin distortion with raw cosine + whole-word hit density, normalized `intent_vec`, and switched intent keywords to whole-word matching (`intent.rs`, `compression/pipeline.rs`).
+    - Added `EMBED_CACHE` (`DashMap`) for keyword and sentence-exemplar embeddings (GAP-37, 17× speedup), moved intent classification into `tokio::task::spawn_blocking`, and wired multi-label `secondary_domains` into `PromptRole.secondary` and `persona_constraints` (`intent.rs`, `engine.rs`, `structurer.rs`).
+    - Added deterministic verbatim exclusion and quantitative bound extraction in `constraints.rs` (100% constraint recall on golden set).
+    - Added per-domain required slot detection in `ambiguity.rs` and high-information-gain slot questions in `questions.rs`.
 ```

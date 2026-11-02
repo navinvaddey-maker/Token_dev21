@@ -145,6 +145,7 @@ fn test_ory_dynamic_blueprint_wiring_to_structurer() -> Result<()> {
         baseline_knowledge: None,
         goal_intent: None,
         vertical: None,
+        secondary_domains: vec![],
         rule_locked: false,
         legal_as_constraint: false,
         composed_primary_role: None,

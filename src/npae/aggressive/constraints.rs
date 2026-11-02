@@ -104,16 +104,154 @@ pub fn extract_constraints(
     sort_fn(&mut inclusions);
     sort_fn(&mut forbidden);
 
-    (
-        inclusions
+    let mut inc_out: Vec<String> = inclusions
+        .iter()
+        .map(|s| s.rule.description.clone())
+        .collect();
+    let mut forb_out: Vec<String> = forbidden
+        .iter()
+        .map(|s| s.rule.description.clone())
+        .collect();
+
+    // Step 4 (Step 3.1): Extract verbatim user constraints (negations/exclusions and
+    // numeric quantity+unit spans) that are not already covered by a canonical rule.
+    let (verbatim_inc, verbatim_forb) = extract_verbatim_spans(raw);
+    for vf in verbatim_forb {
+        let vf_low = vf.to_lowercase();
+        let already_covered = forb_out
             .iter()
-            .map(|s| s.rule.description.clone())
-            .collect(),
-        forbidden
+            .any(|existing| spans_overlap_semantically(existing, &vf_low));
+        if !already_covered {
+            forb_out.push(vf);
+        }
+    }
+    for vi in verbatim_inc {
+        let vi_low = vi.to_lowercase();
+        let already_covered = inc_out
             .iter()
-            .map(|s| s.rule.description.clone())
-            .collect(),
-    )
+            .any(|existing| spans_overlap_semantically(existing, &vi_low));
+        if !already_covered {
+            inc_out.push(vi);
+        }
+    }
+
+    (inc_out, forb_out)
+}
+
+fn spans_overlap_semantically(existing: &str, candidate_lower: &str) -> bool {
+    let ex_low = existing.to_lowercase();
+    if ex_low.contains(candidate_lower) || candidate_lower.contains(&ex_low) {
+        return true;
+    }
+    // Check if any content token (>=4 chars) in the candidate already appears as a whole word in existing rule description
+    let ex_words: HashSet<&str> = ex_low
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .collect();
+    candidate_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| {
+            w.len() >= 4
+                && !w.chars().all(|c| c.is_ascii_digit())
+                && !matches!(
+                    *w,
+                    "without"
+                        | "avoid"
+                        | "avoiding"
+                        | "exclude"
+                        | "excluding"
+                        | "under"
+                        | "within"
+                        | "target"
+                        | "bound"
+                )
+        })
+        .any(|w| ex_words.contains(w) || (w.ends_with('s') && ex_words.contains(&w[..w.len() - 1])))
+}
+
+/// Deterministic span extractor for user-stated exclusions (`no X`, `without X`, `avoid X`,
+/// `allergic to X`) and numeric target bounds (`1800 cal`, `500 mg`, `2000 usd`, `30000 inr`).
+fn extract_verbatim_spans(raw: &str) -> (Vec<String>, Vec<String>) {
+    let mut inclusions = Vec::new();
+    let mut forbidden = Vec::new();
+
+    let stop_boundary: HashSet<&str> = [
+        "for", "in", "on", "at", "to", "with", "and", "or", "but", "then", "while", "during",
+        "because", "if", "when", "where", "that", "which", "who", "my", "our", "your", "the", "a",
+        "an", "please", "only", "under", "within", "below", "above", "over", "around",
+    ]
+    .into_iter()
+    .collect();
+
+    // Clean punctuation into clause boundaries
+    let tokens: Vec<&str> = raw.split_whitespace().collect();
+    let n = tokens.len();
+    let mut i = 0;
+
+    while i < n {
+        let clean = tokens[i]
+            .trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '$' && c != '%');
+        let low = clean.to_lowercase();
+
+        // 1. Negation / exclusion triggers: "no <noun>", "without <noun>", "avoid/avoiding <noun>"
+        if matches!(
+            low.as_str(),
+            "no" | "without" | "avoid" | "avoiding" | "exclude" | "excluding"
+        ) && i + 1 < n
+        {
+            let mut span_words = Vec::new();
+            let mut j = i + 1;
+            while j < n && span_words.len() < 3 {
+                let w_raw = tokens[j];
+                let w_clean = w_raw.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
+                let w_low = w_clean.to_lowercase();
+                if w_clean.is_empty() || stop_boundary.contains(w_low.as_str()) {
+                    break;
+                }
+                span_words.push(w_clean.to_string());
+                if w_raw.ends_with([',', '.', ';', '!', '?']) {
+                    break;
+                }
+                j += 1;
+            }
+            if !span_words.is_empty() {
+                let phrase = format!("Exclude {}", span_words.join(" "));
+                if !forbidden.contains(&phrase) {
+                    forbidden.push(phrase);
+                }
+                i = j;
+                continue;
+            }
+        }
+
+        // 2. Quantitative + unit bounds: `<number> <unit>` (e.g., "1800 cal", "500 mg", "2000 usd")
+        let is_number = !clean.is_empty()
+            && clean
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '.' || c == ',' || c == '$' || c == '%');
+        if is_number && i + 1 < n {
+            let next_clean = tokens[i + 1]
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '/')
+                .to_lowercase();
+            let recognized_units = [
+                "cal", "kcal", "calories", "g", "mg", "mcg", "kg", "lb", "lbs", "oz", "ml", "usd",
+                "inr", "eur", "gbp", "dollars", "rupees", "lakh", "lakhs", "crore", "crores",
+                "mg/dl", "mmol/l", "bpm",
+            ];
+            if recognized_units.contains(&next_clean.as_str()) {
+                let bound = format!("Target/Bound: {} {}", clean, next_clean);
+                if !inclusions.contains(&bound) {
+                    inclusions.push(bound);
+                }
+                i += 2;
+                continue;
+            }
+        }
+
+        i += 1;
+    }
+
+    (inclusions, forbidden)
 }
 
 #[cfg(test)]

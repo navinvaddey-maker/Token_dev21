@@ -22,7 +22,7 @@ pub struct Stage2Out {
     pub confidence: f32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompressedRepr {
     pub token_ids: Vec<u32>,
     pub attention_weights: Vec<f32>,

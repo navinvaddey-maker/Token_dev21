@@ -31,42 +31,68 @@ impl AggressiveEngine {
             .and_then(|e| e.rag_chunks.as_ref())
             .map(|chunks| DerivedRagContext::derive(chunks, &user_prompt, 250));
 
-        // 1. Ory Engine: Meta-Orchestration and Deep Learning (using corrected prompt)
-        let mut ory_lock = ory_engine.lock().await;
+        // 1. Ory Engine + Intent Extraction: run CPU-bound embedding & classification work
+        // inside `spawn_blocking` before acquiring the async Ory mutex (Rule §6: no heavy CPU
+        // on the Tokio runtime; never hold a lock across blocking compute).
         let config_guard = config_handle.read();
+        let prompt_for_intent = user_prompt.clone();
+        let repr_for_intent = repr.clone();
+        let cfg_for_intent = config_guard.clone();
+        let mut profile = tokio::task::spawn_blocking(move || {
+            super::intent::extract_with_config(
+                &repr_for_intent,
+                &prompt_for_intent,
+                Some(&cfg_for_intent),
+            )
+        })
+        .await
+        .map_err(|e| format!("intent spawn_blocking join error: {e}"))??;
+
+        let mut ory_lock = ory_engine.lock().await;
         let ory_result = ory_lock
             .process(&user_prompt, &config_guard)
             .map_err(|e| e.to_string())?;
 
-        let mut profile =
-            super::intent::extract_with_config(repr, &user_prompt, Some(&config_guard))?;
-
         // Enhance Aggressive intent with Ory's deep learning
-        let domain_agreement = ory_result.intent.inferred_domain == profile.domain;
+        // FIX: Step 1.1 — Canonicalize Ory's inferred domain through the config taxonomy
+        // (or audit match) and NEVER override when the deterministic rule layer locked the
+        // domain (`profile.rule_locked`).
+        let ory_canonical_domain = ory_result
+            .audit
+            .existing_domain_match
+            .as_deref()
+            .unwrap_or(&ory_result.intent.inferred_domain);
+        let ory_canonical_domain =
+            super::config::normalize_domain(ory_canonical_domain, &config_guard.domain_taxonomy)
+                .to_string();
+
+        let domain_agreement = ory_canonical_domain == profile.domain;
         let confidence_margin = ory_result.intent.confidence_score - profile.confidence;
 
         if !domain_agreement {
             tracing::warn!(
-                "Domain mismatch: aggressive='{}', ory='{}', aggressive_conf={:.3}, ory_conf={:.3}, margin={:.3}",
+                "Domain mismatch: aggressive='{}', ory='{}' (canonical='{}'), aggressive_conf={:.3}, ory_conf={:.3}, margin={:.3}, rule_locked={}",
                 profile.domain,
                 ory_result.intent.inferred_domain,
+                ory_canonical_domain,
                 profile.confidence,
                 ory_result.intent.confidence_score,
-                confidence_margin
+                confidence_margin,
+                profile.rule_locked
             );
         }
 
-        // Only override if Ory confidence exceeds aggressive by significant margin (0.15)
-        if ory_result.intent.confidence_score > profile.confidence + 0.15 {
+        // Only override if not rule-locked and Ory confidence exceeds aggressive by significant margin (0.15)
+        if !profile.rule_locked && ory_result.intent.confidence_score > profile.confidence + 0.15 {
             if !domain_agreement {
                 tracing::info!(
                     "Overriding domain: '{}' -> '{}' (margin: {:.3})",
                     profile.domain,
-                    ory_result.intent.inferred_domain,
+                    ory_canonical_domain,
                     confidence_margin
                 );
             }
-            profile.domain = ory_result.intent.inferred_domain.clone();
+            profile.domain = ory_canonical_domain;
             profile.confidence = ory_result.intent.confidence_score;
         }
 
@@ -89,8 +115,14 @@ impl AggressiveEngine {
             ory_result.blueprint.as_ref(),
         )?;
 
-        // 3. Score ambiguity (accounting for gaps resolved by RAG facts)
-        let amb = super::ambiguity::score(repr, &user_prompt, reconstructed, derived_rag.as_ref())?;
+        // 3. Score ambiguity (accounting for gaps resolved by RAG facts and domain-required slots)
+        let amb = super::ambiguity::score_for_domain(
+            repr,
+            &user_prompt,
+            reconstructed,
+            derived_rag.as_ref(),
+            Some(&profile),
+        )?;
         let threshold = cfg.ambiguity_threshold.unwrap_or(0.65);
 
         // 4. Generate domain-aware questions if threshold exceeded
