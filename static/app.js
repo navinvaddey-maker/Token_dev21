@@ -75,7 +75,7 @@ async function handleLogin(e) {
         console.log('Login response status:', r.status);
         console.log('Login response ok:', r.ok);
         console.log('Login response headers:', Object.fromEntries(r.headers.entries()));
-
+        
         if (!r.ok) {
             const err = await r.json();
             console.log('Login error response:', err);
@@ -83,21 +83,21 @@ async function handleLogin(e) {
         }
         console.log('Response received, parsing JSON...');
         const data = await r.json();
-
+        
         // Validate required fields FIRST before accessing any properties
         if (!data || typeof data !== 'object') {
             throw new Error('Invalid login response: data is not an object');
         }
-
+        
         // Now it's safe to log data properties
         console.log('Login response data:', data);
         console.log('Login response data type:', typeof data);
         console.log('Login response data keys:', Object.keys(data || {}));
-
+        
         // Additional debugging
         console.log('data.business_type:', data.business_type);
         console.log('type of data.business_type:', typeof data.business_type);
-
+        
         // Validate required fields
         if (!data.token) {
             throw new Error('Invalid login response: missing token');
@@ -112,8 +112,8 @@ async function handleLogin(e) {
             throw new Error('Invalid login response: missing business_type');
         }
         console.log('Setting State.businessType to:', `"${data.business_type}"`);
-        State.token = data.token;
-        State.userId = data.user_id;
+        State.token    = data.token;
+        State.userId   = data.user_id;
         State.username = data.username;
         localStorage.setItem('tce_token', data.token);
         localStorage.setItem('tce_user_id', data.user_id);
@@ -132,9 +132,9 @@ async function handleLogin(e) {
 
 async function handleRegister(e) {
     e.preventDefault();
-    const username = document.getElementById('reg-username').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
+    const username      = document.getElementById('reg-username').value.trim();
+    const email         = document.getElementById('reg-email').value.trim();
+    const password      = document.getElementById('reg-password').value;
     const business_type = document.getElementById('reg-business').value;
 
     if (!username || !email || !password) return showToast('All fields required', 'error');
@@ -188,7 +188,7 @@ function showMainSection() {
     if (authSec) authSec.style.display = 'none';
     const mainSec = document.getElementById('main-section');
     if (mainSec) mainSec.style.display = 'block';
-
+    
     updateUserBar();
 
     if (State.businessType && State.businessType.trim().toLowerCase() === 'admin') {
@@ -639,8 +639,8 @@ async function extractVanillaPdfText(file) {
     }
 
     const rawClean = content.replace(/[\x00-\x08\x0E-\x1F\x7F-\xFF]/g, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+                           .replace(/\s{2,}/g, ' ')
+                           .trim();
     const words = rawClean.split(' ').filter(w => w.length > 2 && /^[a-zA-Z0-9.,!?-]+$/.test(w));
     if (words.length > 10) {
         return words.slice(0, 3000).join(' ');
@@ -1019,7 +1019,7 @@ function validatePromptLength() {
     if (raw.length > 0) {
         updateDetectedDomain(raw);
     }
-
+    
     if (count >= 8) {
         compressBtn.disabled = false;
         if (errorDiv) errorDiv.style.display = 'none';
@@ -1087,7 +1087,7 @@ async function loadScenarioRegistry() {
     try {
         const reg = await API.scenarioRegistry();
         const domainSel = document.getElementById('scenario-domain-select');
-        const styleSel = document.getElementById('scenario-style-select');
+        const styleSel  = document.getElementById('scenario-style-select');
 
         if (domainSel && reg.domains) {
             domainSel.innerHTML = '<option value="" disabled selected>-- Select Mandatory Domain --</option>' +
@@ -1107,7 +1107,7 @@ async function loadScenarioRegistry() {
 function handleScenarioModeChange(mode) {
     const qInput = document.getElementById('scenario-query-input');
     const resultSec = document.getElementById('scenario-result-section');
-
+    
     if ((qInput && qInput.value.trim().length > 0) || (resultSec && resultSec.style.display !== 'none')) {
         if (!confirm("Switching mode will reset current in-flight intake and results. Proceed?")) {
             // Revert dropdown selection
@@ -1122,7 +1122,7 @@ function handleScenarioModeChange(mode) {
 
     const domainRow = document.getElementById('domain-selector-row');
     const geoRow = document.getElementById('geography-selector-row');
-    const styleRow = document.getElementById('style-selector-row');
+    const styleRow  = document.getElementById('style-selector-row');
     const modeHelper = document.getElementById('mode-helper');
 
     if (mode === 'Scenario') {
@@ -1155,12 +1155,12 @@ function handleDomainChange(val) {
 }
 
 async function executeScenarioAsk() {
-    const appMode = document.getElementById('scenario-mode-select').value;
+    const appMode   = document.getElementById('scenario-mode-select').value;
     const domainVal = document.getElementById('scenario-domain-select')?.value;
-    const styleVal = document.getElementById('scenario-style-select')?.value;
-    const geoVal = document.getElementById('scenario-geography-select')?.value;
-    const question = document.getElementById('scenario-query-input')?.value.trim();
-    const modeOpt = document.getElementById('mode')?.value;
+    const styleVal  = document.getElementById('scenario-style-select')?.value;
+    const geoVal    = document.getElementById('scenario-geography-select')?.value;
+    const question  = document.getElementById('scenario-query-input')?.value.trim();
+    const modeOpt   = document.getElementById('mode')?.value;
 
     if (!question) return showToast('Question text is required', 'error');
     if (appMode === 'Scenario' && !domainVal) return showToast('Mandatory domain selection required for Scenario mode', 'error');
@@ -1191,11 +1191,11 @@ async function executeScenarioAsk() {
 function renderScenarioResult(resp) {
     const sec = document.getElementById('scenario-result-section');
     const badgeSource = document.getElementById('scenario-badge-source');
-    const badgeNs = document.getElementById('scenario-badge-ns');
-    const header = document.getElementById('scenario-result-header');
-    const output = document.getElementById('scenario-result-output');
-    const citBox = document.getElementById('scenario-citations-box');
-    const citList = document.getElementById('scenario-citations-list');
+    const badgeNs     = document.getElementById('scenario-badge-ns');
+    const header      = document.getElementById('scenario-result-header');
+    const output      = document.getElementById('scenario-result-output');
+    const citBox      = document.getElementById('scenario-citations-box');
+    const citList     = document.getElementById('scenario-citations-list');
 
     if (sec) sec.style.display = 'block';
     if (badgeSource) badgeSource.textContent = resp.source_badge || 'Source: internal knowledge base only';
@@ -1232,11 +1232,11 @@ let lastAggressivePromptText = '';
 async function executeScenarioAggressiveCompress() {
     console.log('[Scenario] executeScenarioAggressiveCompress triggered');
     const appModeEl = document.getElementById('scenario-mode-select');
-    const appMode = appModeEl ? appModeEl.value : 'Scenario';
+    const appMode   = appModeEl ? appModeEl.value : 'Scenario';
     const domainVal = document.getElementById('scenario-domain-select')?.value;
-    const styleVal = document.getElementById('scenario-style-select')?.value;
-    const geoVal = document.getElementById('scenario-geography-select')?.value;
-    const question = document.getElementById('scenario-query-input')?.value?.trim();
+    const styleVal  = document.getElementById('scenario-style-select')?.value;
+    const geoVal    = document.getElementById('scenario-geography-select')?.value;
+    const question  = document.getElementById('scenario-query-input')?.value?.trim();
 
     if (!question) {
         showToast('Question text is required', 'error');

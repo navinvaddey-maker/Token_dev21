@@ -408,9 +408,9 @@ async function runTestSuite() {
                 this.onload({
                     target: {
                         result: '# System Architecture & Backend Contract\n\n' +
-                            'Please review the database schema and API auth middleware carefully. ' +
-                            'Whenever the Safari browser clears cookies, the auth session crashes with 401 unauthorized. ' +
-                            'We really just want to figure out how to resolve this bug cleanly before launch.'
+                                'Please review the database schema and API auth middleware carefully. ' +
+                                'Whenever the Safari browser clears cookies, the auth session crashes with 401 unauthorized. ' +
+                                'We really just want to figure out how to resolve this bug cleanly before launch.'
                     }
                 });
             }, 10);
