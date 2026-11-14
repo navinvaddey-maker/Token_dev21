@@ -2,10 +2,38 @@
 //!
 //! // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-37 — implements deterministic Intent × Vertical rule
 //! // composition with cached sentence-exemplar + keyword-centroid embedding fallback, whole-word
-//! // lexical density scoring, and multi-label secondary domain extraction.
+//! // lexical density scoring, multi-label secondary domain extraction, and the 3-Axis Intent
+//! // Tensor (`Domain x ActorPerspective x IntentClass`).
 
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::DeliverableType;
+
+/// Identifies the user's actor perspective within the target domain (3-Axis Intent Tensor: D x P x I).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum ActorPerspective {
+    /// Buyer, patient, student, citizen, or personal end-user.
+    Consumer,
+    /// Professional practitioner, engineer, clinician, counsel, agent, or operator.
+    #[default]
+    Practitioner,
+    /// Capital allocator, property/deal underwriter, or portfolio strategist.
+    Investor,
+}
+
+impl ActorPerspective {
+    /// Returns the lowercase key string for template and taxonomy lookups (`"consumer"`, `"practitioner"`, `"investor"`).
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Consumer => "consumer",
+            Self::Practitioner => "practitioner",
+            Self::Investor => "investor",
+        }
+    }
+}
 
 /// Primary intent classification for a user prompt.
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +54,7 @@ pub enum KnowledgeLevel {
 }
 
 /// Complete intent, domain, and execution metadata profile extracted from a user prompt.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct IntentProfile {
     pub primary_intent: IntentClass,
@@ -57,6 +86,8 @@ pub struct IntentProfile {
     pub legal_as_constraint: bool,
     /// Generic primary role composed by the rule layer.
     pub composed_primary_role: Option<String>,
+    /// Actor perspective within the resolved domain (`Consumer`, `Practitioner`, or `Investor`).
+    pub perspective: ActorPerspective,
 }
 
 impl IntentProfile {
@@ -64,6 +95,7 @@ impl IntentProfile {
     ///
     /// # Panics
     /// Never.
+    #[must_use]
     pub fn is_wealth_build(&self) -> bool {
         self.goal_intent.as_deref() == Some("wealth-building")
     }
@@ -72,6 +104,7 @@ impl IntentProfile {
     ///
     /// # Panics
     /// Never.
+    #[must_use]
     pub fn is_legal_query(&self) -> bool {
         self.goal_intent.as_deref() == Some("legal-query")
     }
@@ -148,24 +181,21 @@ pub fn extract_with_config(
         .split(|c: char| !c.is_alphanumeric() && c != '-')
         .filter(|s| !s.is_empty())
         .collect();
-    if words.contains("why")
+    if (words.contains("why")
         || words.contains("actually")
         || lower.contains("feels like")
-        || lower.trim_end().ends_with('?')
+        || lower.trim_end().ends_with('?'))
+        && (primary_intent == IntentClass::Build || primary_intent == IntentClass::Transform)
     {
-        if primary_intent == IntentClass::Build || primary_intent == IntentClass::Transform {
-            primary_intent = IntentClass::Analyze;
-        }
+        primary_intent = IntentClass::Analyze;
     }
 
     // New Heuristic: "List", "Identify", "Find" at start usually implies Analyze or Explain, not Build
     let start_words = [
         "list", "identify", "find", "show", "what are", "give me", "provide",
     ];
-    if start_words.iter().any(|&w| lower.starts_with(w)) {
-        if primary_intent == IntentClass::Build {
-            primary_intent = IntentClass::Analyze;
-        }
+    if start_words.iter().any(|&w| lower.starts_with(w)) && primary_intent == IntentClass::Build {
+        primary_intent = IntentClass::Analyze;
     }
 
     // Knowledge level: check for domain-specific vocabulary density, not just intent_vec magnitude
@@ -180,10 +210,13 @@ pub fn extract_with_config(
     // Detect validation/quality signals
     let has_validation = detect_validation_signals(&lower);
 
-    // Detect business constraints metadata
+    // Detect actor perspective within resolved domain (3-Axis Intent Tensor: D x P x I)
+    let perspective = detect_actor_perspective(&lower, &domain);
+
+    // Detect business constraints metadata (strictly domain- and perspective-gated)
     let detected_geography = detect_geography(&lower);
     let detected_risk = detect_risk_tolerance(&lower);
-    let detected_biz_type = detect_business_type(&lower);
+    let detected_biz_type = detect_business_type(&lower, &domain, perspective);
     let detected_team = detect_team_composition(&lower);
     let dynamic_subject = extract_subject(raw);
     let baseline_knowledge = extract_baseline(raw);
@@ -216,14 +249,12 @@ pub fn extract_with_config(
         goal_intent: rule.as_ref().map(|v| v.intent_class().to_string()),
         vertical: rule
             .as_ref()
-            .and_then(|v| v.vertical.map(|s| s.to_string())),
+            .and_then(|v| v.vertical.map(std::string::ToString::to_string)),
         secondary_domains,
         rule_locked: rule.is_some(),
-        legal_as_constraint: rule
-            .as_ref()
-            .map(|v| v.legal_as_constraint)
-            .unwrap_or(false),
+        legal_as_constraint: rule.as_ref().is_some_and(|v| v.legal_as_constraint),
         composed_primary_role: rule.as_ref().map(|v| v.primary_role.to_string()),
+        perspective,
     })
 }
 
@@ -1177,29 +1208,309 @@ fn detect_risk_tolerance(lower: &str) -> Option<String> {
     }
 }
 
-/// Detect business type from input
-fn detect_business_type(lower: &str) -> Option<String> {
-    if lower.contains("saas") || lower.contains("software as a service") {
+/// Checks whether `lower` contains `needle` on word or phrase boundaries.
+///
+/// Prevents substring false positives such as `"app"` matching `"appraisal"` or `"appreciate"`,
+/// or `"earn"` matching `"learn"`.
+///
+/// # Panics
+/// Never.
+pub(crate) fn has_word_or_phrase(lower: &str, needle: &str) -> bool {
+    let target = needle.trim();
+    if target.is_empty() {
+        return false;
+    }
+    let bytes = lower.as_bytes();
+    let t_bytes = target.as_bytes();
+    if t_bytes.len() > bytes.len() {
+        return false;
+    }
+
+    let is_word_char = |b: u8| b.is_ascii_alphanumeric();
+    let mut start = 0;
+    while let Some(rel_idx) = lower[start..].find(target) {
+        let idx = start + rel_idx;
+        let end = idx + t_bytes.len();
+        let left_ok = idx == 0 || !is_word_char(bytes[idx - 1]);
+        let right_ok = end == bytes.len() || !is_word_char(bytes[end]);
+        if left_ok && right_ok {
+            return true;
+        }
+        start = idx + 1;
+        while start < lower.len() && !lower.is_char_boundary(start) {
+            start += 1;
+        }
+    }
+    false
+}
+
+/// Detects the user's `ActorPerspective` (`Consumer`, `Practitioner`, or `Investor`) within `domain`
+/// using word/phrase boundary matching (`has_word_or_phrase`).
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §6 — implements the `ActorPerspective` axis of the 3-Axis Intent
+/// // Tensor (`Domain x ActorPerspective x IntentClass`).
+///
+/// # Panics
+/// Never.
+#[allow(clippy::too_many_lines)]
+#[must_use]
+pub fn detect_actor_perspective(lower: &str, domain: &str) -> ActorPerspective {
+    const CONSUMER_SIGNALS: &[&str] = &[
+        "buy a house",
+        "buying a house",
+        "buying a home",
+        "buy a home",
+        "buy a condo",
+        "buy an apartment",
+        "buying an apartment",
+        "purchase a home",
+        "purchase a house",
+        "first-time homebuyer",
+        "first time homebuyer",
+        "homebuyer",
+        "home buyer",
+        "house hunting",
+        "down payment",
+        "closing costs",
+        "home inspection",
+        "my house",
+        "my home",
+        "my mortgage",
+        "my landlord",
+        "security deposit",
+        "my symptoms",
+        "knee pain",
+        "back pain",
+        "help me learn",
+        "want to learn",
+        "study for",
+        "personal budget",
+        "my paycheck",
+        "credit card debt",
+        "emergency fund",
+        "for myself",
+        "for my family",
+        "family of",
+        "for my trip",
+        "how do i buy",
+        "should i buy",
+    ];
+
+    const INVESTOR_SIGNALS: &[&str] = &[
+        "cap rate",
+        "noi",
+        "net operating income",
+        "cash-on-cash",
+        "dscr",
+        "multifamily",
+        "brrrr",
+        "reit",
+        "underwriting",
+        "rental property",
+        "investment property",
+        "flipping houses",
+        "cagr",
+        "sharpe",
+        "asset allocation",
+        "wealth gap",
+        "net worth",
+        "passive income",
+        "retire early",
+        "valuation multiple",
+        "ltv/cac",
+    ];
+
+    const PRACTITIONER_SIGNALS: &[&str] = &[
+        "become a real estate agent",
+        "real estate agent",
+        "realtor license",
+        "real estate license",
+        "pre-licensing",
+        "broker sponsorship",
+        "start a brokerage",
+        "real estate business",
+        "real estate agency",
+        "client acquisition",
+        "get listings",
+        "mls",
+        "crm",
+        "production",
+        "microservice",
+        "kubernetes",
+        "clinical trial",
+        "fda",
+        "indemnification",
+        "redline",
+        "syllabus",
+        "curriculum",
+        "b2b",
+        "saas",
+        "checkout conversion",
+        "roas",
+    ];
+
+    let consumer_score = CONSUMER_SIGNALS
+        .iter()
+        .filter(|&&s| has_word_or_phrase(lower, s))
+        .count();
+    let investor_score = INVESTOR_SIGNALS
+        .iter()
+        .filter(|&&s| has_word_or_phrase(lower, s))
+        .count();
+    let practitioner_score = PRACTITIONER_SIGNALS
+        .iter()
+        .filter(|&&s| has_word_or_phrase(lower, s))
+        .count();
+
+    // Domain-aware tie-breaking:
+    // 1. In "real-estate", if any consumer home-buying signal is present and practitioner_score == 0,
+    //    return ActorPerspective::Consumer.
+    if matches!(domain, "real-estate" | "real estate") && practitioner_score == 0 {
+        let explicit_homebuy = [
+            "buy a house",
+            "buying a house",
+            "buying a home",
+            "buy a home",
+            "homebuyer",
+            "first-time",
+            "down payment",
+            "closing costs",
+            "home inspection",
+            "house hunting",
+        ]
+        .iter()
+        .any(|&s| has_word_or_phrase(lower, s));
+
+        let has_house_or_home =
+            has_word_or_phrase(lower, "house") || has_word_or_phrase(lower, "home");
+        let has_buy_or_mortgage = has_word_or_phrase(lower, "buy")
+            || has_word_or_phrase(lower, "buying")
+            || has_word_or_phrase(lower, "purchase")
+            || has_word_or_phrase(lower, "mortgage");
+        let has_agent_or_brokerage = [
+            "agent",
+            "realtor",
+            "broker",
+            "brokerage",
+            "license",
+            "licensing",
+            "pre-licensing",
+        ]
+        .iter()
+        .any(|&s| has_word_or_phrase(lower, s));
+
+        if explicit_homebuy || (has_house_or_home && has_buy_or_mortgage && !has_agent_or_brokerage)
+        {
+            return ActorPerspective::Consumer;
+        }
+    }
+
+    // 2. In "travel" or "nutrition", default to ActorPerspective::Consumer unless practitioner signals appear.
+    if matches!(domain, "travel" | "nutrition") {
+        let travel_or_nutrition_practitioner = [
+            "nutritionist",
+            "dietitian",
+            "dietician",
+            "travel agency",
+            "clinical",
+        ]
+        .iter()
+        .any(|&s| has_word_or_phrase(lower, s));
+        if travel_or_nutrition_practitioner || practitioner_score > consumer_score {
+            return ActorPerspective::Practitioner;
+        }
+        return ActorPerspective::Consumer;
+    }
+
+    if consumer_score > practitioner_score && consumer_score >= investor_score && consumer_score > 0
+    {
+        return ActorPerspective::Consumer;
+    }
+    if investor_score > practitioner_score && investor_score > consumer_score {
+        return ActorPerspective::Investor;
+    }
+    ActorPerspective::Practitioner
+}
+
+/// Detects the business model or venture type from `lower`, gated by `domain` and `perspective`.
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §6 — prevents consumer queries (`ActorPerspective::Consumer`)
+/// // and substring false positives (`"appraisal"`, `"apply"`, `"appreciate"` containing `"app"`)
+/// // from triggering `"Digital Product"` or enterprise business metadata.
+///
+/// # Panics
+/// Never.
+#[must_use]
+pub fn detect_business_type(
+    lower: &str,
+    domain: &str,
+    perspective: ActorPerspective,
+) -> Option<String> {
+    if perspective == ActorPerspective::Consumer {
+        return None;
+    }
+
+    let is_business_or_tech_domain = matches!(
+        domain,
+        "business"
+            | "business-strategy"
+            | "ecommerce"
+            | "marketing"
+            | "software"
+            | "software-engineering"
+    );
+
+    let explicit_venture = [
+        "saas",
+        "software as a service",
+        "e-commerce",
+        "ecommerce",
+        "online store",
+        "consulting agency",
+        "digital product",
+    ]
+    .iter()
+    .any(|&phrase| has_word_or_phrase(lower, phrase));
+
+    if !is_business_or_tech_domain && !explicit_venture {
+        return None;
+    }
+
+    if has_word_or_phrase(lower, "saas") || has_word_or_phrase(lower, "software as a service") {
         Some("SaaS".to_string())
-    } else if lower.contains("e-commerce")
-        || lower.contains("ecommerce")
-        || lower.contains("online store")
+    } else if has_word_or_phrase(lower, "e-commerce")
+        || has_word_or_phrase(lower, "ecommerce")
+        || has_word_or_phrase(lower, "online store")
     {
         Some("E-commerce".to_string())
-    } else if lower.contains("consulting")
-        || lower.contains("agency")
-        || lower.contains("freelance")
+    } else if has_word_or_phrase(lower, "consulting")
+        || has_word_or_phrase(lower, "consulting agency")
+        || has_word_or_phrase(lower, "agency")
+        || has_word_or_phrase(lower, "freelance")
     {
         Some("Services".to_string())
-    } else if lower.contains("physical")
-        || lower.contains("retail")
-        || lower.contains("brick")
-        || lower.contains("store")
+    } else if has_word_or_phrase(lower, "physical")
+        || has_word_or_phrase(lower, "retail")
+        || has_word_or_phrase(lower, "brick and mortar")
+        || has_word_or_phrase(lower, "retail store")
     {
         Some("Physical/Retail".to_string())
-    } else if lower.contains("digital") || lower.contains("app") || lower.contains("platform") {
+    } else if [
+        "mobile app",
+        "web app",
+        "ios app",
+        "android app",
+        "app store",
+        "digital product",
+        "software platform",
+    ]
+    .iter()
+    .any(|&p| has_word_or_phrase(lower, p))
+    {
         Some("Digital Product".to_string())
-    } else if lower.contains("content") || lower.contains("creator") || lower.contains("media") {
+    } else if has_word_or_phrase(lower, "content creator")
+        || has_word_or_phrase(lower, "media company")
+    {
         Some("Content/Media".to_string())
     } else {
         None
@@ -1376,5 +1687,64 @@ fn detect_deliverable_type(lower: &str, intent: &IntentClass, domain: &str) -> D
         DeliverableType::Artifact
     } else {
         DeliverableType::Analysis
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_actor_perspective_real_estate_consumer_vs_practitioner_vs_investor() {
+        let consumer_prompt =
+            "help me learn and build a step-by-step plan for buying a house in austin with a $500k budget, evaluate mortgage options and neighborhood appraisal comparables";
+        assert_eq!(
+            detect_actor_perspective(consumer_prompt, "real-estate"),
+            ActorPerspective::Consumer
+        );
+
+        let practitioner_prompt =
+            "how do i become a licensed real estate agent and start a brokerage with mls and crm?";
+        assert_eq!(
+            detect_actor_perspective(practitioner_prompt, "real-estate"),
+            ActorPerspective::Practitioner
+        );
+
+        let investor_prompt =
+            "analyze multifamily cap rate, noi, cash-on-cash return, and dscr underwriting";
+        assert_eq!(
+            detect_actor_perspective(investor_prompt, "real-estate"),
+            ActorPerspective::Investor
+        );
+    }
+
+    #[test]
+    fn test_detect_business_type_gates_consumer_and_substring_app() {
+        let house_prompt =
+            "i would really appreciate it if you could help me apply for a mortgage and check neighborhood appraisal comparables for an apartment";
+        assert_eq!(
+            detect_business_type(house_prompt, "real-estate", ActorPerspective::Consumer),
+            None
+        );
+        assert_eq!(
+            detect_business_type(house_prompt, "real-estate", ActorPerspective::Practitioner),
+            None
+        );
+        assert_eq!(
+            detect_business_type(house_prompt, "business", ActorPerspective::Practitioner),
+            None
+        );
+
+        let saas_prompt = "build a b2b saas pricing strategy";
+        assert_eq!(
+            detect_business_type(saas_prompt, "business", ActorPerspective::Practitioner),
+            Some("SaaS".to_string())
+        );
+
+        let app_prompt = "launch a mobile app on the app store";
+        assert_eq!(
+            detect_business_type(app_prompt, "software", ActorPerspective::Practitioner),
+            Some("Digital Product".to_string())
+        );
     }
 }

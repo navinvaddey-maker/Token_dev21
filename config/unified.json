@@ -557,6 +557,93 @@
       ],
       "persona_template": "Principal {role} specializing in income acceleration, capital allocation, wealth preservation, and risk-adjusted growth strategies.",
       "phase_templates": {
+        "consumer:build": [
+          {
+            "phase_number": 1,
+            "name": "Household Cashflow & Debt Audit",
+            "description": "Audit monthly take-home income, fixed/discretionary expenses, high-interest credit card/loan obligations, and baseline liquidity.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Personal Monthly Budget & Cashflow Audit",
+              "High-Interest Debt Payoff Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Emergency Reserve & Debt Elimination Plan",
+            "description": "Establish a 3-6 month liquid emergency fund and execute avalanche or snowball debt payoff automation.",
+            "estimated_duration": "1-3 months",
+            "deliverables": [
+              "Emergency Fund Reserve Plan",
+              "Automated Debt & Savings Schedule"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Tax-Advantaged Retirement & Goal Allocation",
+            "description": "Configure employer 401(k)/IRA contributions, low-cost index fund allocations, and sinking funds for major household goals.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Tax-Advantaged Retirement & Savings Plan",
+              "Monthly Net-Worth & Budget Tracker"
+            ]
+          }
+        ],
+        "practitioner:build": [
+          {
+            "phase_number": 1,
+            "name": "Financial & Asset Audit (30 Days)",
+            "description": "Evaluate current active/passive income sources, monthly burn rate, balance sheet assets/debt, and human capital monetization inventory.",
+            "estimated_duration": "30 days",
+            "deliverables": [
+              "Financial Baseline & Burn Rate Audit",
+              "Human Capital & Monetization Matrix",
+              "Target Definition & Wealth Gap Calculation"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategy & Vehicle Selection (90 Days)",
+            "description": "Select and launch primary high-leverage monetization vehicles (career advancement, high-ticket services, business equity, or dividend/index investing).",
+            "estimated_duration": "90 days",
+            "deliverables": [
+              "Vehicle Feasibility Matrix",
+              "Income Growth Blueprint",
+              "First Revenue Milestone Report"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Execution & Reinvestment (6-12 Months)",
+            "description": "Launch revenue-generating initiatives, secure initial cash flows, and configure automated compounding reinvestment.",
+            "estimated_duration": "6-12 months",
+            "deliverables": [
+              "Execution Action Checklist",
+              "Cash Flow & Surplus Automation Blueprint",
+              "Diversified Asset Allocation Strategy"
+            ]
+          },
+          {
+            "phase_number": 4,
+            "name": "Equity & Asset Expansion (3-5 Years)",
+            "description": "Scale business equity, expand productive assets, and optimize capital compounding across market cycles.",
+            "estimated_duration": "3-5 years",
+            "deliverables": [
+              "Equity & Portfolio Growth Model",
+              "Scenario Stress-Test Report (Conservative/Base/Aggressive)"
+            ]
+          },
+          {
+            "phase_number": 5,
+            "name": "Wealth Compounding & Preservation (5-10 Years)",
+            "description": "Maximize compound growth, achieve targeted net worth milestone, and implement estate, tax, and capital preservation structures.",
+            "estimated_duration": "5-10 years",
+            "deliverables": [
+              "Target Achievement & Wealth Preservation Blueprint",
+              "Financial Freedom Audit"
+            ]
+          }
+        ],
         "build": [
           {
             "phase_number": 1,
@@ -1490,6 +1577,70 @@
       ],
       "persona_template": "Senior {role} specializing in instructional design, cognitive load theory, active recall pedagogy, and competency-based assessment.",
       "phase_templates": {
+        "consumer:build": [
+          {
+            "phase_number": 1,
+            "name": "Foundational Concept Mapping & Study Schedule",
+            "description": "Assess current baseline knowledge, break down core topics and prerequisites, and structure a daily/weekly self-study schedule.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Topic Breakdown & Prerequisite Checklist",
+              "Personal Weekly Study Schedule"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Active Recall & Worked Problem Practice",
+            "description": "Study core concepts using worked examples, spaced-repetition flashcards, and progressive practice problems.",
+            "estimated_duration": "1-3 weeks",
+            "deliverables": [
+              "Active Recall Flashcard & Problem Set Plan",
+              "Worked Example & Concept Summary Notes"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Mock Exam Simulation & Gap Remediation",
+            "description": "Complete timed practice exams, review error patterns, and drill weak topics until mastery targets are met.",
+            "estimated_duration": "3-7 days",
+            "deliverables": [
+              "Timed Mock Exam & Error Log",
+              "Exam Readiness & Mastery Checklist"
+            ]
+          }
+        ],
+        "practitioner:build": [
+          {
+            "phase_number": 1,
+            "name": "Knowledge Mapping & Objectives",
+            "description": "Identify core concepts, prerequisite knowledge gaps, and measurable Bloom's taxonomy learning outcomes.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Concept Map & Prerequisite Audit",
+              "Learning Objectives Specification"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Curriculum & Practice Design",
+            "description": "Structure instructional modules using active recall, worked examples, and interleaved practice.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Curriculum & Syllabus Blueprint",
+              "Guided Practice & Active Recall Modules"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Assessment & Mastery Verification",
+            "description": "Validate learner comprehension via project rubrics, formative quizzes, and feedback loops.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Competency Assessment Rubric",
+              "Mastery Feedback Protocol"
+            ]
+          }
+        ],
         "build": [
           {
             "phase_number": 1,
@@ -1905,6 +2056,70 @@
       ],
       "persona_template": "Senior {role} specializing in statutory analysis, contractual risk allocation, regulatory compliance, and intellectual property protection.",
       "phase_templates": {
+        "consumer:build": [
+          {
+            "phase_number": 1,
+            "name": "Facts, Timeline & Evidence Documentation",
+            "description": "Compile written agreements, leases, receipts, communications, and a chronological record of events and statutory notices.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Chronological Fact & Evidence Dossier",
+              "Applicable Consumer/Tenant Rights Summary"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Written Demand & Statutory Notice Preparation",
+            "description": "Draft a formal written notice or demand letter citing relevant consumer/tenant protection rules, cure deadlines, and requested remedies.",
+            "estimated_duration": "2-5 days",
+            "deliverables": [
+              "Formal Written Notice / Demand Letter Draft",
+              "Remedy & Settlement Checklist"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Escalation, Mediation & Small-Claims Readiness",
+            "description": "Evaluate agency complaint channels, mediation options, small-claims filing procedures, or referral to licensed local counsel.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Agency & Small-Claims Escalation Guide",
+              "Licensed Legal Aid / Counsel Referral Checklist"
+            ]
+          }
+        ],
+        "practitioner:build": [
+          {
+            "phase_number": 1,
+            "name": "Jurisdictional & Statutory Scoping",
+            "description": "Identify governing law, applicable statutes/regulations (e.g., GDPR, CCPA, UCC), and counterparty risk profile.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Statutory Basis Analysis",
+              "Jurisdictional Scope Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Instrument Drafting & Risk Allocation",
+            "description": "Draft operative covenants, IP ownership, limitation of liability, indemnification, and termination provisions.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Contractual Clause & Redline Draft",
+              "Liability & Risk Allocation Matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Compliance Verification & Execution Controls",
+            "description": "Validate regulatory compliance obligations, audit trails, and dispute resolution enforceability.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Statutory & Regulatory Compliance Checklist",
+              "Execution & Governance Protocol"
+            ]
+          }
+        ],
         "build": [
           {
             "phase_number": 1,
@@ -3047,8 +3262,94 @@
         "escrow"
       ],
       "boost": 4,
-      "persona_template": "Experienced {role} specializing in licensing compliance, property valuation, market comparables, client acquisition, and brokerage operations.",
+      "persona_template": "Experienced {role} specializing in property valuation, Comparative Market Analysis (CMA), mortgage & financing structure, inspection due diligence, and transaction execution.",
       "phase_templates": {
+        "consumer:build": [
+          {
+            "phase_number": 1,
+            "name": "Financial Readiness & Mortgage Pre-Approval",
+            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure fixed-rate mortgage pre-approval.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Affordability & DTI Budget Ceiling",
+              "Mortgage Pre-Approval Checklist"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Property Search, Neighborhood Comps & Offer Strategy",
+            "description": "Evaluate neighborhood comparables (CMA), property condition, HOA/zoning disclosures, and structure a contingency-protected purchase offer.",
+            "estimated_duration": "2-6 weeks",
+            "deliverables": [
+              "Comparative Market Analysis (CMA)",
+              "Purchase Offer & Contingency Strategy"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Inspection, Appraisal, Underwriting & Closing",
+            "description": "Execute physical home inspection, negotiate repair credits, verify lender appraisal and title/escrow clearance, and complete closing settlement.",
+            "estimated_duration": "30-45 days",
+            "deliverables": [
+              "Inspection & Due Diligence Checklist",
+              "Closing Disclosure & Settlement Plan"
+            ]
+          }
+        ],
+        "practitioner:build": [
+          {
+            "phase_number": 1,
+            "name": "Licensing & Pre-Registration",
+            "description": "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.",
+            "estimated_duration": "1-3 months",
+            "deliverables": [
+              "Real Estate License",
+              "Broker Sponsorship Agreement"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Business Setup & GTM Strategy",
+            "description": "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Business Entity (LLC)",
+              "Lead Generation & CRM Setup"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Client Acquisition & Expansion",
+            "description": "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "First Closed Transactions",
+              "Client Referral Pipeline"
+            ]
+          }
+        ],
+        "investor:analyze": [
+          {
+            "phase_number": 1,
+            "name": "Market Comparables & Location Audit",
+            "description": "Evaluate neighborhood comps, absorption rates, zoning ordinances, and rental demand.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Comparative Market Analysis (CMA)",
+              "Zoning & Due Diligence Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Financial Underwriting & ROI Stress-Test",
+            "description": "Model NOI, cap rate, DSCR, financing terms, and cash-on-cash return scenarios.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "NOI, Cap Rate & ROI Projection",
+              "Financing & Capital Stack Plan"
+            ]
+          }
+        ],
         "build": [
           {
             "phase_number": 1,
@@ -3106,22 +3407,32 @@
         "default": [
           {
             "phase_number": 1,
-            "name": "Licensing & Market Underwriting",
-            "description": "Establish regulatory licensing or evaluate market comparables and underwriting metrics.",
-            "estimated_duration": "2-4 weeks",
+            "name": "Financial Readiness & Mortgage Pre-Approval",
+            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure fixed-rate mortgage pre-approval.",
+            "estimated_duration": "1-2 weeks",
             "deliverables": [
-              "Comparative Market Analysis (CMA)",
-              "NOI, Cap Rate & ROI Projection"
+              "Affordability & DTI Budget Ceiling",
+              "Mortgage Pre-Approval Checklist"
             ]
           },
           {
             "phase_number": 2,
-            "name": "Transaction Execution & Scaling",
-            "description": "Execute deal acquisition, financing, CRM pipeline, and closing operations.",
-            "estimated_duration": "Ongoing",
+            "name": "Property Search, Neighborhood Comps & Offer Strategy",
+            "description": "Evaluate neighborhood comparables (CMA), property condition, HOA/zoning disclosures, and structure a contingency-protected purchase offer.",
+            "estimated_duration": "2-6 weeks",
             "deliverables": [
-              "First Closed Transactions",
-              "Client Referral Pipeline"
+              "Comparative Market Analysis (CMA)",
+              "Purchase Offer & Contingency Strategy"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Inspection, Appraisal, Underwriting & Closing",
+            "description": "Execute physical home inspection, negotiate repair credits, verify lender appraisal and title/escrow clearance, and complete closing settlement.",
+            "estimated_duration": "30-45 days",
+            "deliverables": [
+              "Inspection & Due Diligence Checklist",
+              "Closing Disclosure & Settlement Plan"
             ]
           }
         ]

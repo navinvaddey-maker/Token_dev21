@@ -1,4 +1,7 @@
 //! Flow Registry v2 — Deep multi-level auditing
+//!
+//! // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — multi-level domain, template, constraint, and
+//! // novel-signal auditing for OryEngine adaptive blueprint routing.
 
 use crate::npae::aggressive::config::UnifiedConfig;
 use crate::npae::ory::domain_mapper;
@@ -8,9 +11,18 @@ use crate::npae::ory::types::{
 };
 use anyhow::Result;
 
+/// Multi-level flow registry auditor for `OryEngine`.
+#[derive(Debug)]
 pub struct FlowRegistry;
 
 impl FlowRegistry {
+    /// Audits a `LearnedIntent` against `UnifiedConfig` taxonomy, structurer templates, and constraint rules.
+    ///
+    /// # Errors
+    /// Never returns `Err` in the current implementation.
+    ///
+    /// # Panics
+    /// Never.
     pub fn audit(intent: &LearnedIntent, config: &UnifiedConfig) -> Result<FlowAudit> {
         let mut gaps = Vec::new();
         let mut gap_details = Vec::new();
@@ -40,11 +52,13 @@ impl FlowRegistry {
         }
 
         // Level 2: Template Coverage
+        // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — check both hardcoded structurer templates and
+        // `config.domain_taxonomy` (`phase_templates.is_some()`) so configured domains receive full coverage.
         let eff_domain = dm
             .matched_domain
             .clone()
             .unwrap_or_else(|| intent.inferred_domain.clone());
-        let tc = domain_mapper::has_structurer_templates(&eff_domain);
+        let tc = domain_mapper::has_structurer_templates_with_config(&eff_domain, Some(config));
         let template_audit = TemplateAuditResult {
             has_execution_phases: tc.has_execution_phases,
             has_validation_steps: tc.has_validation_steps,

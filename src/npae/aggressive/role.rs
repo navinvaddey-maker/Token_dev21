@@ -1,8 +1,13 @@
+//! Perspective-Aware Role Synthesis for the NPAE Aggressive Path.
+//!
+//! // ARCH: ARCHITECTURE.md §1.4 & §6 — maps `(Domain x ActorPerspective x IntentClass)` and
+//! // configured `RoleRule` weights into domain- and perspective-accurate role titles.
+
 use super::config::{DomainTaxonomy, RoleRule};
-use super::intent::{IntentClass, IntentProfile};
+use super::intent::{detect_actor_perspective, ActorPerspective, IntentClass, IntentProfile};
 use std::collections::{HashMap, HashSet};
 
-// NOTE: We'll need specialized structs for scoring
+/// Intermediate candidate score for a configured `RoleRule`.
 struct ScoredRole<'a> {
     rule: &'a RoleRule,
     effective_priority: u32,
@@ -10,6 +15,102 @@ struct ScoredRole<'a> {
     match_count: usize,
 }
 
+/// Generates a perspective-specific role title when `perspective` is `Consumer` or `Investor`
+/// in a domain with dedicated consumer/investor advisory personas, or delegates to the
+/// practitioner rule scorer otherwise.
+///
+/// # Panics
+/// Never.
+#[must_use]
+pub fn generate_role_for_perspective(
+    raw: &str,
+    domain: &str,
+    perspective: ActorPerspective,
+    rules: &[RoleRule],
+) -> String {
+    if let Some(override_title) = perspective_role_override(domain, perspective) {
+        return override_title.to_string();
+    }
+
+    let lower = raw.to_lowercase();
+    let word_set: HashSet<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '-')
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut scored: Vec<ScoredRole> = rules
+        .iter()
+        .filter_map(|rule| {
+            let (total_weight, match_count) =
+                rule.verbs.iter().fold((0u32, 0usize), |(w, c), verb| {
+                    if word_set.contains(verb.word.as_str()) {
+                        (w + verb.weight, c + 1)
+                    } else {
+                        (w, c)
+                    }
+                });
+            if match_count == 0 {
+                return None;
+            }
+            let domain_bonus = if rule.domain.eq_ignore_ascii_case(domain) {
+                3
+            } else {
+                0
+            };
+            Some(ScoredRole {
+                rule,
+                effective_priority: rule.priority + domain_bonus,
+                total_weight,
+                match_count,
+            })
+        })
+        .collect();
+
+    scored.sort_by(|a, b| {
+        b.effective_priority
+            .cmp(&a.effective_priority)
+            .then_with(|| b.total_weight.cmp(&a.total_weight))
+            .then_with(|| b.match_count.cmp(&a.match_count))
+    });
+
+    scored
+        .first()
+        .map_or_else(
+            || domain_anchored_fallback(domain, &IntentClass::Build),
+            |s| s.rule.base_title.as_str(),
+        )
+        .to_string()
+}
+
+/// Returns an explicit consumer or investor role title when `(domain, perspective)` maps to a
+/// dedicated non-practitioner persona.
+fn perspective_role_override(domain: &str, perspective: ActorPerspective) -> Option<&'static str> {
+    match (perspective, domain) {
+        (ActorPerspective::Consumer, "real-estate" | "real estate") => {
+            Some("Residential Home-Buying & Mortgage Advisor")
+        }
+        (ActorPerspective::Consumer, "legal") => Some("Consumer Legal Rights & Dispute Advisor"),
+        (ActorPerspective::Consumer, "medical" | "health") => {
+            Some("Clinical Health & Patient Care Educator")
+        }
+        (ActorPerspective::Consumer, "finance") => {
+            Some("Personal Finance & Household Budget Advisor")
+        }
+        (ActorPerspective::Consumer, "education") => Some("Personal Learning & Mastery Coach"),
+        (ActorPerspective::Investor, "real-estate" | "real estate") => {
+            Some("Real Estate Investment & Underwriting Strategist")
+        }
+        _ => None,
+    }
+}
+
+/// Synthesizes the primary role title (and optional focus suffix) for a prompt given its
+/// `IntentProfile`, `DomainTaxonomy`, and `RoleRule` table.
+///
+/// # Panics
+/// Never.
+#[allow(clippy::too_many_lines)]
+#[must_use]
 pub fn generate_role(
     profile: &IntentProfile,
     raw: &str,
@@ -26,6 +127,37 @@ pub fn generate_role(
     // Resolve any alias → canonical domain name so all downstream lookups are consistent.
     let canonical_domain = super::config::normalize_domain(&profile.domain, domain_taxonomy);
     let lower = raw.to_lowercase();
+
+    // Determine effective actor perspective: honor explicit non-default perspective on profile,
+    // or detect from raw text + canonical domain.
+    let effective_perspective = if profile.perspective == ActorPerspective::Practitioner {
+        detect_actor_perspective(&lower, canonical_domain)
+    } else {
+        profile.perspective
+    };
+
+    if perspective_role_override(canonical_domain, effective_perspective).is_some() {
+        let base_role =
+            generate_role_for_perspective(raw, canonical_domain, effective_perspective, roles);
+        let mut topics = extract_focus_topics(raw, domain_taxonomy, canonical_domain);
+        return if topics.is_empty() {
+            base_role
+        } else {
+            let focus_str = match topics.len() {
+                1 => topics[0].clone(),
+                2 => format!("{} and {}", topics[0], topics[1]),
+                _ => {
+                    if let Some(last) = topics.pop() {
+                        format!("{}, and {last}", topics.join(", "))
+                    } else {
+                        String::new()
+                    }
+                }
+            };
+            format!("{base_role} (focus: {focus_str})")
+        };
+    }
+
     let word_set: HashSet<&str> = lower
         .split(|c: char| !c.is_alphanumeric() && c != '-')
         .filter(|s| !s.is_empty())
@@ -118,8 +250,11 @@ pub fn generate_role(
             1 => topics[0].clone(),
             2 => format!("{} and {}", topics[0], topics[1]),
             _ => {
-                let last = topics.pop().unwrap();
-                format!("{}, and {}", topics.join(", "), last)
+                if let Some(last) = topics.pop() {
+                    format!("{}, and {}", topics.join(", "), last)
+                } else {
+                    String::new()
+                }
             }
         };
         format!("{} (focus: {})", base_role, focus_str)
@@ -313,8 +448,7 @@ fn extract_domain_noun(raw: &str) -> Option<String> {
     if words.len() > 1 {
         for word in words.iter().skip(1) {
             let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric());
-            if !clean_word.is_empty() {
-                let first_char = clean_word.chars().next().unwrap();
+            if let Some(first_char) = clean_word.chars().next() {
                 if first_char.is_uppercase()
                     && !clean_word.chars().any(|c| c.is_numeric())
                     && !stop_words.contains(clean_word)
@@ -339,4 +473,67 @@ pub(crate) fn to_title_case(s: &str) -> String {
         })
         .collect::<Vec<String>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_role_for_perspective_consumer_and_investor_overrides() {
+        assert_eq!(
+            generate_role_for_perspective(
+                "Plan for buying a house in Austin with a $500k budget",
+                "real-estate",
+                ActorPerspective::Consumer,
+                &[]
+            ),
+            "Residential Home-Buying & Mortgage Advisor"
+        );
+        assert_eq!(
+            generate_role_for_perspective(
+                "Analyze multifamily cap rate and NOI",
+                "real-estate",
+                ActorPerspective::Investor,
+                &[]
+            ),
+            "Real Estate Investment & Underwriting Strategist"
+        );
+        assert_eq!(
+            generate_role_for_perspective(
+                "My landlord kept my security deposit",
+                "legal",
+                ActorPerspective::Consumer,
+                &[]
+            ),
+            "Consumer Legal Rights & Dispute Advisor"
+        );
+        assert_eq!(
+            generate_role_for_perspective(
+                "I have knee pain and want to understand my symptoms",
+                "medical",
+                ActorPerspective::Consumer,
+                &[]
+            ),
+            "Clinical Health & Patient Care Educator"
+        );
+        assert_eq!(
+            generate_role_for_perspective(
+                "Help me manage my paycheck and credit card debt",
+                "finance",
+                ActorPerspective::Consumer,
+                &[]
+            ),
+            "Personal Finance & Household Budget Advisor"
+        );
+        assert_eq!(
+            generate_role_for_perspective(
+                "Help me learn calculus and study for my exam",
+                "education",
+                ActorPerspective::Consumer,
+                &[]
+            ),
+            "Personal Learning & Mastery Coach"
+        );
+    }
 }

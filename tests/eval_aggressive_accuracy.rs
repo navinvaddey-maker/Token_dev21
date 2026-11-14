@@ -857,3 +857,246 @@ async fn test_aggressive_engine_structurer_and_ory_canonical_domain_roles_phases
         );
     }
 }
+
+#[tokio::test]
+async fn test_buying_a_house_consumer_vs_agent_and_no_cross_domain_hijack() {
+    use std::sync::Arc;
+    use token_compress_engine::npae::aggressive::config::ConfigHandle;
+    use token_compress_engine::npae::aggressive::engine::AggressiveEngine;
+    use token_compress_engine::npae::aggressive::structurer::HttpStructurer;
+    use token_compress_engine::npae::schema::types::NpaeConfig;
+    use tokio::sync::Mutex;
+
+    let config = ConfigLoader::load("config/unified.json").expect("load unified.json");
+    let config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(Mutex::new(OryEngine::new()));
+    let npae_cfg = NpaeConfig::default();
+    let reconstructed = token_compress_engine::types::ReconstructedInput::default();
+
+    // 1. Consumer home-buying prompt with adversarial triggers ("# TASK:", filler, "learn", "$500k",
+    //    "appraisal", "appreciate", "do not use adjustable-rate mortgages")
+    let consumer_prompt = "# TASK: I would really appreciate it if you could please help me learn and build a step-by-step plan for buying a house in Austin with a $500k budget, evaluate mortgage options and neighborhood appraisal comparables, and do not use adjustable-rate mortgages.";
+    let repr = run_parallel_pipeline(consumer_prompt).expect("compression pipeline");
+    let structurer = HttpStructurer {
+        route: "/api/compress".to_string(),
+        remote_addr: "127.0.0.1".to_string(),
+        body: consumer_prompt.to_string(),
+    };
+    let resp = AggressiveEngine::run(
+        consumer_prompt,
+        &repr,
+        &npae_cfg,
+        config_handle.clone(),
+        ory_engine.clone(),
+        &structurer,
+        &reconstructed,
+        None,
+    )
+    .await
+    .expect("AggressiveEngine::run on consumer home-buying prompt");
+
+    assert_eq!(
+        resp.structured_prompt.context.domain, "real-estate",
+        "Expected domain 'real-estate', got '{}'",
+        resp.structured_prompt.context.domain
+    );
+    assert!(
+        resp.structured_prompt
+            .role
+            .primary
+            .starts_with("Residential Home-Buying & Mortgage Advisor"),
+        "Expected consumer home-buying role, got '{}'",
+        resp.structured_prompt.role.primary
+    );
+
+    let phase_names: Vec<&str> = resp
+        .structured_prompt
+        .execution_phases
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    for expected_phase in [
+        "Financial Readiness & Mortgage Pre-Approval",
+        "Property Search, Neighborhood Comps & Offer Strategy",
+        "Inspection, Appraisal, Underwriting & Closing",
+    ] {
+        assert!(
+            phase_names.contains(&expected_phase),
+            "Expected consumer phase '{expected_phase}', got: {phase_names:?}"
+        );
+    }
+
+    for forbidden in [
+        "Licensing & Pre-Registration",
+        "Broker Sponsorship",
+        "Business Entity (LLC)",
+        "Digital Product",
+        "Wealth-Engineering",
+        "Income ≠ Revenue",
+        "DomainTransfer",
+    ] {
+        assert!(
+            !resp.optimized_prompt.contains(forbidden),
+            "Consumer home-buying output must NOT contain '{forbidden}':\n{}",
+            resp.optimized_prompt
+        );
+    }
+
+    // Verify `# TASK / INSTRUCTION:` pruned duplicate `# TASK:` header and conversational filler
+    // while preserving `$500k`, `Austin`, and `adjustable-rate mortgages`.
+    let task_section = resp
+        .optimized_prompt
+        .split("# TASK / INSTRUCTION:")
+        .nth(1)
+        .unwrap_or(&resp.optimized_prompt);
+    let task_block = task_section.split("\n# ").next().unwrap_or(task_section);
+    assert!(
+        !task_block.contains("# TASK:"),
+        "Duplicate '# TASK:' header must be pruned from task block: {task_block}"
+    );
+    assert!(
+        !task_block
+            .to_lowercase()
+            .contains("i would really appreciate it if you could please"),
+        "Conversational filler must be pruned from task block: {task_block}"
+    );
+    assert!(
+        task_block.contains("$500k")
+            && task_block.contains("Austin")
+            && task_block.contains("adjustable-rate mortgages"),
+        "Task block must preserve '$500k', 'Austin', and 'adjustable-rate mortgages': {task_block}"
+    );
+
+    // 2. Practitioner real-estate agent licensing prompt must still emit practitioner phases
+    let practitioner_prompt =
+        "How do I become a licensed real estate agent and build a real estate brokerage from scratch?";
+    let pract_repr = run_parallel_pipeline(practitioner_prompt).expect("compression pipeline");
+    let pract_structurer = HttpStructurer {
+        route: "/api/compress".to_string(),
+        remote_addr: "127.0.0.1".to_string(),
+        body: practitioner_prompt.to_string(),
+    };
+    let pract_resp = AggressiveEngine::run(
+        practitioner_prompt,
+        &pract_repr,
+        &npae_cfg,
+        config_handle,
+        ory_engine,
+        &pract_structurer,
+        &reconstructed,
+        None,
+    )
+    .await
+    .expect("AggressiveEngine::run on practitioner prompt");
+
+    assert_eq!(pract_resp.structured_prompt.context.domain, "real-estate");
+    assert!(
+        pract_resp
+            .optimized_prompt
+            .contains("Licensing & Pre-Registration")
+            || pract_resp.optimized_prompt.contains("Broker Sponsorship"),
+        "Practitioner real-estate prompt must emit licensing/brokerage phases:\n{}",
+        pract_resp.optimized_prompt
+    );
+}
+
+#[tokio::test]
+async fn test_multi_domain_consumer_vs_practitioner_separation() {
+    use std::sync::Arc;
+    use token_compress_engine::npae::aggressive::config::ConfigHandle;
+    use token_compress_engine::npae::aggressive::engine::AggressiveEngine;
+    use token_compress_engine::npae::aggressive::intent::{
+        detect_actor_perspective, ActorPerspective,
+    };
+    use token_compress_engine::npae::aggressive::structurer::HttpStructurer;
+    use token_compress_engine::npae::schema::types::NpaeConfig;
+    use tokio::sync::Mutex;
+
+    // 1. Perspective detection across legal, finance, medical, and education
+    let perspective_cases = [
+        (
+            "My landlord is refusing to return my security deposit, how do I dispute this?",
+            "legal",
+            ActorPerspective::Consumer,
+        ),
+        (
+            "Draft a commercial vendor indemnification contract with GDPR compliance",
+            "legal",
+            ActorPerspective::Practitioner,
+        ),
+        (
+            "Help me set up a personal budget from my paycheck to pay off credit card debt",
+            "finance",
+            ActorPerspective::Consumer,
+        ),
+        (
+            "Build a Sharpe-optimized multi-asset portfolio with CAGR and underwriting targets",
+            "finance",
+            ActorPerspective::Investor,
+        ),
+        (
+            "Explain my symptoms of knee pain and when I should see a doctor",
+            "medical",
+            ActorPerspective::Consumer,
+        ),
+        (
+            "Design a clinical trial protocol with FDA compliance for cardiology patients",
+            "medical",
+            ActorPerspective::Practitioner,
+        ),
+        (
+            "Help me learn calculus and study for my exam",
+            "education",
+            ActorPerspective::Consumer,
+        ),
+        (
+            "Design a 12-week university syllabus and pedagogy curriculum for instructors",
+            "education",
+            ActorPerspective::Practitioner,
+        ),
+    ];
+
+    for (prompt, domain, expected) in perspective_cases {
+        let got = detect_actor_perspective(&prompt.to_lowercase(), domain);
+        assert_eq!(
+            got, expected,
+            "Perspective mismatch for domain '{domain}' on prompt '{prompt}': expected {expected:?}, got {got:?}"
+        );
+    }
+
+    // 2. End-to-end check: "Help me learn calculus and study for my exam" must NOT trigger
+    //    "Wealth-Engineering" from "learn" containing "earn".
+    let config = ConfigLoader::load("config/unified.json").expect("load unified.json");
+    let config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(Mutex::new(OryEngine::new()));
+    let npae_cfg = NpaeConfig::default();
+    let reconstructed = token_compress_engine::types::ReconstructedInput::default();
+
+    let edu_prompt = "Help me learn calculus and study for my exam";
+    let repr = run_parallel_pipeline(edu_prompt).expect("compression pipeline");
+    let structurer = HttpStructurer {
+        route: "/api/compress".to_string(),
+        remote_addr: "127.0.0.1".to_string(),
+        body: edu_prompt.to_string(),
+    };
+    let resp = AggressiveEngine::run(
+        edu_prompt,
+        &repr,
+        &npae_cfg,
+        config_handle,
+        ory_engine,
+        &structurer,
+        &reconstructed,
+        None,
+    )
+    .await
+    .expect("AggressiveEngine::run on education consumer prompt");
+
+    assert_eq!(resp.structured_prompt.context.domain, "education");
+    assert!(
+        !resp.optimized_prompt.contains("Wealth-Engineering")
+            && !resp.optimized_prompt.contains("Income ≠ Revenue"),
+        "Education prompt with 'learn' must NOT trigger Wealth-Engineering:\n{}",
+        resp.optimized_prompt
+    );
+}

@@ -2,7 +2,8 @@
 //!
 //! Resolves `CompressionSchema` directly in-memory from `config/unified.json` (`ConfigHandle`)
 //! using a 3-tier resolution strategy (`Domain+TaskType+Expertise` -> `Domain+TaskType` -> `General fallback`)
-//! with zero SQLite queries.
+//! and supporting 3-Axis Intent Tensor `(Domain × ActorPerspective × IntentClass)` perspective-prefixed
+//! keys (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`, etc.) with zero SQLite queries.
 
 use std::cmp::Reverse;
 use std::collections::HashSet;
@@ -149,31 +150,28 @@ impl SchemaRegistry {
             .iter()
             .find(|t| t.domain.eq_ignore_ascii_case(canonical_domain))?;
 
-        let norm_task = normalize_task_type(&key.task_type)?;
+        let (perspective, raw_task) = parse_perspective_and_task(&key.task_type);
+        let norm_task = normalize_task_type(raw_task)?;
         let norm_expertise = normalize_expertise(&key.expertise)?;
 
-        // Ensure the domain actually has a template for this specific task_type
-        let has_explicit_task = tax
-            .task_templates
-            .as_ref()
-            .is_some_and(|m| m.contains_key(norm_task))
-            || tax
-                .phase_templates
-                .as_ref()
-                .is_some_and(|m| m.contains_key(task_type_to_phase_key(norm_task)));
-        if !has_explicit_task {
+        // Ensure the domain actually has a template for this specific (perspective, task_type)
+        if !has_explicit_task_or_phase_template(tax, perspective, norm_task) {
             return None;
         }
 
         Some(build_domain_schema(
             &cfg,
             tax,
+            perspective,
             norm_task,
             Some(norm_expertise),
         ))
     }
 
     /// Tier 2: Domain + `task_type` match, ignoring expertise (and falling back to `"default"` task templates for known domains).
+    ///
+    /// Supports both standard task types (`"creation"`, `"analysis"`, `"planning"`) and
+    /// perspective-prefixed task keys (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`).
     ///
     /// # Panics
     /// Never panics.
@@ -194,8 +192,9 @@ impl SchemaRegistry {
             .iter()
             .find(|t| t.domain.eq_ignore_ascii_case(canonical_domain))?;
 
-        let norm_task = normalize_task_type(task_type).unwrap_or("default");
-        Some(build_domain_schema(&cfg, tax, norm_task, None))
+        let (perspective, raw_task) = parse_perspective_and_task(task_type);
+        let norm_task = normalize_task_type(raw_task).unwrap_or("default");
+        Some(build_domain_schema(&cfg, tax, perspective, norm_task, None))
     }
 
     /// Tier 3: General fallback template when domain is `"general"` or unrecognized.
@@ -244,6 +243,85 @@ impl SchemaRegistry {
     }
 }
 
+/// Splits an optional actor perspective prefix (`"consumer:"`, `"practitioner:"`, `"investor:"`)
+/// from a task or phase key.
+///
+/// For example:
+/// - `"consumer:build"` -> `(Some("consumer"), "build")`
+/// - `"practitioner:creation"` -> `(Some("practitioner"), "creation")`
+/// - `"investor:analyze"` -> `(Some("investor"), "analyze")`
+/// - `"consumer"` -> `(Some("consumer"), "creation")`
+/// - `"creation"` -> `(None, "creation")`
+fn parse_perspective_and_task(task_type: &str) -> (Option<&'static str>, &str) {
+    let trimmed = task_type.trim();
+    if let Some((prefix, rest)) = trimmed.split_once(':') {
+        let p = match prefix.trim().to_ascii_lowercase().as_str() {
+            "consumer" | "buyer" | "patient" | "student" | "citizen" => Some("consumer"),
+            "practitioner" | "agent" | "professional" | "clinician" | "counsel" => {
+                Some("practitioner")
+            }
+            "investor" | "underwriter" | "allocator" => Some("investor"),
+            _ => None,
+        };
+        if p.is_some() {
+            let task_part = rest.trim();
+            return (
+                p,
+                if task_part.is_empty() {
+                    "creation"
+                } else {
+                    task_part
+                },
+            );
+        }
+    }
+
+    match trimmed.to_ascii_lowercase().as_str() {
+        "consumer" => (Some("consumer"), "creation"),
+        "practitioner" => (Some("practitioner"), "creation"),
+        "investor" => (Some("investor"), "analysis"),
+        _ => (None, trimmed),
+    }
+}
+
+/// Checks whether `tax` defines an explicit task or phase template for `(perspective, norm_task)`.
+fn has_explicit_task_or_phase_template(
+    tax: &DomainTaxonomy,
+    perspective: Option<&str>,
+    norm_task: &str,
+) -> bool {
+    let phase_key = task_type_to_phase_key(norm_task);
+
+    if let Some(p) = perspective {
+        let comp_task = format!("{p}:{norm_task}");
+        let comp_phase = format!("{p}:{phase_key}");
+        if tax
+            .task_templates
+            .as_ref()
+            .is_some_and(|m| m.contains_key(&comp_task) || m.contains_key(&comp_phase))
+        {
+            return true;
+        }
+        if tax
+            .phase_templates
+            .as_ref()
+            .is_some_and(|m| m.contains_key(&comp_phase) || m.contains_key(p))
+        {
+            return true;
+        }
+    }
+
+    tax.task_templates
+        .as_ref()
+        .is_some_and(|m| m.contains_key(norm_task))
+        || tax.phase_templates.as_ref().is_some_and(|m| {
+            m.contains_key(phase_key)
+                || m.contains_key(&format!("consumer:{phase_key}"))
+                || m.contains_key(&format!("practitioner:{phase_key}"))
+                || m.contains_key(&format!("investor:{phase_key}"))
+        })
+}
+
 /// Normalizes task type aliases into canonical `task_templates` keys.
 fn normalize_task_type(task_type: &str) -> Option<&'static str> {
     let lower = task_type.trim().to_ascii_lowercase();
@@ -290,10 +368,11 @@ fn normalize_expertise(expertise: &str) -> Option<&'static str> {
 fn build_domain_schema(
     cfg: &UnifiedConfig,
     tax: &DomainTaxonomy,
+    perspective: Option<&str>,
     norm_task: &str,
     expertise: Option<&str>,
 ) -> CompressionSchema {
-    let role_str = resolve_domain_role(cfg, tax, expertise);
+    let role_str = resolve_domain_role(cfg, tax, perspective, expertise);
     let context = tax
         .context_fields
         .as_ref()
@@ -301,10 +380,20 @@ fn build_domain_schema(
         .map(|fields| fields.join(" "))
         .or_else(|| Some(format!("{}_context", tax.domain)));
 
+    let phase_key = task_type_to_phase_key(norm_task);
     let task = tax
         .task_templates
         .as_ref()
         .and_then(|templates| {
+            if let Some(p) = perspective {
+                if let Some(t) = templates
+                    .get(&format!("{p}:{norm_task}"))
+                    .or_else(|| templates.get(&format!("{p}:{phase_key}")))
+                    .or_else(|| templates.get(p))
+                {
+                    return Some(t.clone());
+                }
+            }
             templates
                 .get(norm_task)
                 .or_else(|| templates.get("default"))
@@ -317,7 +406,7 @@ fn build_domain_schema(
         });
 
     let constraints = resolve_domain_constraints(cfg, tax);
-    let output = resolve_domain_deliverables(tax, norm_task);
+    let output = resolve_domain_deliverables(tax, perspective, norm_task);
 
     CompressionSchema {
         role: Some(role_str),
@@ -328,23 +417,47 @@ fn build_domain_schema(
     }
 }
 
-/// Resolves the highest-priority role title for a domain, modulated by optional expertise level.
+/// Resolves the highest-priority role title for a domain, modulated by optional actor perspective and expertise level.
 fn resolve_domain_role(
     cfg: &UnifiedConfig,
     tax: &DomainTaxonomy,
+    perspective: Option<&str>,
     expertise: Option<&str>,
 ) -> String {
-    let mut matching_roles: Vec<_> = cfg
-        .roles
-        .iter()
-        .filter(|r| r.domain.eq_ignore_ascii_case(&tax.domain))
-        .collect();
-    matching_roles.sort_by_key(|r| Reverse(r.priority));
+    let base_role = match (perspective, tax.domain.as_str()) {
+        (Some("consumer"), "real-estate") => {
+            "Residential Home-Buying & Mortgage Advisor".to_string()
+        }
+        (Some("consumer"), "legal") => "Consumer Legal Rights & Dispute Advisor".to_string(),
+        (Some("consumer"), "medical" | "health") => {
+            "Clinical Health & Patient Care Educator".to_string()
+        }
+        (Some("consumer"), "finance") => "Personal Finance & Household Budget Advisor".to_string(),
+        (Some("consumer"), "education") => "Personal Learning & Mastery Coach".to_string(),
+        (Some("investor"), "real-estate") => {
+            "Real Estate Investment & Underwriting Strategist".to_string()
+        }
+        _ => {
+            let mut matching_roles: Vec<_> = cfg
+                .roles
+                .iter()
+                .filter(|r| r.domain.eq_ignore_ascii_case(&tax.domain))
+                .collect();
+            matching_roles.sort_by_key(|r| Reverse(r.priority));
 
-    let base_role = matching_roles.first().map_or_else(
-        || default_domain_role_title(&tax.domain),
-        |r| r.base_title.clone(),
-    );
+            matching_roles.first().map_or_else(
+                || default_domain_role_title(&tax.domain),
+                |r| r.base_title.clone(),
+            )
+        }
+    };
+
+    if perspective == Some("consumer") {
+        return match expertise {
+            Some("beginner") => format!("{base_role} (Guided Mode)"),
+            _ => base_role,
+        };
+    }
 
     match expertise {
         Some("expert" | "advanced") => {
@@ -397,11 +510,59 @@ fn resolve_domain_constraints(cfg: &UnifiedConfig, tax: &DomainTaxonomy) -> Vec<
     constraints
 }
 
-/// Collects up to 3 concise deliverables for `(tax, norm_task)` from `default_deliverables` or `phase_templates`.
-fn resolve_domain_deliverables(tax: &DomainTaxonomy, norm_task: &str) -> Vec<Deliverable> {
+/// Collects up to 3 concise deliverables for `(tax, perspective, norm_task)` from `default_deliverables` or `phase_templates`.
+fn resolve_domain_deliverables(
+    tax: &DomainTaxonomy,
+    perspective: Option<&str>,
+    norm_task: &str,
+) -> Vec<Deliverable> {
     let mut output = Vec::new();
     let mut seen_deliverables = HashSet::new();
+    let phase_key = task_type_to_phase_key(norm_task);
 
+    // 1. When an explicit actor perspective is present, check perspective-keyed deliverables and phase_templates first.
+    if let Some(p) = perspective {
+        let comp_task = format!("{p}:{norm_task}");
+        let comp_phase = format!("{p}:{phase_key}");
+
+        if let Some(ref deliv_map) = tax.default_deliverables {
+            if let Some(items) = deliv_map
+                .get(&comp_task)
+                .or_else(|| deliv_map.get(&comp_phase))
+                .or_else(|| deliv_map.get(p))
+            {
+                for item in items {
+                    let lower = item.to_ascii_lowercase();
+                    if seen_deliverables.insert(lower) {
+                        output.push(Deliverable { name: item.clone() });
+                        if output.len() >= 3 {
+                            return output;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(ref phases_map) = tax.phase_templates {
+            if let Some(phases) = phases_map.get(&comp_phase).or_else(|| phases_map.get(p)) {
+                for phase in phases {
+                    for deliv in &phase.deliverables {
+                        let lower = deliv.to_ascii_lowercase();
+                        if seen_deliverables.insert(lower) {
+                            output.push(Deliverable {
+                                name: deliv.clone(),
+                            });
+                            if output.len() >= 3 {
+                                return output;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Standard task_type lookup in default_deliverables.
     if let Some(ref deliv_map) = tax.default_deliverables {
         if let Some(items) = deliv_map
             .get(norm_task)
@@ -419,12 +580,17 @@ fn resolve_domain_deliverables(tax: &DomainTaxonomy, norm_task: &str) -> Vec<Del
         }
     }
 
+    // 3. Fallback to phase_templates (including perspective-prefixed keys if standard keys are absent).
     if output.is_empty() {
         if let Some(ref phases_map) = tax.phase_templates {
-            let phase_key = task_type_to_phase_key(norm_task);
             if let Some(phases) = phases_map
                 .get(phase_key)
+                .or_else(|| phases_map.get(&format!("consumer:{phase_key}")))
+                .or_else(|| phases_map.get(&format!("practitioner:{phase_key}")))
+                .or_else(|| phases_map.get(&format!("investor:{phase_key}")))
                 .or_else(|| phases_map.get("build"))
+                .or_else(|| phases_map.get("consumer:build"))
+                .or_else(|| phases_map.get("practitioner:build"))
                 .or_else(|| phases_map.get("default"))
             {
                 for phase in phases {
@@ -620,5 +786,130 @@ mod tests {
             schema.role
         );
         assert!(!schema.output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_perspective_keyed_resolution_consumer_practitioner_investor() {
+        let registry = SchemaRegistry::without_pool();
+
+        // 1. Real Estate Consumer ("consumer:build") -> Residential Home-Buying & Mortgage Advisor + homebuying deliverables
+        let re_consumer = registry
+            .resolve_schema_for_signal(&SchemaLookupKey {
+                domain: "real-estate".to_string(),
+                task_type: "consumer:build".to_string(),
+                expertise: "intermediate".to_string(),
+            })
+            .await;
+        assert_eq!(
+            re_consumer.role.as_deref(),
+            Some("Residential Home-Buying & Mortgage Advisor")
+        );
+        assert!(
+            re_consumer
+                .output
+                .iter()
+                .any(|d| d.name.contains("Mortgage Pre-Approval")
+                    || d.name.contains("Affordability")),
+            "Expected homebuyer deliverables for consumer:build in real-estate, got: {:?}",
+            re_consumer.output
+        );
+
+        // 2. Real Estate Practitioner ("practitioner:build") -> Real Estate Agent + licensing/brokerage deliverables
+        let re_practitioner = registry
+            .resolve_schema_for_signal(&SchemaLookupKey {
+                domain: "real-estate".to_string(),
+                task_type: "practitioner:build".to_string(),
+                expertise: "intermediate".to_string(),
+            })
+            .await;
+        assert_eq!(re_practitioner.role.as_deref(), Some("Real Estate Agent"));
+        assert!(
+            re_practitioner
+                .output
+                .iter()
+                .any(|d| d.name.contains("Real Estate License")
+                    || d.name.contains("Broker Sponsorship")),
+            "Expected licensing deliverables for practitioner:build in real-estate, got: {:?}",
+            re_practitioner.output
+        );
+
+        // 3. Real Estate Investor ("investor:analyze") -> Real Estate Investment & Underwriting Strategist + CMA/NOI deliverables
+        let re_investor = registry
+            .resolve_schema_for_signal(&SchemaLookupKey {
+                domain: "real-estate".to_string(),
+                task_type: "investor:analyze".to_string(),
+                expertise: "expert".to_string(),
+            })
+            .await;
+        assert!(
+            re_investor
+                .role
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Real Estate Investment & Underwriting Strategist"),
+            "Got investor role: {:?}",
+            re_investor.role
+        );
+        assert!(
+            re_investor
+                .output
+                .iter()
+                .any(|d| d.name.contains("Comparative Market Analysis") || d.name.contains("NOI")),
+            "Expected underwriting deliverables for investor:analyze, got: {:?}",
+            re_investor.output
+        );
+
+        // 4. Finance, Legal, Education consumer:build vs practitioner:build
+        for (domain, consumer_role, consumer_deliv_substr, practitioner_deliv_substr) in [
+            (
+                "finance",
+                "Personal Finance & Household Budget Advisor",
+                "Budget",
+                "Burn Rate Audit",
+            ),
+            (
+                "legal",
+                "Consumer Legal Rights & Dispute Advisor",
+                "Evidence Dossier",
+                "Statutory Basis Analysis",
+            ),
+            (
+                "education",
+                "Personal Learning & Mastery Coach",
+                "Study Schedule",
+                "Prerequisite Audit",
+            ),
+        ] {
+            let cons = registry
+                .resolve_schema_for_signal(&SchemaLookupKey {
+                    domain: domain.to_string(),
+                    task_type: "consumer:build".to_string(),
+                    expertise: "intermediate".to_string(),
+                })
+                .await;
+            assert_eq!(cons.role.as_deref(), Some(consumer_role));
+            assert!(
+                cons.output
+                    .iter()
+                    .any(|d| d.name.contains(consumer_deliv_substr)),
+                "[{domain} consumer:build] expected deliverable containing '{consumer_deliv_substr}', got {:?}",
+                cons.output
+            );
+
+            let prac = registry
+                .resolve_schema_for_signal(&SchemaLookupKey {
+                    domain: domain.to_string(),
+                    task_type: "practitioner:build".to_string(),
+                    expertise: "expert".to_string(),
+                })
+                .await;
+            assert!(
+                prac.output
+                    .iter()
+                    .any(|d| d.name.contains(practitioner_deliv_substr)),
+                "[{domain} practitioner:build] expected deliverable containing '{practitioner_deliv_substr}', got {:?}",
+                prac.output
+            );
+        }
     }
 }

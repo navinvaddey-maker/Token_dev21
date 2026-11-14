@@ -35,6 +35,7 @@ fn test_real_estate_prompt_structuring() {
         rule_locked: false,
         legal_as_constraint: false,
         composed_primary_role: None,
+        perspective: Default::default(),
     };
 
     let role = generate_role(&profile, raw_input, &config.domain_taxonomy, &config.roles);

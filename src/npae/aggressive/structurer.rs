@@ -254,6 +254,108 @@ pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
     (context, rag, user_prompt)
 }
 
+/// Prunes redundant `# TASK / INSTRUCTION:` headers and leading conversational politeness
+/// filler from the raw user task while preserving 100% of numbers, budgets (`$500k`),
+/// locations (`Austin`), domain terms, and negations (`do not`, `never`, `without`, `no `).
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §6 — eliminates duplicate header emission and verbose
+/// // conversational preambles under `# TASK / INSTRUCTION:`.
+///
+/// # Panics
+/// Never.
+#[must_use]
+pub fn prune_task_instruction(user_prompt: &str) -> String {
+    let mut s = user_prompt.trim();
+
+    let headers = [
+        "# task / instruction:",
+        "# task / instruction",
+        "# task:",
+        "# task",
+        "# instruction:",
+        "# instruction",
+        "task / instruction:",
+        "task:",
+        "instruction:",
+    ];
+    loop {
+        let lower = s.to_lowercase();
+        let mut stripped_any = false;
+        for h in headers {
+            if lower.starts_with(h) {
+                if let Some(rest) = s.get(h.len()..) {
+                    s = rest.trim_start_matches(&[' ', '\t', '\r', '\n', ':', '-'][..]);
+                    stripped_any = true;
+                    break;
+                }
+            }
+        }
+        if !stripped_any {
+            break;
+        }
+    }
+
+    let polite_prefixes = [
+        "i would really appreciate it if you could please help me to ",
+        "i would really appreciate it if you could please help me ",
+        "i would really appreciate it if you could please ",
+        "i would appreciate it if you could please help me to ",
+        "i would appreciate it if you could please help me ",
+        "i would appreciate it if you could please ",
+        "i would really appreciate it if you could ",
+        "i would appreciate it if you could ",
+        "could you please help me to ",
+        "could you please help me ",
+        "can you please help me to ",
+        "can you please help me ",
+        "would you please help me to ",
+        "would you please help me ",
+        "could you kindly help me to ",
+        "could you kindly help me ",
+        "could you please ",
+        "can you please ",
+        "would you please ",
+        "please help me to ",
+        "please help me ",
+        "help me to ",
+        "i want you to please ",
+        "i need you to please ",
+        "i want you to ",
+        "i need you to ",
+        "i would like you to ",
+        "please ",
+    ];
+    loop {
+        let lower = s.to_lowercase();
+        let mut stripped_any = false;
+        for p in polite_prefixes {
+            if lower.starts_with(p) {
+                if let Some(rest) = s.get(p.len()..) {
+                    let trimmed_rest = rest.trim_start();
+                    if !trimmed_rest.is_empty() {
+                        s = trimmed_rest;
+                        stripped_any = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !stripped_any {
+            break;
+        }
+    }
+
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(first) => {
+            let mut result: String = first.to_uppercase().collect();
+            result.push_str(chars.as_str());
+            result
+        }
+        None => user_prompt.trim().to_string(),
+    }
+}
+
 /// Renders a `StructuredPrompt` and optional clarifying questions in the CRISP Markdown format.
 ///
 /// # Panics
@@ -472,8 +574,9 @@ pub fn render_crisp_prompt(
     }
 
     // FINAL INSTRUCTION — adaptive based on intent
+    let pruned_task = prune_task_instruction(&user_prompt);
     out.push_str("# TASK / INSTRUCTION:\n");
-    out.push_str(&user_prompt);
+    out.push_str(&pruned_task);
     out.push_str("\n\n---\n");
     out.push_str(&prompt.dynamic_instruction);
     if !questions.is_empty() {
@@ -1193,7 +1296,9 @@ pub fn build_with_blueprint(
         None => true,
     };
 
-    let suppress_phases = profile.deliverable_type == DeliverableType::Content
+    let suppress_phases = (profile.deliverable_type == DeliverableType::Content
+        && !profile.has_phases
+        && !profile.has_timeline)
         || (profile.primary_intent == IntentClass::Explain && curated_phases.is_empty());
 
     let execution_phases = if suppress_phases {
@@ -1244,16 +1349,22 @@ pub fn build_with_blueprint(
     let assumptions = infer_assumptions(profile, raw);
 
     // Build dynamic instruction
+    // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — only append Ory `bp.rationale` when the domain is
+    // genuinely novel/unconfigured (`!domain_in_config_taxonomy`, e.g. `tests/ory_test.rs` with
+    // empty `domain_taxonomy`), preventing internal `DomainTransfer` telemetry from leaking into
+    // canonical configured domains.
     let mut dynamic_instruction = derive_dynamic_instruction(profile, raw);
-    if let Some(bp) = blueprint {
-        if !bp.rationale.is_empty() {
-            if dynamic_instruction.is_empty() {
-                dynamic_instruction = format!("Architecture Strategy: {}", bp.rationale);
-            } else {
-                dynamic_instruction = format!(
-                    "{}\nArchitecture Strategy: {}",
-                    dynamic_instruction, bp.rationale
-                );
+    if !domain_in_config_taxonomy {
+        if let Some(bp) = blueprint {
+            if !bp.rationale.is_empty() {
+                if dynamic_instruction.is_empty() {
+                    dynamic_instruction = format!("Architecture Strategy: {}", bp.rationale);
+                } else {
+                    dynamic_instruction = format!(
+                        "{}\nArchitecture Strategy: {}",
+                        dynamic_instruction, bp.rationale
+                    );
+                }
             }
         }
     }
@@ -1270,7 +1381,7 @@ pub fn build_with_blueprint(
     let persona_anchor = if let Some(ref v) = rule_verdict {
         v.persona_anchor()
     } else {
-        derive_persona_anchor(&profile.domain, &role_primary, config)
+        derive_persona_anchor(&profile.domain, &role_primary, profile.perspective, config)
     };
     let secondary = rule_verdict
         .as_ref()
@@ -1519,7 +1630,12 @@ fn infer_execution_phases(
     raw: &str,
     config: Option<&super::config::UnifiedConfig>,
 ) -> Vec<ExecutionPhase> {
-    if !profile.has_phases && !profile.has_timeline {
+    let raw_lower = raw.to_lowercase();
+    let is_planning_prompt = raw_lower.contains("step-by-step")
+        || raw_lower.contains("plan")
+        || raw_lower.contains("how do i ")
+        || raw_lower.contains("become a ");
+    if !profile.has_phases && !profile.has_timeline && !is_planning_prompt {
         // No temporal signals — check if this is a build/planning task
         if profile.primary_intent != super::intent::IntentClass::Build
             && profile.primary_intent != super::intent::IntentClass::Transform
@@ -1542,6 +1658,35 @@ fn infer_execution_phases(
         let canonical = super::config::normalize_domain(&profile.domain, &cfg.domain_taxonomy);
         if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == canonical) {
             if let Some(ref templates) = tax.phase_templates {
+                let composite_key = format!("{}:{}", profile.perspective.as_key(), intent_key);
+                if let Some(phases) = templates.get(&composite_key) {
+                    if !phases.is_empty() {
+                        return phases.clone();
+                    }
+                }
+                if let Some(phases) = templates.get(profile.perspective.as_key()) {
+                    if !phases.is_empty() {
+                        return phases.clone();
+                    }
+                }
+                if profile.perspective == super::intent::ActorPerspective::Consumer
+                    && (is_planning_prompt || profile.has_phases)
+                {
+                    if let Some(phases) = templates.get("consumer:build") {
+                        if !phases.is_empty() {
+                            return phases.clone();
+                        }
+                    }
+                }
+                if profile.perspective == super::intent::ActorPerspective::Practitioner
+                    && (is_planning_prompt || profile.has_phases)
+                {
+                    if let Some(phases) = templates.get("practitioner:build") {
+                        if !phases.is_empty() {
+                            return phases.clone();
+                        }
+                    }
+                }
                 if let Some(phases) = templates.get(intent_key) {
                     if !phases.is_empty() {
                         return phases.clone();
@@ -1703,29 +1848,94 @@ fn infer_execution_phases(
                 deliverables: vec!["Launch plan".into(), "First 30-day action items".into()],
             });
         }
-        "real-estate" | "real estate" => {
-            phases.push(ExecutionPhase {
-                phase_number: 1,
-                name: "Licensing & Pre-Registration".into(),
-                description: "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.".into(),
-                estimated_duration: "1-3 months".into(),
-                deliverables: vec!["Real Estate License".into(), "Broker Sponsorship Agreement".into()],
-            });
-            phases.push(ExecutionPhase {
-                phase_number: 2,
-                name: "Business Setup & GTM Strategy".into(),
-                description: "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.".into(),
-                estimated_duration: "2-4 weeks".into(),
-                deliverables: vec!["Business Entity (LLC)".into(), "Lead Generation & CRM Setup".into()],
-            });
-            phases.push(ExecutionPhase {
-                phase_number: 3,
-                name: "Client Acquisition & Expansion".into(),
-                description: "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.".into(),
-                estimated_duration: "Ongoing".into(),
-                deliverables: vec!["First Closed Transactions".into(), "Client Referral Pipeline".into()],
-            });
-        }
+        "real-estate" | "real estate" => match profile.perspective {
+            super::intent::ActorPerspective::Consumer => {
+                phases.push(ExecutionPhase {
+                    phase_number: 1,
+                    name: "Financial Readiness & Mortgage Pre-Approval".into(),
+                    description: "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure fixed-rate mortgage pre-approval.".into(),
+                    estimated_duration: "1-2 weeks".into(),
+                    deliverables: vec![
+                        "Affordability & DTI Budget Ceiling".into(),
+                        "Mortgage Pre-Approval Checklist".into(),
+                    ],
+                });
+                phases.push(ExecutionPhase {
+                    phase_number: 2,
+                    name: "Property Search, Neighborhood Comps & Offer Strategy".into(),
+                    description: "Evaluate neighborhood comparables (CMA), property condition, HOA/zoning disclosures, and structure a contingency-protected purchase offer.".into(),
+                    estimated_duration: "2-6 weeks".into(),
+                    deliverables: vec![
+                        "Comparative Market Analysis (CMA)".into(),
+                        "Purchase Offer & Contingency Strategy".into(),
+                    ],
+                });
+                phases.push(ExecutionPhase {
+                    phase_number: 3,
+                    name: "Inspection, Appraisal, Underwriting & Closing".into(),
+                    description: "Execute physical home inspection, negotiate repair credits, verify lender appraisal and title/escrow clearance, and complete closing settlement.".into(),
+                    estimated_duration: "30-45 days".into(),
+                    deliverables: vec![
+                        "Inspection & Due Diligence Checklist".into(),
+                        "Closing Disclosure & Settlement Plan".into(),
+                    ],
+                });
+            }
+            super::intent::ActorPerspective::Investor => {
+                phases.push(ExecutionPhase {
+                    phase_number: 1,
+                    name: "Market Comparables & Location Audit".into(),
+                    description: "Evaluate local market comparables (CMA), submarket supply/demand dynamics, zoning disclosures, and property condition.".into(),
+                    estimated_duration: "2-3 days".into(),
+                    deliverables: vec![
+                        "Comparative Market Analysis (CMA)".into(),
+                        "Zoning & Due Diligence Audit".into(),
+                    ],
+                });
+                phases.push(ExecutionPhase {
+                    phase_number: 2,
+                    name: "Financial Underwriting & ROI Stress-Test".into(),
+                    description: "Model Net Operating Income (NOI), capitalization rate, cash-on-cash return, and debt-service coverage across downside scenarios.".into(),
+                    estimated_duration: "2-3 days".into(),
+                    deliverables: vec![
+                        "NOI, Cap Rate & ROI Projection".into(),
+                        "Financing & Capital Stack Plan".into(),
+                    ],
+                });
+            }
+            super::intent::ActorPerspective::Practitioner => {
+                phases.push(ExecutionPhase {
+                    phase_number: 1,
+                    name: "Licensing & Pre-Registration".into(),
+                    description: "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.".into(),
+                    estimated_duration: "1-3 months".into(),
+                    deliverables: vec![
+                        "Real Estate License".into(),
+                        "Broker Sponsorship Agreement".into(),
+                    ],
+                });
+                phases.push(ExecutionPhase {
+                    phase_number: 2,
+                    name: "Business Setup & GTM Strategy".into(),
+                    description: "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.".into(),
+                    estimated_duration: "2-4 weeks".into(),
+                    deliverables: vec![
+                        "Business Entity (LLC)".into(),
+                        "Lead Generation & CRM Setup".into(),
+                    ],
+                });
+                phases.push(ExecutionPhase {
+                    phase_number: 3,
+                    name: "Client Acquisition & Expansion".into(),
+                    description: "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.".into(),
+                    estimated_duration: "Ongoing".into(),
+                    deliverables: vec![
+                        "First Closed Transactions".into(),
+                        "Client Referral Pipeline".into(),
+                    ],
+                });
+            }
+        },
         "career-growth" => {
             phases.push(ExecutionPhase {
                 phase_number: 1,
@@ -2254,30 +2464,59 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
                 validation_method: "Traveler constraint checklist".into(),
             },
         ],
-        "real-estate" => vec![
-            ValidationStep {
-                step_number: 1,
-                name: "Comparable Market & Valuation Check".into(),
-                criteria: "Pricing, cap rate, and cash-on-cash return align with local comps"
-                    .into(),
-                validation_method: "CMA & underwriting audit".into(),
-            },
-            ValidationStep {
-                step_number: 2,
-                name: "Zoning, Title & Licensing Compliance".into(),
-                criteria:
-                    "Property use, disclosures, and brokerage steps satisfy local regulations"
+        "real-estate" => match profile.perspective {
+            super::intent::ActorPerspective::Consumer => vec![
+                ValidationStep {
+                    step_number: 1,
+                    name: "Affordability & DTI Stress Test".into(),
+                    criteria:
+                        "Monthly PITI + HOA payment stays within DTI ceiling and budget reserves"
+                            .into(),
+                    validation_method: "Mortgage affordability & DTI audit".into(),
+                },
+                ValidationStep {
+                    step_number: 2,
+                    name: "Neighborhood Comps & Appraisal Check".into(),
+                    criteria:
+                        "Offer price aligns with recent comparable sales (CMA) and appraisal value"
+                            .into(),
+                    validation_method: "CMA & lender appraisal verification".into(),
+                },
+                ValidationStep {
+                    step_number: 3,
+                    name: "Inspection, Title & Closing Verification".into(),
+                    criteria:
+                        "Physical inspection contingencies, title clearance, and closing disclosures are verified"
+                            .into(),
+                    validation_method: "Inspection & settlement checklist".into(),
+                },
+            ],
+            _ => vec![
+                ValidationStep {
+                    step_number: 1,
+                    name: "Comparable Market & Valuation Check".into(),
+                    criteria: "Pricing, cap rate, and cash-on-cash return align with local comps"
                         .into(),
-                validation_method: "Regulatory & title checklist".into(),
-            },
-            ValidationStep {
-                step_number: 3,
-                name: "Financing & Cashflow Stress Test".into(),
-                criteria: "Debt service coverage survives vacancy and interest rate sensitivity"
-                    .into(),
-                validation_method: "Underwriting sensitivity model".into(),
-            },
-        ],
+                    validation_method: "CMA & underwriting audit".into(),
+                },
+                ValidationStep {
+                    step_number: 2,
+                    name: "Zoning, Title & Licensing Compliance".into(),
+                    criteria:
+                        "Property use, disclosures, and brokerage steps satisfy local regulations"
+                            .into(),
+                    validation_method: "Regulatory & title checklist".into(),
+                },
+                ValidationStep {
+                    step_number: 3,
+                    name: "Financing & Cashflow Stress Test".into(),
+                    criteria:
+                        "Debt service coverage survives vacancy and interest rate sensitivity"
+                            .into(),
+                    validation_method: "Underwriting sensitivity model".into(),
+                },
+            ],
+        },
         "marketing" | "ecommerce" => vec![
             ValidationStep {
                 step_number: 1,
@@ -2341,26 +2580,80 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
     }
 }
 
+/// Returns `true` when `text_lower` contains `needle` on word boundaries, preventing substring
+/// false positives such as `"learn"` matching `"earn"` or `"appraisal"` matching `"app"`.
+fn has_whole_word_or_phrase(text_lower: &str, needle: &str) -> bool {
+    if needle.is_empty() || text_lower.len() < needle.len() {
+        return false;
+    }
+    let bytes = text_lower.as_bytes();
+    let mut start = 0;
+    while let Some(pos) = text_lower.get(start..).and_then(|s| s.find(needle)) {
+        let abs = start + pos;
+        let end = abs + needle.len();
+        let left_ok = abs == 0
+            || bytes
+                .get(abs - 1)
+                .is_none_or(|b| !b.is_ascii_alphanumeric());
+        let right_ok =
+            end == bytes.len() || bytes.get(end).is_none_or(|b| !b.is_ascii_alphanumeric());
+        if left_ok && right_ok {
+            return true;
+        }
+        start = abs + 1;
+    }
+    false
+}
+
+/// Returns `true` when the prompt is genuinely a wealth-engineering / net-worth compounding query,
+/// strictly gated by the deterministic rule layer or `(domain in finance/business && perspective != Consumer)`
+/// so consumer homebuying, education (`"learn"`), or travel prompts with budgets (`"$500k"`) are never hijacked.
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §6 — domain-conditioned feature gating for wealth-engineering templates.
+fn is_wealth_engineering_query(profile: &IntentProfile, raw: &str) -> bool {
+    if profile.is_wealth_build()
+        || crate::classifier::intent_rule::resolve_prompt_rules(raw)
+            .map(|v| v.intent == crate::classifier::intent_rule::GoalIntent::WealthBuild)
+            .unwrap_or(false)
+    {
+        return true;
+    }
+
+    if !matches!(profile.domain.as_str(), "finance" | "business")
+        || profile.perspective == super::intent::ActorPerspective::Consumer
+    {
+        return false;
+    }
+
+    let lower = raw.to_lowercase();
+    let wealth_phrases = [
+        "wealth",
+        "million",
+        "billion",
+        "financial freedom",
+        "passive income",
+        "retire early",
+    ];
+    wealth_phrases
+        .iter()
+        .any(|p| has_whole_word_or_phrase(&lower, p))
+        || lower.contains("make $")
+}
+
+/// Returns `true` when the prompt is an enterprise / venture business query (`Practitioner` or `Investor`
+/// in `"business"` / `"business-strategy"`), preventing cross-domain hijacks on non-business prompts.
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §6 — domain-conditioned feature gating for enterprise business templates.
+fn is_enterprise_business_query(profile: &IntentProfile) -> bool {
+    matches!(profile.domain.as_str(), "business" | "business-strategy")
+        && profile.perspective != super::intent::ActorPerspective::Consumer
+}
+
 /// Infer success criteria from profile and raw prompt — intent and domain driven
 fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut criteria = Vec::new();
-    let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance"
-        || lower.contains("earn")
-        || lower.contains("wealth")
-        || lower.contains("million")
-        || lower.contains("billion")
-        || lower.contains("rich")
-        || lower.contains("financial freedom")
-        || lower.contains("money")
-        || lower.contains("passive income")
-        || lower.contains("retire early")
-        || lower.contains("make $");
-    let is_business = profile.domain == "business"
-        || lower.contains("business")
-        || lower.contains("startup")
-        || lower.contains("company")
-        || lower.contains("enterprise");
+    let is_financial = is_wealth_engineering_query(profile, raw);
+    let is_business = is_enterprise_business_query(profile);
 
     if is_financial && !profile.domain.starts_with("workplace") {
         criteria.push("Target is clearly defined with explicit amount ($), currency, time horizon, and target type (Distinguish: Income ≠ Revenue ≠ Profit ≠ Savings ≠ Investable Capital ≠ Net Worth)".into());
@@ -2442,16 +2735,24 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
             );
             criteria.push("Includes incident detection telemetry and response playbooks".into());
         }
-        (IntentClass::Build, "real-estate") => {
-            criteria.push("Property valuation and cashflow underwriting are grounded in comparable market data".into());
-            criteria.push(
-                "Licensing, zoning, and transaction steps adhere to local real estate regulations"
-                    .into(),
-            );
-            criteria.push(
-                "Includes actionable client acquisition, financing, and closing milestones".into(),
-            );
-        }
+        (IntentClass::Build, "real-estate") => match profile.perspective {
+            super::intent::ActorPerspective::Consumer => {
+                criteria.push("Homebuying budget, DTI ratio, down payment, and closing-cost reserves are verified against mortgage pre-approval limits".into());
+                criteria.push("Property evaluation and offer pricing are grounded in neighborhood Comparative Market Analysis (CMA) and appraisal comps".into());
+                criteria.push("Includes actionable inspection contingencies, title/escrow due diligence, and closing settlement milestones".into());
+            }
+            _ => {
+                criteria.push("Property valuation and cashflow underwriting are grounded in comparable market data".into());
+                criteria.push(
+                    "Licensing, zoning, and transaction steps adhere to local real estate regulations"
+                        .into(),
+                );
+                criteria.push(
+                    "Includes actionable client acquisition, financing, and closing milestones"
+                        .into(),
+                );
+            }
+        },
         (IntentClass::Build, "travel") => {
             criteria.push(
                 "Itinerary schedule is geographically logical and optimizes transit times".into(),
@@ -2602,23 +2903,8 @@ fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
         .clone()
         .unwrap_or_else(|| "the core topic".into());
     let naturalized = naturalize_subject(&subject, &profile.primary_intent);
-    let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance"
-        || lower.contains("earn")
-        || lower.contains("wealth")
-        || lower.contains("million")
-        || lower.contains("billion")
-        || lower.contains("rich")
-        || lower.contains("financial freedom")
-        || lower.contains("money")
-        || lower.contains("passive income")
-        || lower.contains("retire early")
-        || lower.contains("make $");
-    let is_business = profile.domain == "business"
-        || lower.contains("business")
-        || lower.contains("startup")
-        || lower.contains("company")
-        || lower.contains("enterprise");
+    let is_financial = is_wealth_engineering_query(profile, raw);
+    let is_business = is_enterprise_business_query(profile);
 
     if is_financial && !profile.domain.starts_with("workplace") {
         return Some(format!(
@@ -2649,22 +2935,8 @@ fn unpack_context(profile: &IntentProfile, raw: &str) -> Option<String> {
 fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
     let mut assumptions = Vec::new();
     let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance"
-        || lower.contains("earn")
-        || lower.contains("wealth")
-        || lower.contains("million")
-        || lower.contains("billion")
-        || lower.contains("rich")
-        || lower.contains("financial freedom")
-        || lower.contains("money")
-        || lower.contains("passive income")
-        || lower.contains("retire early")
-        || lower.contains("make $");
-    let is_business = profile.domain == "business"
-        || lower.contains("business")
-        || lower.contains("startup")
-        || lower.contains("company")
-        || lower.contains("enterprise");
+    let is_financial = is_wealth_engineering_query(profile, raw);
+    let is_business = is_enterprise_business_query(profile);
 
     if is_financial && !profile.domain.starts_with("workplace") {
         assumptions.push(
@@ -2754,23 +3026,8 @@ fn infer_assumptions(profile: &IntentProfile, raw: &str) -> Vec<String> {
 
 /// Derive dynamic final instruction based on intent and goal engineering
 fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
-    let lower = raw.to_lowercase();
-    let is_financial = profile.domain == "finance"
-        || lower.contains("earn")
-        || lower.contains("wealth")
-        || lower.contains("million")
-        || lower.contains("billion")
-        || lower.contains("rich")
-        || lower.contains("financial freedom")
-        || lower.contains("money")
-        || lower.contains("passive income")
-        || lower.contains("retire early")
-        || lower.contains("make $");
-    let is_business = profile.domain == "business"
-        || lower.contains("business")
-        || lower.contains("startup")
-        || lower.contains("company")
-        || lower.contains("enterprise");
+    let is_financial = is_wealth_engineering_query(profile, raw);
+    let is_business = is_enterprise_business_query(profile);
 
     if is_financial && !profile.domain.starts_with("workplace") {
         return "Execute the comprehensive Goal-Decomposition and Wealth-Engineering plan detailed in the Roadmap section, ensuring each of the 8 quantitative milestones is addressed with mathematical rigor.".into();
@@ -2809,9 +3066,14 @@ fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
             "data-science" | "ai-ml" => {
                 "Design the requested data science or ML pipeline with leak-free validation splits, baseline benchmarks, and deployment guardrails.".into()
             }
-            "real-estate" => {
-                "Develop the requested real estate strategy with comparable market underwriting, regulatory compliance, and transaction milestones.".into()
-            }
+            "real-estate" => match profile.perspective {
+                super::intent::ActorPerspective::Consumer => {
+                    "Construct the requested home-buying and mortgage readiness plan with neighborhood CMA valuation, inspection due diligence, and closing settlement milestones.".into()
+                }
+                _ => {
+                    "Develop the requested real estate strategy with comparable market underwriting, regulatory compliance, and transaction milestones.".into()
+                }
+            },
             _ => "Implement the requested solution with a comprehensive and actionable plan.".into(),
         },
         IntentClass::Debug => {
@@ -2830,8 +3092,16 @@ fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
 fn derive_persona_anchor(
     domain: &str,
     role: &str,
+    perspective: super::intent::ActorPerspective,
     config: Option<&super::config::UnifiedConfig>,
 ) -> String {
+    if domain == "real-estate" && perspective == super::intent::ActorPerspective::Consumer {
+        return format!(
+            "Experienced {} specializing in residential homebuying, mortgage affordability & DTI analysis, neighborhood Comparative Market Analysis (CMA), inspection contingencies, and closing settlement.",
+            role
+        );
+    }
+
     if let Some(cfg) = config {
         let canonical = super::config::normalize_domain(domain, &cfg.domain_taxonomy);
         if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == canonical) {
@@ -2977,5 +3247,63 @@ mod tests {
                 text
             );
         }
+    }
+
+    #[test]
+    fn test_prune_task_instruction_strips_headers_and_filler_preserving_constraints() {
+        let raw = "# TASK: I would really appreciate it if you could please help me learn and build a step-by-step plan for buying a house in Austin with a $500k budget, evaluate mortgage options and neighborhood appraisal comparables, and do not use adjustable-rate mortgages.";
+        let pruned = prune_task_instruction(raw);
+        assert!(!pruned.to_lowercase().contains("# task"));
+        assert!(!pruned
+            .to_lowercase()
+            .contains("i would really appreciate it if you could please"));
+        assert!(pruned.starts_with("Learn and build"));
+        assert!(pruned.contains("$500k"));
+        assert!(pruned.contains("Austin"));
+        assert!(pruned.contains("do not use adjustable-rate mortgages"));
+    }
+
+    #[test]
+    fn test_wealth_and_business_hijack_gates_respect_domain_and_perspective() {
+        let mut homebuyer_profile = IntentProfile {
+            primary_intent: IntentClass::Build,
+            deliverable_type: DeliverableType::Strategy,
+            domain: "real-estate".to_string(),
+            user_knowledge: super::super::intent::KnowledgeLevel::Intermediate,
+            temporal_scope: "immediate".to_string(),
+            output_preference: "markdown".to_string(),
+            confidence: 0.9,
+            has_timeline: false,
+            has_phases: true,
+            has_validation: true,
+            detected_geography: None,
+            detected_risk: None,
+            detected_biz_type: None,
+            detected_team: None,
+            dynamic_subject: Some("house in Austin".to_string()),
+            baseline_knowledge: None,
+            goal_intent: None,
+            vertical: None,
+            secondary_domains: vec![],
+            rule_locked: false,
+            legal_as_constraint: false,
+            composed_primary_role: None,
+            perspective: super::super::intent::ActorPerspective::Consumer,
+        };
+        let house_prompt = "Help me learn and build a step-by-step plan for buying a house in Austin with a $500k budget.";
+        assert!(!is_wealth_engineering_query(
+            &homebuyer_profile,
+            house_prompt
+        ));
+        assert!(!is_enterprise_business_query(&homebuyer_profile));
+
+        let criteria = infer_success_criteria(&homebuyer_profile, house_prompt);
+        assert!(criteria.iter().any(|c| c.contains("Homebuying budget")));
+        assert!(!criteria.iter().any(|c| c.contains("Income ≠ Revenue")));
+        assert!(!criteria.iter().any(|c| c.contains("client acquisition")));
+
+        homebuyer_profile.domain = "education".to_string();
+        let edu_prompt = "Help me learn calculus and study for my exam.";
+        assert!(!is_wealth_engineering_query(&homebuyer_profile, edu_prompt));
     }
 }

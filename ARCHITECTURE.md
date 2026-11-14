@@ -5,7 +5,7 @@ Project      : token_compress_engine
 Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
-Version      : 3.6.0 (Unified Config-Backed SchemaRegistry, Taxonomy & Exemplar Fallback, Non-Destructive Stage 4 Merge, Canonical Domain Precedence)
+Version      : 3.7.0 (3-Axis Intent Tensor D×P×I, Perspective-Keyed Templates, Strict Domain-Conditioned Feature Gating & Task Pruning)
 Last updated : 2026-11-14 by Antigravity (Gemini 4 Argon)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
@@ -80,42 +80,64 @@ Mode = Balanced | Gentle → Legacy path
 
 **Both paths enforce identical quality guardrails, Scoring (TES, SFS, SCS), HallucinationGuard, and Stage 6B correction iterations.**
 
-### 1.4 Scenario Classification & Intent × Vertical Role Composition (Deterministic Rules & Gated Fallback)
+### 1.4 Scenario Classification, 3-Axis Intent Tensor ($D \times P \times I$) & Intent × Vertical Role Composition
 
-To eliminate domain and role hallucination (e.g. classifying venture building in pharma as software/finance development, or personal wealth asks as generic builders), a deterministic Intent × Vertical rule layer executes prior to and inside NPAE / Pipeline processing:
+To eliminate domain, role, and perspective hallucination (e.g., classifying residential homebuying as real-estate brokerage licensing, venture building in pharma as software/finance development, or non-finance prompts containing `"learn"`/`"$500k"`/`"appraisal"` as `"Wealth-Engineering"` or `"Digital Product"`), a deterministic Intent × Vertical rule layer and **3-Axis Intent Tensor** $(D \times P \times I) = (\text{Domain} \times \text{ActorPerspective} \times \text{IntentClass})$ execute prior to and inside NPAE / Pipeline processing:
 
 ```
 raw prompt
     │
     ├─ 1. Intent detect (rules, synonym classes: GoalIntent::WealthBuild, GoalIntent::LegalQuery)
     ├─ 2. Vertical detect (rules, synonym classes: pharma, fintech, energy, real-estate, software, ecommerce)
-    ├─ 3. Role compose: generic primary = f(intent), secondary = vertical
-    │       - primary: "Business Strategist" (WealthBuild), "Legal Advisor" (LegalQuery)
-    │       - secondary: "Pharma", "Fintech", "Real Estate", etc.
-    ├─ 4. Precedence: legal owns role only if question is legal; regulations on wealth paths act as constraints
-    │       - wealth + FDA/licensing → primary="Business Strategist", legal_as_constraint=true
-    ├─ 5. Cached Exemplar + Centroid Classifier (in `spawn_blocking`):
+    ├─ 3. 3-Axis Intent Tensor (Domain × ActorPerspective × IntentClass):
+    │       - ActorPerspective distinguishes:
+    │           • Consumer     : Buyer, patient, student, citizen, or personal end-user
+    │           • Practitioner : Agent, broker, engineer, clinician, counsel, or operator
+    │           • Investor     : Deal underwriter, capital allocator, or portfolio strategist
+    │       - Word/phrase-boundary detection (`has_word_or_phrase`) with domain-aware tie-breaking
+    │       - Perspective-aware role synthesis (`generate_role_for_perspective`):
+    │           • real-estate + Consumer     → "Residential Home-Buying & Mortgage Advisor"
+    │           • real-estate + Practitioner → "Real Estate Agent" / brokerage specialist
+    │           • real-estate + Investor     → "Real Estate Investment & Underwriting Strategist"
+    │           • legal / finance / medical / education + Consumer → consumer-tailored advisor roles
+    ├─ 4. Strict Domain-Conditioned Feature Gating & Word-Boundary Matching:
+    │       - `detect_business_type`: returns `None` immediately for `ActorPerspective::Consumer` and
+    │         uses strict word-boundary phrases (`"mobile app"`, `"web app"`, `"digital product"`) instead
+    │         of raw substring `.contains("app")` — preventing `"appraisal"`, `"appreciate"`, `"apply"`,
+    │         or `"apartment"` from triggering `"Digital Product"`.
+    │       - `is_wealth_engineering_query` / `is_enterprise_business_query`: gates `"Wealth-Engineering"`
+    │         and `"Income ≠ Revenue"` strictly to non-consumer `finance`/`business` wealth-build intents
+    │         with whole-word triggers — preventing `"learn"` (containing `"earn"`) or homebuyer budgets
+    │         (`"$500k"`) from hijacking `real-estate`, `education`, `travel`, or `software` prompts.
+    ├─ 5. Role compose & Precedence:
+    │       - generic primary = f(intent, perspective), secondary = vertical
+    │       - legal owns role only if question is legal; regulations on wealth paths act as constraints
+    │         (wealth + FDA/licensing → primary="Business Strategist", legal_as_constraint=true)
+    ├─ 6. Cached Exemplar + Centroid Classifier (in `spawn_blocking`):
     │       - sentence-level domain exemplars + cached keyword centroids + whole-word hit density
     │       - raw-cosine margin gate (HASH_MARGIN_GAP = 0.05) + multi-label secondary domain extraction
     │       - Ory domain override guarded by `!rule_locked` and canonicalized via `normalize_domain`
-    └─ 6. Verbatim Constraint Spans & Domain Required Slots:
-            - `constraints.rs`: captures verbatim exclusions (`no X`, `without X`) & numeric bounds (`1800 cal`, `2000 usd`)
-            - `ambiguity.rs` + `questions.rs`: checks per-domain required slots (`legal`, `medical`, `nutrition`, `finance`, `education`, `travel`, `software`, `devops`, `business`, `data-science`, `ai-ml`, `cybersecurity`, `real-estate`) → targeted clarifying questions
-    └─ 7. In-Memory Taxonomy & Exemplar Fallback (When SQLite `scenario_index` Abstains):
+    ├─ 7. Verbatim Constraint Spans, `# TASK / INSTRUCTION:` Pruning & Domain Required Slots:
+    │       - `constraints.rs`: captures verbatim exclusions (`no X`, `without X`) & numeric bounds (`1800 cal`, `2000 usd`, `$500k`)
+    │       - `prune_task_instruction`: strips duplicate leading `# TASK:` / `# INSTRUCTION:` headers and
+    │         conversational politeness prefixes (`"I would really appreciate it if you could please help me"`, etc.)
+    │         while preserving 100% of budgets, locations, domain terms, and negations
+    │       - `ambiguity.rs` + `questions.rs`: checks per-domain required slots → targeted clarifying questions
+    └─ 8. In-Memory Taxonomy & Exemplar Fallback (When SQLite `scenario_index` Abstains):
             - When `ScenarioClassifier` abstains (`output.scenario == None`, e.g., empty or un-seeded `scenario_index`), `PipelineOrchestrator::process()` runs a deterministic in-memory fallback against `ConfigHandle` (`config/unified.json`):
               (a) `resolve_prompt_rules(input)` for Intent × Vertical rule composition, then
-              (b) `detect_domain_with_confidence(input, &cfg.domain_taxonomy)` (with `conf >= 0.45`), deriving `task_type` (`creation`, `analysis`, `planning`, `troubleshooting`, `optimization`, `explanation`), `expertise`, and `primary_role` (`generate_role`) without SQLite round-trips.
+              (b) `detect_domain_with_confidence(input, &cfg.domain_taxonomy)` (with `conf >= 0.45`), deriving `task_type` (`creation`, `analysis`, `planning`, `troubleshooting`, `optimization`, `explanation`), `expertise`, and perspective-aware `primary_role` (`generate_role`) without SQLite round-trips.
 ```
 
 The resulting `ScenarioSignal` and NPAE rule profile inject:
-- **`primary_role`**: Generic intent-driven role scaling across N verticals.
+- **`primary_role`**: Intent- and `ActorPerspective`-driven role scaling across N verticals.
 - **`secondary`**: Title-cased industry vertical (surfaced in `PromptRole.secondary` and `# ROLE:` rendering).
-- **`persona_anchor`**: Specialized vertical persona anchor (e.g. `"Senior Business Strategist specializing in Pharma venture building, capital strategy, and industry structure. Finance is a sub-skill, not the owning frame."`).
+- **`persona_anchor`**: Specialized vertical and perspective-aware persona anchor.
 - **`legal_as_constraint`**: Keeps legal/regulatory lenses as constraints without hijacking the primary role.
-- **Fast-path stage routing**:
+- **Fast-path stage routing & Perspective-Keyed Templates**:
   - `Stage 0B`: Uses `(domain, task_type)` across all canonical domains and task types to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
-  - `Stage 4`: Resolves domain-accurate `CompressionSchema` in-memory via `SchemaRegistry` (`config/unified.json` / `ConfigHandle`) and merges non-destructively with `SchemaFilling` and `ScenarioSignal` (preserving composed roles, secondary domain lenses, domain constraints, and deliverables).
-  - `Aggressive Mode`: Canonical domain `phase_templates` (`config/unified.json`) and curated domain phases take precedence over generic `OryEngine` `DynamicBlueprint` phases (while keeping `execution_phases` empty on `DeliverableType::Content` or pure `Explain` prompts).
+  - `Stage 4` & `SchemaRegistry`: Resolves domain-accurate `CompressionSchema` in-memory via `SchemaRegistry` (`config/unified.json` / `ConfigHandle`), supporting perspective-prefixed keys (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`, etc.) alongside canonical task keys, and merges non-destructively with `SchemaFilling` and `ScenarioSignal`.
+  - `Aggressive Mode` & `OryEngine` Calibration: `Structurer` resolves perspective-keyed `phase_templates` (`"{perspective}:{intent}"` → `"{perspective}"` → `"{intent}"` → `"default"`) from `config/unified.json` first. `FlowRegistry::audit` checks `has_structurer_templates_with_config`, and `OryEngine` restricts `BlueprintStrategy::DomainTransfer` to genuinely novel/unconfigured domains (`!ExactMatch && !SynonymMatch`), preventing `"DomainTransfer"` telemetry leaks on all 22 configured canonical domains.
 
 ### 1.5 The Balanced Mode Contract (Canonical Specification — GAP-F1)
 
@@ -312,14 +334,21 @@ User compresses prompt
    - L2: Hedge detector using lexical patterns on factual claims without RAG backing
    - L3: CONSTRAINT_LOCK token coverage check on output
 
-6. **Unified Config-Backed SchemaRegistry (`src/db/schema_registry.rs`) & Non-Destructive Stage 4 Merge**:
+6. **Unified Config-Backed SchemaRegistry (`src/db/schema_registry.rs`), 3-Axis Intent Tensor ($D \times P \times I$) & Non-Destructive Stage 4 Merge**:
    - **In-Memory 3-Tier Resolution (Zero SQLite Queries)**: `SchemaRegistry` resolves `CompressionSchema` directly in-memory from `ConfigHandle` (`config/unified.json` — `domain_taxonomy`, `roles`, `constraints`) with a `once_cell::sync::Lazy<Arc<ConfigHandle>>` fallback so `SchemaRegistry::without_pool()`, `new()`, `with_optional_pool()`, and `with_config()` all resolve domain schemas without querying an empty SQLite `schema_index` table.
+   - **Perspective-Keyed Template Lookup (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`, etc.)**:
+     - Both `SchemaRegistry` and `Structurer` support composite `"{perspective}:{intent_or_task}"` lookup keys across `phase_templates`, `task_templates`, and `default_deliverables` in `config/unified.json`.
+     - When a perspective-prefixed task type is supplied (e.g. `"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`) or resolved via `ActorPerspective`, lookup checks `"<perspective>:<phase_or_task>"` first, then `"<perspective>"`, then canonical `"<phase_or_task>"` (`"build"`, `"analyze"`, `"creation"`, `"planning"`, etc.), and finally `"default"`.
    - **3-Tier Lookup**:
-     - **Tier 1 (`find_exact_schema_match`)**: Normalizes `key.domain` via `normalize_domain` (resolving aliases such as `"tech"` → `"software"` case-insensitively), selects the highest-priority `RoleRule` (modulated by `expertise`: `"expert"`/`"advanced"` → `"Principal <Role>"` or `persona_template`, `"beginner"` → `"<Role> (Guided Mode)"`), maps `context_fields`, selects `task_templates` by `task_type`, collects domain `constraints`, and derives `output` deliverables from `default_deliverables` or `phase_templates`.
-     - **Tier 2 (`find_domain_level_schema`)**: Matches normalized `domain` + `task_type` (or `"default"` task/phase template) independent of expertise level.
+     - **Tier 1 (`find_exact_schema_match`)**: Normalizes `key.domain` via `normalize_domain` (resolving aliases such as `"tech"` → `"software"` case-insensitively), normalizes optional perspective prefix + `task_type`, selects the highest-priority `RoleRule` (modulated by `ActorPerspective` and `expertise`: `"expert"`/`"advanced"` → `"Principal <Role>"` or `persona_template`, `"beginner"` → `"<Role> (Guided Mode)"`), maps `context_fields`, selects `task_templates` by perspective/task key, collects domain `constraints`, and derives `output` deliverables from `default_deliverables` or `phase_templates`.
+     - **Tier 2 (`find_domain_level_schema`)**: Matches normalized `domain` + `task_type` (including perspective-prefixed keys or `"default"` task/phase template) independent of expertise level.
      - **Tier 3 (`get_general_fallback_schema`)**: Returns a clean, deterministic general fallback `CompressionSchema`.
    - **Non-Destructive Stage 4 Merge (`src/pipeline/stage4.rs`)**: `Stage4::run()` merges `SchemaFilling::fill()` output non-destructively with `ScenarioSignal` and `SchemaRegistry`: composing `signal.primary_role` + `signal.secondary_domain` (e.g., `"Business Strategist (Pharma)"`), preserving registry `role`, `context`, and `task` when `SchemaFilling` produces generic/empty values, and merging deduplicated constraints and deliverables (capped at 3 concise items to honor the Balanced Mode token budget).
-   - **Canonical Domain Precedence over Generic Ory Blueprints (`src/npae/aggressive/structurer.rs`)**: In Aggressive mode, `build_with_blueprint()` computes curated domain phases (`infer_execution_phases` from `config/unified.json` `phase_templates`) and curated domain validation steps first, preferring canonical domain templates over generic `OryEngine` `DynamicBlueprint` phases and keeping `execution_phases` empty on `DeliverableType::Content` or pure `Explain` prompts.
+   - **Canonical Domain Precedence, Strict Feature Gating & Ory `DomainTransfer` Calibration (`src/npae/aggressive/structurer.rs`, `src/npae/ory/`)**:
+     - In Aggressive mode, `build_with_blueprint()` resolves perspective-keyed domain `phase_templates` (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`, `"build"`, `"analyze"`, `"default"`) and perspective-aware validation/success criteria first, preferring canonical domain templates over generic `OryEngine` `DynamicBlueprint` phases and keeping `execution_phases` empty on `DeliverableType::Content` or pure `Explain` prompts.
+     - Strict domain-conditioned feature gating and word-boundary matching prevent substring false positives (`"appraisal"` / `"appreciate"` never trigger `"Digital Product"`, and `"learn"` / `"$500k"` never hijack non-finance prompts into `"Wealth-Engineering"`).
+     - `prune_task_instruction()` deterministically strips duplicate `# TASK:` / `# INSTRUCTION:` headers and conversational politeness prefixes before rendering `# TASK / INSTRUCTION:`.
+     - `FlowRegistry::audit()` passes `Some(config)` to `has_structurer_templates_with_config()`, and `OryEngine` (`select_strategy` / `build_with_blueprint`) restricts `BlueprintStrategy::DomainTransfer` and `Architecture Strategy` rationale injection to genuinely unconfigured/novel domains, eliminating `DomainTransfer` telemetry leaks on all 22 canonical domains.
 
 ---
 
@@ -552,4 +581,11 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Updated `src/npae/aggressive/config.rs` & `config/unified.json`: Extended `DomainTaxonomy` with optional `context_fields`, `task_templates`, and `default_deliverables`; added `"tech"` alias to `"software"`; updated `normalize_domain` for case-insensitive canonical and alias resolution; replaced `.unwrap()` in `ConfigHandle` with poisoned-lock recovery; enriched all 22 canonical domains in `config/unified.json`.
     - Upgraded `src/db/schema_registry.rs`: Replaced SQLite `schema_index` queries with zero-DB in-memory 3-tier `CompressionSchema` resolution (`find_exact_schema_match`, `find_domain_level_schema`, `get_general_fallback_schema`, `resolve_schema_for_signal`) backed by `ConfigHandle` and a `Lazy<Arc<ConfigHandle>>` `config/unified.json` fallback.
     - Updated `Stage 4`, `PipelineOrchestrator`, and `Aggressive` structurer: Added in-memory taxonomy/exemplar fallback when `scenario_index` abstains, non-destructive Stage 4 schema merging, and canonical domain template precedence over generic Ory blueprints.
+
+[2026-11-14] [Antigravity / Gemini 4 Argon] ARCHITECTURE.md
+  Implemented 3-Axis Intent Tensor (D×P×I), Perspective-Keyed Templates, Strict Feature Gating & Task Pruning (v3.7.0):
+    - Added `ActorPerspective` (`Consumer`, `Practitioner`, `Investor`) and `detect_actor_perspective()` in `src/npae/aggressive/intent.rs` plus `generate_role_for_perspective()` in `src/npae/aggressive/role.rs`.
+    - Enforced strict domain-conditioned feature gating and word-boundary matching in `detect_business_type`, `is_wealth_engineering_query`, and `is_enterprise_business_query`, eliminating `"Digital Product"` (`"appraisal"`/`"appreciate"`) and `"Wealth-Engineering"` (`"learn"`/`"$500k"`) cross-domain hijacks.
+    - Added perspective-keyed `phase_templates` (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`) in `config/unified.json` across `real-estate`, `finance`, `legal`, and `education`, and wired composite perspective lookup into `SchemaRegistry` and `Structurer`.
+    - Added deterministic `prune_task_instruction()` for `# TASK / INSTRUCTION:` header/filler pruning and calibrated Ory `DomainTransfer` gating in `src/npae/ory/registry.rs` and `src/npae/ory/architect.rs`.
 ```

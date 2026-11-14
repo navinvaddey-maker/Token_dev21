@@ -97,8 +97,14 @@ fn select_strategy(audit: &FlowAudit) -> BlueprintStrategy {
             }
         }
         AuditRecommendation::BuildDynamicFlow => {
-            // Check if we can transfer from a related domain
-            if audit.domain_audit.match_confidence > 0.3 {
+            // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — only select `DomainTransfer` when the domain
+            // was NOT matched via `ExactMatch` or `SynonymMatch` (i.e. genuine hierarchy/fuzzy transfer).
+            let is_direct_match = matches!(
+                audit.domain_audit.match_method,
+                crate::npae::ory::types::DomainMatchMethod::ExactMatch
+                    | crate::npae::ory::types::DomainMatchMethod::SynonymMatch
+            );
+            if !is_direct_match && audit.domain_audit.match_confidence > 0.3 {
                 BlueprintStrategy::DomainTransfer {
                     source_domain: audit
                         .domain_audit
@@ -109,6 +115,20 @@ fn select_strategy(audit: &FlowAudit) -> BlueprintStrategy {
                         .gap_details
                         .iter()
                         .map(|g| g.suggested_action.clone())
+                        .collect(),
+                }
+            } else if is_direct_match {
+                BlueprintStrategy::TemplateExtension {
+                    base_template: audit
+                        .domain_audit
+                        .matched_domain
+                        .clone()
+                        .or_else(|| audit.existing_domain_match.clone())
+                        .unwrap_or_default(),
+                    additions: audit
+                        .gap_details
+                        .iter()
+                        .map(|g| g.description.clone())
                         .collect(),
                 }
             } else {

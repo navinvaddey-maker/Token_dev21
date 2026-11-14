@@ -152,6 +152,7 @@ fn test_ory_dynamic_blueprint_wiring_to_structurer() -> Result<()> {
         rule_locked: false,
         legal_as_constraint: false,
         composed_primary_role: None,
+        perspective: Default::default(),
     };
 
     let resolved = ResolvedPrompt {
