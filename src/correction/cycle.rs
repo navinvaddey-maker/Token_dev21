@@ -92,7 +92,7 @@ pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
     }
 }
 
-/// Adds implicit deliverables for Balanced/Aggressive when constraints imply them.
+/// Adds implicit deliverables for Balanced/Aggressive when constraints or domain signals imply them.
 ///
 /// # Panics
 /// Never.
@@ -119,20 +119,144 @@ pub fn infer_implicit_deliverables(out: &mut AlgorithmOutput) {
         .as_deref()
         .unwrap_or("")
         .to_lowercase();
+    let norm_text = out
+        .normalization
+        .as_ref()
+        .map(|n| n.normalized_text.to_lowercase())
+        .unwrap_or_default();
+    let combined = format!("{task_text} {constraint_text} {norm_text}");
+    let domain = out
+        .scenario
+        .as_ref()
+        .map(|s| s.domain.as_str())
+        .unwrap_or("");
 
-    let meal_plan =
-        task_text.contains("meal") || task_text.contains("plan") || task_text.contains("nutrition");
-    let dietary_constraints = ["fiber", "dairy", "nightshade", "carb", "macro"]
-        .iter()
-        .any(|k| constraint_text.contains(k));
+    let push_unique = |list: &mut Vec<crate::types::Deliverable>, item: &str| {
+        if !list.iter().any(|d| d.name.eq_ignore_ascii_case(item)) {
+            list.push(crate::types::Deliverable {
+                name: item.to_string(),
+            });
+        }
+    };
+
+    let meal_plan = domain == "nutrition"
+        || combined.contains("meal")
+        || combined.contains("nutrition")
+        || (combined.contains("plan")
+            && ["diet", "calorie", "protein", "macro"]
+                .iter()
+                .any(|k| combined.contains(k)));
+    let dietary_constraints = [
+        "fiber",
+        "dairy",
+        "nightshade",
+        "carb",
+        "macro",
+        "calorie",
+        "vegan",
+        "keto",
+    ]
+    .iter()
+    .any(|k| combined.contains(k));
 
     if meal_plan && dietary_constraints {
         for extra in ["shopping_list", "substitution_guide"] {
-            if !out.resolved_schema.output.iter().any(|d| d.name == extra) {
-                out.resolved_schema.output.push(crate::types::Deliverable {
-                    name: extra.to_string(),
-                });
-            }
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    }
+
+    if out.resolved_schema.output.len() >= 2 {
+        return;
+    }
+
+    if matches!(
+        domain,
+        "software" | "software-engineering" | "devops" | "devops-infra" | "tech" | "computers"
+    ) || [
+        "kubernetes",
+        "microservice",
+        "backend",
+        "dockerfile",
+        "pipeline",
+        "rust",
+        "python",
+    ]
+    .iter()
+    .any(|k| combined.contains(k))
+    {
+        for extra in ["architecture_outline", "verification_steps"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if domain == "finance"
+        || [
+            "portfolio",
+            "asset allocation",
+            "cashflow",
+            "retirement",
+            "sharpe",
+        ]
+        .iter()
+        .any(|k| combined.contains(k))
+    {
+        for extra in ["risk_breakdown", "allocation_summary"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if domain == "legal"
+        || [
+            "contract",
+            "statute",
+            "indemnification",
+            "gdpr",
+            "hipaa",
+            "nda",
+        ]
+        .iter()
+        .any(|k| combined.contains(k))
+    {
+        for extra in ["statutory_basis", "compliance_checklist"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if matches!(domain, "medical" | "health" | "pharma")
+        || ["clinical", "patient", "diagnosis", "symptom", "biomarker"]
+            .iter()
+            .any(|k| combined.contains(k))
+    {
+        for extra in ["clinical_considerations", "safety_precautions"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if domain == "travel"
+        || ["itinerary", "vacation", "sightseeing", "flight", "hotel"]
+            .iter()
+            .any(|k| combined.contains(k))
+    {
+        for extra in ["daily_itinerary", "logistics_summary"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if domain == "education"
+        || ["curriculum", "syllabus", "pedagogy", "lesson", "student"]
+            .iter()
+            .any(|k| combined.contains(k))
+    {
+        for extra in ["learning_objectives", "practice_exercises"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if matches!(
+        domain,
+        "business" | "business-strategy" | "marketing" | "ecommerce"
+    ) || ["go-to-market", "monetize", "campaign", "revenue", "startup"]
+        .iter()
+        .any(|k| combined.contains(k))
+    {
+        for extra in ["action_plan", "kpi_metrics"] {
+            push_unique(&mut out.resolved_schema.output, extra);
+        }
+    } else if domain == "real-estate"
+        || ["property", "mortgage", "cap rate", "reit", "multifamily"]
+            .iter()
+            .any(|k| combined.contains(k))
+    {
+        for extra in ["market_comparables", "roi_projection"] {
+            push_unique(&mut out.resolved_schema.output, extra);
         }
     }
 }

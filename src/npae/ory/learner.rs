@@ -1,26 +1,28 @@
-//! Ory Learning Engine v2
+//! Ory Learning Engine v2.
 //!
-//! Deep semantic analysis of raw user prompts. Builds a `LearnedIntent` that captures
-//! not just surface-level keywords but semantic intent, hidden dependencies, novel signals,
-//! and computed confidence scores.
-//!
-//! v2 improvements:
-//! - Reuses Aggressive engine's 19-domain classifier instead of 3-domain keyword match
-//! - Token-level semantic classification via the `semantic` module
-//! - Multi-dimensional novel signal detection (constraints, temporal, meta-instructions)
-//! - Computed confidence based on token coverage + domain signal strength + ambiguity
-//! - Intent fingerprinting for pattern memory matching
+//! // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — performs deep semantic analysis of raw user prompts,
+//! // builds a `LearnedIntent` with canonical domain classification using word/token boundary checks,
+//! // hidden dependencies, novel signals, and computed confidence scores.
 
 use crate::npae::ory::semantic;
 use crate::npae::ory::types::{LearnedIntent, TokenAnalysis, TokenClass};
 use anyhow::Result;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
+/// Ory Learner: Deep semantic and domain learner for raw user prompts.
+#[derive(Debug)]
 pub struct OryLearner;
 
 impl OryLearner {
-    /// v2 learning — uses semantic analysis + Aggressive engine domain detection
+    /// Performs v2 semantic analysis and canonical domain detection on a raw user prompt.
+    ///
+    /// # Errors
+    /// Never returns `Err` in current implementation (returns `Ok(LearnedIntent)`).
+    ///
+    /// # Panics
+    /// Never.
     pub fn learn(raw: &str) -> Result<LearnedIntent> {
         let lower = raw.to_lowercase();
 
@@ -30,7 +32,7 @@ impl OryLearner {
         // 2. Extract core objective from action-object pairs
         let core_objective = extract_core_objective_v2(&analysis, &lower);
 
-        // 3. Deep domain detection — reuse Aggressive engine's 19-domain classifier
+        // 3. Deep domain detection — canonical domain classifier with word-boundary matching
         let inferred_domain = detect_deep_domain_v2(&lower);
 
         // 4. Multi-dimensional novel signal detection
@@ -126,18 +128,58 @@ fn extract_core_objective_v2(analysis: &TokenAnalysis, lower: &str) -> String {
     }
 }
 
-/// v2 domain detection — reuses the Aggressive engine's weighted keyword scoring
-/// with 19+ domains. This replaces the v1 3-domain keyword check.
+/// Checks whether a keyword or phrase appears on word/token boundaries in `lower`.
+///
+/// // ARCH: ARCHITECTURE.md §1.4 — prevents false-positive substring matches (e.g., `"ai"` inside
+/// // `"daily"`, `"ml"` inside `"html"`, `"ads"` inside `"leads"`, or `"soc"` inside `"social"`).
+fn matches_keyword_on_boundary(lower: &str, words: &HashSet<&str>, kw: &str) -> bool {
+    if !kw.contains(' ') {
+        return words.contains(kw);
+    }
+    for (idx, _) in lower.match_indices(kw) {
+        let before_ok = idx == 0
+            || lower[..idx]
+                .chars()
+                .next_back()
+                .map(|c| !c.is_alphanumeric() && c != '-')
+                .unwrap_or(true);
+        let after_idx = idx + kw.len();
+        let after_ok = after_idx >= lower.len()
+            || lower[after_idx..]
+                .chars()
+                .next()
+                .map(|c| !c.is_alphanumeric() && c != '-')
+                .unwrap_or(true);
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
+}
+
+/// v2 domain detection — uses canonical domain names and word/token boundary keyword scoring.
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — returns canonical domain names (`"nutrition"`,
+/// // `"software"`, `"creative"`, `"business"`, `"data-science"`, `"education"`, `"health"`,
+/// // `"legal"`, `"marketing"`, `"finance"`, `"devops"`, `"ai-ml"`, `"medical"`, `"science"`,
+/// // `"cybersecurity"`, `"ecommerce"`, `"real-estate"`, `"workplace-productivity"`, `"travel"`,
+/// // `"computers"`) using word/token boundary checks instead of raw `.contains(kw)`.
 fn detect_deep_domain_v2(lower: &str) -> String {
     struct DomainScore {
         domain: &'static str,
         keywords: &'static [&'static str],
     }
 
+    let words: HashSet<&str> = lower
+        .split(|c: char| !c.is_alphanumeric() && c != '-' && c != '/')
+        .filter(|s| !s.is_empty())
+        .collect();
+
     let domains = [
         DomainScore {
-            domain: "sports-nutrition",
+            domain: "nutrition",
             keywords: &[
+                "nutrition",
                 "nutritionist",
                 "dietician",
                 "dietitian",
@@ -146,21 +188,26 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "meal",
                 "diet",
                 "macro",
+                "macros",
                 "carb",
                 "protein",
                 "fiber",
-                "training",
+                "calorie",
+                "calories",
                 "marathon",
                 "supplements",
+                "probiotic",
                 "keto",
                 "vegan",
+                "vegetarian",
                 "paleo",
                 "fasting",
             ],
         },
         DomainScore {
-            domain: "software-engineering",
+            domain: "software",
             keywords: &[
+                "software",
                 "code",
                 "rust",
                 "python",
@@ -176,7 +223,21 @@ fn detect_deep_domain_v2(lower: &str) -> String {
             ],
         },
         DomainScore {
-            domain: "technical-writing",
+            domain: "computers",
+            keywords: &[
+                "computer",
+                "computing",
+                "cpu",
+                "processor",
+                "kernel",
+                "operating-system",
+                "linux",
+                "firmware",
+                "hardware",
+            ],
+        },
+        DomainScore {
+            domain: "creative",
             keywords: &[
                 "article",
                 "blog",
@@ -186,10 +247,18 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "readme",
                 "guide",
                 "manual",
+                "story",
+                "novel",
+                "character",
+                "plot",
+                "fiction",
+                "screenplay",
+                "narrative",
+                "dialogue",
             ],
         },
         DomainScore {
-            domain: "business-strategy",
+            domain: "business",
             keywords: &[
                 "business",
                 "startup",
@@ -234,9 +303,12 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "learning",
                 "faster",
                 "curriculum",
+                "syllabus",
                 "course",
                 "student",
                 "lecture",
+                "tutor",
+                "e-learning",
                 "training program",
                 "certification",
                 "assessment",
@@ -248,20 +320,7 @@ fn detect_deep_domain_v2(lower: &str) -> String {
             ],
         },
         DomainScore {
-            domain: "creative-writing",
-            keywords: &[
-                "story",
-                "novel",
-                "character",
-                "plot",
-                "fiction",
-                "screenplay",
-                "narrative",
-                "dialogue",
-            ],
-        },
-        DomainScore {
-            domain: "health-fitness",
+            domain: "health",
             keywords: &[
                 "workout",
                 "exercise",
@@ -287,6 +346,11 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "liability",
                 "attorney",
                 "lawsuit",
+                "jurisdiction",
+                "statute",
+                "statutory",
+                "nda",
+                "gdpr",
             ],
         },
         DomainScore {
@@ -308,6 +372,8 @@ fn detect_deep_domain_v2(lower: &str) -> String {
         DomainScore {
             domain: "finance",
             keywords: &[
+                "finance",
+                "financial",
                 "investment",
                 "portfolio",
                 "stock",
@@ -318,11 +384,16 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "interest",
                 "dividend",
                 "hedge",
+                "cashflow",
+                "budgeting",
+                "retirement",
+                "wealth",
             ],
         },
         DomainScore {
-            domain: "devops-infra",
+            domain: "devops",
             keywords: &[
+                "devops",
                 "ci/cd",
                 "pipeline",
                 "infrastructure",
@@ -355,20 +426,32 @@ fn detect_deep_domain_v2(lower: &str) -> String {
             domain: "medical",
             keywords: &[
                 "medical",
+                "clinical",
                 "patient",
                 "doctor",
+                "doctors",
                 "hospital",
                 "surgery",
                 "healthcare",
                 "diagnosis",
+                "diagnose",
                 "treatment",
+                "symptoms",
+                "pathology",
+                "radiology",
+                "cardiology",
+                "neurology",
+                "oncology",
                 "anatomy",
                 "physiology",
+                "physiological",
             ],
         },
         DomainScore {
-            domain: "scientific-research",
+            domain: "science",
             keywords: &[
+                "science",
+                "scientific",
                 "research",
                 "experiment",
                 "laboratory",
@@ -377,12 +460,17 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "publication",
                 "peer-review",
                 "methodology",
+                "quantum",
+                "qubit",
+                "superposition",
+                "entanglement",
             ],
         },
         DomainScore {
             domain: "cybersecurity",
             keywords: &[
                 "security",
+                "cybersecurity",
                 "hacking",
                 "firewall",
                 "encryption",
@@ -416,6 +504,7 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "realtor",
                 "appraisal",
                 "listing",
+                "real estate",
             ],
         },
         DomainScore {
@@ -435,57 +524,6 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "work-from-home",
             ],
         },
-        // Additional domains beyond aggressive engine
-        DomainScore {
-            domain: "quantum-computing",
-            keywords: &[
-                "quantum",
-                "qubit",
-                "superposition",
-                "entanglement",
-                "quantum gate",
-                "decoherence",
-            ],
-        },
-        DomainScore {
-            domain: "sustainability",
-            keywords: &[
-                "sustainability",
-                "carbon",
-                "renewable",
-                "climate",
-                "green",
-                "emissions",
-                "esg",
-                "circular economy",
-            ],
-        },
-        DomainScore {
-            domain: "gaming",
-            keywords: &[
-                "game",
-                "gaming",
-                "player",
-                "level",
-                "multiplayer",
-                "engine",
-                "unity",
-                "unreal",
-            ],
-        },
-        DomainScore {
-            domain: "psychology",
-            keywords: &[
-                "psychology",
-                "cognitive",
-                "behavioral",
-                "therapy",
-                "mental health",
-                "anxiety",
-                "depression",
-                "mindfulness",
-            ],
-        },
         DomainScore {
             domain: "travel",
             keywords: &[
@@ -500,6 +538,10 @@ fn detect_deep_domain_v2(lower: &str) -> String {
                 "resort",
                 "flight",
                 "destination",
+                "roadtrip",
+                "backpacking",
+                "homestay",
+                "excursion",
             ],
         },
     ];
@@ -508,7 +550,11 @@ fn detect_deep_domain_v2(lower: &str) -> String {
     let mut best_score = 0usize;
 
     for ds in &domains {
-        let score = ds.keywords.iter().filter(|&&kw| lower.contains(kw)).count();
+        let score = ds
+            .keywords
+            .iter()
+            .filter(|&&kw| matches_keyword_on_boundary(lower, &words, kw))
+            .count();
         if score > best_score {
             best_score = score;
             best_domain = ds.domain;
@@ -620,9 +666,10 @@ fn identify_novel_signals_v2(analysis: &TokenAnalysis, lower: &str) -> Vec<Strin
 fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -> Vec<String> {
     let mut deps = Vec::new();
 
-    // Domain-specific dependencies (expanded from v1's 3 domains to 23)
+    // Domain-specific dependencies (canonical + legacy aliases)
+    // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — match canonical domain names alongside legacy names.
     match domain {
-        "sports-nutrition" | "health-fitness" => {
+        "nutrition" | "sports-nutrition" | "health" | "health-fitness" => {
             deps.push("Nutritional Timing".to_string());
             deps.push("Injury Prevention".to_string());
             if lower.contains("marathon") || lower.contains("race") || lower.contains("competition")
@@ -631,7 +678,7 @@ fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -
                 deps.push("Race-Day Nutrition".to_string());
             }
         }
-        "business-strategy" => {
+        "business" | "business-strategy" => {
             deps.push("Unit Economics".to_string());
             deps.push("Customer Acquisition Cost".to_string());
             deps.push("Scaling Bottlenecks".to_string());
@@ -640,12 +687,12 @@ fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -
                 deps.push("Fundraising Readiness".to_string());
             }
         }
-        "scientific-research" | "quantum-computing" => {
+        "science" | "scientific-research" | "quantum-computing" => {
             deps.push("Mathematical Foundations".to_string());
             deps.push("Experimental Verification".to_string());
             deps.push("Literature Review".to_string());
         }
-        "software-engineering" | "devops-infra" => {
+        "software" | "software-engineering" | "devops" | "devops-infra" | "computers" => {
             deps.push("Architecture Decisions".to_string());
             deps.push("Test Strategy".to_string());
             if lower.contains("scale") || lower.contains("distributed") {
@@ -662,7 +709,7 @@ fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -
                 deps.push("Bias Assessment".to_string());
             }
         }
-        "medical" => {
+        "medical" | "pharma" => {
             deps.push("Clinical Evidence Base".to_string());
             deps.push("Regulatory Compliance".to_string());
             deps.push("Risk-Benefit Analysis".to_string());
@@ -684,7 +731,7 @@ fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -
             deps.push("Assessment Design".to_string());
             deps.push("Cognitive Load Management".to_string());
         }
-        "marketing" => {
+        "marketing" | "ecommerce" => {
             deps.push("Target Audience Analysis".to_string());
             deps.push("Channel Strategy".to_string());
             deps.push("Measurement Framework".to_string());
@@ -693,6 +740,16 @@ fn unpack_dependencies_v2(lower: &str, domain: &str, analysis: &TokenAnalysis) -
             deps.push("Threat Model".to_string());
             deps.push("Compliance Framework".to_string());
             deps.push("Incident Response Plan".to_string());
+        }
+        "travel" => {
+            deps.push("Transit & Lodging Logistics".to_string());
+            deps.push("Budget Allocation".to_string());
+            deps.push("Daily Schedule Optimization".to_string());
+        }
+        "real-estate" => {
+            deps.push("Market Valuation & Comps".to_string());
+            deps.push("Regulatory & Licensing Compliance".to_string());
+            deps.push("Transaction Structure".to_string());
         }
         _ => {
             // Generic dependencies based on semantic analysis

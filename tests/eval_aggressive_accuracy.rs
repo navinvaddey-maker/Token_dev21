@@ -6,6 +6,16 @@
 //!
 //! Run baseline/eval report: `cargo test --test eval_aggressive_accuracy -- --nocapture`
 
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::uninlined_format_args,
+    clippy::unwrap_used
+)]
+
 use std::collections::{BTreeMap, BTreeSet};
 use token_compress_engine::npae::aggressive::config::{ConfigLoader, UnifiedConfig};
 use token_compress_engine::npae::aggressive::constraints::extract_constraints;
@@ -646,4 +656,204 @@ fn test_domain_required_slots_generate_targeted_clarifying_questions() {
         "Complete travel prompt must not flag missing travel slots, got: {:?}",
         trv_amb.gap_zones
     );
+
+    // 4. Expanded missing-slot detections for canonical domains:
+    //    software, business, data-science, cybersecurity, real-estate.
+    let expanded_slot_cases = [
+        (
+            "Build a backend microservice API with authentication and database caching",
+            "software",
+            "missing_slot:software:stack_or_environment",
+            "language",
+        ),
+        (
+            "Create a go-to-market business strategy and revenue growth plan for a new startup",
+            "business",
+            "missing_slot:business:target_market_or_stage",
+            "market",
+        ),
+        (
+            "Train a machine learning classification model and feature engineering pipeline",
+            "data-science",
+            "missing_slot:data-science:dataset_or_metric",
+            "dataset",
+        ),
+        (
+            "Conduct a cybersecurity vulnerability assessment and threat model audit",
+            "cybersecurity",
+            "missing_slot:cybersecurity:target_scope_or_environment",
+            "scope",
+        ),
+        (
+            "Create a real estate property investment and underwriting acquisition strategy",
+            "real-estate",
+            "missing_slot:real-estate:location_or_property_type",
+            "property",
+        ),
+    ];
+
+    for (raw_prompt, expected_dom, expected_gap, expected_q_word) in expanded_slot_cases {
+        let repr = run_parallel_pipeline(raw_prompt).expect("compression");
+        let mut prof = extract_with_config(&repr, raw_prompt, Some(&config)).expect("intent");
+        if prof.domain != expected_dom {
+            prof.domain = expected_dom.to_string();
+        }
+        let amb = token_compress_engine::npae::aggressive::ambiguity::score_for_domain(
+            &repr,
+            raw_prompt,
+            &reconstructed,
+            None,
+            Some(&prof),
+        )
+        .expect("ambiguity");
+        assert!(
+            amb.gap_zones.iter().any(|g| g == expected_gap),
+            "[{expected_dom}] Expected gap '{expected_gap}', got: {:?}",
+            amb.gap_zones
+        );
+        let qs = token_compress_engine::npae::aggressive::questions::generate_with_domain(
+            &repr,
+            &amb,
+            3,
+            &prof.domain,
+        )
+        .expect("questions");
+        assert!(
+            qs.iter()
+                .any(|q| q.question.to_lowercase().contains(expected_q_word)),
+            "[{expected_dom}] Expected clarifying question mentioning '{expected_q_word}', got: {:?}",
+            qs
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_aggressive_engine_structurer_and_ory_canonical_domain_roles_phases_and_validation() {
+    use std::sync::Arc;
+    use token_compress_engine::npae::aggressive::config::ConfigHandle;
+    use token_compress_engine::npae::aggressive::engine::AggressiveEngine;
+    use token_compress_engine::npae::aggressive::structurer::HttpStructurer;
+    use token_compress_engine::npae::schema::types::{DeliverableType, NpaeConfig};
+    use tokio::sync::Mutex;
+
+    let config = ConfigLoader::load("config/unified.json").expect("load unified.json");
+    let config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(Mutex::new(OryEngine::new()));
+    let npae_cfg = NpaeConfig::default();
+    let reconstructed = token_compress_engine::types::ReconstructedInput::default();
+
+    // 1. Canonical Build prompts across software, cybersecurity, finance, legal
+    //    must produce domain-specific roles, non-empty curated execution phases, and domain-specific
+    //    validation steps when validation is requested.
+    let build_cases = [
+        (
+            "Build and validate a fault-tolerant Rust microservice with PostgreSQL and Kubernetes deployment",
+            "software",
+            "Unit Tests",
+        ),
+        (
+            "Design and verify a zero-trust cloud IAM and Kubernetes security architecture against OWASP threats",
+            "cybersecurity",
+            "Threat Model",
+        ),
+        (
+            "Draft and verify a GDPR data privacy compliance checklist and vendor contract liability framework under EU law",
+            "legal",
+            "Jurisdictional",
+        ),
+        (
+            "Build and verify a 10-year diversified equity and bond portfolio strategy with tax-loss harvesting",
+            "finance",
+            "Mathematical",
+        ),
+    ];
+
+    for (prompt, expected_domain, expected_validation_substr) in build_cases {
+        let repr = run_parallel_pipeline(prompt).expect("compression pipeline");
+        let structurer = HttpStructurer {
+            route: "/api/compress".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: prompt.to_string(),
+        };
+        let resp = AggressiveEngine::run(
+            prompt,
+            &repr,
+            &npae_cfg,
+            config_handle.clone(),
+            ory_engine.clone(),
+            &structurer,
+            &reconstructed,
+            None,
+        )
+        .await
+        .unwrap_or_else(|e| panic!("AggressiveEngine::run failed for {expected_domain}: {e}"));
+
+        assert_eq!(
+            resp.structured_prompt.context.domain, expected_domain,
+            "Expected canonical domain '{expected_domain}', got '{}'",
+            resp.structured_prompt.context.domain
+        );
+        assert!(
+            !resp.structured_prompt.role.primary.is_empty()
+                && resp.structured_prompt.role.primary != "Domain Expert",
+            "[{expected_domain}] Expected specific primary role, got '{}'",
+            resp.structured_prompt.role.primary
+        );
+        assert!(
+            !resp.structured_prompt.execution_phases.is_empty(),
+            "[{expected_domain}] Build prompt must produce curated execution phases"
+        );
+        assert!(
+            resp.structured_prompt
+                .validation_steps
+                .iter()
+                .any(|s| s.name.contains(expected_validation_substr)),
+            "[{expected_domain}] Expected validation step containing '{expected_validation_substr}', got: {:?}",
+            resp.structured_prompt.validation_steps
+        );
+    }
+
+    // 2. Pure Explain / Content prompts must NOT have forced execution phases even when OryEngine
+    //    synthesizes a DynamicBlueprint (`execution_phases` must remain empty).
+    let explain_prompts = [
+        "Explain how compound interest and asset allocation work for retirement investing",
+        "What is the physiological mechanism of cardiovascular disease and how do doctors diagnose symptoms?",
+    ];
+
+    for prompt in explain_prompts {
+        let repr = run_parallel_pipeline(prompt).expect("compression pipeline");
+        let structurer = HttpStructurer {
+            route: "/api/compress".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: prompt.to_string(),
+        };
+        let resp = AggressiveEngine::run(
+            prompt,
+            &repr,
+            &npae_cfg,
+            config_handle.clone(),
+            ory_engine.clone(),
+            &structurer,
+            &reconstructed,
+            None,
+        )
+        .await
+        .expect("AggressiveEngine::run on Explain prompt");
+
+        assert!(
+            resp.structured_prompt.execution_phases.is_empty()
+                || resp
+                    .structured_prompt
+                    .objective
+                    .as_ref()
+                    .is_some_and(|o| o.deliverable_type != DeliverableType::Content),
+            "Explain/Content prompt must not have forced generic Ory blueprint phases: {:?}",
+            resp.structured_prompt.execution_phases
+        );
+        assert!(
+            resp.structured_prompt.execution_phases.is_empty(),
+            "Pure Explain prompt '{prompt}' must keep execution_phases empty, got: {:?}",
+            resp.structured_prompt.execution_phases
+        );
+    }
 }

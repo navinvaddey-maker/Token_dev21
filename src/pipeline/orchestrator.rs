@@ -104,7 +104,7 @@ impl PipelineOrchestrator {
         schema_priors: Arc<DashMap<String, u32>>,
         npae_config_handle: Arc<ConfigHandle>,
         ory_engine: Arc<tokio::sync::Mutex<crate::npae::ory::OryEngine>>,
-        pool: Option<sqlx::SqlitePool>,
+        _pool: Option<sqlx::SqlitePool>,
     ) -> Self {
         let predictive = PredictiveCoding::new(schema_priors);
         Self {
@@ -114,7 +114,7 @@ impl PipelineOrchestrator {
             stage1: Stage1::new(),
             stage2: Stage2::new(predictive),
             stage3: Stage3::new(),
-            stage4: Stage4::with_optional_pool(pool),
+            stage4: Stage4::with_config(npae_config_handle.clone()),
             stage5: Stage5::new(),
             field_validator: FieldTypeValidator::new(),
             _token_efficiency_scorer: TokenEfficiencyScorer::new(),
@@ -124,6 +124,145 @@ impl PipelineOrchestrator {
             _correction_cycle: CorrectionCycle::new(0),
             npae_config_handle,
             ory_engine,
+        }
+    }
+
+    /// Resolves an in-memory `ScenarioSignal` fallback when upstream `ScenarioClassifier` abstains
+    /// or no SQLite pool is wired.
+    ///
+    /// # Panics
+    /// Never.
+    fn resolve_scenario_fallback(
+        &self,
+        input: &str,
+    ) -> Option<crate::classifier::signal::ScenarioSignal> {
+        // 1. Deterministic Intent x Vertical rule layer first.
+        if let Some(verdict) = crate::classifier::intent_rule::resolve_prompt_rules(input) {
+            let detected_expertise =
+                crate::classifier::expertise::detect_expertise_from_query(input).to_string();
+            return Some(crate::classifier::signal::ScenarioSignal {
+                domain: verdict.pipeline_domain().to_string(),
+                task_type: verdict.task_type().to_string(),
+                expertise: detected_expertise,
+                intent_class: verdict.intent_class().to_string(),
+                confidence: 0.95,
+                secondary_domain: verdict.secondary_domain().map(ToString::to_string),
+                primary_role: Some(verdict.primary_role.to_string()),
+                rule_locked: true,
+                legal_as_constraint: verdict.legal_as_constraint,
+            });
+        }
+
+        // 2. Config-backed taxonomy & exemplar classifier fallback.
+        let cfg = self.npae_config_handle.read();
+        if cfg.domain_taxonomy.is_empty() {
+            return None;
+        }
+
+        let (domain, conf, secondaries) =
+            crate::npae::aggressive::intent::detect_domain_with_confidence(input, Some(&cfg));
+        if domain == "general" || conf < 0.45 {
+            return None;
+        }
+
+        let repr = crate::npae::compression::pipeline::run_parallel_pipeline(input).ok()?;
+        let mut profile =
+            crate::npae::aggressive::intent::extract_with_config(&repr, input, Some(&cfg)).ok()?;
+        profile.domain = domain.clone();
+        profile.confidence = conf;
+
+        let task_type = Self::derive_task_type(input, &profile.primary_intent).to_string();
+        let expertise =
+            crate::classifier::expertise::detect_expertise_from_query(input).to_string();
+        let raw_role = crate::npae::aggressive::role::generate_role(
+            &profile,
+            input,
+            &cfg.domain_taxonomy,
+            &cfg.roles,
+        );
+        let primary_role = raw_role
+            .split(" (focus:")
+            .next()
+            .unwrap_or(raw_role.as_str())
+            .trim()
+            .to_string();
+
+        let intent_class = match (domain.as_str(), task_type.as_str()) {
+            ("legal", _) => "compliance",
+            ("finance" | "business" | "real-estate", "creation" | "planning") => "wealth-building",
+            ("marketing" | "ecommerce", _) => "brand-building",
+            (_, "troubleshooting") => "debugging",
+            _ => task_type.as_str(),
+        }
+        .to_string();
+
+        Some(crate::classifier::signal::ScenarioSignal {
+            domain,
+            task_type,
+            expertise,
+            intent_class,
+            confidence: conf,
+            secondary_domain: secondaries
+                .first()
+                .cloned()
+                .or_else(|| profile.secondary_domains.first().cloned()),
+            primary_role: if primary_role.is_empty() {
+                None
+            } else {
+                Some(primary_role)
+            },
+            rule_locked: profile.rule_locked,
+            legal_as_constraint: profile.legal_as_constraint,
+        })
+    }
+
+    /// Maps lexical verbs and `IntentClass` to canonical `task_type` strings:
+    /// `"creation"`, `"analysis"`, `"planning"`, `"troubleshooting"`, `"optimization"`, `"explanation"`.
+    fn derive_task_type(
+        input: &str,
+        intent: &crate::npae::aggressive::intent::IntentClass,
+    ) -> &'static str {
+        let lower = input.to_lowercase();
+        let words: std::collections::HashSet<&str> = lower
+            .split(|c: char| !c.is_alphanumeric() && c != '-')
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if [
+            "optimize",
+            "optimization",
+            "tune",
+            "speedup",
+            "accelerate",
+            "streamline",
+        ]
+        .iter()
+        .any(|w| words.contains(w))
+        {
+            return "optimization";
+        }
+
+        if [
+            "plan",
+            "roadmap",
+            "itinerary",
+            "schedule",
+            "syllabus",
+            "strategy",
+            "blueprint",
+        ]
+        .iter()
+        .any(|w| words.contains(w))
+        {
+            return "planning";
+        }
+
+        match intent {
+            crate::npae::aggressive::intent::IntentClass::Build => "creation",
+            crate::npae::aggressive::intent::IntentClass::Analyze => "analysis",
+            crate::npae::aggressive::intent::IntentClass::Debug => "troubleshooting",
+            crate::npae::aggressive::intent::IntentClass::Explain => "explanation",
+            crate::npae::aggressive::intent::IntentClass::Transform => "optimization",
         }
     }
 
@@ -140,6 +279,10 @@ impl PipelineOrchestrator {
         // Initialize AlgorithmOutput that will be passed through the pipeline
         let mut output = AlgorithmOutput::default();
         output.scenario = scenario;
+        if output.scenario.is_none() {
+            // ARCH: §1.4 — In-memory taxonomy & exemplar fallback when SQLite scenario_index abstains.
+            output.scenario = self.resolve_scenario_fallback(input);
+        }
         output.enrichment = enrichment.clone();
 
         // Stage -1: Token Reconstruction

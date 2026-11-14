@@ -14,6 +14,15 @@
 //! 6. Honest scoring & compact fallback: SCS/SFS penalize dropped constraints/negations instead of
 //!    crediting pre-sparse `clean_tokens`, and compact fallback retains constraint locks.
 
+#![allow(
+    clippy::expect_used,
+    clippy::panic,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::uninlined_format_args,
+    clippy::unwrap_used
+)]
+
 use dashmap::DashMap;
 use std::sync::Arc;
 use token_compress_engine::{
@@ -502,4 +511,236 @@ fn test_honest_scorers_and_compact_fallback_edge_cases() {
         tes_same, 0.0,
         "Identical input and output text must yield 0.0 TES (no false savings from unit mismatch)"
     );
+}
+
+#[tokio::test]
+async fn test_schema_registry_resolves_canonical_domains_and_aliases_without_pool() {
+    use token_compress_engine::db::schema_registry::{SchemaLookupKey, SchemaRegistry};
+
+    let registry = SchemaRegistry::without_pool();
+
+    // Verify all 10 required canonical domains + 2 aliases resolve domain-specific schemas
+    // directly from `config/unified.json` in-memory without a SQLite pool.
+    let cases = [
+        ("software", "creation", "expert", "Systems Architect"),
+        ("tech", "creation", "expert", "Systems Architect"),
+        (
+            "software-engineering",
+            "analysis",
+            "intermediate",
+            "Systems Architect",
+        ),
+        ("legal", "analysis", "expert", "Legal Strategist"),
+        (
+            "finance",
+            "planning",
+            "expert",
+            "Wealth & Income Strategist",
+        ),
+        ("medical", "analysis", "expert", "Physician"),
+        (
+            "nutrition",
+            "creation",
+            "intermediate",
+            "Registered Dietician",
+        ),
+        (
+            "cybersecurity",
+            "troubleshooting",
+            "expert",
+            "Security Analyst",
+        ),
+        ("travel", "planning", "intermediate", "Travel Planner"),
+        ("education", "creation", "expert", "Curriculum Designer"),
+        ("real-estate", "analysis", "expert", "Real Estate Agent"),
+        ("business", "planning", "expert", "Business Strategist"),
+    ];
+
+    for (domain, task_type, expertise, expected_role_substr) in cases {
+        let key = SchemaLookupKey {
+            domain: domain.to_string(),
+            task_type: task_type.to_string(),
+            expertise: expertise.to_string(),
+        };
+
+        let tier1 = registry
+            .find_exact_schema_match(&key)
+            .await
+            .unwrap_or_else(|| {
+                panic!(
+                    "Tier 1 exact schema match must resolve for domain={domain}, task={task_type}, expertise={expertise}"
+                )
+            });
+
+        let resolved = registry.resolve_schema_for_signal(&key).await;
+        let role = resolved.role.as_deref().unwrap_or_default();
+        assert!(
+            role.contains(expected_role_substr),
+            "Domain '{domain}' must resolve role containing '{expected_role_substr}', got '{role}'"
+        );
+        assert_ne!(
+            role, "Domain Expert",
+            "Domain '{domain}' must not fall back to generic 'Domain Expert'"
+        );
+        assert_eq!(tier1.role, resolved.role);
+        assert!(
+            resolved.context.as_ref().is_some_and(|c| !c.is_empty()),
+            "Domain '{domain}' must resolve non-empty context fields"
+        );
+        assert!(
+            resolved.task.as_ref().is_some_and(|t| !t.is_empty()),
+            "Domain '{domain}' must resolve non-empty task template"
+        );
+        assert!(
+            !resolved.output.is_empty(),
+            "Domain '{domain}' must resolve non-empty default deliverables"
+        );
+
+        // Also verify Tier 2 domain-level lookup succeeds when expertise is omitted/unknown
+        let tier2 = registry
+            .find_domain_level_schema(domain, task_type)
+            .await
+            .unwrap_or_else(|| {
+                panic!("Tier 2 domain-level schema must resolve for domain={domain}")
+            });
+        assert!(
+            tier2
+                .role
+                .as_deref()
+                .unwrap_or_default()
+                .contains(expected_role_substr),
+            "Tier 2 role for '{domain}' must contain '{expected_role_substr}', got {:?}",
+            tier2.role
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_stage4_and_stage6a_preserve_domain_roles_lenses_and_deliverables_under_balanced_contract(
+) {
+    let orchestrator = build_test_orchestrator();
+
+    // 1. Pharma wealth-building prompt (Intent x Vertical rule composition:
+    //    primary="Business Strategist", secondary="pharma", legal_as_constraint=true)
+    let pharma_prompt = "Hi there, I was basically wondering if you could please help me out. How can I make millions in pharma by building a biotech empire while navigating FDA regulatory compliance and clinical licensing? Please keep it under 300 words and do not speculate on unapproved drugs. Thanks so much in advance!";
+    let mut session1 = SessionHistory::new(10);
+    let OrchestratorResponse::Legacy(pharma_resp) = orchestrator
+        .process(
+            pharma_prompt,
+            &mut session1,
+            None,
+            Some("balanced"),
+            None,
+            None,
+        )
+        .await
+        .expect("Balanced pharma compression should succeed")
+    else {
+        panic!("Expected Legacy response for Balanced mode");
+    };
+
+    let pharma_in = estimate_tokens(pharma_prompt);
+    let pharma_out = estimate_tokens(&pharma_resp.response);
+    assert!(
+        pharma_out <= pharma_in,
+        "Balanced Mode Contract violated on pharma prompt: out={pharma_out} > in={pharma_in}\n{}",
+        pharma_resp.response
+    );
+    let pharma_role = pharma_resp.schema.role.as_deref().unwrap_or_default();
+    assert!(
+        pharma_role.contains("Business Strategist") && pharma_role.contains("Pharma"),
+        "Stage 4 must compose primary role 'Business Strategist' with secondary lens '(Pharma)', got: '{pharma_role}'"
+    );
+    assert!(
+        pharma_resp
+            .schema
+            .constraints
+            .iter()
+            .any(|c| c.name.eq_ignore_ascii_case("regulatory_compliance")),
+        "Stage 4 must inject 'regulatory_compliance' when legal_as_constraint is true, got: {:?}",
+        pharma_resp.schema.constraints
+    );
+    assert!(
+        !pharma_resp.schema.output.is_empty(),
+        "Stage 4 must populate domain deliverables in schema.output"
+    );
+    assert!(
+        pharma_resp
+            .response
+            .to_lowercase()
+            .contains("not speculate"),
+        "Stage 6A must preserve negation lock 'not speculate' in pharma output: {}",
+        pharma_resp.response
+    );
+
+    // 2. Multi-domain Balanced mode sweep (legal, cybersecurity, finance, travel) verifying:
+    //    - In-memory ScenarioSignal fallback & Stage 4 non-destructive schema merge
+    //    - Non-generic domain role & non-empty deliverables in `resp.schema`
+    //    - Strict Balanced Mode Contract (`output_tokens <= input_tokens`) and constraint survival
+    let multi_domain_prompts = [
+        (
+            "legal",
+            "Hello there, could you please help me review this commercial vendor contract clause for intellectual property indemnification and GDPR statutory compliance under Delaware jurisdiction? It must not waive liability caps under 50000 usd. Thanks in advance!",
+            "Legal",
+            "not waive",
+        ),
+        (
+            "cybersecurity",
+            "Hi there, I was basically wondering if you could please conduct a penetration test, SOC incident response audit, and SIEM vulnerability assessment to mitigate ransomware, phishing, and OWASP threats. Do not allow wildcard permissions and keep latency under 50 ms. Thanks so much!",
+            "Security",
+            "not allow",
+        ),
+        (
+            "travel",
+            "Hey there, could you please plan a 5 day family sightseeing travel itinerary in Goa with hotel resort bookings and flight transit logistics? Keep total budget under 30000 inr and include no alcohol venues. Thank you so much in advance!",
+            "Travel",
+            "30000",
+        ),
+    ];
+
+    for (label, prompt, expected_role_keyword, expected_constraint_substr) in multi_domain_prompts {
+        let mut session = SessionHistory::new(10);
+        let OrchestratorResponse::Legacy(resp) = orchestrator
+            .process(prompt, &mut session, None, Some("balanced"), None, None)
+            .await
+            .unwrap_or_else(|e| panic!("Balanced mode failed for {label}: {e}"))
+        else {
+            panic!("Expected Legacy response for Balanced mode ({label})");
+        };
+
+        let in_tok = estimate_tokens(prompt);
+        let out_tok = estimate_tokens(&resp.response);
+        assert!(
+            out_tok <= in_tok,
+            "[{label}] Balanced output ({out_tok} tokens) must not exceed input ({in_tok} tokens):\n{}",
+            resp.response
+        );
+
+        let role = resp.schema.role.as_deref().unwrap_or_default();
+        assert!(
+            role.to_lowercase()
+                .contains(&expected_role_keyword.to_lowercase()),
+            "[{label}] Expected schema.role to contain '{expected_role_keyword}', got '{role}'"
+        );
+        assert!(
+            !resp.schema.output.is_empty(),
+            "[{label}] Expected non-empty deliverables in schema.output"
+        );
+        assert!(
+            resp.response
+                .to_lowercase()
+                .contains(expected_constraint_substr),
+            "[{label}] Expected rendered response to preserve constraint '{expected_constraint_substr}':\n{}",
+            resp.response
+        );
+        assert!(
+            resp.scoring_result.tes >= 6.0
+                && resp.scoring_result.sfs >= 6.0
+                && resp.scoring_result.scs >= 6.0,
+            "[{label}] Expected TES/SFS/SCS >= 6.0, got TES={:.2} SFS={:.2} SCS={:.2}",
+            resp.scoring_result.tes,
+            resp.scoring_result.sfs,
+            resp.scoring_result.scs
+        );
+    }
 }

@@ -1,7 +1,7 @@
-//! Ory Architect v2 — Adaptive Blueprint Generation
+//! Ory Architect v2 — Adaptive Blueprint Generation.
 //!
-//! Generates dynamic flow architectures using strategy selection,
-//! domain-specific phase templates, dependency graphs, and resource estimation.
+//! // ARCH: ARCHITECTURE.md §5 GAP-35 — generates dynamic flow architectures using strategy
+//! // selection, canonical domain-specific phase templates, dependency graphs, and resource estimation.
 
 use crate::npae::ory::types::{
     AuditRecommendation, BlueprintPhase, BlueprintStrategy, DynamicBlueprint, FlowAudit,
@@ -9,14 +9,25 @@ use crate::npae::ory::types::{
 };
 use anyhow::Result;
 
+/// Ory Architect: Synthesizes dynamic execution blueprints when audit identifies gaps.
+#[derive(Debug)]
 pub struct OryArchitect;
 
 impl OryArchitect {
+    /// Designs a `DynamicBlueprint` for the given `LearnedIntent` and `FlowAudit`.
+    ///
+    /// # Errors
+    /// Never returns `Err` in current implementation (returns `Ok(DynamicBlueprint)`).
+    ///
+    /// # Panics
+    /// Never.
     pub fn design(intent: &LearnedIntent, audit: &FlowAudit) -> Result<DynamicBlueprint> {
+        let uuid_str = uuid::Uuid::new_v4().to_string();
+        let short_id = uuid_str.split('-').next().unwrap_or("00000000");
         let arch_id = format!(
             "ORY-{}-{}",
             intent.inferred_domain.to_uppercase().replace(' ', "_"),
-            uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+            short_id
         );
 
         // 1. Select strategy based on audit
@@ -135,9 +146,10 @@ fn generate_phases(
         estimated_complexity: 2.0,
     });
 
-    // Domain-specific phases
+    // Domain-specific phases (canonical + legacy aliases)
+    // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — match canonical domain names alongside legacy names.
     match domain.as_str() {
-        "software-engineering" | "devops-infra" => {
+        "software" | "software-engineering" | "devops" | "devops-infra" | "computers" => {
             phases.push(bp(
                 "Architecture & Design",
                 "System design and tech selection",
@@ -166,7 +178,7 @@ fn generate_phases(
                 4.0,
             ));
         }
-        "business-strategy" | "finance" => {
+        "business" | "business-strategy" | "finance" => {
             phases.push(bp(
                 "Market Research",
                 "Competitor analysis and market sizing",
@@ -192,6 +204,64 @@ fn generate_phases(
                 PhaseType::Implementation,
                 vec!["strategy_doc"],
                 vec!["execution_plan"],
+                5.0,
+            ));
+        }
+        "nutrition" | "sports-nutrition" => {
+            phases.push(bp(
+                "Baseline & Metabolic Assessment",
+                "Assess caloric requirements, dietary constraints, and activity expenditure",
+                vec!["Metabolic & Macro Baseline"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["nutrition_baseline"],
+                3.0,
+            ));
+            phases.push(bp(
+                "Meal & Macro Protocol Design",
+                "Design structured meal schedules, food selections, and hydration timing",
+                vec!["Meal Plan & Macro Schedule"],
+                PhaseType::Design,
+                vec!["nutrition_baseline"],
+                vec!["nutrition_plan"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Adherence & Adaptation Check",
+                "Verify allergen exclusions, micronutrient sufficiency, and progress tracking",
+                vec!["Compliance & Adjustment Checklist"],
+                PhaseType::Validation,
+                vec!["nutrition_plan"],
+                vec!["validated_nutrition_plan"],
+                4.0,
+            ));
+        }
+        "legal" => {
+            phases.push(bp(
+                "Jurisdictional & Fact Review",
+                "Identify governing jurisdiction, parties, and applicable statutes",
+                vec!["Jurisdictional Scope Summary"],
+                PhaseType::Analysis,
+                vec!["verified_intent"],
+                vec!["legal_context"],
+                5.0,
+            ));
+            phases.push(bp(
+                "Clause & Risk Analysis",
+                "Evaluate contractual obligations, liability exposure, and regulatory requirements",
+                vec!["Legal Risk & Clause Matrix"],
+                PhaseType::Design,
+                vec!["legal_context"],
+                vec!["legal_analysis"],
+                6.0,
+            ));
+            phases.push(bp(
+                "Compliance & Remediation Verification",
+                "Verify statutory compliance and formulate protective redlines",
+                vec!["Compliance & Redline Recommendations"],
+                PhaseType::Validation,
+                vec!["legal_analysis"],
+                vec!["compliant_legal_output"],
                 5.0,
             ));
         }
@@ -233,7 +303,7 @@ fn generate_phases(
                 5.0,
             ));
         }
-        "medical" => {
+        "medical" | "health" | "pharma" => {
             phases.push(bp(
                 "Evidence Review",
                 "Literature and clinical evidence gathering",

@@ -1,3 +1,10 @@
+//! Aggressive Mode Orchestration Engine (`AggressiveEngine`).
+//!
+//! // ARCH: ARCHITECTURE.md §1.3, §1.4, §5 GAP-33, GAP-35 & GAP-42 — orchestrates NPAE Aggressive
+//! // structuring, OryEngine pattern memory & dynamic blueprint integration, domain-aware ambiguity
+//! // & question generation, CRISP / Grounding Harness rendering, tri-layer HallucinationGuard,
+//! // and Stage 6B quality scoring & correction.
+
 use super::grammar::GrammarCorrector;
 use super::rag_context::DerivedRagContext;
 use crate::npae::compression::types::CompressedRepr;
@@ -6,9 +13,19 @@ use crate::npae::schema::types::{
 };
 use std::time::Instant;
 
+/// Aggressive Mode execution engine.
+#[derive(Debug)]
 pub struct AggressiveEngine;
 
 impl AggressiveEngine {
+    /// Executes the full NPAE Aggressive pipeline on a raw prompt and compressed representation.
+    ///
+    /// # Errors
+    /// Returns `Err` if intent extraction, Ory processing, structurer dispatch, or ambiguity
+    /// scoring fails.
+    ///
+    /// # Panics
+    /// Never.
     pub async fn run(
         raw: &str,
         repr: &CompressedRepr,

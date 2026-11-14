@@ -1,6 +1,13 @@
+//! Intent & Domain Extraction for the NPAE Aggressive Path.
+//!
+//! // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-37 — implements deterministic Intent × Vertical rule
+//! // composition with cached sentence-exemplar + keyword-centroid embedding fallback, whole-word
+//! // lexical density scoring, and multi-label secondary domain extraction.
+
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::DeliverableType;
 
+/// Primary intent classification for a user prompt.
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntentClass {
     Build,
@@ -10,6 +17,7 @@ pub enum IntentClass {
     Transform,
 }
 
+/// Estimated expertise level of the user based on vocabulary density.
 #[derive(Debug, Clone, PartialEq)]
 pub enum KnowledgeLevel {
     Novice,
@@ -17,6 +25,7 @@ pub enum KnowledgeLevel {
     Expert,
 }
 
+/// Complete intent, domain, and execution metadata profile extracted from a user prompt.
 #[derive(Debug, Clone)]
 pub struct IntentProfile {
     pub primary_intent: IntentClass,
@@ -51,19 +60,41 @@ pub struct IntentProfile {
 }
 
 impl IntentProfile {
+    /// Returns `true` when the deterministic rule layer classified the prompt as wealth-building.
+    ///
+    /// # Panics
+    /// Never.
     pub fn is_wealth_build(&self) -> bool {
         self.goal_intent.as_deref() == Some("wealth-building")
     }
 
+    /// Returns `true` when the deterministic rule layer classified the prompt as a legal query.
+    ///
+    /// # Panics
+    /// Never.
     pub fn is_legal_query(&self) -> bool {
         self.goal_intent.as_deref() == Some("legal-query")
     }
 }
 
+/// Extracts an `IntentProfile` without external taxonomy configuration.
+///
+/// # Errors
+/// Returns `Err` if `repr.intent_vec` is empty.
+///
+/// # Panics
+/// Never.
 pub fn extract(repr: &CompressedRepr, raw: &str) -> Result<IntentProfile, String> {
     extract_with_config(repr, raw, None)
 }
 
+/// Extracts an `IntentProfile` using optional `UnifiedConfig` taxonomy and exemplars.
+///
+/// # Errors
+/// Returns `Err` if `repr.intent_vec` is empty.
+///
+/// # Panics
+/// Never.
 pub fn extract_with_config(
     repr: &CompressedRepr,
     raw: &str,
@@ -250,7 +281,7 @@ fn domain_exemplars(domain: &str) -> &'static [&'static str] {
             "Analyze monthly cashflow, savings rate, debt payoff, and tax allocation",
             "Compare equity index funds, bonds, and fixed deposits for wealth preservation",
         ],
-        "medical" | "health" => &[
+        "medical" | "health" | "pharma" => &[
             "Clinical diagnosis and treatment protocol for a hospital patient with symptoms",
             "Analyze pathology, radiology, and biomarkers before surgical intervention",
             "Preventative healthcare screening and medical rehabilitation plan",
@@ -275,6 +306,61 @@ fn domain_exemplars(domain: &str) -> &'static [&'static str] {
             "Compare flight transit routes, resort lodging, and vacation budget costs",
             "Backpacking roadtrip and destination tourism excursion under budget",
         ],
+        "software" => &[
+            "Architect and implement a production backend microservice API in Rust or Python",
+            "Debug database query latency, concurrency bottlenecks, and software unit tests",
+            "Refactor application code architecture and REST or GraphQL API endpoints",
+        ],
+        "devops" => &[
+            "Configure Kubernetes cluster autoscaling, Terraform infrastructure, and CI/CD pipelines",
+            "Set up Docker container orchestration, Prometheus monitoring, and cloud deployment on AWS",
+            "Automate site reliability engineering, zero-downtime rollouts, and observability logging",
+        ],
+        "ai-ml" => &[
+            "Fine-tune a large language model transformer with RLHF alignment and safety guardrails",
+            "Optimize neural network inference latency, vector embeddings, and RAG retrieval",
+            "Design deep learning model architecture, prompt engineering, and evaluation benchmarks",
+        ],
+        "data-science" => &[
+            "Build a predictive classification and regression pipeline on a tabular dataset",
+            "Perform exploratory data analysis, feature engineering, and statistical hypothesis testing",
+            "Evaluate machine learning model precision, recall, ROC-AUC, and data drift",
+        ],
+        "cybersecurity" => &[
+            "Conduct a penetration test, threat modeling audit, and vulnerability assessment",
+            "Harden network firewall rules, zero-trust authentication, and encryption protocols",
+            "Investigate SOC security incident response, malware indicators, and SIEM alerts",
+        ],
+        "business" => &[
+            "Develop a B2B SaaS go-to-market strategy, pricing model, and unit economics plan",
+            "Analyze customer acquisition cost, LTV, churn, and startup venture scaling roadmap",
+            "Design a competitive market positioning and enterprise revenue expansion framework",
+        ],
+        "real-estate" => &[
+            "Analyze residential and commercial property valuation, cap rate, and rental cashflow",
+            "Plan a real estate brokerage listing, mortgage financing, and buyer acquisition strategy",
+            "Evaluate housing market comps, zoning regulations, and property management operations",
+        ],
+        "marketing" => &[
+            "Launch a multi-channel digital marketing campaign, SEO content funnel, and brand strategy",
+            "Optimize paid ad conversion rates, audience segmentation, and customer retention",
+            "Design social media growth loops, email drip campaigns, and attribution analytics",
+        ],
+        "ecommerce" => &[
+            "Optimize online store checkout conversion, shopping cart UX, and product catalog",
+            "Manage ecommerce inventory forecasting, warehouse fulfillment, and marketplace listings",
+            "Increase average order value and repeat purchase rate for a direct-to-consumer storefront",
+        ],
+        "science" => &[
+            "Formulate a falsifiable scientific hypothesis and controlled laboratory experiment protocol",
+            "Analyze empirical physics, chemistry, or biology research data for peer-reviewed publication",
+            "Evaluate experimental methodology, statistical significance, and reproducibility",
+        ],
+        "computers" => &[
+            "Optimize operating system kernel scheduling, CPU cache locality, and memory hierarchy",
+            "Design low-level systems architecture, hardware driver interfaces, and instruction pipelines",
+            "Analyze processor throughput, virtual memory paging, and embedded systems performance",
+        ],
         _ => &[],
     }
 }
@@ -282,7 +368,13 @@ fn domain_exemplars(domain: &str) -> &'static [&'static str] {
 /// Dynamic domain detection — Uses cached Vector Space Modeling (VSM), sentence-level
 /// exemplar prototypes, whole-word lexical tie-breaking, and multi-label secondary domain
 /// extraction (Steps 2.1, 2.2, 2.3).
-fn detect_domain_with_confidence(
+///
+/// // ARCH: ARCHITECTURE.md §1.4 — exposed as `pub` so `PipelineOrchestrator` can invoke the
+/// // in-memory taxonomy + exemplar classifier when the SQLite scenario index abstains.
+///
+/// # Panics
+/// Never.
+pub fn detect_domain_with_confidence(
     raw: &str,
     config: Option<&super::config::UnifiedConfig>,
 ) -> (String, f32, Vec<String>) {
@@ -932,27 +1024,29 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
 
     let has_timeline = detected_scope.is_some() || has_phases;
 
-    let scope = if has_phases && detected_scope.is_some() {
-        format!("phased_{}", detected_scope.unwrap())
-    } else if has_phases {
-        "phased".to_string()
-    } else if let Some(s) = detected_scope {
-        s
-    } else if lower.contains("long-term") || lower.contains("long term") {
-        "long_term".to_string()
-    } else if lower.contains("short-term")
-        || lower.contains("short term")
-        || lower.contains("quick")
-    {
-        "short_term".to_string()
-    } else if lower.contains("now")
-        || lower.contains("immediately")
-        || lower.contains("asap")
-        || lower.contains("urgent")
-    {
-        "immediate".to_string()
-    } else {
-        "unspecified".to_string()
+    let scope = match (has_phases, detected_scope) {
+        (true, Some(s)) => format!("phased_{s}"),
+        (true, None) => "phased".to_string(),
+        (false, Some(s)) => s,
+        (false, None) if lower.contains("long-term") || lower.contains("long term") => {
+            "long_term".to_string()
+        }
+        (false, None)
+            if lower.contains("short-term")
+                || lower.contains("short term")
+                || lower.contains("quick") =>
+        {
+            "short_term".to_string()
+        }
+        (false, None)
+            if lower.contains("now")
+                || lower.contains("immediately")
+                || lower.contains("asap")
+                || lower.contains("urgent") =>
+        {
+            "immediate".to_string()
+        }
+        (false, None) => "unspecified".to_string(),
     };
 
     (scope, has_timeline, has_phases)
@@ -1251,8 +1345,17 @@ fn detect_deliverable_type(lower: &str, intent: &IntentClass, domain: &str) -> D
         // Fallback: use intent + domain to infer
         return match intent {
             IntentClass::Build => {
-                if domain == "software-engineering" || domain == "devops-infra" || domain == "ai-ml"
-                {
+                if matches!(
+                    domain,
+                    "software"
+                        | "software-engineering"
+                        | "devops"
+                        | "devops-infra"
+                        | "ai-ml"
+                        | "data-science"
+                        | "computers"
+                        | "cybersecurity"
+                ) {
                     DeliverableType::Artifact
                 } else {
                     DeliverableType::Strategy

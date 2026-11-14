@@ -1,3 +1,10 @@
+//! Domain-Aware Ambiguity & Missing Required Slot Detector.
+//!
+//! // ARCH: ARCHITECTURE.md §1.4 (Step 6) — evaluates structural ambiguity and per-domain required
+//! // slots across canonical domains (`legal`, `medical`/`health`, `nutrition`, `finance`,
+//! // `education`, `travel`, `software`/`devops`, `business`, `data-science`/`ai-ml`,
+//! // `cybersecurity`, `real-estate`) to drive targeted clarifying questions.
+
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::AmbiguityAnalysis;
 use std::collections::HashSet;
@@ -5,6 +12,13 @@ use std::collections::HashSet;
 use super::intent::IntentProfile;
 use super::rag_context::DerivedRagContext;
 
+/// Scores ambiguity without domain-specific slot checks.
+///
+/// # Errors
+/// Never returns `Err` in current implementation.
+///
+/// # Panics
+/// Never.
 pub fn score(
     repr: &CompressedRepr,
     raw: &str,
@@ -15,9 +29,17 @@ pub fn score(
 }
 
 /// Domain-aware ambiguity scoring (Step 4).
+///
 /// Evaluates both structural/generic ambiguity and missing required domain slots
 /// across primary and secondary domains (`finance`, `medical`/`health`, `nutrition`,
-/// `legal`, `education`, `travel`).
+/// `legal`, `education`, `travel`, `software`/`devops`, `business`, `data-science`/`ai-ml`,
+/// `cybersecurity`, `real-estate`).
+///
+/// # Errors
+/// Never returns `Err` in current implementation.
+///
+/// # Panics
+/// Never.
 pub fn score_for_domain(
     repr: &CompressedRepr,
     raw: &str,
@@ -500,6 +522,187 @@ fn detect_missing_domain_slots(
             );
             if !has_budget_or_pax {
                 out_gaps.push("missing_slot:travel:budget_or_travelers".into());
+            }
+        }
+        "software" | "software-engineering" | "devops" | "devops-infra" => {
+            let has_stack_or_env = has_any_word_or_phrase(
+                text,
+                words,
+                &[
+                    "rust",
+                    "python",
+                    "go",
+                    "golang",
+                    "java",
+                    "typescript",
+                    "javascript",
+                    "node",
+                    "react",
+                    "postgres",
+                    "postgresql",
+                    "sqlite",
+                    "mysql",
+                    "redis",
+                    "kubernetes",
+                    "k8s",
+                    "docker",
+                    "aws",
+                    "gcp",
+                    "azure",
+                    "linux",
+                    "axum",
+                    "tokio",
+                    "fastapi",
+                    "django",
+                    "spring",
+                    "graphql",
+                    "rest",
+                    "grpc",
+                    "terraform",
+                ],
+            );
+            if !has_stack_or_env {
+                out_gaps.push("missing_slot:software:stack_or_environment".into());
+            }
+        }
+        "business" | "business-strategy" => {
+            let has_market_or_stage = has_number(text)
+                || has_any_word_or_phrase(
+                    text,
+                    words,
+                    &[
+                        "b2b",
+                        "b2c",
+                        "saas",
+                        "enterprise",
+                        "smb",
+                        "consumer",
+                        "seed",
+                        "series",
+                        "bootstrap",
+                        "bootstrapped",
+                        "pre-seed",
+                        "mvp",
+                        "pharma",
+                        "biotech",
+                        "fintech",
+                        "healthcare",
+                        "ecommerce",
+                        "marketplace",
+                        "retail",
+                        "agency",
+                        "subscription",
+                    ],
+                );
+            if !has_market_or_stage {
+                out_gaps.push("missing_slot:business:target_market_or_stage".into());
+            }
+        }
+        "data-science" | "ai-ml" => {
+            let has_dataset_or_metric = has_number(text)
+                || has_any_word_or_phrase(
+                    text,
+                    words,
+                    &[
+                        "dataset",
+                        "csv",
+                        "parquet",
+                        "sql",
+                        "tabular",
+                        "images",
+                        "text",
+                        "corpus",
+                        "f1",
+                        "auc",
+                        "roc-auc",
+                        "accuracy",
+                        "precision",
+                        "recall",
+                        "rmse",
+                        "mae",
+                        "latency",
+                        "perplexity",
+                        "benchmark",
+                        "pytorch",
+                        "tensorflow",
+                        "xgboost",
+                        "transformer",
+                        "llm",
+                        "rag",
+                    ],
+                );
+            if !has_dataset_or_metric {
+                out_gaps.push("missing_slot:data-science:dataset_or_metric".into());
+            }
+        }
+        "cybersecurity" => {
+            let has_scope_or_asset = has_any_word_or_phrase(
+                text,
+                words,
+                &[
+                    "web",
+                    "api",
+                    "cloud",
+                    "aws",
+                    "kubernetes",
+                    "network",
+                    "endpoint",
+                    "iam",
+                    "oauth",
+                    "jwt",
+                    "tls",
+                    "firewall",
+                    "siem",
+                    "soc",
+                    "owasp",
+                    "pentest",
+                    "penetration",
+                    "zero-trust",
+                    "ransomware",
+                    "phishing",
+                    "database",
+                ],
+            );
+            if !has_scope_or_asset {
+                out_gaps.push("missing_slot:cybersecurity:target_scope_or_environment".into());
+            }
+        }
+        "real-estate" => {
+            let has_location_or_type = has_number(text)
+                || has_any_word_or_phrase(
+                    text,
+                    words,
+                    &[
+                        "residential",
+                        "commercial",
+                        "multifamily",
+                        "single-family",
+                        "condo",
+                        "apartment",
+                        "house",
+                        "rental",
+                        "reit",
+                        "mortgage",
+                        "cap rate",
+                        "cashflow",
+                        "licensing",
+                        "license",
+                        "broker",
+                        "brokerage",
+                        "realtor",
+                        "agent",
+                        "india",
+                        "us",
+                        "usa",
+                        "uk",
+                        "texas",
+                        "california",
+                        "new york",
+                        "florida",
+                    ],
+                );
+            if !has_location_or_type {
+                out_gaps.push("missing_slot:real-estate:location_or_property_type".into());
             }
         }
         _ => {}

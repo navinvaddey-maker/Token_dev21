@@ -267,6 +267,7 @@ mod tests {
             aliases: vec![],
             persona_template: None,
             phase_templates: None,
+            ..Default::default()
         }];
 
         let constraints = vec![ConstraintRule {

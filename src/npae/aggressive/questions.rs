@@ -1,6 +1,18 @@
+//! Domain-Aware Clarifying Question Generator.
+//!
+//! // ARCH: ARCHITECTURE.md §1.4 (Step 6) — maps ambiguity gap zones and missing required domain
+//! // slots into ranked, high-information-gain clarifying questions.
+
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::{AmbiguityAnalysis, ClarifyingQuestion, Priority};
 
+/// Generates clarifying questions using the default `"general"` domain context.
+///
+/// # Errors
+/// Never returns `Err` in current implementation.
+///
+/// # Panics
+/// Never.
 pub fn generate(
     repr: &CompressedRepr,
     amb: &AmbiguityAnalysis,
@@ -11,6 +23,12 @@ pub fn generate(
 
 /// Domain-aware question generation — produces relevant questions based on domain context
 /// and missing required domain slots (Step 4).
+///
+/// # Errors
+/// Never returns `Err` in current implementation.
+///
+/// # Panics
+/// Never.
 pub fn generate_with_domain(
     repr: &CompressedRepr,
     amb: &AmbiguityAnalysis,
@@ -87,6 +105,26 @@ fn score_gap(gap: &str, _repr: &CompressedRepr, id: u8, domain: &str) -> Clarify
         ("missing_slot:travel:budget_or_travelers", _) => (
             "What is your total travel budget and how many travelers (solo, couple, family) are in the group?".into(),
             0.88,
+        ),
+        ("missing_slot:software:stack_or_environment", _) => (
+            "What is the target programming language, framework, database, and deployment environment?".into(),
+            0.91,
+        ),
+        ("missing_slot:business:target_market_or_stage", _) => (
+            "What is the target market segment (B2B/B2C, industry vertical) and current venture stage (idea, MVP, or scaling)?".into(),
+            0.90,
+        ),
+        ("missing_slot:data-science:dataset_or_metric", _) => (
+            "What is the dataset modality/size and primary evaluation metric (e.g., F1, ROC-AUC, RMSE, or latency)?".into(),
+            0.90,
+        ),
+        ("missing_slot:cybersecurity:target_scope_or_environment", _) => (
+            "What is the target system architecture or scope (web API, cloud IAM, network, or endpoint) and compliance framework?".into(),
+            0.91,
+        ),
+        ("missing_slot:real-estate:location_or_property_type", _) => (
+            "What is the target geographic market/jurisdiction and property type (residential, commercial, or multifamily)?".into(),
+            0.90,
         ),
 
         // --- Domain-specific: Business ---

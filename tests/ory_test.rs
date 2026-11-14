@@ -13,6 +13,7 @@ fn test_ory_novel_domain_flow() -> Result<()> {
                 aliases: vec![],
                 persona_template: None,
                 phase_templates: None,
+                ..Default::default()
             },
             DomainTaxonomy {
                 domain: "software".to_string(),
@@ -21,6 +22,7 @@ fn test_ory_novel_domain_flow() -> Result<()> {
                 aliases: vec![],
                 persona_template: None,
                 phase_templates: None,
+                ..Default::default()
             },
         ],
         roles: vec![],
@@ -75,6 +77,7 @@ fn test_ory_existing_domain_with_novel_signals() -> Result<()> {
             aliases: vec![],
             persona_template: None,
             phase_templates: None,
+            ..Default::default()
         }],
         roles: vec![],
         constraints: vec![],

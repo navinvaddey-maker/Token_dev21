@@ -1,13 +1,19 @@
-// Removed unused serde imports
+//! Structured Prompt Builder & CRISP / Grounding Harness Renderers.
+//!
+//! // ARCH: ARCHITECTURE.md §1.4, §5 GAP-35 & GAP-42 — builds `StructuredPrompt` from canonical
+//! // domain templates (`config/unified.json`), rule-composed personas, and Ory `DynamicBlueprint`,
+//! // and renders CRISP or opt-in Grounding Harness prompts.
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 
-use super::intent::IntentProfile;
+use super::intent::{IntentClass, IntentProfile};
 use crate::npae::schema::types::{
-    ClarifyingQuestion, ConstraintsMeta, ExecutionPhase, HallucinationGuardConfig, LengthBound,
-    PromptConstraints, PromptContext, PromptRole, StructuredPrompt, ValidationStep,
+    ClarifyingQuestion, ConstraintsMeta, DeliverableType, ExecutionPhase, HallucinationGuardConfig,
+    LengthBound, PromptConstraints, PromptContext, PromptRole, StructuredPrompt, ValidationStep,
 };
 
+/// Source channel from which a raw prompt entered the engine.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PromptSource {
     Cli,
@@ -36,6 +42,7 @@ pub enum PromptSource {
     Unknown,
 }
 
+/// Trust level assigned to a prompt source channel.
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TrustLevel {
     High,
@@ -45,6 +52,10 @@ pub enum TrustLevel {
 }
 
 impl PromptSource {
+    /// Returns the default `TrustLevel` for this prompt source.
+    ///
+    /// # Panics
+    /// Never.
     pub fn trust_level(&self) -> TrustLevel {
         match self {
             PromptSource::Internal { .. } => TrustLevel::High,
@@ -59,6 +70,7 @@ impl PromptSource {
     }
 }
 
+/// Raw user input bundled with its source, trust level, and request metadata.
 #[derive(Debug, Clone)]
 pub struct RawInput {
     pub text: String,
@@ -67,6 +79,7 @@ pub struct RawInput {
     pub metadata: InputMetadata,
 }
 
+/// Request metadata attached to a `RawInput`.
 #[derive(Debug, Clone)]
 pub struct InputMetadata {
     pub request_id: String,
@@ -76,6 +89,10 @@ pub struct InputMetadata {
 }
 
 impl InputMetadata {
+    /// Creates a new `InputMetadata` with a fresh UUID and current UTC timestamp.
+    ///
+    /// # Panics
+    /// Never.
     pub fn new() -> Self {
         Self {
             request_id: uuid::Uuid::new_v4().to_string(),
@@ -86,14 +103,32 @@ impl InputMetadata {
     }
 }
 
+impl Default for InputMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trait implemented by input collectors that validate and wrap raw user prompts.
 pub trait Structurer: Send + Sync {
+    /// Collects raw input from the underlying source.
+    ///
+    /// # Errors
+    /// Returns `Err` if reading or initial bounds checking fails.
     fn collect(&self) -> Result<RawInput>;
+    /// Returns the static identifier of the input source.
     fn source_name(&self) -> &'static str;
+    /// Validates the collected `RawInput` for security or structural issues.
+    ///
+    /// # Errors
+    /// Returns `Err` if dangerous patterns (e.g. XSS or SQLi) are detected.
     fn pre_validate(&self, _input: &RawInput) -> Result<()> {
         Ok(())
     }
 }
 
+/// CLI stdin input collector.
+#[derive(Debug)]
 pub struct CliStructurer {
     pub max_length: usize,
 }
@@ -128,6 +163,8 @@ impl Structurer for CliStructurer {
     }
 }
 
+/// HTTP request body input collector with XSS/SQLi pre-validation.
+#[derive(Debug)]
 pub struct HttpStructurer {
     pub route: String,
     pub remote_addr: String,
@@ -185,6 +222,10 @@ impl Structurer for HttpStructurer {
 
 // --- CRISP Prompt Renderer (v2 — token waste eliminated) ---
 
+/// Splits a raw prompt into `(optional_context_block, optional_rag_block, clean_user_prompt)`.
+///
+/// # Panics
+/// Never.
 pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
     let mut context = None;
     let mut rag = None;
@@ -213,6 +254,10 @@ pub fn split_raw_input(raw: &str) -> (Option<String>, Option<String>, String) {
     (context, rag, user_prompt)
 }
 
+/// Renders a `StructuredPrompt` and optional clarifying questions in the CRISP Markdown format.
+///
+/// # Panics
+/// Never.
 pub fn render_crisp_prompt(
     prompt: &StructuredPrompt,
     questions: &[ClarifyingQuestion],
@@ -1012,6 +1057,13 @@ fn append_harness_optional_blocks(
     }
 }
 
+/// Builds a `StructuredPrompt` without an Ory `DynamicBlueprint`.
+///
+/// # Errors
+/// Returns `Err` if structure assembly fails.
+///
+/// # Panics
+/// Never.
 pub fn build(
     profile: &IntentProfile,
     raw: &str,
@@ -1033,6 +1085,10 @@ pub fn build(
 
 /// Builds a structured prompt, incorporating an optional dynamic blueprint from OryEngine.
 ///
+/// // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — curated canonical domain templates
+/// // (`infer_execution_phases` & `infer_validation_steps`) take precedence over generic
+/// // Ory blueprint phases, and `Content` / `Explain` prompts do not receive forced phases.
+///
 /// # Arguments
 /// * `profile` - Intent profile derived from classification
 /// * `raw` - Raw prompt text
@@ -1044,6 +1100,9 @@ pub fn build(
 ///
 /// # Errors
 /// Returns error string on formatting or structure build failure.
+///
+/// # Panics
+/// Never.
 pub fn build_with_blueprint(
     profile: &IntentProfile,
     raw: &str,
@@ -1072,17 +1131,27 @@ pub fn build_with_blueprint(
     .to_string();
 
     let intent_type = match profile.primary_intent {
-        super::intent::IntentClass::Build => {
-            if profile.domain == "software-engineering" || profile.domain == "devops-infra" {
+        IntentClass::Build => {
+            if matches!(
+                profile.domain.as_str(),
+                "software"
+                    | "software-engineering"
+                    | "devops"
+                    | "devops-infra"
+                    | "computers"
+                    | "ai-ml"
+                    | "data-science"
+                    | "cybersecurity"
+            ) {
                 "development/construction"
             } else {
                 "creation/design"
             }
         }
-        super::intent::IntentClass::Explain => "educational/instructional",
-        super::intent::IntentClass::Debug => "troubleshooting/optimization",
-        super::intent::IntentClass::Analyze => "analytical/discovery",
-        super::intent::IntentClass::Transform => "refactoring/conversion",
+        IntentClass::Explain => "educational/instructional",
+        IntentClass::Debug => "troubleshooting/optimization",
+        IntentClass::Analyze => "analytical/discovery",
+        IntentClass::Transform => "refactoring/conversion",
     };
 
     // Extract a concise task description (not just raw first line)
@@ -1101,11 +1170,38 @@ pub fn build_with_blueprint(
         }
     }
 
-    // ARCH: GAP-35 — If a dynamic blueprint was architected by OryEngine, use its phases and validation steps.
-    // Otherwise fallback to static domain/template inference.
-    let (execution_phases, validation_steps) = if let Some(bp) = blueprint {
-        let phases: Vec<ExecutionPhase> = bp
-            .phases
+    // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — Always compute curated domain phases and
+    // validation steps first. Curated canonical templates (`config/unified.json` `phase_templates`
+    // and domain-specific structurer rules) take precedence over generic `DynamicBlueprint` phases,
+    // and `Content` or `Explain` prompts must not be forced into multi-phase execution roadmaps.
+    // When `config` is explicitly provided without the domain in `config.domain_taxonomy` (e.g.,
+    // novel-domain audit / empty taxonomy test where Ory synthesized a `NovelDesign` blueprint),
+    // allow the Ory `DynamicBlueprint` phases and validation checklist to flow through.
+    let curated_phases = infer_execution_phases(profile, raw, config);
+    let curated_steps = infer_validation_steps(profile, raw);
+
+    let domain_in_config_taxonomy = match config {
+        Some(cfg) => {
+            let norm = super::config::normalize_domain(&profile.domain, &cfg.domain_taxonomy);
+            cfg.domain_taxonomy.iter().any(|t| {
+                t.domain.eq_ignore_ascii_case(norm)
+                    || t.aliases
+                        .iter()
+                        .any(|a| a.eq_ignore_ascii_case(&profile.domain))
+            })
+        }
+        None => true,
+    };
+
+    let suppress_phases = profile.deliverable_type == DeliverableType::Content
+        || (profile.primary_intent == IntentClass::Explain && curated_phases.is_empty());
+
+    let execution_phases = if suppress_phases {
+        vec![]
+    } else if !curated_phases.is_empty() && (domain_in_config_taxonomy || blueprint.is_none()) {
+        curated_phases
+    } else if let Some(bp) = blueprint {
+        bp.phases
             .iter()
             .enumerate()
             .map(|(idx, p)| ExecutionPhase {
@@ -1115,26 +1211,30 @@ pub fn build_with_blueprint(
                 estimated_duration: format!("Complexity {:.1}/10", p.estimated_complexity),
                 deliverables: p.expected_deliverables.clone(),
             })
-            .collect();
-
-        let val_steps: Vec<ValidationStep> = bp
-            .validation_checklist
-            .iter()
-            .enumerate()
-            .map(|(idx, check)| ValidationStep {
-                step_number: (idx + 1) as u8,
-                name: format!("Verification Step {}", idx + 1),
-                criteria: check.clone(),
-                validation_method: "Automated & Human Review".to_string(),
-            })
-            .collect();
-
-        (phases, val_steps)
+            .collect()
     } else {
-        (
-            infer_execution_phases(profile, raw, config),
-            infer_validation_steps(profile, raw),
-        )
+        curated_phases
+    };
+
+    let validation_steps = if !curated_steps.is_empty() {
+        curated_steps
+    } else if let Some(bp) = blueprint {
+        if profile.has_validation || !domain_in_config_taxonomy {
+            bp.validation_checklist
+                .iter()
+                .enumerate()
+                .map(|(idx, check)| ValidationStep {
+                    step_number: (idx + 1) as u8,
+                    name: format!("Verification Step {}", idx + 1),
+                    criteria: check.clone(),
+                    validation_method: "Automated & Human Review".to_string(),
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
     };
 
     // Infer success criteria (Intent-driven)
@@ -1443,7 +1543,19 @@ fn infer_execution_phases(
         if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == canonical) {
             if let Some(ref templates) = tax.phase_templates {
                 if let Some(phases) = templates.get(intent_key) {
-                    return phases.clone();
+                    if !phases.is_empty() {
+                        return phases.clone();
+                    }
+                }
+                if matches!(
+                    profile.primary_intent,
+                    IntentClass::Build | IntentClass::Transform
+                ) {
+                    if let Some(phases) = templates.get("default") {
+                        if !phases.is_empty() {
+                            return phases.clone();
+                        }
+                    }
                 }
             }
         }
@@ -1909,13 +2021,16 @@ fn infer_execution_phases(
 }
 
 /// Infer validation steps if validation signals detected
+///
+/// // ARCH: ARCHITECTURE.md §1.4 & §5 GAP-35 — provides domain-specific validation checkpoints
+/// // across canonical and legacy domain names.
 fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<ValidationStep> {
     if !profile.has_validation {
         return vec![];
     }
 
     match profile.domain.as_str() {
-        "software-engineering" | "devops-infra" => vec![
+        "software" | "software-engineering" | "devops" | "devops-infra" | "computers" => vec![
             ValidationStep {
                 step_number: 1,
                 name: "Unit Tests".into(),
@@ -1935,7 +2050,7 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
                 validation_method: "Load testing".into(),
             },
         ],
-        "business-strategy" => vec![
+        "business" | "business-strategy" => vec![
             ValidationStep {
                 step_number: 1,
                 name: "Market Fit".into(),
@@ -1953,6 +2068,260 @@ fn infer_validation_steps(profile: &IntentProfile, _raw: &str) -> Vec<Validation
                 name: "Competitive Position".into(),
                 criteria: "Clear differentiation identified".into(),
                 validation_method: "Competitor analysis".into(),
+            },
+        ],
+        "finance" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Mathematical & CAGR Audit".into(),
+                criteria: "Compound returns, savings rate, and cashflows reconcile mathematically"
+                    .into(),
+                validation_method: "Quantitative spreadsheet verification".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Downside & Drawdown Stress Test".into(),
+                criteria: "Portfolio survives conservative market drawdown and liquidity shocks"
+                    .into(),
+                validation_method: "Scenario sensitivity modeling".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Tax & Regulatory Alignment".into(),
+                criteria: "Asset location and withdrawal assumptions account for tax drag".into(),
+                validation_method: "Tax efficiency review".into(),
+            },
+        ],
+        "legal" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Jurisdictional & Statutory Check".into(),
+                criteria: "All cited clauses and statutes match the governing jurisdiction".into(),
+                validation_method: "Statutory cross-reference audit".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Liability & Indemnification Review".into(),
+                criteria: "Risk allocation, caps, and remedies are unambiguous and enforceable"
+                    .into(),
+                validation_method: "Contractual risk matrix review".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Regulatory Compliance Gate".into(),
+                criteria:
+                    "Satisfies applicable privacy, IP, or industry regulations (e.g. GDPR/HIPAA)"
+                        .into(),
+                validation_method: "Compliance checklist verification".into(),
+            },
+        ],
+        "medical" | "health" | "pharma" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Clinical Evidence Verification".into(),
+                criteria: "Recommendations align with peer-reviewed clinical guidelines".into(),
+                validation_method: "Clinical literature cross-check".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Contraindication & Safety Screening".into(),
+                criteria: "Dosages, interactions, and patient risk factors are screened".into(),
+                validation_method: "Safety & contraindication audit".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Regulatory & Ethical Compliance".into(),
+                criteria: "Includes clinical disclaimer and adheres to FDA/EMA/HIPAA standards"
+                    .into(),
+                validation_method: "Regulatory review gate".into(),
+            },
+        ],
+        "nutrition" | "sports-nutrition" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Caloric & Macronutrient Balance".into(),
+                criteria:
+                    "Daily protein, carbohydrate, fat, and caloric totals match target expenditure"
+                        .into(),
+                validation_method: "Macro & energy balance audit".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Allergen & Restriction Compliance".into(),
+                criteria: "Zero forbidden ingredients or allergens appear in meal selections"
+                    .into(),
+                validation_method: "Strict exclusion checklist".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Micronutrient & Hydration Sufficiency".into(),
+                criteria: "Electrolyte, fiber, and vitamin requirements are met sustainably".into(),
+                validation_method: "Nutritional completeness review".into(),
+            },
+        ],
+        "data-science" | "ai-ml" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Data Leakage & Split Integrity".into(),
+                criteria:
+                    "Train/validation/test splits are strictly isolated with zero target leakage"
+                        .into(),
+                validation_method: "Pipeline data audit".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Metric & Baseline Evaluation".into(),
+                criteria:
+                    "Model beats baseline on target evaluation metrics (e.g. F1, ROC-AUC, RMSE)"
+                        .into(),
+                validation_method: "Holdout benchmark evaluation".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Calibration, Drift & Safety Check".into(),
+                criteria:
+                    "Predictions are calibrated and robust against distribution shift or bias"
+                        .into(),
+                validation_method: "Robustness & fairness suite".into(),
+            },
+        ],
+        "cybersecurity" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Threat Model & Attack Surface Coverage".into(),
+                criteria: "All trust boundaries and OWASP/MITRE threat vectors are enumerated"
+                    .into(),
+                validation_method: "STRIDE / MITRE ATT&CK review".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Vulnerability & Control Verification".into(),
+                criteria: "Authentication, encryption, and network controls block exploit paths"
+                    .into(),
+                validation_method: "Penetration test & scanner verification".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Incident Detection & Audit Logging".into(),
+                criteria: "SIEM alerts and immutable audit logs capture anomalous activity".into(),
+                validation_method: "SOC detection rule test".into(),
+            },
+        ],
+        "education" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Learning Objective Alignment".into(),
+                criteria: "Every module maps directly to measurable Bloom's taxonomy outcomes"
+                    .into(),
+                validation_method: "Curriculum alignment rubric".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Cognitive Load & Pacing Check".into(),
+                criteria: "Concepts progress from foundational to advanced with active recall"
+                    .into(),
+                validation_method: "Pedagogical pacing review".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Assessment & Mastery Verification".into(),
+                criteria: "Formative and summative assessments accurately test concept retention"
+                    .into(),
+                validation_method: "Assessment rubric validation".into(),
+            },
+        ],
+        "travel" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Route & Transit Feasibility".into(),
+                criteria: "Daily transit times and geographic sequencing are realistic".into(),
+                validation_method: "Route & schedule audit".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Budget & Constraint Reconciliation".into(),
+                criteria:
+                    "Lodging, flights, activities, and dining stay within the stated budget ceiling"
+                        .into(),
+                validation_method: "Itemized cost tally".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Dietary & Group Accommodation Check".into(),
+                criteria:
+                    "All dietary restrictions, accessibility, and traveler group needs are met"
+                        .into(),
+                validation_method: "Traveler constraint checklist".into(),
+            },
+        ],
+        "real-estate" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Comparable Market & Valuation Check".into(),
+                criteria: "Pricing, cap rate, and cash-on-cash return align with local comps"
+                    .into(),
+                validation_method: "CMA & underwriting audit".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Zoning, Title & Licensing Compliance".into(),
+                criteria:
+                    "Property use, disclosures, and brokerage steps satisfy local regulations"
+                        .into(),
+                validation_method: "Regulatory & title checklist".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Financing & Cashflow Stress Test".into(),
+                criteria: "Debt service coverage survives vacancy and interest rate sensitivity"
+                    .into(),
+                validation_method: "Underwriting sensitivity model".into(),
+            },
+        ],
+        "marketing" | "ecommerce" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Audience & Positioning Fit".into(),
+                criteria: "Value proposition and messaging match target segment pain points".into(),
+                validation_method: "Segment & copy review".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Funnel & Conversion Economics".into(),
+                criteria: "CAC, ROAS, and checkout conversion targets are Positive-ROI".into(),
+                validation_method: "Funnel unit economics audit".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Attribution & A/B Test Readiness".into(),
+                criteria:
+                    "Tracking pixels, KPIs, and experiment hypotheses are instrumentation-ready"
+                        .into(),
+                validation_method: "Analytics & experiment checklist".into(),
+            },
+        ],
+        "science" | "scientific-research" => vec![
+            ValidationStep {
+                step_number: 1,
+                name: "Hypothesis Falsifiability & Controls".into(),
+                criteria:
+                    "Null hypothesis, independent variables, and negative controls are defined"
+                        .into(),
+                validation_method: "Experimental design review".into(),
+            },
+            ValidationStep {
+                step_number: 2,
+                name: "Statistical Power & Significance".into(),
+                criteria: "Sample size, confidence intervals, and p-value thresholds are justified"
+                    .into(),
+                validation_method: "Biostatistics / power analysis".into(),
+            },
+            ValidationStep {
+                step_number: 3,
+                name: "Reproducibility & Peer-Review Rigor".into(),
+                criteria: "Methodology and apparatus parameters allow independent replication"
+                    .into(),
+                validation_method: "Protocol reproducibility checklist".into(),
             },
         ],
         _ => vec![
@@ -2020,7 +2389,7 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
 
     // Domain-Aware Success Criteria for other domains
     match (profile.primary_intent.clone(), profile.domain.as_str()) {
-        (super::intent::IntentClass::Build, "career-growth") => {
+        (IntentClass::Build, "career-growth") => {
             criteria.push("Comprehensive skills gap analysis completed and validated against industry benchmarks".into());
             criteria.push("Target certifications or credentials acquired and verified".into());
             criteria.push(
@@ -2029,41 +2398,61 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
             );
             criteria.push("Market positioning aligned with target role expectations".into());
         }
-        (super::intent::IntentClass::Build, "software")
-        | (super::intent::IntentClass::Build, "software-engineering")
-        | (super::intent::IntentClass::Build, "devops")
-        | (super::intent::IntentClass::Build, "devops-infra") => {
+        (
+            IntentClass::Build,
+            "software" | "software-engineering" | "devops" | "devops-infra" | "computers",
+        ) => {
             criteria.push("Functional, bug-free implementation with optimized performance".into());
             criteria.push(
                 "Adheres to industry-standard architectural patterns and best practices".into(),
             );
             criteria.push("Includes necessary technical documentation and test coverage".into());
         }
-        (super::intent::IntentClass::Build, "ai-ml")
-        | (super::intent::IntentClass::Build, "data-science") => {
+        (IntentClass::Build, "ai-ml" | "data-science") => {
             criteria.push("Model performance meets or exceeds stated benchmarks".into());
             criteria.push(
                 "Alignment, safety, and ethical considerations are explicitly addressed".into(),
             );
             criteria.push("Data handling and inference pipelines are robust and scalable".into());
         }
-        (super::intent::IntentClass::Build, "health")
-        | (super::intent::IntentClass::Build, "medical")
-        | (super::intent::IntentClass::Build, "pharma") => {
+        (IntentClass::Build, "health" | "medical" | "pharma") => {
             criteria
                 .push("Clinically accurate protocols grounded in peer-reviewed evidence".into());
             criteria.push("Strict adherence to regulatory (FDA/EMA) and ethical guidelines".into());
             criteria.push("Risk-benefit analysis is comprehensive and clearly stated".into());
         }
-        (super::intent::IntentClass::Build, "nutrition")
-        | (super::intent::IntentClass::Build, "sports-nutrition")
-        | (super::intent::IntentClass::Build, "health-fitness") => {
+        (IntentClass::Build, "nutrition" | "sports-nutrition" | "health-fitness") => {
             criteria.push("Plan is physiologically sound and tailored to specific goals".into());
             criteria
                 .push("Macros and micronutrients are balanced according to activity level".into());
             criteria.push("Includes clear instructions for tracking and adjustment".into());
         }
-        (super::intent::IntentClass::Build, "travel") => {
+        (IntentClass::Build, "legal") => {
+            criteria.push("Legal clauses and analysis strictly conform to governing jurisdiction and statutory precedent".into());
+            criteria.push("Liability exposure, indemnification, and compliance obligations are unambiguously specified".into());
+            criteria.push(
+                "Includes actionable risk-mitigation language and regulatory verification".into(),
+            );
+        }
+        (IntentClass::Build, "cybersecurity") => {
+            criteria.push("Threat model enumerates all trust boundaries and attack vectors (OWASP/MITRE ATT&CK)".into());
+            criteria.push(
+                "Defensive controls, encryption, and authentication mechanisms are verifiable"
+                    .into(),
+            );
+            criteria.push("Includes incident detection telemetry and response playbooks".into());
+        }
+        (IntentClass::Build, "real-estate") => {
+            criteria.push("Property valuation and cashflow underwriting are grounded in comparable market data".into());
+            criteria.push(
+                "Licensing, zoning, and transaction steps adhere to local real estate regulations"
+                    .into(),
+            );
+            criteria.push(
+                "Includes actionable client acquisition, financing, and closing milestones".into(),
+            );
+        }
+        (IntentClass::Build, "travel") => {
             criteria.push(
                 "Itinerary schedule is geographically logical and optimizes transit times".into(),
             );
@@ -2392,23 +2781,46 @@ fn derive_dynamic_instruction(profile: &IntentProfile, raw: &str) -> String {
     }
 
     match profile.primary_intent {
-        super::intent::IntentClass::Explain => {
+        IntentClass::Explain => {
             "Provide a well-structured explanation that balances simplicity with depth.".into()
         }
-        super::intent::IntentClass::Build => {
-            if profile.domain == "software-engineering" || profile.domain == "devops-infra" {
-                "Implement the requested solution with modular, high-quality code.".into()
-            } else {
-                "Implement the requested solution with a comprehensive and actionable plan.".into()
+        IntentClass::Build => match profile.domain.as_str() {
+            "software" | "software-engineering" | "devops" | "devops-infra" | "computers" => {
+                "Implement the requested solution with modular, production-grade code, explicit error handling, and verification steps.".into()
             }
-        }
-        super::intent::IntentClass::Debug => {
+            "legal" => {
+                "Draft the requested legal analysis or instrument with jurisdiction-specific statutory precision, liability safeguards, and compliance checkpoints.".into()
+            }
+            "medical" | "health" | "pharma" => {
+                "Construct the requested clinical protocol grounded in peer-reviewed evidence, safety contraindications, and regulatory standards.".into()
+            }
+            "nutrition" | "sports-nutrition" => {
+                "Design the requested nutrition and meal protocol with quantified caloric/macronutrient targets and strict adherence to dietary exclusions.".into()
+            }
+            "education" => {
+                "Design the requested curriculum or learning plan with measurable learning objectives, active-recall scaffolding, and mastery assessments.".into()
+            }
+            "travel" => {
+                "Construct the requested travel itinerary with geographically optimized daily logistics, itemized budget adherence, and traveler constraint compliance.".into()
+            }
+            "cybersecurity" => {
+                "Architect the requested security defense or assessment plan covering threat vectors, control hardening, and incident detection.".into()
+            }
+            "data-science" | "ai-ml" => {
+                "Design the requested data science or ML pipeline with leak-free validation splits, baseline benchmarks, and deployment guardrails.".into()
+            }
+            "real-estate" => {
+                "Develop the requested real estate strategy with comparable market underwriting, regulatory compliance, and transaction milestones.".into()
+            }
+            _ => "Implement the requested solution with a comprehensive and actionable plan.".into(),
+        },
+        IntentClass::Debug => {
             "Identify and resolve the issue while explaining the underlying cause.".into()
         }
-        super::intent::IntentClass::Analyze => {
+        IntentClass::Analyze => {
             "Provide deep insights and actionable recommendations based on the analysis.".into()
         }
-        super::intent::IntentClass::Transform => {
+        IntentClass::Transform => {
             "Efficiently transform the input while maintaining data integrity and accuracy.".into()
         }
     }
@@ -2421,7 +2833,8 @@ fn derive_persona_anchor(
     config: Option<&super::config::UnifiedConfig>,
 ) -> String {
     if let Some(cfg) = config {
-        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == domain) {
+        let canonical = super::config::normalize_domain(domain, &cfg.domain_taxonomy);
+        if let Some(tax) = cfg.domain_taxonomy.iter().find(|t| t.domain == canonical) {
             if let Some(ref template) = tax.persona_template {
                 return template.replace("{role}", role);
             }
@@ -2429,16 +2842,24 @@ fn derive_persona_anchor(
     }
 
     match domain {
-        "business-strategy" => format!("Senior {} with specialization in market scaling, resource optimization, and strategic growth.", role),
+        "business" | "business-strategy" => format!("Senior {} with specialization in market scaling, resource optimization, and strategic growth.", role),
         "real-estate" => format!("Experienced {} specializing in licensing compliance, property marketing, client acquisition, and agency operations.", role),
-        "software-engineering" => format!("Expert {} focused on scalable architecture, clean code principles, and performance optimization.", role),
+        "software" | "software-engineering" => format!("Expert {} focused on scalable architecture, clean code principles, and performance optimization.", role),
+        "devops" | "devops-infra" => format!("Principal {} specializing in cloud infrastructure, CI/CD automation, reliability engineering, and observability.", role),
+        "computers" => format!("Principal {} specializing in low-level systems architecture, operating systems, hardware-software co-design, and runtime performance.", role),
         "ai-ml" => format!("Senior {} specializing in large-scale model alignment, safety protocols, and LLM architecture.", role),
-        "medical" => format!("Specialized {} with clinical expertise, diagnostic precision, and evidence-based practice.", role),
+        "data-science" => format!("Senior {} specializing in statistical modeling, feature engineering, predictive analytics, and experimental rigor.", role),
+        "medical" | "health" | "pharma" => format!("Specialized {} with clinical expertise, diagnostic precision, and evidence-based practice.", role),
+        "nutrition" | "sports-nutrition" => format!("Certified {} specializing in metabolic health, macronutrient periodization, and dietary protocol design.", role),
         "finance" => format!("Senior {} focused on quantitative analysis, risk management, and financial modeling.", role),
         "cybersecurity" => format!("Security {} specializing in threat detection, vulnerability research, and incident response.", role),
         "legal" => format!("Senior {} with expertise in regulatory compliance, contract law, and strategic advisory.", role),
+        "education" => format!("Experienced {} specializing in curriculum design, cognitive load optimization, and mastery-based pedagogy.", role),
         "travel" => format!("Experienced {} specializing in bespoke itinerary planning, destination logistics, and travel budget optimization.", role),
+        "marketing" | "ecommerce" => format!("Senior {} specializing in customer acquisition funnels, conversion rate optimization, and growth analytics.", role),
+        "science" | "scientific-research" => format!("Principal {} specializing in experimental design, hypothesis testing, and peer-reviewed empirical methodology.", role),
         "workplace-productivity" => format!("Senior {} specializing in organizational dynamics, distributed team performance, and workplace culture.", role),
+        "creative" | "creative-writing" => format!("Acclaimed {} specializing in narrative structure, rhetorical clarity, and audience engagement.", role),
         _ => format!("Professional {} with deep expertise in the {} domain and related methodologies.", role, domain),
     }
 }

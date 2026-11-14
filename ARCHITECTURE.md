@@ -5,8 +5,8 @@ Project      : token_compress_engine
 Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
-Version      : 3.5.0 (Unified Canonical Spec, Balanced Mode Contract, Reality Audit, NPAE Accuracy & Grounding Harness)
-Last updated : 2026-11-13 by Antigravity (Gemini 4 Argon)
+Version      : 3.6.0 (Unified Config-Backed SchemaRegistry, Taxonomy & Exemplar Fallback, Non-Destructive Stage 4 Merge, Canonical Domain Precedence)
+Last updated : 2026-11-14 by Antigravity (Gemini 4 Argon)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
@@ -100,7 +100,11 @@ raw prompt
     │       - Ory domain override guarded by `!rule_locked` and canonicalized via `normalize_domain`
     └─ 6. Verbatim Constraint Spans & Domain Required Slots:
             - `constraints.rs`: captures verbatim exclusions (`no X`, `without X`) & numeric bounds (`1800 cal`, `2000 usd`)
-            - `ambiguity.rs` + `questions.rs`: checks per-domain required slots (`legal`, `medical`, `nutrition`, `finance`, `education`, `travel`) → targeted clarifying questions
+            - `ambiguity.rs` + `questions.rs`: checks per-domain required slots (`legal`, `medical`, `nutrition`, `finance`, `education`, `travel`, `software`, `devops`, `business`, `data-science`, `ai-ml`, `cybersecurity`, `real-estate`) → targeted clarifying questions
+    └─ 7. In-Memory Taxonomy & Exemplar Fallback (When SQLite `scenario_index` Abstains):
+            - When `ScenarioClassifier` abstains (`output.scenario == None`, e.g., empty or un-seeded `scenario_index`), `PipelineOrchestrator::process()` runs a deterministic in-memory fallback against `ConfigHandle` (`config/unified.json`):
+              (a) `resolve_prompt_rules(input)` for Intent × Vertical rule composition, then
+              (b) `detect_domain_with_confidence(input, &cfg.domain_taxonomy)` (with `conf >= 0.45`), deriving `task_type` (`creation`, `analysis`, `planning`, `troubleshooting`, `optimization`, `explanation`), `expertise`, and `primary_role` (`generate_role`) without SQLite round-trips.
 ```
 
 The resulting `ScenarioSignal` and NPAE rule profile inject:
@@ -109,8 +113,9 @@ The resulting `ScenarioSignal` and NPAE rule profile inject:
 - **`persona_anchor`**: Specialized vertical persona anchor (e.g. `"Senior Business Strategist specializing in Pharma venture building, capital strategy, and industry structure. Finance is a sub-skill, not the owning frame."`).
 - **`legal_as_constraint`**: Keeps legal/regulatory lenses as constraints without hijacking the primary role.
 - **Fast-path stage routing**:
-  - `Stage 0B`: Uses `(domain, task_type)` to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
-  - `Stage 4`: Injects composed primary role, secondary domain, and constraint locks.
+  - `Stage 0B`: Uses `(domain, task_type)` across all canonical domains and task types to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
+  - `Stage 4`: Resolves domain-accurate `CompressionSchema` in-memory via `SchemaRegistry` (`config/unified.json` / `ConfigHandle`) and merges non-destructively with `SchemaFilling` and `ScenarioSignal` (preserving composed roles, secondary domain lenses, domain constraints, and deliverables).
+  - `Aggressive Mode`: Canonical domain `phase_templates` (`config/unified.json`) and curated domain phases take precedence over generic `OryEngine` `DynamicBlueprint` phases (while keeping `execution_phases` empty on `DeliverableType::Content` or pure `Explain` prompts).
 
 ### 1.5 The Balanced Mode Contract (Canonical Specification — GAP-F1)
 
@@ -152,22 +157,27 @@ User → API (Axum) → Auth+RateLimit → Domain
                                        ├─ RAG Retrieval (when rag_enabled)
                                        ├─ ScenarioClassifier (Intent × Vertical Rule + Hash/Margin)
                                        │    └─ ScenarioSignal (domain, task_type, primary_role, secondary, rule_locked)
-                                       └─ PipelineOrchestrator
+                                       └─ PipelineOrchestrator (+ In-Memory Taxonomy & Exemplar Fallback via ConfigHandle)
                                              │
                                        Stage -1: TokenReconstructor
                                        Stage 0A: Normalization
-                                       Stage 0B: Topology (fast-path via ScenarioSignal)
+                                       Stage 0B: Topology (fast-path via ScenarioSignal across canonical domains)
                                        Stage 1: Signal Reduction
                                        Stage 2: Mode Router ──────────────────────┐
                                              │                                    │
                                        Mode: Balanced/Gentle               Mode: Aggressive
                                        Stage 3: Context Mgmt               NPAE path:
                                        Stage 4: Schema Filling               compression::pipeline
-                                       Stage 4B: Field Validation            AggressiveEngine::run()
-                                       Stage 5: Scope Injection              OryEngine (pattern memory)
-                                       Stage 6A: Generation                  ↓
-                                       HallucinationGuard (tri-layer)   AggressiveResponse
-                                       Scoring: TES+SFS+SCS             (fully guarded & scored)
+                                         ├─ SchemaRegistry (in-memory         AggressiveEngine::run()
+                                         │    3-tier ConfigHandle lookup,     Structurer (canonical domain
+                                         │    zero SQLite queries)              templates > Ory blueprints)
+                                         └─ Non-destructive merge with        OryEngine (pattern memory)
+                                            SchemaFilling + ScenarioSignal    ↓
+                                       Stage 4B: Field Validation          AggressiveResponse
+                                       Stage 5: Scope Injection            (fully guarded & scored)
+                                       Stage 6A: Generation
+                                       HallucinationGuard (tri-layer)
+                                       Scoring: TES+SFS+SCS
                                        Stage 6B: Correction (inline)
                                              │
                                        LearningEngine.update()
@@ -301,6 +311,15 @@ User compresses prompt
    - L1: Cosine similarity between output claims and RAG source chunks (contradiction = low similarity to any source)
    - L2: Hedge detector using lexical patterns on factual claims without RAG backing
    - L3: CONSTRAINT_LOCK token coverage check on output
+
+6. **Unified Config-Backed SchemaRegistry (`src/db/schema_registry.rs`) & Non-Destructive Stage 4 Merge**:
+   - **In-Memory 3-Tier Resolution (Zero SQLite Queries)**: `SchemaRegistry` resolves `CompressionSchema` directly in-memory from `ConfigHandle` (`config/unified.json` — `domain_taxonomy`, `roles`, `constraints`) with a `once_cell::sync::Lazy<Arc<ConfigHandle>>` fallback so `SchemaRegistry::without_pool()`, `new()`, `with_optional_pool()`, and `with_config()` all resolve domain schemas without querying an empty SQLite `schema_index` table.
+   - **3-Tier Lookup**:
+     - **Tier 1 (`find_exact_schema_match`)**: Normalizes `key.domain` via `normalize_domain` (resolving aliases such as `"tech"` → `"software"` case-insensitively), selects the highest-priority `RoleRule` (modulated by `expertise`: `"expert"`/`"advanced"` → `"Principal <Role>"` or `persona_template`, `"beginner"` → `"<Role> (Guided Mode)"`), maps `context_fields`, selects `task_templates` by `task_type`, collects domain `constraints`, and derives `output` deliverables from `default_deliverables` or `phase_templates`.
+     - **Tier 2 (`find_domain_level_schema`)**: Matches normalized `domain` + `task_type` (or `"default"` task/phase template) independent of expertise level.
+     - **Tier 3 (`get_general_fallback_schema`)**: Returns a clean, deterministic general fallback `CompressionSchema`.
+   - **Non-Destructive Stage 4 Merge (`src/pipeline/stage4.rs`)**: `Stage4::run()` merges `SchemaFilling::fill()` output non-destructively with `ScenarioSignal` and `SchemaRegistry`: composing `signal.primary_role` + `signal.secondary_domain` (e.g., `"Business Strategist (Pharma)"`), preserving registry `role`, `context`, and `task` when `SchemaFilling` produces generic/empty values, and merging deduplicated constraints and deliverables (capped at 3 concise items to honor the Balanced Mode token budget).
+   - **Canonical Domain Precedence over Generic Ory Blueprints (`src/npae/aggressive/structurer.rs`)**: In Aggressive mode, `build_with_blueprint()` computes curated domain phases (`infer_execution_phases` from `config/unified.json` `phase_templates`) and curated domain validation steps first, preferring canonical domain templates over generic `OryEngine` `DynamicBlueprint` phases and keeping `execution_phases` empty on `DeliverableType::Content` or pure `Explain` prompts.
 
 ---
 
@@ -527,4 +546,10 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - GAP-47 FIXED (`src/scoring/scs.rs`, `src/scoring/sfs.rs`, `src/scoring/tes.rs`, `src/pipeline/stage6b.rs`): Removed pre-sparse `clean_tokens` fallback in SCS to verify active output text, added negation/constraint lock fidelity checks in SFS, unified `estimate_tokens` units across input and output in TES, and added in-loop hallucination remediation plus best-candidate retention in Stage 6B.
     - GAP-48 FIXED (`src/pipeline/stage1.rs`, `src/pipeline/orchestrator.rs`): Normalized `forced_mode` case-insensitively in Stage 1 and Orchestrator, executed Stage 2 predictive error (`delta_tokens`, `error_score`) unconditionally even when mode is forced, and re-ran Stage 1 with the 45% keep ratio whenever Stage 2 auto-selects `Mode::Balanced`.
     - Added integration verification suite (`tests/test_balanced_mode.rs`) and unit tests in `sparse_coding.rs`.
+
+[2026-11-14] [Antigravity / Gemini 4 Argon] ARCHITECTURE.md
+  Implemented Unified Config-Backed SchemaRegistry, Taxonomy & Exemplar Fallback, Non-Destructive Stage 4 Merge & Canonical Domain Precedence:
+    - Updated `src/npae/aggressive/config.rs` & `config/unified.json`: Extended `DomainTaxonomy` with optional `context_fields`, `task_templates`, and `default_deliverables`; added `"tech"` alias to `"software"`; updated `normalize_domain` for case-insensitive canonical and alias resolution; replaced `.unwrap()` in `ConfigHandle` with poisoned-lock recovery; enriched all 22 canonical domains in `config/unified.json`.
+    - Upgraded `src/db/schema_registry.rs`: Replaced SQLite `schema_index` queries with zero-DB in-memory 3-tier `CompressionSchema` resolution (`find_exact_schema_match`, `find_domain_level_schema`, `get_general_fallback_schema`, `resolve_schema_for_signal`) backed by `ConfigHandle` and a `Lazy<Arc<ConfigHandle>>` `config/unified.json` fallback.
+    - Updated `Stage 4`, `PipelineOrchestrator`, and `Aggressive` structurer: Added in-memory taxonomy/exemplar fallback when `scenario_index` abstains, non-destructive Stage 4 schema merging, and canonical domain template precedence over generic Ory blueprints.
 ```

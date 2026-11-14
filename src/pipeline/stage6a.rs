@@ -8,6 +8,7 @@ use crate::types::{AlgorithmOutput, Mode};
 use crate::utils::tokens::estimate_tokens;
 
 /// Handles Stage 6A: Output Generation.
+#[derive(Debug)]
 pub struct Stage6a;
 
 impl Stage6a {
@@ -320,14 +321,30 @@ impl Stage6a {
             ));
         }
 
-        // Target token budget: strictly < input_tokens (aim for <= 75% of input_tokens when input >= 15 tokens)
-        let target_budget = if input_tokens >= 15 {
+        // Strict token ceiling (`<= input_tokens`) and target structured budget:
+        // Aim for <= 75% of `input_tokens` when `input_tokens >= 15` (so TES >= 6.0 and savings stay in the
+        // 30-55% target band), and `input_tokens.saturating_sub(1).max(1)` on shorter prompts so we never
+        // violate `output_token_count <= input_token_count`.
+        let strict_budget = if input_tokens >= 15 {
             ((input_tokens as f32) * 0.75).floor() as u32
         } else {
             input_tokens.saturating_sub(1).max(1)
         };
 
-        // Add Deliverables if non-empty, not already in Task, and within budget
+        // Include `**Role:**` first when a domain-specific role is resolved and fits within `strict_budget`.
+        if let Some(role) = &schema_filled.resolved_schema.role {
+            let trimmed_role = role.trim();
+            if !trimmed_role.is_empty() && !trimmed_role.eq_ignore_ascii_case("Domain Expert") {
+                let role_line = format!("**Role:** {}", trimmed_role);
+                let candidate = format!("{}\n{}", role_line, lines.join("\n"));
+                let cand_tokens = estimate_tokens(&candidate);
+                if cand_tokens <= strict_budget && cand_tokens <= input_tokens {
+                    lines.insert(0, role_line);
+                }
+            }
+        }
+
+        // Add concise Deliverables (capped at 3) if non-empty, not already in Task, and within `strict_budget`
         if !schema_filled.resolved_schema.output.is_empty() {
             let core_lower = core_task.to_lowercase();
             let delivs: Vec<String> = schema_filled
@@ -335,12 +352,14 @@ impl Stage6a {
                 .output
                 .iter()
                 .filter(|d| !Self::contains_constraint_phrase(&core_lower, &d.name.to_lowercase()))
+                .take(3)
                 .map(|d| d.name.clone())
                 .collect();
             if !delivs.is_empty() {
                 let deliv_line = format!("**Deliverables:** {}", delivs.join(", "));
                 let candidate = format!("{}\n{}", lines.join("\n"), deliv_line);
-                if estimate_tokens(&candidate) <= target_budget {
+                let cand_tokens = estimate_tokens(&candidate);
+                if cand_tokens <= strict_budget && cand_tokens <= input_tokens {
                     lines.push(deliv_line);
                 }
             }
@@ -350,7 +369,8 @@ impl Stage6a {
         if let Some(ctx) = ctx_opt {
             let ctx_line = format!("**Semantic Context:** {}", ctx);
             let candidate = format!("{}\n{}", lines.join("\n"), ctx_line);
-            if estimate_tokens(&candidate) <= target_budget {
+            let cand_tokens = estimate_tokens(&candidate);
+            if cand_tokens <= strict_budget && cand_tokens <= input_tokens {
                 lines.push(ctx_line);
             }
         }
@@ -361,27 +381,16 @@ impl Stage6a {
             lines.push(rag_block);
         }
 
-        // Only include Role if there is still comfortable budget headroom
-        if let Some(role) = &schema_filled.resolved_schema.role {
-            if !role.is_empty() && !role.eq_ignore_ascii_case("Domain Expert") {
-                let role_line = format!("**Role:** {}", role);
-                let candidate = format!("{}\n{}", role_line, lines.join("\n"));
-                if estimate_tokens(&candidate) <= target_budget {
-                    lines.insert(0, role_line);
-                }
-            }
-        }
-
         let rendered = lines.join("\n");
 
-        // Final safety check: if structured headers caused expansion on a very short prompt,
+        // Final safety check: if structured headers caused expansion (`> input_tokens`) on a very short prompt,
         // fall back to compact representation with constraints preserved.
         if input_tokens > 0
-            && estimate_tokens(&rendered) >= input_tokens
+            && estimate_tokens(&rendered) > input_tokens.saturating_sub(1).max(1)
             && schema_filled.enrichment.is_none()
         {
             let compact = Self::build_compact_with_constraints(schema_filled);
-            if !compact.is_empty() && estimate_tokens(&compact) < estimate_tokens(&rendered) {
+            if !compact.is_empty() && estimate_tokens(&compact) <= input_tokens {
                 return compact;
             }
         }

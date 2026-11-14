@@ -2,13 +2,50 @@
   "domain_taxonomy": [
     {
       "domain": "computers",
-      "aliases": ["computer-science", "computing", "it", "systems-architecture"],
+      "aliases": [
+        "computer-science",
+        "computing",
+        "it",
+        "systems-architecture"
+      ],
       "boost": 3,
       "keywords": [
-        "computer", "computing", "cpu", "gpu", "processor", "memory", "ram", "storage", "ssd", "nvme",
-        "operating-system", "kernel", "linux", "unix", "windows", "network", "tcp-ip", "dns", "lan", "wan",
-        "distributed-systems", "concurrency", "threading", "compiler", "runtime", "virtual-machine", "hypervisor",
-        "cache", "bus", "firmware", "assembly", "instruction-set", "risc", "cisc", "cloud-computing", "server"
+        "computer",
+        "computing",
+        "cpu",
+        "gpu",
+        "processor",
+        "memory",
+        "ram",
+        "storage",
+        "ssd",
+        "nvme",
+        "operating-system",
+        "kernel",
+        "linux",
+        "unix",
+        "windows",
+        "network",
+        "tcp-ip",
+        "dns",
+        "lan",
+        "wan",
+        "distributed-systems",
+        "concurrency",
+        "threading",
+        "compiler",
+        "runtime",
+        "virtual-machine",
+        "hypervisor",
+        "cache",
+        "bus",
+        "firmware",
+        "assembly",
+        "instruction-set",
+        "risc",
+        "cisc",
+        "cloud-computing",
+        "server"
       ],
       "persona_template": "Principal {role} specializing in computer systems architecture, low-level optimization, runtime performance, and scalable infrastructure.",
       "phase_templates": {
@@ -18,21 +55,30 @@
             "name": "System Architecture & Specs",
             "description": "Define hardware/software compute requirements, throughput constraints, and interface specifications.",
             "estimated_duration": "3-5 days",
-            "deliverables": ["System Architecture Specification", "Compute & Memory Budget"]
+            "deliverables": [
+              "System Architecture Specification",
+              "Compute & Memory Budget"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Core System Implementation",
             "description": "Develop core modules, memory management, concurrency models, and driver/OS integrations.",
             "estimated_duration": "1-3 weeks",
-            "deliverables": ["Working System Implementation", "Benchmark Test Suite"]
+            "deliverables": [
+              "Working System Implementation",
+              "Benchmark Test Suite"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Optimization & Deployment",
             "description": "Profile bottlenecks, optimize cache/memory locality, and configure production telemetry.",
             "estimated_duration": "3-5 days",
-            "deliverables": ["Performance Audit Report", "Production Configuration"]
+            "deliverables": [
+              "Performance Audit Report",
+              "Production Configuration"
+            ]
           }
         ],
         "analyze": [
@@ -41,34 +87,135 @@
             "name": "Profiling & Telemetry Gathering",
             "description": "Collect hardware counters, trace system calls, and benchmark latency/throughput profiles.",
             "estimated_duration": "1-2 days",
-            "deliverables": ["Telemetry Profile Dataset", "Resource Utilization Baseline"]
+            "deliverables": [
+              "Telemetry Profile Dataset",
+              "Resource Utilization Baseline"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Bottleneck & Root Cause Analysis",
             "description": "Analyze thread contention, cache misses, IO saturation, and algorithmic complexity.",
             "estimated_duration": "2-3 days",
-            "deliverables": ["Bottleneck Diagnosis Matrix", "Optimization Opportunity Log"]
+            "deliverables": [
+              "Bottleneck Diagnosis Matrix",
+              "Optimization Opportunity Log"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Optimization Roadmap",
             "description": "Formulate prioritized architectural and configuration recommendations.",
             "estimated_duration": "1-2 days",
-            "deliverables": ["Target Architecture Recommendations", "Implementation Roadmap"]
+            "deliverables": [
+              "Target Architecture Recommendations",
+              "Implementation Roadmap"
+            ]
           }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "System Architecture & Specs",
+            "description": "Define hardware/software compute requirements, throughput constraints, and interface specifications.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "System Architecture Specification",
+              "Compute & Memory Budget"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Core System Implementation",
+            "description": "Develop core modules, memory management, concurrency models, and driver/OS integrations.",
+            "estimated_duration": "1-3 weeks",
+            "deliverables": [
+              "Working System Implementation",
+              "Benchmark Test Suite"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "system_architecture",
+        "compute_constraints",
+        "operating_environment",
+        "throughput_targets"
+      ],
+      "task_templates": {
+        "creation": "Architect and implement the target computer system, runtime module, or low-level infrastructure specification.",
+        "analysis": "Profile and analyze compute bottlenecks, memory hierarchy utilization, and system throughput.",
+        "planning": "Develop a phased systems architecture and infrastructure capacity roadmap.",
+        "troubleshooting": "Diagnose kernel, memory, concurrency, or hardware-interface faults and specify remediation steps.",
+        "optimization": "Optimize cache locality, instruction throughput, concurrency locks, and I/O latency.",
+        "default": "Deliver a rigorous computer systems architecture and performance engineering solution."
+      },
+      "default_deliverables": {
+        "creation": [
+          "System Architecture Specification",
+          "Compute & Memory Budget",
+          "Benchmark Test Suite"
+        ],
+        "analysis": [
+          "Telemetry Profile Dataset",
+          "Bottleneck Diagnosis Matrix",
+          "Target Architecture Recommendations"
+        ],
+        "planning": [
+          "Systems Capacity Roadmap",
+          "Interface Specification",
+          "Migration & Verification Plan"
+        ],
+        "troubleshooting": [
+          "Root Cause Diagnosis",
+          "Kernel/Runtime Patch Plan",
+          "Regression Verification Steps"
+        ],
+        "default": [
+          "System Architecture Specification",
+          "Performance & Resource Analysis"
         ]
       }
     },
     {
       "domain": "science",
-      "aliases": ["scientific-research", "natural-sciences", "physics", "chemistry", "biology"],
+      "aliases": [
+        "scientific-research",
+        "natural-sciences",
+        "physics",
+        "chemistry",
+        "biology"
+      ],
       "boost": 3,
       "keywords": [
-        "science", "scientific", "physics", "chemistry", "biology", "experiment", "hypothesis", "laboratory",
-        "empirical", "theory", "methodology", "quantum", "molecule", "genetics", "cellular", "astrophysics",
-        "peer-review", "thermodynamics", "mathematics", "spectroscopy", "crystallography", "reaction",
-        "organism", "ecology", "statistical-significance", "protocol", "replication", "control-group"
+        "science",
+        "scientific",
+        "physics",
+        "chemistry",
+        "biology",
+        "experiment",
+        "hypothesis",
+        "laboratory",
+        "empirical",
+        "theory",
+        "methodology",
+        "quantum",
+        "molecule",
+        "genetics",
+        "cellular",
+        "astrophysics",
+        "peer-review",
+        "thermodynamics",
+        "mathematics",
+        "spectroscopy",
+        "crystallography",
+        "reaction",
+        "organism",
+        "ecology",
+        "statistical-significance",
+        "protocol",
+        "replication",
+        "control-group"
       ],
       "persona_template": "Lead Research {role} with rigorous expertise in empirical methodology, theoretical modeling, experimental validation, and peer-reviewed analysis.",
       "phase_templates": {
@@ -78,21 +225,30 @@
             "name": "Hypothesis & Experimental Design",
             "description": "Formulate testable hypotheses, define control/variable parameters, and establish statistical power criteria.",
             "estimated_duration": "1-2 weeks",
-            "deliverables": ["Experimental Protocol", "Power Analysis & Sampling Plan"]
+            "deliverables": [
+              "Experimental Protocol",
+              "Power Analysis & Sampling Plan"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Data Acquisition & Execution",
             "description": "Execute experimental runs, record instrument telemetry, and calibrate baseline measurements.",
             "estimated_duration": "2-4 weeks",
-            "deliverables": ["Raw Experimental Dataset", "Calibration & Quality Log"]
+            "deliverables": [
+              "Raw Experimental Dataset",
+              "Calibration & Quality Log"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Synthesis & Peer Review",
             "description": "Perform statistical hypothesis testing, synthesize findings, and draft formal scientific report.",
             "estimated_duration": "1-2 weeks",
-            "deliverables": ["Peer-Review Ready Paper", "Reproducibility Artifacts"]
+            "deliverables": [
+              "Peer-Review Ready Paper",
+              "Reproducibility Artifacts"
+            ]
           }
         ],
         "explain": [
@@ -101,34 +257,134 @@
             "name": "Core Scientific Principles",
             "description": "Introduce fundamental laws, underlying physics/chemistry/biology concepts, and historical context.",
             "estimated_duration": "Step 1",
-            "deliverables": ["Theoretical Foundation Brief"]
+            "deliverables": [
+              "Theoretical Foundation Brief"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Mechanistic Deep Dive",
             "description": "Detail molecular, mathematical, or physical mechanisms with empirical proof points.",
             "estimated_duration": "Step 2",
-            "deliverables": ["Mechanistic Breakdown"]
+            "deliverables": [
+              "Mechanistic Breakdown"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Modern Applications & Frontiers",
             "description": "Connect theory to modern research frontiers, experimental instruments, and real-world impact.",
             "estimated_duration": "Step 3",
-            "deliverables": ["State of the Art Summary"]
+            "deliverables": [
+              "State of the Art Summary"
+            ]
           }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Hypothesis & Experimental Design",
+            "description": "Formulate testable hypotheses, define control/variable parameters, and establish statistical power criteria.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Experimental Protocol",
+              "Power Analysis & Sampling Plan"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Synthesis & Peer Review",
+            "description": "Perform statistical hypothesis testing, synthesize findings, and draft formal scientific report.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Peer-Review Ready Paper",
+              "Reproducibility Artifacts"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "hypothesis_scope",
+        "experimental_variables",
+        "control_parameters",
+        "statistical_power"
+      ],
+      "task_templates": {
+        "creation": "Design a reproducible experimental protocol with falsifiable hypotheses, control groups, and statistical power criteria.",
+        "analysis": "Evaluate empirical findings, statistical significance, error bounds, and methodological validity.",
+        "planning": "Develop a phased scientific research roadmap from hypothesis formulation to peer-reviewed synthesis.",
+        "troubleshooting": "Identify experimental confounds, instrument calibration drift, or protocol deviations and specify corrective controls.",
+        "optimization": "Refine experimental sensitivity, sample efficiency, and measurement precision.",
+        "default": "Provide an evidence-based scientific analysis grounded in empirical methodology and peer-reviewed rigor."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Experimental Protocol",
+          "Power Analysis & Sampling Plan",
+          "Reproducibility Artifacts"
+        ],
+        "analysis": [
+          "Statistical Validation Report",
+          "Error & Confound Analysis",
+          "Peer-Review Synthesis"
+        ],
+        "planning": [
+          "Research Execution Roadmap",
+          "Hypothesis & Variable Matrix",
+          "Milestone Validation Plan"
+        ],
+        "troubleshooting": [
+          "Confound Diagnosis Report",
+          "Calibration & Control Remediation",
+          "Replication Checklist"
+        ],
+        "default": [
+          "Experimental Protocol",
+          "Statistical Validation Report"
         ]
       }
     },
     {
       "domain": "health",
-      "aliases": ["healthcare", "medicine", "clinical", "wellness", "public-health"],
+      "aliases": [
+        "healthcare",
+        "medicine",
+        "clinical",
+        "wellness",
+        "public-health",
+        "health-fitness"
+      ],
       "boost": 3,
       "keywords": [
-        "health", "healthcare", "wellness", "medical", "clinical", "patient", "diagnosis", "treatment",
-        "preventative", "therapy", "vital-signs", "physiology", "mental-health", "immunity", "epidemiology",
-        "rehabilitation", "symptoms", "disease", "pathology", "vitality", "cardiovascular", "longevity",
-        "screening", "doctor", "hospital", "clinic", "wellbeing", "stress-management", "lifestyle"
+        "health",
+        "healthcare",
+        "wellness",
+        "medical",
+        "clinical",
+        "patient",
+        "diagnosis",
+        "treatment",
+        "preventative",
+        "therapy",
+        "vital-signs",
+        "physiology",
+        "mental-health",
+        "immunity",
+        "epidemiology",
+        "rehabilitation",
+        "symptoms",
+        "disease",
+        "pathology",
+        "vitality",
+        "cardiovascular",
+        "longevity",
+        "screening",
+        "doctor",
+        "hospital",
+        "clinic",
+        "wellbeing",
+        "stress-management",
+        "lifestyle"
       ],
       "persona_template": "Board-Certified {role} specializing in evidence-based clinical protocols, preventative medicine, physiological assessment, and healthcare optimization.",
       "phase_templates": {
@@ -138,35 +394,166 @@
             "name": "Health Assessment & Baseline Audit",
             "description": "Evaluate biomarkers, health history, risk factors, and physiological baseline parameters.",
             "estimated_duration": "1-3 days",
-            "deliverables": ["Biomarker & Risk Profile", "Health Baseline Summary"]
+            "deliverables": [
+              "Biomarker & Risk Profile",
+              "Health Baseline Summary"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Intervention & Protocol Design",
             "description": "Structure evidence-based lifestyle, therapeutic, or clinical intervention roadmap.",
             "estimated_duration": "1-2 weeks",
-            "deliverables": ["Personalized Health Protocol", "Safety & Monitoring Guidelines"]
+            "deliverables": [
+              "Personalized Health Protocol",
+              "Safety & Monitoring Guidelines"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Monitoring & Long-Term Adaptation",
             "description": "Track health markers, evaluate clinical outcomes, and calibrate ongoing maintenance.",
             "estimated_duration": "Ongoing",
-            "deliverables": ["Progress Tracking Dashboard", "Outcome Evaluation Report"]
+            "deliverables": [
+              "Progress Tracking Dashboard",
+              "Outcome Evaluation Report"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Biomarker & Risk Stratification",
+            "description": "Review vital signs, laboratory panels, lifestyle factors, and preventative screening history.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Biomarker & Risk Profile",
+              "Clinical Considerations"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Evidence-Based Recommendations",
+            "description": "Synthesize physiological findings into prioritized wellness interventions and safety precautions.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Personalized Health Protocol",
+              "Safety & Monitoring Guidelines"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Health Assessment & Baseline Audit",
+            "description": "Evaluate biomarkers, health history, risk factors, and physiological baseline parameters.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Biomarker & Risk Profile",
+              "Health Baseline Summary"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Intervention & Protocol Design",
+            "description": "Structure evidence-based lifestyle, therapeutic, or clinical intervention roadmap.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Personalized Health Protocol",
+              "Safety & Monitoring Guidelines"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "patient_baseline",
+        "biomarker_profile",
+        "lifestyle_constraints",
+        "safety_contraindications"
+      ],
+      "task_templates": {
+        "creation": "Design an evidence-based preventative health and wellness protocol tailored to baseline physiological markers.",
+        "analysis": "Evaluate health biomarkers, lifestyle risk factors, and physiological recovery metrics.",
+        "planning": "Build a phased health optimization and longitudinal biomarker monitoring plan.",
+        "troubleshooting": "Assess recovery plateaus, physiological stressors, or adherence barriers and recommend safe adjustments.",
+        "optimization": "Optimize sleep, cardiovascular conditioning, metabolic resilience, and preventative screening cadence.",
+        "default": "Deliver an evidence-based health and wellness protocol with clear safety and monitoring guidelines."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Biomarker & Risk Profile",
+          "Personalized Health Protocol",
+          "Safety & Monitoring Guidelines"
+        ],
+        "analysis": [
+          "Health Baseline Summary",
+          "Risk Factor Stratification",
+          "Clinical Considerations"
+        ],
+        "planning": [
+          "Longitudinal Health Roadmap",
+          "Screening & Biomarker Schedule",
+          "Outcome Evaluation Report"
+        ],
+        "troubleshooting": [
+          "Physiological Bottleneck Audit",
+          "Protocol Adjustment Plan",
+          "Safety Precautions"
+        ],
+        "default": [
+          "Personalized Health Protocol",
+          "Safety & Monitoring Guidelines"
         ]
       }
     },
     {
       "domain": "finance",
-      "aliases": ["personal-finance", "wealth-management", "financial-planning", "investing"],
+      "aliases": [
+        "personal-finance",
+        "wealth-management",
+        "financial-planning",
+        "investing"
+      ],
       "boost": 3,
       "keywords": [
-        "money", "earn", "income", "wealth", "cashflow", "salary", "capital", "passive-income", "savings",
-        "net-worth", "compensation", "investment", "portfolio", "stock", "crypto", "trading", "banking",
-        "loan", "interest", "dividend", "accounting", "audit", "tax", "fintech", "asset", "equity",
-        "asset-allocation", "financial-freedom", "budgeting", "compound-interest", "side-hustle",
-        "million", "millions", "billion", "dollars", "rich", "monetize", "monetization"
+        "money",
+        "earn",
+        "income",
+        "wealth",
+        "cashflow",
+        "salary",
+        "capital",
+        "passive-income",
+        "savings",
+        "net-worth",
+        "compensation",
+        "investment",
+        "portfolio",
+        "stock",
+        "crypto",
+        "trading",
+        "banking",
+        "loan",
+        "interest",
+        "dividend",
+        "accounting",
+        "audit",
+        "tax",
+        "fintech",
+        "asset",
+        "equity",
+        "asset-allocation",
+        "financial-freedom",
+        "budgeting",
+        "compound-interest",
+        "side-hustle",
+        "million",
+        "millions",
+        "billion",
+        "dollars",
+        "rich",
+        "monetize",
+        "monetization"
       ],
       "persona_template": "Principal {role} specializing in income acceleration, capital allocation, wealth preservation, and risk-adjusted growth strategies.",
       "phase_templates": {
@@ -176,47 +563,178 @@
             "name": "Financial & Asset Audit (30 Days)",
             "description": "Evaluate current active/passive income sources, monthly burn rate, balance sheet assets/debt, and human capital monetization inventory.",
             "estimated_duration": "30 days",
-            "deliverables": ["Financial Baseline & Burn Rate Audit", "Human Capital & Monetization Matrix", "Target Definition & Wealth Gap Calculation"]
+            "deliverables": [
+              "Financial Baseline & Burn Rate Audit",
+              "Human Capital & Monetization Matrix",
+              "Target Definition & Wealth Gap Calculation"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Strategy & Vehicle Selection (90 Days)",
             "description": "Select and launch primary high-leverage monetization vehicles (career advancement, high-ticket services, business equity, or dividend/index investing).",
             "estimated_duration": "90 days",
-            "deliverables": ["Vehicle Feasibility Matrix", "Income Growth Blueprint", "First Revenue Milestone Report"]
+            "deliverables": [
+              "Vehicle Feasibility Matrix",
+              "Income Growth Blueprint",
+              "First Revenue Milestone Report"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Execution & Reinvestment (6-12 Months)",
             "description": "Launch revenue-generating initiatives, secure initial cash flows, and configure automated compounding reinvestment.",
             "estimated_duration": "6-12 months",
-            "deliverables": ["Execution Action Checklist", "Cash Flow & Surplus Automation Blueprint", "Diversified Asset Allocation Strategy"]
+            "deliverables": [
+              "Execution Action Checklist",
+              "Cash Flow & Surplus Automation Blueprint",
+              "Diversified Asset Allocation Strategy"
+            ]
           },
           {
             "phase_number": 4,
             "name": "Equity & Asset Expansion (3-5 Years)",
             "description": "Scale business equity, expand productive assets, and optimize capital compounding across market cycles.",
             "estimated_duration": "3-5 years",
-            "deliverables": ["Equity & Portfolio Growth Model", "Scenario Stress-Test Report (Conservative/Base/Aggressive)"]
+            "deliverables": [
+              "Equity & Portfolio Growth Model",
+              "Scenario Stress-Test Report (Conservative/Base/Aggressive)"
+            ]
           },
           {
             "phase_number": 5,
             "name": "Wealth Compounding & Preservation (5-10 Years)",
             "description": "Maximize compound growth, achieve targeted net worth milestone, and implement estate, tax, and capital preservation structures.",
             "estimated_duration": "5-10 years",
-            "deliverables": ["Target Achievement & Wealth Preservation Blueprint", "Financial Freedom Audit"]
+            "deliverables": [
+              "Target Achievement & Wealth Preservation Blueprint",
+              "Financial Freedom Audit"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Balance Sheet & Cashflow Diagnostics",
+            "description": "Audit income streams, fixed/variable liabilities, tax exposure, and liquidity runway.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Financial Baseline & Burn Rate Audit",
+              "Liquidity & Debt Coverage Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Risk & Return Modeling",
+            "description": "Stress-test asset allocation across conservative, base, and drawdown market scenarios.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Diversified Asset Allocation Strategy",
+              "Scenario Stress-Test Report (Conservative/Base/Aggressive)"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Financial & Asset Audit (30 Days)",
+            "description": "Evaluate current active/passive income sources, monthly burn rate, balance sheet assets/debt, and human capital monetization inventory.",
+            "estimated_duration": "30 days",
+            "deliverables": [
+              "Financial Baseline & Burn Rate Audit",
+              "Target Definition & Wealth Gap Calculation"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Execution & Reinvestment (6-12 Months)",
+            "description": "Launch revenue-generating initiatives, secure initial cash flows, and configure automated compounding reinvestment.",
+            "estimated_duration": "6-12 months",
+            "deliverables": [
+              "Diversified Asset Allocation Strategy",
+              "Scenario Stress-Test Report (Conservative/Base/Aggressive)"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "capital_baseline",
+        "risk_tolerance",
+        "time_horizon",
+        "tax_and_liquidity_constraints"
+      ],
+      "task_templates": {
+        "creation": "Construct a risk-adjusted capital allocation, portfolio, and wealth compounding blueprint.",
+        "analysis": "Analyze cashflow dynamics, balance-sheet exposure, valuation multiples, and downside risk scenarios.",
+        "planning": "Formulate a multi-horizon financial roadmap covering liquidity reserves, asset allocation, and tax efficiency.",
+        "troubleshooting": "Diagnose cashflow leakage, debt-service drag, or portfolio concentration risks and specify corrective rebalancing.",
+        "optimization": "Optimize savings rate, tax-advantaged yield, Sharpe ratio, and capital compounding velocity.",
+        "default": "Provide a rigorous financial strategy with quantitative allocation targets and risk controls."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Financial Baseline & Burn Rate Audit",
+          "Diversified Asset Allocation Strategy",
+          "Scenario Stress-Test Report"
+        ],
+        "analysis": [
+          "Cash Flow & Valuation Audit",
+          "Risk Exposure Breakdown",
+          "Allocation Optimization Summary"
+        ],
+        "planning": [
+          "Income Growth Blueprint",
+          "Reinvestment & Compounding Schedule",
+          "Wealth Preservation Plan"
+        ],
+        "troubleshooting": [
+          "Debt & Burn Rate Remediation Plan",
+          "Portfolio Rebalancing Checklist",
+          "Liquidity Safeguards"
+        ],
+        "default": [
+          "Diversified Asset Allocation Strategy",
+          "Risk & Cashflow Breakdown"
         ]
       }
     },
     {
       "domain": "software",
-      "aliases": ["software-engineering", "technical-writing", "web-development"],
+      "aliases": [
+        "software-engineering",
+        "technical-writing",
+        "web-development",
+        "tech",
+        "coding",
+        "programming"
+      ],
       "boost": 2,
       "keywords": [
-        "code", "rust", "python", "bug", "api", "database", "backend", "frontend", "deploy", "docker",
-        "kubernetes", "typescript", "javascript", "refactoring", "git", "ci", "microservices", "compiler",
-        "framework", "sdk", "full-stack", "rest", "graphql", "sql", "nosql"
+        "code",
+        "rust",
+        "python",
+        "bug",
+        "api",
+        "database",
+        "backend",
+        "frontend",
+        "deploy",
+        "docker",
+        "kubernetes",
+        "typescript",
+        "javascript",
+        "refactoring",
+        "git",
+        "ci",
+        "microservices",
+        "compiler",
+        "framework",
+        "sdk",
+        "full-stack",
+        "rest",
+        "graphql",
+        "sql",
+        "nosql"
       ],
       "persona_template": "Principal {role} specializing in modular software architecture, high-performance clean code, testing rigor, and robust production systems.",
       "phase_templates": {
@@ -226,33 +744,153 @@
             "name": "Design & Architecture",
             "description": "System design, technology selection, API contract definitions, and architecture blueprints.",
             "estimated_duration": "3-5 days",
-            "deliverables": ["Architecture Document", "Tech Stack Decision Matrix"]
+            "deliverables": [
+              "Architecture Document",
+              "Tech Stack Decision Matrix"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Implementation & Testing",
             "description": "Core module development, automated unit/integration tests, and iterative refinement.",
             "estimated_duration": "1-3 weeks",
-            "deliverables": ["Working Codebase", "Automated Test Suite"]
+            "deliverables": [
+              "Working Codebase",
+              "Automated Test Suite"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Deployment & Validation",
             "description": "Staging validation, performance benchmarking, and production release with telemetry.",
             "estimated_duration": "2-3 days",
-            "deliverables": ["Deployed Production Service", "Monitoring & Alerting Setup"]
+            "deliverables": [
+              "Deployed Production Service",
+              "Monitoring & Alerting Setup"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Codebase & Architecture Audit",
+            "description": "Inspect module boundaries, data flows, error handling, and dependency couplings.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Architectural Trade-off Matrix",
+              "Code Quality Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Performance & Reliability Verification",
+            "description": "Evaluate concurrency safety, edge-case coverage, and refactoring priorities.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Remediation Recommendations",
+              "Verification Test Plan"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Design & Architecture",
+            "description": "System design, technology selection, API contract definitions, and architecture blueprints.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Architecture Document",
+              "Tech Stack Decision Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Implementation & Testing",
+            "description": "Core module development, automated unit/integration tests, and iterative refinement.",
+            "estimated_duration": "1-3 weeks",
+            "deliverables": [
+              "Working Codebase",
+              "Automated Test Suite"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "runtime_stack",
+        "system_interfaces",
+        "scalability_sla",
+        "security_and_testing_bounds"
+      ],
+      "task_templates": {
+        "creation": "Design and implement production-grade software architecture, clean modular code, and automated verification tests.",
+        "analysis": "Review architectural trade-offs, code quality, concurrency safety, and latency/throughput characteristics.",
+        "planning": "Define a phased technical architecture, API contract specification, and delivery roadmap.",
+        "troubleshooting": "Isolate root causes of defects, race conditions, or regressions and provide verified code fixes.",
+        "optimization": "Refactor hot paths, reduce memory allocations, optimize database queries, and improve tail latency.",
+        "default": "Deliver modular, production-ready software engineering architecture and implementation guidance."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Architecture Document",
+          "Working Codebase",
+          "Automated Test Suite"
+        ],
+        "analysis": [
+          "Architectural Trade-off Matrix",
+          "Code & Bottleneck Audit",
+          "Remediation Recommendations"
+        ],
+        "planning": [
+          "System Design Blueprint",
+          "API Contract Specification",
+          "Phased Rollout Plan"
+        ],
+        "troubleshooting": [
+          "Root Cause Analysis",
+          "Patch Implementation",
+          "Regression Test Cases"
+        ],
+        "default": [
+          "Architecture Document",
+          "Working Codebase",
+          "Automated Test Suite"
         ]
       }
     },
     {
       "domain": "business",
-      "aliases": ["business-strategy", "career-growth", "monetization"],
+      "aliases": [
+        "business-strategy",
+        "career-growth",
+        "monetization"
+      ],
       "boost": 2,
       "keywords": [
-        "business", "startup", "revenue", "market", "profit", "investor", "funding", "saas", "growth", "scale",
-        "venture", "customer", "monetize", "b2b", "b2c", "churn", "arr", "mrr", "valuation", "business-plan",
-        "client-acquisition", "freelancing", "consulting", "offer-creation", "pricing"
+        "business",
+        "startup",
+        "revenue",
+        "market",
+        "profit",
+        "investor",
+        "funding",
+        "saas",
+        "growth",
+        "scale",
+        "venture",
+        "customer",
+        "monetize",
+        "b2b",
+        "b2c",
+        "churn",
+        "arr",
+        "mrr",
+        "valuation",
+        "business-plan",
+        "client-acquisition",
+        "freelancing",
+        "consulting",
+        "offer-creation",
+        "pricing"
       ],
       "persona_template": "Senior {role} specializing in business model design, go-to-market strategy, customer acquisition, and scalable unit economics.",
       "phase_templates": {
@@ -262,33 +900,151 @@
             "name": "Market Validation & Discovery",
             "description": "Target customer research, competitor benchmarking, and value proposition validation.",
             "estimated_duration": "1-2 weeks",
-            "deliverables": ["Market Validation Report", "Competitor Matrix"]
+            "deliverables": [
+              "Market Validation Report",
+              "Competitor Matrix"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Strategy & Model Design",
             "description": "Business model canvas, pricing structure, and go-to-market funnel blueprint.",
             "estimated_duration": "1-2 weeks",
-            "deliverables": ["Business Model Canvas", "Revenue & Pricing Model"]
+            "deliverables": [
+              "Business Model Canvas",
+              "Revenue & Pricing Model"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Launch & Go-To-Market",
             "description": "Launch campaigns, customer acquisition execution, and early feedback optimization.",
             "estimated_duration": "2-4 weeks",
-            "deliverables": ["Launch Execution Plan", "First 30-Day Customer Acquisition Report"]
+            "deliverables": [
+              "Launch Execution Plan",
+              "First 30-Day Customer Acquisition Report"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Market & Unit Economics Audit",
+            "description": "Assess TAM/SAM/SOM, competitive moat, CAC/LTV ratios, and gross margin structure.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Competitor Matrix",
+              "Unit Economics & CAC/LTV Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategic Growth Synthesis",
+            "description": "Prioritize high-leverage growth channels, pricing adjustments, and operational KPIs.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Strategic Recommendation Brief",
+              "KPI Milestone Dashboard"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Market Validation & Discovery",
+            "description": "Target customer research, competitor benchmarking, and value proposition validation.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Market Validation Report",
+              "Competitor Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategy & Model Design",
+            "description": "Business model canvas, pricing structure, and go-to-market funnel blueprint.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Business Model Canvas",
+              "Revenue & Pricing Model"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_market",
+        "unit_economics",
+        "competitive_moat",
+        "resource_and_capital_constraints"
+      ],
+      "task_templates": {
+        "creation": "Build a defensible business model, pricing architecture, and go-to-market execution blueprint.",
+        "analysis": "Evaluate market sizing, competitor positioning, unit economics (CAC/LTV), and operational bottlenecks.",
+        "planning": "Develop a phased commercial growth roadmap with milestone KPIs and capital allocation gates.",
+        "troubleshooting": "Diagnose churn drivers, funnel conversion drop-offs, or margin compression and specify turnaround actions.",
+        "optimization": "Optimize pricing tiers, sales cycle velocity, net revenue retention, and operating leverage.",
+        "default": "Formulate an actionable business strategy grounded in unit economics and market validation."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Market Validation Report",
+          "Business Model Canvas",
+          "Launch Execution Plan"
+        ],
+        "analysis": [
+          "Competitor Matrix",
+          "Unit Economics & CAC/LTV Audit",
+          "Strategic Recommendation Brief"
+        ],
+        "planning": [
+          "Go-To-Market Roadmap",
+          "Revenue & Pricing Model",
+          "KPI Milestone Dashboard"
+        ],
+        "troubleshooting": [
+          "Churn & Funnel Root Cause Audit",
+          "Turnaround Action Plan",
+          "Unit Economics Recovery Model"
+        ],
+        "default": [
+          "Business Model Canvas",
+          "Revenue & Pricing Model",
+          "Launch Execution Plan"
         ]
       }
     },
     {
       "domain": "nutrition",
-      "aliases": ["sports-nutrition", "clinical-nutrition", "dietetics"],
+      "aliases": [
+        "sports-nutrition",
+        "clinical-nutrition",
+        "dietetics"
+      ],
       "boost": 2,
       "keywords": [
-        "meal", "diet", "nutrition", "vitamins", "protein", "carbs", "fiber", "macro", "calorie", "dietician",
-        "dietitian", "keto", "vegan", "paleo", "fasting", "supplements", "hydration", "metabolic", "probiotic",
-        "vegetarian", "micronutrients", "caloric-deficit", "meal-plan"
+        "meal",
+        "diet",
+        "nutrition",
+        "vitamins",
+        "protein",
+        "carbs",
+        "fiber",
+        "macro",
+        "calorie",
+        "dietician",
+        "dietitian",
+        "keto",
+        "vegan",
+        "paleo",
+        "fasting",
+        "supplements",
+        "hydration",
+        "metabolic",
+        "probiotic",
+        "vegetarian",
+        "micronutrients",
+        "caloric-deficit",
+        "meal-plan"
       ],
       "persona_template": "Registered {role} specializing in evidence-based nutritional science, metabolic optimization, and personalized dietary programming.",
       "phase_templates": {
@@ -298,98 +1054,2000 @@
             "name": "Baseline Nutritional Assessment",
             "description": "Assess energy expenditure, dietary habits, macro targets, and health constraints.",
             "estimated_duration": "Day 1",
-            "deliverables": ["Nutritional Baseline Assessment", "Daily Macro/Micro Targets"]
+            "deliverables": [
+              "Nutritional Baseline Assessment",
+              "Daily Macro/Micro Targets"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Meal Protocol Design",
             "description": "Develop structured daily/weekly meal protocols with whole-food sourcing and timing.",
             "estimated_duration": "Day 2-3",
-            "deliverables": ["Detailed Meal Protocol", "Supplement & Hydration Guide"]
+            "deliverables": [
+              "Detailed Meal Protocol",
+              "Supplement & Hydration Guide"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Adherence & Calibration",
             "description": "Monitor body composition changes, energy levels, and adjust macro ratios.",
             "estimated_duration": "Ongoing",
-            "deliverables": ["Progress Tracking Sheet", "Protocol Calibration Log"]
+            "deliverables": [
+              "Progress Tracking Sheet",
+              "Protocol Calibration Log"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Dietary Intake & Macro Audit",
+            "description": "Quantify caloric balance, protein/carbohydrate/fat ratios, fiber, and micronutrient coverage.",
+            "estimated_duration": "Day 1",
+            "deliverables": [
+              "Nutritional Baseline Assessment",
+              "Daily Macro/Micro Targets"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Metabolic & Restriction Optimization",
+            "description": "Align meal composition with allergens/exclusions and metabolic performance goals.",
+            "estimated_duration": "Day 2",
+            "deliverables": [
+              "Detailed Meal Protocol",
+              "Protocol Calibration Log"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Baseline Nutritional Assessment",
+            "description": "Assess energy expenditure, dietary habits, macro targets, and health constraints.",
+            "estimated_duration": "Day 1",
+            "deliverables": [
+              "Nutritional Baseline Assessment",
+              "Daily Macro/Micro Targets"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Meal Protocol Design",
+            "description": "Develop structured daily/weekly meal protocols with whole-food sourcing and timing.",
+            "estimated_duration": "Day 2-3",
+            "deliverables": [
+              "Detailed Meal Protocol",
+              "Supplement & Hydration Guide"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "caloric_and_macro_targets",
+        "dietary_exclusions",
+        "metabolic_goals",
+        "meal_timing_schedule"
+      ],
+      "task_templates": {
+        "creation": "Design a personalized meal protocol with exact caloric, macronutrient, and dietary restriction compliance.",
+        "analysis": "Analyze daily macronutrient distribution, micronutrient density, hydration, and metabolic response.",
+        "planning": "Structure a phased nutritional periodization and meal-prep schedule aligned with physiological goals.",
+        "troubleshooting": "Identify nutritional deficiencies, digestive triggers, or energy dips and adjust macro/food selections.",
+        "optimization": "Optimize nutrient timing, protein synthesis efficiency, glycemic control, and dietary adherence.",
+        "default": "Deliver a structured, evidence-based nutrition and meal protocol honoring all dietary constraints."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Nutritional Baseline Assessment",
+          "Daily Macro/Micro Targets",
+          "Detailed Meal Protocol"
+        ],
+        "analysis": [
+          "Macro & Micronutrient Audit",
+          "Glycemic & Metabolic Assessment",
+          "Dietary Adjustment Plan"
+        ],
+        "planning": [
+          "Periodized Nutrition Plan",
+          "Weekly Meal & Prep Schedule",
+          "Supplement & Hydration Guide"
+        ],
+        "troubleshooting": [
+          "Trigger & Deficiency Analysis",
+          "Elimination/Substitution Protocol",
+          "Adherence Calibration Log"
+        ],
+        "default": [
+          "Daily Macro/Micro Targets",
+          "Detailed Meal Protocol"
         ]
       }
     },
     {
       "domain": "pharma",
-      "keywords": ["pharma", "pharmaceutical", "drug", "fda", "compound", "clinical", "trial", "dosage", "toxicology", "biochemistry", "regulatory", "pharmacovigilance", "biosimilar", "biotech", "pharmacokinetics", "pharmacodynamics", "formulation", "clinical-trial"],
-      "boost": 3
+      "keywords": [
+        "pharma",
+        "pharmaceutical",
+        "drug",
+        "fda",
+        "compound",
+        "clinical",
+        "trial",
+        "dosage",
+        "toxicology",
+        "biochemistry",
+        "regulatory",
+        "pharmacovigilance",
+        "biosimilar",
+        "biotech",
+        "pharmacokinetics",
+        "pharmacodynamics",
+        "formulation",
+        "clinical-trial"
+      ],
+      "boost": 3,
+      "aliases": [
+        "pharmaceutical",
+        "biotech",
+        "clinical-pharma",
+        "drug-development"
+      ],
+      "persona_template": "Principal {role} specializing in pharmacokinetics, regulatory CMC/FDA compliance, clinical trial design, and therapeutic development.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Preclinical & PK/PD Characterization",
+            "description": "Establish mechanism of action, ADME/PK parameters, toxicology margins, and CMC formulation specs.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Preclinical & PK/PD Dossier",
+              "CMC Formulation Specification"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Clinical Trial & Regulatory Design",
+            "description": "Design Phase I-III clinical endpoints, statistical power, and IND/FDA regulatory submission dossier.",
+            "estimated_duration": "4-6 weeks",
+            "deliverables": [
+              "Clinical Trial Protocol Synopsis",
+              "FDA/ICH Regulatory Compliance Matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Pharmacovigilance & Commercial Scale",
+            "description": "Establish GMP manufacturing controls, safety signal monitoring, and post-market surveillance.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "GMP Validation Plan",
+              "Pharmacovigilance & Safety Plan"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "PK/PD & Safety Margin Audit",
+            "description": "Analyze dose-response curves, bioavailability, adverse event profiles, and drug-drug interactions.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "PK/PD & Toxicology Evaluation",
+              "Benefit-Risk Assessment"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Regulatory & Clinical Readiness",
+            "description": "Assess compliance with FDA/EMA guidance and clinical endpoint robustness.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Regulatory Gap Audit",
+              "FDA/ICH Regulatory Compliance Matrix"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Preclinical & PK/PD Characterization",
+            "description": "Establish mechanism of action, ADME/PK parameters, toxicology margins, and CMC formulation specs.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Preclinical & PK/PD Dossier",
+              "CMC Formulation Specification"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Clinical Trial & Regulatory Design",
+            "description": "Design Phase I-III clinical endpoints, statistical power, and IND/FDA regulatory submission dossier.",
+            "estimated_duration": "4-6 weeks",
+            "deliverables": [
+              "Clinical Trial Protocol Synopsis",
+              "FDA/ICH Regulatory Compliance Matrix"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "indication_and_mechanism",
+        "regulatory_pathway_fda_ema",
+        "pharmacokinetic_parameters",
+        "clinical_safety_bounds"
+      ],
+      "task_templates": {
+        "creation": "Design a pharmaceutical development, formulation, or clinical trial protocol aligned with FDA/ICH guidelines.",
+        "analysis": "Evaluate pharmacokinetics/pharmacodynamics (PK/PD), toxicology margins, and regulatory submission readiness.",
+        "planning": "Develop a phased IND/NDA regulatory and clinical development roadmap with risk mitigation gates.",
+        "troubleshooting": "Investigate bioavailability, stability, or clinical endpoint deviations and specify CAPA/protocol amendments.",
+        "optimization": "Optimize dosage regimen, therapeutic index, formulation stability, and trial accrual efficiency.",
+        "default": "Provide a rigorous pharmaceutical and regulatory science analysis aligned with clinical standards."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Preclinical & PK/PD Dossier",
+          "Clinical Trial Protocol Synopsis",
+          "FDA/ICH Regulatory Compliance Matrix"
+        ],
+        "analysis": [
+          "PK/PD & Toxicology Evaluation",
+          "Regulatory Gap Audit",
+          "Benefit-Risk Assessment"
+        ],
+        "planning": [
+          "IND-to-NDA Development Roadmap",
+          "CMC & Formulation Milestones",
+          "Pharmacovigilance Plan"
+        ],
+        "troubleshooting": [
+          "Formulation/Assay Root Cause Report",
+          "CAPA & Protocol Amendment",
+          "Safety Signal Review"
+        ],
+        "default": [
+          "Clinical Trial Protocol Synopsis",
+          "FDA/ICH Regulatory Compliance Matrix"
+        ]
+      }
     },
     {
       "domain": "data-science",
-      "aliases": ["data-analytics", "machine-learning"],
-      "keywords": ["data", "ml", "machine-learning", "model", "dataset", "neural", "prediction", "classification", "pandas", "tensorflow", "pytorch", "scikit-learn", "data-pipeline", "feature-engineering", "deep-learning", "nlp", "computer-vision"],
-      "boost": 2
+      "aliases": [
+        "data-analytics",
+        "machine-learning",
+        "statistical-modeling"
+      ],
+      "keywords": [
+        "data",
+        "ml",
+        "machine-learning",
+        "model",
+        "dataset",
+        "neural",
+        "prediction",
+        "classification",
+        "pandas",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data-pipeline",
+        "feature-engineering",
+        "deep-learning",
+        "nlp",
+        "computer-vision"
+      ],
+      "boost": 2,
+      "persona_template": "Staff {role} specializing in statistical modeling, feature engineering, reproducible data pipelines, and rigorous offline/online evaluation.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Exploratory Data Analysis & Schema Audit",
+            "description": "Profile data distributions, missingness, leakage risks, and define train/validation/test splits.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Data Quality & EDA Report",
+              "Split & Leakage Prevention Spec"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Feature Engineering & Model Training",
+            "description": "Construct domain features, train baseline and gradient-boosted/neural models, and tune hyperparameters.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Feature Engineering Pipeline",
+              "Trained Model Artifacts"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Evaluation & Drift Monitoring",
+            "description": "Validate precision/recall/AUC/RMSE across slices and configure production drift telemetry.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Model Evaluation & Validation Matrix",
+              "Drift Monitoring Configuration"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Statistical & Cohort Profiling",
+            "description": "Test distributional assumptions, correlations, and segment-level performance variance.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Statistical Analysis & Cohort Report",
+              "Feature Attribution Breakdown"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Error Slicing & Recommendations",
+            "description": "Isolate high-error cohorts and synthesize actionable modeling or product interventions.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Error Slice Diagnosis",
+              "Model Evaluation & Validation Matrix"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Exploratory Data Analysis & Schema Audit",
+            "description": "Profile data distributions, missingness, leakage risks, and define train/validation/test splits.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Data Quality & EDA Report",
+              "Split & Leakage Prevention Spec"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Feature Engineering & Model Training",
+            "description": "Construct domain features, train baseline and advanced models, and validate target metrics.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Feature Engineering Pipeline",
+              "Model Evaluation & Validation Matrix"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "dataset_schema_and_volume",
+        "target_evaluation_metrics",
+        "feature_pipeline_constraints",
+        "leakage_and_bias_controls"
+      ],
+      "task_templates": {
+        "creation": "Build an end-to-end data science pipeline covering exploratory analysis, feature engineering, model training, and validation.",
+        "analysis": "Conduct statistical hypothesis testing, cohort analysis, feature importance attribution, and error slicing.",
+        "planning": "Define a phased data modeling and experimentation roadmap with clear baseline and target metrics.",
+        "troubleshooting": "Diagnose data leakage, covariate shift, class imbalance, or metric degradation and specify fixes.",
+        "optimization": "Optimize feature selection, hyperparameter tuning, cross-validation stability, and inference latency.",
+        "default": "Deliver a reproducible data science and statistical modeling solution with validated metrics."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Data Quality & EDA Report",
+          "Feature Engineering Pipeline",
+          "Model Evaluation & Validation Matrix"
+        ],
+        "analysis": [
+          "Statistical Analysis & Cohort Report",
+          "Feature Attribution Breakdown",
+          "Error Slice Diagnosis"
+        ],
+        "planning": [
+          "Experimentation & Modeling Roadmap",
+          "Metric & Baseline Specification",
+          "Data Governance Plan"
+        ],
+        "troubleshooting": [
+          "Leakage & Drift Audit",
+          "Retraining & Calibration Plan",
+          "Validation Benchmark Suite"
+        ],
+        "default": [
+          "Feature Engineering Pipeline",
+          "Model Evaluation & Validation Matrix"
+        ]
+      }
     },
     {
       "domain": "education",
-      "keywords": ["teach", "learn", "curriculum", "course", "student", "lecture", "training", "certification", "assessment", "pedagogy", "syllabus", "e-learning", "tutor", "instructor", "academic"],
-      "boost": 1
+      "keywords": [
+        "teach",
+        "learn",
+        "curriculum",
+        "course",
+        "student",
+        "lecture",
+        "training",
+        "certification",
+        "assessment",
+        "pedagogy",
+        "syllabus",
+        "e-learning",
+        "tutor",
+        "instructor",
+        "academic"
+      ],
+      "boost": 1,
+      "aliases": [
+        "pedagogy",
+        "curriculum-design",
+        "e-learning",
+        "academic-training"
+      ],
+      "persona_template": "Senior {role} specializing in instructional design, cognitive load theory, active recall pedagogy, and competency-based assessment.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Knowledge Mapping & Objectives",
+            "description": "Identify core concepts, prerequisite knowledge gaps, and measurable Bloom's taxonomy learning outcomes.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Concept Map & Prerequisite Audit",
+              "Learning Objectives Specification"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Curriculum & Practice Design",
+            "description": "Structure instructional modules using active recall, worked examples, and interleaved practice.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Curriculum & Syllabus Blueprint",
+              "Guided Practice & Active Recall Modules"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Assessment & Mastery Verification",
+            "description": "Validate learner comprehension via project rubrics, formative quizzes, and feedback loops.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Competency Assessment Rubric",
+              "Mastery Feedback Protocol"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Curriculum & Outcome Audit",
+            "description": "Evaluate alignment between instructional materials, cognitive load, and target competencies.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Pedagogical Gap Analysis",
+              "Learning Outcome Alignment Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Assessment & Retention Synthesis",
+            "description": "Recommend scaffolding improvements, spaced repetition cadences, and rubric refinements.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Assessment Validity Report",
+              "Competency Assessment Rubric"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Knowledge Mapping & Objectives",
+            "description": "Identify core concepts, prerequisite knowledge gaps, and measurable learning outcomes.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Concept Map & Prerequisite Audit",
+              "Learning Objectives Specification"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Curriculum & Practice Design",
+            "description": "Structure instructional modules using active recall, worked examples, and competency rubrics.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Curriculum & Syllabus Blueprint",
+              "Competency Assessment Rubric"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "learner_level_and_prerequisites",
+        "learning_objectives",
+        "instructional_modality",
+        "assessment_rubric"
+      ],
+      "task_templates": {
+        "creation": "Design a structured curriculum, syllabus, or lesson plan with measurable learning outcomes and active recall assessments.",
+        "analysis": "Evaluate curriculum alignment, cognitive load progression, learner engagement, and assessment validity.",
+        "planning": "Build a phased learning pathway from foundational concepts to applied mastery and certification.",
+        "troubleshooting": "Identify knowledge gaps, misconceptions, or drop-off points and redesign instructional scaffolding.",
+        "optimization": "Optimize spaced repetition schedules, practice exercise transfer, and rubric clarity.",
+        "default": "Deliver a pedagogically sound curriculum and instructional framework with clear learning objectives."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Curriculum & Syllabus Blueprint",
+          "Guided Practice & Active Recall Modules",
+          "Competency Assessment Rubric"
+        ],
+        "analysis": [
+          "Pedagogical Gap Analysis",
+          "Learning Outcome Alignment Matrix",
+          "Assessment Validity Report"
+        ],
+        "planning": [
+          "Phased Learning Roadmap",
+          "Module Pacing Schedule",
+          "Mastery Verification Plan"
+        ],
+        "troubleshooting": [
+          "Misconception & Drop-off Audit",
+          "Scaffolding Remediation Plan",
+          "Targeted Practice Exercises"
+        ],
+        "default": [
+          "Curriculum & Syllabus Blueprint",
+          "Competency Assessment Rubric"
+        ]
+      }
     },
     {
       "domain": "creative",
-      "aliases": ["creative-writing", "content-writing"],
-      "keywords": ["story", "novel", "character", "plot", "fiction", "screenplay", "narrative", "dialogue", "writing", "copywriting", "worldbuilding", "prose", "scriptwriting", "illustration"],
-      "boost": 1
+      "aliases": [
+        "creative-writing",
+        "content-writing",
+        "storytelling",
+        "copywriting"
+      ],
+      "keywords": [
+        "story",
+        "novel",
+        "character",
+        "plot",
+        "fiction",
+        "screenplay",
+        "narrative",
+        "dialogue",
+        "writing",
+        "copywriting",
+        "worldbuilding",
+        "prose",
+        "scriptwriting",
+        "illustration"
+      ],
+      "boost": 1,
+      "persona_template": "Lead {role} specializing in narrative architecture, character psychology, evocative worldbuilding, and high-impact prose.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Premise, Worldbuilding & Character Bible",
+            "description": "Define core thematic premise, world rules, character motivations, and dramatic stakes.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Narrative & Worldbuilding Bible",
+              "Character Psychology Profiles"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Structural Beat Sheet & Drafting",
+            "description": "Map multi-act scene beats, turning points, and compose the primary narrative draft.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Multi-Act Beat Sheet",
+              "Primary Narrative Draft"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Editorial Polish & Pacing Refinement",
+            "description": "Tighten dialogue, elevate sensory prose, and verify thematic and continuity cohesion.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Polished Manuscript / Script Draft",
+              "Continuity & Style Checklist"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Narrative Structure & Pacing Audit",
+            "description": "Evaluate act structure, tension curves, stakes escalation, and scene economy.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Structural & Pacing Critique",
+              "Character Arc Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Line & Voice Enhancement Plan",
+            "description": "Provide concrete line-level rewrites and structural revision priorities.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Editorial Revision Notes",
+              "Pacing Tightening Checklist"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Premise, Worldbuilding & Character Bible",
+            "description": "Define core thematic premise, world rules, character motivations, and dramatic stakes.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Narrative & Worldbuilding Bible",
+              "Multi-Act Beat Sheet"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Drafting & Editorial Polish",
+            "description": "Compose the narrative draft and refine dialogue, pacing, and stylistic cohesion.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Polished Manuscript / Script Draft",
+              "Continuity & Style Checklist"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "genre_and_tone",
+        "narrative_arc_and_theme",
+        "character_voices",
+        "target_audience_and_format"
+      ],
+      "task_templates": {
+        "creation": "Craft an original narrative, script, or creative piece with compelling structure, voice, and thematic resonance.",
+        "analysis": "Critique narrative pacing, character motivation, dialogue authenticity, and stylistic cohesion.",
+        "planning": "Outline a multi-act story bible, worldbuilding taxonomy, and scene-by-scene beat sheet.",
+        "troubleshooting": "Resolve plot holes, pacing sag, flat character arcs, or tonal inconsistency.",
+        "optimization": "Polish prose rhythm, sensory imagery, hook retention, and emotional payoff.",
+        "default": "Deliver a structured, resonant creative work with strong narrative pacing and voice."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Narrative & Worldbuilding Bible",
+          "Multi-Act Beat Sheet",
+          "Polished Manuscript / Script Draft"
+        ],
+        "analysis": [
+          "Structural & Pacing Critique",
+          "Character Arc Audit",
+          "Editorial Revision Notes"
+        ],
+        "planning": [
+          "Story Arc Outline",
+          "Character & Lore Dossier",
+          "Scene Progression Plan"
+        ],
+        "troubleshooting": [
+          "Plot & Continuity Fix Plan",
+          "Dialogue & Tone Rewrite",
+          "Pacing Tightening Checklist"
+        ],
+        "default": [
+          "Multi-Act Beat Sheet",
+          "Polished Manuscript / Script Draft"
+        ]
+      }
     },
     {
       "domain": "health-fitness",
-      "keywords": ["workout", "exercise", "cardio", "strength", "weight", "health", "wellness", "recovery", "sleep", "training", "hypertrophy", "calisthenics", "endurance", "fitness", "physiotherapy"],
-      "boost": 2
+      "keywords": [
+        "workout",
+        "exercise",
+        "cardio",
+        "strength",
+        "weight",
+        "health",
+        "wellness",
+        "recovery",
+        "sleep",
+        "training",
+        "hypertrophy",
+        "calisthenics",
+        "endurance",
+        "fitness",
+        "physiotherapy"
+      ],
+      "boost": 2,
+      "aliases": [
+        "fitness",
+        "strength-conditioning",
+        "athletic-training",
+        "exercise-science"
+      ],
+      "persona_template": "Certified {role} specializing in exercise physiology, progressive overload periodization, biomechanical safety, and recovery programming.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Movement & Conditioning Baseline",
+            "description": "Assess work capacity, mobility restrictions, injury history, and weekly training frequency.",
+            "estimated_duration": "Week 1",
+            "deliverables": [
+              "Movement & Baseline Capacity Audit",
+              "Warm-Up, Mobility & Recovery Protocol"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Progressive Overload Mesocycle",
+            "description": "Execute structured resistance and cardiovascular sessions with weekly RPE/load progression.",
+            "estimated_duration": "Weeks 2-6",
+            "deliverables": [
+              "Periodized Training Split & Mesocycle",
+              "Exercise Selection, Sets, Reps & RPE Table"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Deload & Performance Re-Test",
+            "description": "Dissipate cumulative fatigue, evaluate strength/endurance PRs, and calibrate next block.",
+            "estimated_duration": "Week 7-8",
+            "deliverables": [
+              "Deload & Peaking Schedule",
+              "Performance Progression Log"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Movement & Conditioning Baseline",
+            "description": "Assess work capacity, mobility restrictions, and weekly training split.",
+            "estimated_duration": "Week 1",
+            "deliverables": [
+              "Movement & Baseline Capacity Audit",
+              "Periodized Training Split & Mesocycle"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Progressive Overload Execution",
+            "description": "Execute structured sessions with progressive overload and recovery monitoring.",
+            "estimated_duration": "Weeks 2-6",
+            "deliverables": [
+              "Exercise Selection, Sets, Reps & RPE Table",
+              "Warm-Up, Mobility & Recovery Protocol"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "training_experience_and_baseline",
+        "strength_or_endurance_goals",
+        "equipment_and_schedule_access",
+        "injury_history_and_mobility"
+      ],
+      "task_templates": {
+        "creation": "Design a periodized strength, conditioning, and recovery program with exact sets, reps, RPE, and progression rules.",
+        "analysis": "Evaluate training volume, intensity distribution, recovery markers, and biomechanical movement patterns.",
+        "planning": "Build a multi-week mesocycle training plan balancing hypertrophy, strength, conditioning, and deloads.",
+        "troubleshooting": "Resolve strength plateaus, overtraining fatigue, or joint discomfort with exercise regressions and volume adjustments.",
+        "optimization": "Optimize weekly volume landmarks, conditioning work-to-rest ratios, sleep recovery, and injury resilience.",
+        "default": "Deliver a structured, periodized fitness and conditioning protocol with progressive overload and safety cues."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Periodized Training Split & Mesocycle",
+          "Exercise Selection, Sets, Reps & RPE Table",
+          "Warm-Up, Mobility & Recovery Protocol"
+        ],
+        "analysis": [
+          "Volume & Intensity Distribution Audit",
+          "Recovery & Fatigue Assessment",
+          "Biomechanical Modification Notes"
+        ],
+        "planning": [
+          "Multi-Week Progression Roadmap",
+          "Deload & Peaking Schedule",
+          "Conditioning Benchmark Targets"
+        ],
+        "troubleshooting": [
+          "Plateau & Fatigue Resolution Plan",
+          "Joint-Friendly Exercise Substitutions",
+          "Recovery Calibration Checklist"
+        ],
+        "default": [
+          "Periodized Training Split & Mesocycle",
+          "Warm-Up, Mobility & Recovery Protocol"
+        ]
+      }
     },
     {
       "domain": "legal",
-      "keywords": ["contract", "legal", "compliance", "regulation", "patent", "trademark", "liability", "attorney", "litigation", "clause", "ip", "intellectual-property", "jurisdiction", "statute", "gdpr"],
-      "boost": 3
+      "keywords": [
+        "contract",
+        "legal",
+        "compliance",
+        "regulation",
+        "patent",
+        "trademark",
+        "liability",
+        "attorney",
+        "litigation",
+        "clause",
+        "ip",
+        "intellectual-property",
+        "jurisdiction",
+        "statute",
+        "gdpr"
+      ],
+      "boost": 3,
+      "aliases": [
+        "corporate-law",
+        "regulatory-compliance",
+        "contract-law",
+        "intellectual-property"
+      ],
+      "persona_template": "Senior {role} specializing in statutory analysis, contractual risk allocation, regulatory compliance, and intellectual property protection.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Jurisdictional & Statutory Scoping",
+            "description": "Identify governing law, applicable statutes/regulations (e.g., GDPR, CCPA, UCC), and counterparty risk profile.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Statutory Basis Analysis",
+              "Jurisdictional Scope Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Instrument Drafting & Risk Allocation",
+            "description": "Draft operative covenants, IP ownership, limitation of liability, indemnification, and termination provisions.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Contractual Clause & Redline Draft",
+              "Liability & Risk Allocation Matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Compliance Verification & Execution Controls",
+            "description": "Validate regulatory compliance obligations, audit trails, and dispute resolution enforceability.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Statutory & Regulatory Compliance Checklist",
+              "Execution & Governance Protocol"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Clause & Statutory Risk Audit",
+            "description": "Examine agreement terms against governing statutes, liability caps, IP rights, and mandatory disclosures.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Legal Risk & Enforceability Memorandum",
+              "Statutory Basis Analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Redline & Compliance Remediation",
+            "description": "Formulate protective clause redlines and regulatory compliance controls.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Redline Remediation Recommendations",
+              "Statutory & Regulatory Compliance Checklist"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Jurisdictional & Statutory Scoping",
+            "description": "Identify governing law, applicable statutes/regulations, and counterparty risk profile.",
+            "estimated_duration": "1-3 days",
+            "deliverables": [
+              "Statutory Basis Analysis",
+              "Liability & Risk Allocation Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Compliance & Redline Synthesis",
+            "description": "Draft protective provisions and verify statutory and regulatory compliance.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Contractual Clause & Redline Draft",
+              "Statutory & Regulatory Compliance Checklist"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "governing_jurisdiction",
+        "statutory_and_regulatory_framework",
+        "contractual_counterparties",
+        "liability_and_indemnity_bounds"
+      ],
+      "task_templates": {
+        "creation": "Draft or structure enforceable contractual clauses, compliance policies, and regulatory governance frameworks.",
+        "analysis": "Analyze statutory obligations, contractual liability exposure, IP ownership, and regulatory compliance gaps.",
+        "planning": "Develop a phased legal and regulatory compliance roadmap across applicable jurisdictions.",
+        "troubleshooting": "Assess breach exposure, regulatory audit findings, or unenforceable clauses and specify remediation language.",
+        "optimization": "Strengthen indemnification caps, IP assignment clarity, dispute resolution mechanisms, and GDPR/privacy posture.",
+        "default": "Provide a rigorous legal and regulatory analysis grounded in applicable jurisdiction and statutory frameworks."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Contractual Clause & Redline Draft",
+          "Statutory & Regulatory Compliance Checklist",
+          "Liability & Risk Allocation Matrix"
+        ],
+        "analysis": [
+          "Legal Risk & Enforceability Memorandum",
+          "Statutory Basis Analysis",
+          "Redline Remediation Recommendations"
+        ],
+        "planning": [
+          "Regulatory Compliance Roadmap",
+          "Governance & Policy Framework",
+          "Audit Readiness Checklist"
+        ],
+        "troubleshooting": [
+          "Breach & Liability Exposure Assessment",
+          "Corrective Clause Redlines",
+          "Regulatory Mitigation Plan"
+        ],
+        "default": [
+          "Statutory & Regulatory Compliance Checklist",
+          "Liability & Risk Allocation Matrix"
+        ]
+      }
     },
     {
       "domain": "marketing",
-      "keywords": ["marketing", "brand", "campaign", "seo", "content", "social-media", "conversion", "funnel", "audience", "ads", "copywriting", "ppc", "ctr", "email-marketing", "influencer", "lead-gen"],
-      "boost": 2
+      "keywords": [
+        "marketing",
+        "brand",
+        "campaign",
+        "seo",
+        "content",
+        "social-media",
+        "conversion",
+        "funnel",
+        "audience",
+        "ads",
+        "copywriting",
+        "ppc",
+        "ctr",
+        "email-marketing",
+        "influencer",
+        "lead-gen"
+      ],
+      "boost": 2,
+      "aliases": [
+        "digital-marketing",
+        "growth-marketing",
+        "brand-strategy",
+        "seo-content"
+      ],
+      "persona_template": "Principal {role} specializing in full-funnel customer acquisition, brand positioning, conversion rate optimization, and attribution analytics.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "ICP Research & Positioning Architecture",
+            "description": "Define ideal customer segments, pain points, value proposition hierarchy, and competitive differentiation.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "ICP & Messaging Positioning Framework",
+              "Competitive Positioning Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Channel & Funnel Execution",
+            "description": "Launch paid, organic SEO, content, and lifecycle email campaigns with instrumented landing pages.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Multi-Channel Campaign Blueprint",
+              "Conversion Funnel & CRO Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Attribution Analytics & CRO Scaling",
+            "description": "Measure CAC, LTV, and ROAS across cohorts and run iterative A/B conversion experiments.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "KPI Attribution Dashboard",
+              "A/B Experiment Optimization Log"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Funnel & Channel Attribution Audit",
+            "description": "Evaluate traffic quality, CTR, landing page CVR, CAC payback, and cohort retention.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Channel Attribution & ROAS Audit",
+              "Funnel Drop-off Diagnosis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Growth & CRO Experiment Plan",
+            "description": "Prioritize high-impact creative, bidding, and landing page conversion interventions.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Conversion Funnel & CRO Plan",
+              "A/B Experiment Backlog"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "ICP Research & Positioning Architecture",
+            "description": "Define ideal customer segments, value proposition hierarchy, and channel selection.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "ICP & Messaging Positioning Framework",
+              "Multi-Channel Campaign Blueprint"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Funnel Execution & Attribution",
+            "description": "Execute campaign launches and track CAC, CVR, and ROAS targets.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Conversion Funnel & CRO Plan",
+              "KPI Attribution Dashboard"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_audience_icp",
+        "acquisition_channels",
+        "conversion_funnel_metrics",
+        "budget_and_cac_targets"
+      ],
+      "task_templates": {
+        "creation": "Design a multi-channel marketing campaign, brand messaging hierarchy, and high-converting funnel assets.",
+        "analysis": "Analyze funnel conversion rates, channel CAC/ROAS attribution, audience retention, and SEO/content performance.",
+        "planning": "Build a phased go-to-market campaign calendar with channel budget allocation and KPI targets.",
+        "troubleshooting": "Diagnose ad fatigue, landing page bounce rates, or CAC inflation and specify creative/funnel experiments.",
+        "optimization": "Optimize conversion rate (CRO), email lifecycle segmentation, organic SEO authority, and ROAS efficiency.",
+        "default": "Deliver a data-driven marketing and growth strategy with clear funnel KPIs and channel execution steps."
+      },
+      "default_deliverables": {
+        "creation": [
+          "ICP & Messaging Positioning Framework",
+          "Multi-Channel Campaign Blueprint",
+          "Conversion Funnel & CRO Plan"
+        ],
+        "analysis": [
+          "Channel Attribution & ROAS Audit",
+          "Funnel Drop-off Diagnosis",
+          "Competitive Positioning Matrix"
+        ],
+        "planning": [
+          "Go-To-Market Campaign Roadmap",
+          "Budget & CAC Allocation Model",
+          "KPI Attribution Dashboard"
+        ],
+        "troubleshooting": [
+          "CAC & Funnel Recovery Plan",
+          "A/B Experiment Backlog",
+          "Creative Refresh Playbook"
+        ],
+        "default": [
+          "Multi-Channel Campaign Blueprint",
+          "KPI Attribution Dashboard"
+        ]
+      }
     },
     {
       "domain": "devops",
-      "aliases": ["devops-infra", "platform-engineering"],
-      "keywords": ["ci-cd", "pipeline", "infrastructure", "terraform", "ansible", "monitoring", "cloud", "aws", "gcp", "azure", "kubernetes", "docker", "helm", "gitops", "observability", "prometheus", "grafana", "sre"],
-      "boost": 2
+      "aliases": [
+        "devops-infra",
+        "platform-engineering",
+        "sre",
+        "cloud-infrastructure"
+      ],
+      "keywords": [
+        "ci-cd",
+        "pipeline",
+        "infrastructure",
+        "terraform",
+        "ansible",
+        "monitoring",
+        "cloud",
+        "aws",
+        "gcp",
+        "azure",
+        "kubernetes",
+        "docker",
+        "helm",
+        "gitops",
+        "observability",
+        "prometheus",
+        "grafana",
+        "sre"
+      ],
+      "boost": 2,
+      "persona_template": "Staff {role} specializing in cloud-native infrastructure-as-code, CI/CD automation, Kubernetes reliability, and SRE observability.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Infrastructure Topology & IaC Design",
+            "description": "Define VPC networking, IAM least-privilege policies, Kubernetes/compute clusters, and Terraform modules.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Infrastructure-as-Code (Terraform/Helm) Spec",
+              "Network & IAM Security Topology"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "CI/CD & GitOps Automation",
+            "description": "Implement automated build, security scanning, canary/blue-green deployment pipelines, and rollback gates.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "CI/CD Pipeline & GitOps Blueprint",
+              "Automated Rollback Verification"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Observability, SLOs & Chaos Validation",
+            "description": "Configure Prometheus/Grafana metrics, distributed tracing, on-call runbooks, and failover drills.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "SRE Observability & Alerting Runbook",
+              "Disaster Recovery Validation Report"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Reliability, Security & Cost Audit",
+            "description": "Assess single points of failure, IAM posture, deployment DORA metrics, and compute utilization.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Infrastructure Reliability & SPOF Audit",
+              "Cloud FinOps & Resource Report"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "SRE Hardening Roadmap",
+            "description": "Specify high-availability, autoscaling, and observability remediation actions.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "SLO Readiness Matrix",
+              "SRE Observability & Alerting Runbook"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Infrastructure Topology & IaC Design",
+            "description": "Define networking, IAM policies, cluster topology, and reproducible IaC modules.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Infrastructure-as-Code (Terraform/Helm) Spec",
+              "CI/CD Pipeline & GitOps Blueprint"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Observability & Production Readiness",
+            "description": "Configure SLO alerting, automated rollbacks, and incident runbooks.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "SRE Observability & Alerting Runbook",
+              "Disaster Recovery Validation Report"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "cloud_provider_and_cluster",
+        "deployment_topology",
+        "slo_availability_targets",
+        "security_and_iac_tooling"
+      ],
+      "task_templates": {
+        "creation": "Architect and provision reproducible Infrastructure-as-Code, automated CI/CD pipelines, and resilient cluster deployments.",
+        "analysis": "Audit infrastructure reliability, deployment blast radius, cloud cost utilization, and observability coverage.",
+        "planning": "Develop a phased platform engineering, migration, and disaster recovery roadmap.",
+        "troubleshooting": "Triage production outages, container crashes, networking partitions, or CI/CD bottlenecks and restore SLOs.",
+        "optimization": "Optimize autoscaling policies, build/deploy lead times, container resource requests, and cloud FinOps spend.",
+        "default": "Deliver a production-hardened DevOps and SRE infrastructure solution with automated verification."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Infrastructure-as-Code (Terraform/Helm) Spec",
+          "CI/CD Pipeline & GitOps Blueprint",
+          "SRE Observability & Alerting Runbook"
+        ],
+        "analysis": [
+          "Infrastructure Reliability & SPOF Audit",
+          "Cloud FinOps & Resource Report",
+          "SLO Readiness Matrix"
+        ],
+        "planning": [
+          "Platform Migration Roadmap",
+          "Disaster Recovery & Failover Plan",
+          "Zero-Downtime Rollout Strategy"
+        ],
+        "troubleshooting": [
+          "Incident Root Cause Analysis (RCA)",
+          "Rollback & Remediation Playbook",
+          "Post-Mortem Hardening Tasks"
+        ],
+        "default": [
+          "Infrastructure-as-Code (Terraform/Helm) Spec",
+          "SRE Observability & Alerting Runbook"
+        ]
+      }
     },
     {
       "domain": "ai-ml",
-      "keywords": ["alignment", "safety", "llm", "transformer", "neural", "agi", "general intelligence", "machine learning", "rlhf", "inference", "real-world implications", "prompt", "token", "fine-tuning", "embeddings", "rag", "vector-database", "agent"],
-      "boost": 3
+      "keywords": [
+        "alignment",
+        "safety",
+        "llm",
+        "transformer",
+        "neural",
+        "agi",
+        "general intelligence",
+        "machine learning",
+        "rlhf",
+        "inference",
+        "real-world implications",
+        "prompt",
+        "token",
+        "fine-tuning",
+        "embeddings",
+        "rag",
+        "vector-database",
+        "agent"
+      ],
+      "boost": 3,
+      "aliases": [
+        "artificial-intelligence",
+        "llm-engineering",
+        "deep-learning",
+        "genai"
+      ],
+      "persona_template": "Principal {role} specializing in foundation model alignment, RAG/agentic architectures, fine-tuning, and low-latency inference systems.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Golden Evaluation Set & Architecture Design",
+            "description": "Curate golden benchmark queries, define RAG/model topology, and establish recall/faithfulness targets.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "AI/LLM System Architecture Spec",
+              "Golden Evaluation & Safety Harness"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Grounding, Fine-Tuning & Guardrail Implementation",
+            "description": "Implement hybrid retrieval, structured prompt contracts, or fine-tuning with prompt-injection defenses.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Retrieval & Grounding Pipeline",
+              "Safety Guardrail Specification"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Inference Optimization & Production Telemetry",
+            "description": "Benchmark p95 latency, token efficiency, and deploy continuous hallucination/drift evaluators.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Faithfulness & Recall@K Benchmark Report",
+              "Production Telemetry & Eval Pipeline"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Model & Retrieval Evaluation Audit",
+            "description": "Measure recall@k, MRR, answer faithfulness, and adversarial prompt-injection resilience.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Faithfulness & Recall@K Benchmark Report",
+              "Failure Mode & Hallucination Taxonomy"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Alignment & Efficiency Recommendations",
+            "description": "Prioritize chunking, re-ranking, model routing, and guardrail improvements.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Safety Guardrail Specification",
+              "Latency/Token Cost Profile"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Golden Evaluation Set & Architecture Design",
+            "description": "Define RAG/model architecture, grounding rules, and golden evaluation metrics.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "AI/LLM System Architecture Spec",
+              "Golden Evaluation & Safety Harness"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Grounding & Guardrail Verification",
+            "description": "Implement retrieval grounding, anti-hallucination checks, and benchmark recall/faithfulness.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Retrieval & Grounding Pipeline",
+              "Faithfulness & Recall@K Benchmark Report"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "model_architecture_and_context",
+        "grounding_and_rag_corpus",
+        "latency_and_cost_budget",
+        "safety_and_hallucination_guardrails"
+      ],
+      "task_templates": {
+        "creation": "Architect and implement an AI/LLM system covering retrieval grounding, prompt/model alignment, and evaluation harnesses.",
+        "analysis": "Evaluate model faithfulness, retrieval recall@k, hallucination rates, alignment safety, and inference latency/cost.",
+        "planning": "Develop a phased AI system roadmap from golden evaluation dataset creation to production guardrails.",
+        "troubleshooting": "Diagnose hallucinations, retrieval misses, prompt-injection vulnerabilities, or training instability.",
+        "optimization": "Optimize quantization, KV-cache throughput, embedding hybrid search (RRF), and DPO/fine-tuning alignment.",
+        "default": "Deliver a grounded, evaluated AI/ML architecture with strict anti-hallucination and safety guardrails."
+      },
+      "default_deliverables": {
+        "creation": [
+          "AI/LLM System Architecture Spec",
+          "Retrieval & Grounding Pipeline",
+          "Golden Evaluation & Safety Harness"
+        ],
+        "analysis": [
+          "Faithfulness & Recall@K Benchmark Report",
+          "Failure Mode & Hallucination Taxonomy",
+          "Latency/Token Cost Profile"
+        ],
+        "planning": [
+          "AI Alignment & Deployment Roadmap",
+          "Dataset Curation & Fine-Tuning Plan",
+          "Safety Guardrail Specification"
+        ],
+        "troubleshooting": [
+          "Hallucination & Retrieval Root Cause Audit",
+          "Prompt/RAG Remediation Patch",
+          "Adversarial Red-Team Suite"
+        ],
+        "default": [
+          "AI/LLM System Architecture Spec",
+          "Golden Evaluation & Safety Harness"
+        ]
+      }
     },
     {
       "domain": "medical",
-      "keywords": ["medical", "patient", "doctor", "hospital", "surgery", "healthcare", "diagnosis", "treatment", "anatomy", "physiology", "pathology", "radiology", "clinical", "oncology", "cardiology", "neurology", "symptoms"],
-      "boost": 3
+      "keywords": [
+        "medical",
+        "patient",
+        "doctor",
+        "hospital",
+        "surgery",
+        "healthcare",
+        "diagnosis",
+        "treatment",
+        "anatomy",
+        "physiology",
+        "pathology",
+        "radiology",
+        "clinical",
+        "oncology",
+        "cardiology",
+        "neurology",
+        "symptoms"
+      ],
+      "boost": 3,
+      "aliases": [
+        "clinical-medicine",
+        "diagnostics",
+        "patient-care",
+        "medical-specialty"
+      ],
+      "persona_template": "Board-Certified {role} specializing in differential diagnosis, evidence-based clinical pathways, patient safety, and multidisciplinary care.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Clinical Triage & Differential Workup",
+            "description": "Assess presenting history, vital signs, red-flag emergencies, and order targeted laboratory/imaging studies.",
+            "estimated_duration": "Immediate / Day 1",
+            "deliverables": [
+              "Differential Diagnosis & Workup Matrix",
+              "Red-Flag & Safety Escalation Criteria"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Evidence-Based Therapeutic Intervention",
+            "description": "Initiate guideline-directed medical or procedural therapy accounting for comorbidities and contraindications.",
+            "estimated_duration": "Days 2-7",
+            "deliverables": [
+              "Evidence-Based Clinical Management Protocol",
+              "Contraindication & Interaction Check"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Longitudinal Monitoring & Rehabilitation",
+            "description": "Track clinical response, titrate therapy, and coordinate outpatient follow-up and secondary prevention.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Phased Care & Follow-Up Pathway",
+              "Patient Safety Monitoring Plan"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Diagnostic & Pathology Synthesis",
+            "description": "Correlate clinical presentation with laboratory, radiology, and pathology evidence.",
+            "estimated_duration": "Day 1",
+            "deliverables": [
+              "Clinical Findings & Pathology Interpretation",
+              "Differential Diagnosis & Workup Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Risk Stratification & Care Recommendations",
+            "description": "Evaluate therapeutic benefit-risk ratios, contraindications, and escalation thresholds.",
+            "estimated_duration": "Day 2",
+            "deliverables": [
+              "Risk Stratification & Contraindication Audit",
+              "Red-Flag & Safety Escalation Criteria"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Clinical Triage & Differential Workup",
+            "description": "Assess presenting history, red-flag emergencies, and targeted diagnostic studies.",
+            "estimated_duration": "Day 1",
+            "deliverables": [
+              "Differential Diagnosis & Workup Matrix",
+              "Red-Flag & Safety Escalation Criteria"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Evidence-Based Therapeutic Intervention",
+            "description": "Specify guideline-directed clinical management and safety monitoring.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Evidence-Based Clinical Management Protocol",
+              "Patient Safety Monitoring Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "patient_presentation_and_history",
+        "diagnostic_and_lab_findings",
+        "comorbidities_and_medications",
+        "red_flag_contraindications"
+      ],
+      "task_templates": {
+        "creation": "Formulate an evidence-based clinical workup, differential diagnosis framework, and treatment management protocol.",
+        "analysis": "Evaluate clinical symptoms, pathology/imaging findings, drug interactions, and prognostic risk stratification.",
+        "planning": "Structure a phased clinical care pathway covering acute stabilization, diagnostic confirmation, and follow-up.",
+        "troubleshooting": "Reassess refractory symptoms, adverse medication reactions, or diagnostic discordance with safety escalations.",
+        "optimization": "Refine therapeutic dosing, perioperative risk reduction, and multidisciplinary care coordination.",
+        "default": "Provide an evidence-based clinical assessment prioritizing differential diagnosis, red-flag exclusion, and patient safety."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Differential Diagnosis & Workup Matrix",
+          "Evidence-Based Clinical Management Protocol",
+          "Red-Flag & Safety Escalation Criteria"
+        ],
+        "analysis": [
+          "Clinical Findings & Pathology Interpretation",
+          "Risk Stratification & Contraindication Audit",
+          "Clinical Considerations"
+        ],
+        "planning": [
+          "Phased Care & Follow-Up Pathway",
+          "Diagnostic Testing Sequence",
+          "Patient Safety Monitoring Plan"
+        ],
+        "troubleshooting": [
+          "Refractory Case Reassessment",
+          "Adverse Event & Interaction Review",
+          "Safety Precautions"
+        ],
+        "default": [
+          "Differential Diagnosis & Workup Matrix",
+          "Evidence-Based Clinical Management Protocol"
+        ]
+      }
     },
     {
       "domain": "scientific-research",
-      "keywords": ["research", "experiment", "laboratory", "hypothesis", "data analysis", "publication", "peer-review", "methodology", "citation", "abstract", "paper", "journal", "academic", "statistical-significance"],
-      "boost": 2
+      "keywords": [
+        "research",
+        "experiment",
+        "laboratory",
+        "hypothesis",
+        "data analysis",
+        "publication",
+        "peer-review",
+        "methodology",
+        "citation",
+        "abstract",
+        "paper",
+        "journal",
+        "academic",
+        "statistical-significance"
+      ],
+      "boost": 2,
+      "aliases": [
+        "academic-research",
+        "empirical-study",
+        "lab-research"
+      ],
+      "persona_template": "Lead Research {role} specializing in hypothesis-driven methodology, statistical power design, and peer-reviewed scientific publication.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Hypothesis & Experimental Design",
+            "description": "Formulate falsifiable hypotheses, define control variables, and design experimental protocols.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Formal Hypothesis & Study Protocol",
+              "Statistical Analysis Plan (SAP)"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Data Acquisition & Statistical Synthesis",
+            "description": "Execute trials, apply statistical significance testing, and prepare peer-review artifacts.",
+            "estimated_duration": "2-6 weeks",
+            "deliverables": [
+              "Statistical Power & Effect-Size Evaluation",
+              "Reproducibility & Data Package"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Hypothesis & Experimental Design",
+            "description": "Formulate falsifiable hypotheses, define control variables, and design experimental protocols.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Formal Hypothesis & Study Protocol",
+              "Statistical Analysis Plan (SAP)"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Data Acquisition & Statistical Synthesis",
+            "description": "Execute trials, apply statistical significance testing, and prepare peer-review artifacts.",
+            "estimated_duration": "2-6 weeks",
+            "deliverables": [
+              "Statistical Power & Effect-Size Evaluation",
+              "Reproducibility & Data Package"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "research_question_and_hypothesis",
+        "experimental_design_and_controls",
+        "statistical_methodology",
+        "reproducibility_standards"
+      ],
+      "task_templates": {
+        "creation": "Design a rigorous scientific study protocol, methodology section, and statistical analysis plan.",
+        "analysis": "Critique experimental design, statistical power, confounding variables, and literature synthesis.",
+        "planning": "Develop a phased research execution and peer-reviewed publication roadmap.",
+        "troubleshooting": "Resolve experimental artifacts, sample bias, or statistical model violations.",
+        "optimization": "Improve assay sensitivity, statistical efficiency, and replication robustness.",
+        "default": "Deliver a peer-review grade scientific research methodology and statistical validation plan."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Formal Hypothesis & Study Protocol",
+          "Statistical Analysis Plan (SAP)",
+          "Reproducibility & Data Package"
+        ],
+        "analysis": [
+          "Methodological Critique & Confound Audit",
+          "Statistical Power & Effect-Size Evaluation",
+          "Literature Synthesis Matrix"
+        ],
+        "planning": [
+          "Research & Publication Roadmap",
+          "Data Collection Protocol",
+          "Peer-Review Readiness Checklist"
+        ],
+        "troubleshooting": [
+          "Bias & Artifact Remediation Plan",
+          "Protocol Amendment Specification",
+          "Sensitivity Analysis Report"
+        ],
+        "default": [
+          "Formal Hypothesis & Study Protocol",
+          "Statistical Analysis Plan (SAP)"
+        ]
+      }
     },
     {
       "domain": "cybersecurity",
-      "keywords": ["security", "hacking", "firewall", "encryption", "vulnerability", "pentest", "soc", "malware", "threat", "zero-day", "endpoint", "siem", "zero-trust", "authentication", "authorization", "xss", "csrf"],
-      "boost": 2
+      "keywords": [
+        "security",
+        "hacking",
+        "firewall",
+        "encryption",
+        "vulnerability",
+        "pentest",
+        "soc",
+        "malware",
+        "threat",
+        "zero-day",
+        "endpoint",
+        "siem",
+        "zero-trust",
+        "authentication",
+        "authorization",
+        "xss",
+        "csrf"
+      ],
+      "boost": 2,
+      "aliases": [
+        "infosec",
+        "application-security",
+        "network-security",
+        "secops"
+      ],
+      "persona_template": "Principal {role} specializing in threat modeling, zero-trust architecture, vulnerability remediation, and incident response.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Threat Modeling & Attack Surface Mapping",
+            "description": "Enumerate trust boundaries, assets, STRIDE threat vectors, and IAM/network exposure.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Threat Model & Attack Surface Matrix",
+              "Trust Boundary Diagram"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Defense-in-Depth & Zero-Trust Controls",
+            "description": "Implement mTLS/encryption, least-privilege RBAC, input sanitization, and secret management.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Zero-Trust Security Architecture Spec",
+              "Defensive Remediation Checklist"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Continuous Detection & Pentest Validation",
+            "description": "Deploy SIEM/EDR detection rules, run automated SAST/DAST scans, and validate incident runbooks.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "SIEM Detection & Hardening Playbook",
+              "Penetration Test Verification Report"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Vulnerability & Exposure Assessment",
+            "description": "Audit code, dependencies, network perimeters, and authentication flows for exploitable weaknesses.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Vulnerability & CVSS Risk Audit",
+              "Attack Path Analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Prioritized Remediation & Hardening",
+            "description": "Specify concrete patches, compensating controls, and detection rules.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Defensive Remediation Checklist",
+              "SIEM Detection & Hardening Playbook"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Threat Modeling & Attack Surface Mapping",
+            "description": "Enumerate trust boundaries, threat vectors, and exploitable exposures.",
+            "estimated_duration": "2-4 days",
+            "deliverables": [
+              "Threat Model & Attack Surface Matrix",
+              "Vulnerability & CVSS Risk Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Defense-in-Depth Remediation",
+            "description": "Implement zero-trust controls, patches, and continuous SIEM detection.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Defensive Remediation Checklist",
+              "SIEM Detection & Hardening Playbook"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "attack_surface_and_assets",
+        "threat_model_stride",
+        "compliance_and_zero_trust_bounds",
+        "telemetry_and_siem_scope"
+      ],
+      "task_templates": {
+        "creation": "Architect a zero-trust security control plane, hardened authentication/encryption flow, and detection ruleset.",
+        "analysis": "Conduct STRIDE threat modeling, vulnerability severity triage (CVSS), and attack-path analysis.",
+        "planning": "Develop a phased security hardening, penetration testing, and incident response readiness roadmap.",
+        "troubleshooting": "Contain active security incidents, patch exploitable vulnerabilities (XSS/SQLi/RCE), and eradicate persistence.",
+        "optimization": "Tune SIEM detection signal-to-noise ratio, reduce IAM blast radius, and harden supply-chain dependencies.",
+        "default": "Deliver a defense-in-depth cybersecurity assessment and remediation blueprint."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Threat Model & Attack Surface Matrix",
+          "Zero-Trust Security Architecture Spec",
+          "SIEM Detection & Hardening Playbook"
+        ],
+        "analysis": [
+          "Vulnerability & CVSS Risk Audit",
+          "Attack Path Analysis",
+          "Defensive Remediation Checklist"
+        ],
+        "planning": [
+          "Security Hardening Roadmap",
+          "Incident Response & Containment Plan",
+          "Compliance Control Mapping"
+        ],
+        "troubleshooting": [
+          "Incident Containment & Forensics Report",
+          "Vulnerability Patch Specification",
+          "IOC & Detection Rules"
+        ],
+        "default": [
+          "Threat Model & Attack Surface Matrix",
+          "Defensive Remediation Checklist"
+        ]
+      }
     },
     {
       "domain": "ecommerce",
-      "keywords": ["store", "shopping", "cart", "checkout", "inventory", "warehouse", "logistics", "marketplace", "shipping", "fulfillment", "shopify", "woocommerce", "sku", "payment-gateway", "dropshipping"],
-      "boost": 2
+      "keywords": [
+        "store",
+        "shopping",
+        "cart",
+        "checkout",
+        "inventory",
+        "warehouse",
+        "logistics",
+        "marketplace",
+        "shipping",
+        "fulfillment",
+        "shopify",
+        "woocommerce",
+        "sku",
+        "payment-gateway",
+        "dropshipping"
+      ],
+      "boost": 2,
+      "aliases": [
+        "online-retail",
+        "marketplace-ops",
+        "d2c",
+        "merchandising"
+      ],
+      "persona_template": "Senior {role} specializing in storefront conversion, SKU merchandising, supply-chain fulfillment logistics, and customer lifetime value.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Catalog Architecture & Unit Economics",
+            "description": "Define SKU taxonomy, landed cost margins, bundling tiers, and inventory safety stock levels.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "SKU Assortment & Pricing Matrix",
+              "Unit Economics Breakdown"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Storefront, Checkout & Payment Integration",
+            "description": "Optimize PDP layout, friction-free checkout flow, payment gateways, and tax/shipping calculators.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Storefront & Checkout Architecture Plan",
+              "Conversion & Cart Abandonment Audit"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Fulfillment Logistics & Retention Loops",
+            "description": "Integrate WMS/3PL fulfillment SLAs, reverse logistics, and post-purchase LTV flows.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Fulfillment & 3PL Logistics SLA",
+              "Retention & LTV Playbook"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Storefront Funnel & SKU Margin Audit",
+            "description": "Evaluate PDP-to-cart rate, checkout drop-off, SKU contribution margin, and inventory turns.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Conversion & Cart Abandonment Audit",
+              "SKU Sell-Through & Margin Analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "AOV, LTV & Logistics Optimization",
+            "description": "Recommend bundling, checkout friction removal, and 3PL cost optimizations.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "SKU Assortment & Pricing Matrix",
+              "Fulfillment & 3PL Logistics SLA"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Catalog Architecture & Storefront Setup",
+            "description": "Structure SKU pricing, PDP conversion design, and friction-free checkout.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "SKU Assortment & Pricing Matrix",
+              "Storefront & Checkout Architecture Plan"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Fulfillment & LTV Scaling",
+            "description": "Establish inventory replenishment, 3PL shipping SLAs, and repeat purchase flows.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Fulfillment & 3PL Logistics SLA",
+              "Retention & LTV Playbook"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "catalog_and_sku_structure",
+        "checkout_and_payment_stack",
+        "inventory_and_fulfillment_sla",
+        "unit_margin_and_aov_targets"
+      ],
+      "task_templates": {
+        "creation": "Launch and structure a high-converting e-commerce storefront, SKU catalog, and fulfillment workflow.",
+        "analysis": "Analyze cart abandonment, average order value (AOV), SKU inventory turnover, and fulfillment unit costs.",
+        "planning": "Build a seasonal merchandising, inventory replenishment, and omnichannel growth roadmap.",
+        "troubleshooting": "Resolve checkout friction, stockout/overstock imbalances, or return-rate spikes.",
+        "optimization": "Optimize product detail page (PDP) conversion, cross-sell bundling, 3PL shipping SLAs, and repeat purchase LTV.",
+        "default": "Deliver an end-to-end e-commerce merchandising, conversion, and fulfillment strategy."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Storefront & Checkout Architecture Plan",
+          "SKU Assortment & Pricing Matrix",
+          "Fulfillment & 3PL Logistics SLA"
+        ],
+        "analysis": [
+          "Conversion & Cart Abandonment Audit",
+          "SKU Sell-Through & Margin Analysis",
+          "Unit Economics Breakdown"
+        ],
+        "planning": [
+          "Inventory Replenishment & Demand Forecast",
+          "Merchandising & Bundling Calendar",
+          "Retention & LTV Playbook"
+        ],
+        "troubleshooting": [
+          "Checkout & Return-Rate Fix Plan",
+          "Stockout Mitigation Protocol",
+          "Payment Gateway Audit"
+        ],
+        "default": [
+          "SKU Assortment & Pricing Matrix",
+          "Conversion & Fulfillment Plan"
+        ]
+      }
     },
     {
       "domain": "real-estate",
-      "keywords": ["property", "house", "apartment", "mortgage", "realtor", "appraisal", "listing", "commercial", "residential", "lease", "equity", "real estate", "estate agent", "real estate agent", "brokerage", "home", "tenant", "landlord", "zoning", "escrow"],
+      "keywords": [
+        "property",
+        "house",
+        "apartment",
+        "mortgage",
+        "realtor",
+        "appraisal",
+        "listing",
+        "commercial",
+        "residential",
+        "lease",
+        "equity",
+        "real estate",
+        "estate agent",
+        "real estate agent",
+        "brokerage",
+        "home",
+        "tenant",
+        "landlord",
+        "zoning",
+        "escrow"
+      ],
       "boost": 4,
-      "persona_template": "Experienced {role} specializing in licensing compliance, property marketing, client acquisition, and agency operations.",
+      "persona_template": "Experienced {role} specializing in licensing compliance, property valuation, market comparables, client acquisition, and brokerage operations.",
       "phase_templates": {
         "build": [
           {
@@ -397,58 +3055,375 @@
             "name": "Licensing & Pre-Registration",
             "description": "Complete pre-licensing education coursework, pass state/regional real estate exam, and secure broker sponsorship.",
             "estimated_duration": "1-3 months",
-            "deliverables": ["Real Estate License", "Broker Sponsorship Agreement"]
+            "deliverables": [
+              "Real Estate License",
+              "Broker Sponsorship Agreement"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Business Setup & GTM Strategy",
             "description": "Form business entity (LLC), set up MLS & CRM systems, build personal brand, and establish marketing funnel.",
             "estimated_duration": "2-4 weeks",
-            "deliverables": ["Business Entity (LLC)", "Lead Generation & CRM Setup"]
+            "deliverables": [
+              "Business Entity (LLC)",
+              "Lead Generation & CRM Setup"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Client Acquisition & Expansion",
             "description": "Execute prospecting campaigns, handle buyer/seller representations, secure initial listings, and scale brokerage operations.",
             "estimated_duration": "Ongoing",
-            "deliverables": ["First Closed Transactions", "Client Referral Pipeline"]
+            "deliverables": [
+              "First Closed Transactions",
+              "Client Referral Pipeline"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Market Comparables & Location Audit",
+            "description": "Evaluate neighborhood comps, absorption rates, zoning ordinances, and rental demand.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Comparative Market Analysis (CMA)",
+              "Zoning & Due Diligence Audit"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Financial Underwriting & ROI Stress-Test",
+            "description": "Model NOI, cap rate, DSCR, financing terms, and cash-on-cash return scenarios.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "NOI, Cap Rate & ROI Projection",
+              "Financing & Capital Stack Plan"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Licensing & Market Underwriting",
+            "description": "Establish regulatory licensing or evaluate market comparables and underwriting metrics.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Comparative Market Analysis (CMA)",
+              "NOI, Cap Rate & ROI Projection"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Transaction Execution & Scaling",
+            "description": "Execute deal acquisition, financing, CRM pipeline, and closing operations.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "First Closed Transactions",
+              "Client Referral Pipeline"
+            ]
+          }
+        ]
+      },
+      "aliases": [
+        "real estate",
+        "property-investment",
+        "brokerage",
+        "commercial-real-estate"
+      ],
+      "context_fields": [
+        "target_market_and_zoning",
+        "property_asset_class",
+        "financing_and_cap_rate_targets",
+        "regulatory_and_licensing_scope"
+      ],
+      "task_templates": {
+        "creation": "Develop a real estate acquisition, brokerage launch, or property marketing and underwriting blueprint.",
+        "analysis": "Analyze market comparables (comps), Net Operating Income (NOI), cap rates, cash-on-cash ROI, and zoning risks.",
+        "planning": "Structure a phased real estate licensing, deal sourcing, financing, and portfolio expansion roadmap.",
+        "troubleshooting": "Resolve appraisal gaps, title/escrow contingencies, tenant vacancy, or financing bottlenecks.",
+        "optimization": "Optimize property NOI, debt-service coverage ratio (DSCR), tax depreciation, and lead-to-close velocity.",
+        "default": "Deliver a grounded real estate analysis covering market comparables, underwriting ROI, and transaction execution."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Market Comparables & Underwriting Model",
+          "Licensing & Entity Setup Checklist",
+          "Deal Sourcing & Marketing Funnel"
+        ],
+        "analysis": [
+          "Comparative Market Analysis (CMA)",
+          "NOI, Cap Rate & ROI Projection",
+          "Zoning & Due Diligence Audit"
+        ],
+        "planning": [
+          "Real Estate Acquisition Roadmap",
+          "Financing & Capital Stack Plan",
+          "Client & Deal Pipeline Blueprint"
+        ],
+        "troubleshooting": [
+          "Escrow & Appraisal Contingency Plan",
+          "Vacancy & Cashflow Turnaround Plan",
+          "Risk Mitigation Checklist"
+        ],
+        "default": [
+          "Comparative Market Analysis (CMA)",
+          "NOI, Cap Rate & ROI Projection"
         ]
       }
     },
     {
       "domain": "workplace-productivity",
-      "keywords": ["remote", "wfh", "productivity", "culture", "collaboration", "engagement", "performance", "output", "burnout", "hybrid", "distributed team", "work-from-home", "async", "synchronous", "meeting", "workflow", "time-management", "notion", "jira", "slack"],
-      "boost": 2
+      "keywords": [
+        "remote",
+        "wfh",
+        "productivity",
+        "culture",
+        "collaboration",
+        "engagement",
+        "performance",
+        "output",
+        "burnout",
+        "hybrid",
+        "distributed team",
+        "work-from-home",
+        "async",
+        "synchronous",
+        "meeting",
+        "workflow",
+        "time-management",
+        "notion",
+        "jira",
+        "slack"
+      ],
+      "boost": 2,
+      "aliases": [
+        "remote-work",
+        "organizational-culture",
+        "team-operations",
+        "workflow-optimization"
+      ],
+      "persona_template": "Senior {role} specializing in distributed team workflows, organizational effectiveness, burnout prevention, and asynchronous operational cadence.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Data Collection & Audit",
+            "description": "Gather quantitative (output, hours) and qualitative (surveys, sentiment) data.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Data collection framework",
+              "Initial sentiment report"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Comparative Analysis",
+            "description": "Compare remote vs in-office benchmarks, analyze 'perception vs reality' gap.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Productivity gap analysis",
+              "Variable correlation matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Strategic Recommendation",
+            "description": "Propose hybrid/remote optimizations, cultural adjustments, and KPI realignment.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Strategic optimization roadmap",
+              "Policy adjustment guide"
+            ]
+          }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Workflow & Sentiment Diagnostics",
+            "description": "Measure cycle times, synchronous meeting load, focus hours, and team engagement scores.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Data collection framework",
+              "Productivity gap analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Operating Model Optimization",
+            "description": "Synthesize async communication norms, KPI realignments, and burnout safeguards.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Strategic optimization roadmap",
+              "Policy adjustment guide"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Data Collection & Audit",
+            "description": "Gather quantitative output and qualitative team sentiment data.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Data collection framework",
+              "Productivity gap analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Strategic Recommendation",
+            "description": "Propose hybrid/remote optimizations, cultural adjustments, and KPI realignment.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Strategic optimization roadmap",
+              "Policy adjustment guide"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "team_size_and_work_modality",
+        "collaboration_and_tooling_stack",
+        "output_and_engagement_kpis",
+        "meeting_and_focus_time_bounds"
+      ],
+      "task_templates": {
+        "creation": "Design an asynchronous workflow architecture, communication charter, and outcome-based KPI framework.",
+        "analysis": "Audit remote vs. hybrid productivity metrics, meeting load, employee sentiment, and collaboration bottlenecks.",
+        "planning": "Develop a phased organizational rollout for hybrid/remote operating norms and tooling consolidation.",
+        "troubleshooting": "Address team burnout, cross-functional handoff delays, or synchronous meeting overload.",
+        "optimization": "Optimize deep-work focus blocks, documentation discoverability, and cycle-time predictability.",
+        "default": "Deliver an evidence-based workplace productivity and team operations blueprint."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Async Operating Charter & Workflow Spec",
+          "Outcome KPI & Performance Framework",
+          "Tooling & Cadence Playbook"
+        ],
+        "analysis": [
+          "Productivity & Sentiment Gap Audit",
+          "Meeting & Focus-Time Load Matrix",
+          "Variable Correlation Report"
+        ],
+        "planning": [
+          "Hybrid/Remote Transformation Roadmap",
+          "Change Management & Onboarding Plan",
+          "Policy Adjustment Guide"
+        ],
+        "troubleshooting": [
+          "Burnout & Bottleneck Remediation Plan",
+          "Meeting Audit & Reduction Protocol",
+          "Handoff SLA Checklist"
+        ],
+        "default": [
+          "Async Operating Charter & Workflow Spec",
+          "Strategic Optimization Roadmap"
+        ]
+      }
     },
     {
       "domain": "gaming",
-      "keywords": ["game", "gaming", "unreal", "unity", "gameplay", "graphics", "fps", "rpg", "multiplayer", "esports", "shader", "rendering", "level-design", "gamedev"],
+      "keywords": [
+        "game",
+        "gaming",
+        "unreal",
+        "unity",
+        "gameplay",
+        "graphics",
+        "fps",
+        "rpg",
+        "multiplayer",
+        "esports",
+        "shader",
+        "rendering",
+        "level-design",
+        "gamedev"
+      ],
       "boost": 2
     },
     {
       "domain": "hardware",
-      "keywords": ["hardware", "circuit", "pcb", "microcontroller", "embedded", "firmware", "fpga", "semiconductor", "arm", "risc-v", "soldering", "iot", "sensor"],
+      "keywords": [
+        "hardware",
+        "circuit",
+        "pcb",
+        "microcontroller",
+        "embedded",
+        "firmware",
+        "fpga",
+        "semiconductor",
+        "arm",
+        "risc-v",
+        "soldering",
+        "iot",
+        "sensor"
+      ],
       "boost": 2
     },
     {
       "domain": "supply-chain",
-      "keywords": ["supply-chain", "logistics", "freight", "procurement", "inventory", "vendor", "distribution", "supplier", "customs", "fulfillment", "lead-time"],
+      "keywords": [
+        "supply-chain",
+        "logistics",
+        "freight",
+        "procurement",
+        "inventory",
+        "vendor",
+        "distribution",
+        "supplier",
+        "customs",
+        "fulfillment",
+        "lead-time"
+      ],
       "boost": 2
     },
     {
       "domain": "customer-support",
-      "keywords": ["support", "ticket", "customer-service", "helpdesk", "zendesk", "sla", "satisfaction", "csat", "onboarding", "churn-prevention", "resolution"],
+      "keywords": [
+        "support",
+        "ticket",
+        "customer-service",
+        "helpdesk",
+        "zendesk",
+        "sla",
+        "satisfaction",
+        "csat",
+        "onboarding",
+        "churn-prevention",
+        "resolution"
+      ],
       "boost": 2
     },
     {
       "domain": "travel",
-      "aliases": ["lifestyle-travel", "tourism", "itinerary-planning"],
+      "aliases": [
+        "lifestyle-travel",
+        "tourism",
+        "itinerary-planning"
+      ],
       "boost": 3,
       "keywords": [
-        "itinerary", "trip", "travel", "vacation", "holiday", "destination",
-        "hotel", "flight", "tour", "sightseeing", "goa", "booking", "tourism",
-        "resort", "homestay", "excursion", "backpacking", "roadtrip"
+        "itinerary",
+        "trip",
+        "travel",
+        "vacation",
+        "holiday",
+        "destination",
+        "hotel",
+        "flight",
+        "tour",
+        "sightseeing",
+        "goa",
+        "booking",
+        "tourism",
+        "resort",
+        "homestay",
+        "excursion",
+        "backpacking",
+        "roadtrip"
       ],
       "persona_template": "Experienced {role} specializing in bespoke itinerary planning, destination logistics, and travel budget optimization.",
       "phase_templates": {
@@ -458,22 +3433,115 @@
             "name": "Destination Logistics & Route Planning",
             "description": "Establish travel transit, lodging hubs, arrival schedules, and geographic cluster routes.",
             "estimated_duration": "Day 1",
-            "deliverables": ["Route & Transit Logistics Map", "Lodging & Hub Selection"]
+            "deliverables": [
+              "Route & Transit Logistics Map",
+              "Lodging & Hub Selection"
+            ]
           },
           {
             "phase_number": 2,
             "name": "Daily Activity & Dining Scheduling",
             "description": "Schedule morning/afternoon/evening activities, attractions, and dietary-compliant dining options.",
             "estimated_duration": "Day 2-3",
-            "deliverables": ["Hour-by-Hour Activity Schedule", "Curated Dining & Dietary Recommendations"]
+            "deliverables": [
+              "Hour-by-Hour Activity Schedule",
+              "Curated Dining & Dietary Recommendations"
+            ]
           },
           {
             "phase_number": 3,
             "name": "Cost Optimization & Contingency Blueprint",
             "description": "Itemize cost estimates across lodging, transit, food, and activities to enforce budget ceiling.",
             "estimated_duration": "Ongoing",
-            "deliverables": ["Itemized Budget & Expense Allocation", "Cost-Saving Alternatives & Contingencies"]
+            "deliverables": [
+              "Itemized Budget & Expense Allocation",
+              "Cost-Saving Alternatives & Contingencies"
+            ]
           }
+        ],
+        "analyze": [
+          {
+            "phase_number": 1,
+            "name": "Transit, Lodging & Cost Benchmarking",
+            "description": "Compare flight/rail routes, accommodation hubs, and daily expense baselines.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Route & Transit Logistics Map",
+              "Itemized Budget & Expense Allocation"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Itinerary & Contingency Synthesis",
+            "description": "Select optimal geographic clusters, dining options, and backup weather/transit plans.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Hour-by-Hour Activity Schedule",
+              "Cost-Saving Alternatives & Contingencies"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Destination Logistics & Route Planning",
+            "description": "Establish travel transit, lodging hubs, arrival schedules, and geographic cluster routes.",
+            "estimated_duration": "Day 1",
+            "deliverables": [
+              "Route & Transit Logistics Map",
+              "Hour-by-Hour Activity Schedule"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Cost Optimization & Contingency Blueprint",
+            "description": "Itemize cost estimates across lodging, transit, food, and activities to enforce budget ceiling.",
+            "estimated_duration": "Ongoing",
+            "deliverables": [
+              "Itemized Budget & Expense Allocation",
+              "Cost-Saving Alternatives & Contingencies"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "destination_and_season",
+        "trip_duration_and_pace",
+        "total_budget_and_currency",
+        "traveler_profile_and_dietary_needs"
+      ],
+      "task_templates": {
+        "creation": "Design a day-by-day travel itinerary with transit logistics, curated dining, lodging hubs, and itemized budget allocation.",
+        "analysis": "Compare transit routes, neighborhood lodging options, seasonal weather/crowd trade-offs, and total trip costs.",
+        "planning": "Structure a phased trip preparation, booking sequence, route clustering, and contingency plan.",
+        "troubleshooting": "Resolve transit connection gaps, budget overruns, weather disruptions, or dietary accommodation constraints.",
+        "optimization": "Optimize geographic route clustering, off-peak booking savings, transit transfer time, and cost-per-day efficiency.",
+        "default": "Deliver a practical, budget-verified travel itinerary and destination logistics plan."
+      },
+      "default_deliverables": {
+        "creation": [
+          "Route & Transit Logistics Map",
+          "Hour-by-Hour Activity Schedule",
+          "Itemized Budget & Expense Allocation"
+        ],
+        "analysis": [
+          "Destination & Lodging Comparison Matrix",
+          "Transit & Cost Trade-off Audit",
+          "Seasonal Readiness Brief"
+        ],
+        "planning": [
+          "Day-by-Day Itinerary Blueprint",
+          "Booking & Reservation Timeline",
+          "Cost-Saving Alternatives & Contingencies"
+        ],
+        "troubleshooting": [
+          "Rerouting & Contingency Playbook",
+          "Budget Reallocation Breakdown",
+          "Dietary & Local Logistics Guide"
+        ],
+        "default": [
+          "Hour-by-Hour Activity Schedule",
+          "Itemized Budget & Expense Allocation"
         ]
       }
     }
@@ -484,12 +3552,30 @@
       "domain": "computers",
       "base_title": "Computer Systems Architect",
       "verbs": [
-        { "word": "computer",         "weight": 10 },
-        { "word": "computing",        "weight": 10 },
-        { "word": "operating-system", "weight": 10 },
-        { "word": "kernel",           "weight": 9 },
-        { "word": "processor",        "weight": 9 },
-        { "word": "architecture",     "weight": 9 }
+        {
+          "word": "computer",
+          "weight": 10
+        },
+        {
+          "word": "computing",
+          "weight": 10
+        },
+        {
+          "word": "operating-system",
+          "weight": 10
+        },
+        {
+          "word": "kernel",
+          "weight": 9
+        },
+        {
+          "word": "processor",
+          "weight": 9
+        },
+        {
+          "word": "architecture",
+          "weight": 9
+        }
       ]
     },
     {
@@ -497,13 +3583,34 @@
       "domain": "science",
       "base_title": "Lead Research Scientist",
       "verbs": [
-        { "word": "science",          "weight": 10 },
-        { "word": "scientific",       "weight": 10 },
-        { "word": "experiment",       "weight": 10 },
-        { "word": "hypothesis",       "weight": 10 },
-        { "word": "physics",          "weight": 9 },
-        { "word": "chemistry",        "weight": 9 },
-        { "word": "biology",          "weight": 9 }
+        {
+          "word": "science",
+          "weight": 10
+        },
+        {
+          "word": "scientific",
+          "weight": 10
+        },
+        {
+          "word": "experiment",
+          "weight": 10
+        },
+        {
+          "word": "hypothesis",
+          "weight": 10
+        },
+        {
+          "word": "physics",
+          "weight": 9
+        },
+        {
+          "word": "chemistry",
+          "weight": 9
+        },
+        {
+          "word": "biology",
+          "weight": 9
+        }
       ]
     },
     {
@@ -511,12 +3618,30 @@
       "domain": "health",
       "base_title": "Clinical Health Specialist",
       "verbs": [
-        { "word": "health",           "weight": 10 },
-        { "word": "healthcare",       "weight": 10 },
-        { "word": "wellness",         "weight": 9 },
-        { "word": "clinical",         "weight": 9 },
-        { "word": "prevention",       "weight": 8 },
-        { "word": "vitality",         "weight": 8 }
+        {
+          "word": "health",
+          "weight": 10
+        },
+        {
+          "word": "healthcare",
+          "weight": 10
+        },
+        {
+          "word": "wellness",
+          "weight": 9
+        },
+        {
+          "word": "clinical",
+          "weight": 9
+        },
+        {
+          "word": "prevention",
+          "weight": 8
+        },
+        {
+          "word": "vitality",
+          "weight": 8
+        }
       ]
     },
     {
@@ -524,17 +3649,50 @@
       "domain": "finance",
       "base_title": "Wealth & Income Strategist",
       "verbs": [
-        { "word": "earn",             "weight": 10 },
-        { "word": "money",            "weight": 10 },
-        { "word": "income",           "weight": 10 },
-        { "word": "wealth",           "weight": 10 },
-        { "word": "million",          "weight": 10 },
-        { "word": "millions",         "weight": 10 },
-        { "word": "billion",          "weight": 10 },
-        { "word": "cashflow",         "weight": 9 },
-        { "word": "salary",           "weight": 8 },
-        { "word": "investment",       "weight": 9 },
-        { "word": "portfolio",        "weight": 9 }
+        {
+          "word": "earn",
+          "weight": 10
+        },
+        {
+          "word": "money",
+          "weight": 10
+        },
+        {
+          "word": "income",
+          "weight": 10
+        },
+        {
+          "word": "wealth",
+          "weight": 10
+        },
+        {
+          "word": "million",
+          "weight": 10
+        },
+        {
+          "word": "millions",
+          "weight": 10
+        },
+        {
+          "word": "billion",
+          "weight": 10
+        },
+        {
+          "word": "cashflow",
+          "weight": 9
+        },
+        {
+          "word": "salary",
+          "weight": 8
+        },
+        {
+          "word": "investment",
+          "weight": 9
+        },
+        {
+          "word": "portfolio",
+          "weight": 9
+        }
       ]
     },
     {
@@ -542,10 +3700,22 @@
       "domain": "pharma",
       "base_title": "Pharmacologist",
       "verbs": [
-        { "word": "pharmacokinetics", "weight": 10 },
-        { "word": "dosage",           "weight": 9 },
-        { "word": "bioavailability",  "weight": 10 },
-        { "word": "receptor",         "weight": 9 }
+        {
+          "word": "pharmacokinetics",
+          "weight": 10
+        },
+        {
+          "word": "dosage",
+          "weight": 9
+        },
+        {
+          "word": "bioavailability",
+          "weight": 10
+        },
+        {
+          "word": "receptor",
+          "weight": 9
+        }
       ]
     },
     {
@@ -553,10 +3723,22 @@
       "domain": "software",
       "base_title": "Systems Architect",
       "verbs": [
-        { "word": "design",           "weight": 8 },
-        { "word": "architecture",     "weight": 10 },
-        { "word": "scalability",      "weight": 9 },
-        { "word": "distributed",      "weight": 9 }
+        {
+          "word": "design",
+          "weight": 8
+        },
+        {
+          "word": "architecture",
+          "weight": 10
+        },
+        {
+          "word": "scalability",
+          "weight": 9
+        },
+        {
+          "word": "distributed",
+          "weight": 9
+        }
       ]
     },
     {
@@ -564,10 +3746,22 @@
       "domain": "software",
       "base_title": "Full Stack Developer",
       "verbs": [
-        { "word": "build",            "weight": 7 },
-        { "word": "implement",        "weight": 8 },
-        { "word": "frontend",         "weight": 9 },
-        { "word": "backend",          "weight": 9 }
+        {
+          "word": "build",
+          "weight": 7
+        },
+        {
+          "word": "implement",
+          "weight": 8
+        },
+        {
+          "word": "frontend",
+          "weight": 9
+        },
+        {
+          "word": "backend",
+          "weight": 9
+        }
       ]
     },
     {
@@ -575,11 +3769,26 @@
       "domain": "business",
       "base_title": "Business Strategist",
       "verbs": [
-        { "word": "business",         "weight": 8 },
-        { "word": "startup",          "weight": 9 },
-        { "word": "revenue",          "weight": 9 },
-        { "word": "growth",           "weight": 8 },
-        { "word": "market",           "weight": 7 }
+        {
+          "word": "business",
+          "weight": 8
+        },
+        {
+          "word": "startup",
+          "weight": 9
+        },
+        {
+          "word": "revenue",
+          "weight": 9
+        },
+        {
+          "word": "growth",
+          "weight": 8
+        },
+        {
+          "word": "market",
+          "weight": 7
+        }
       ]
     },
     {
@@ -587,10 +3796,22 @@
       "domain": "business",
       "base_title": "Product Manager",
       "verbs": [
-        { "word": "product",          "weight": 9 },
-        { "word": "roadmap",          "weight": 10 },
-        { "word": "feature",          "weight": 7 },
-        { "word": "user",             "weight": 6 }
+        {
+          "word": "product",
+          "weight": 9
+        },
+        {
+          "word": "roadmap",
+          "weight": 10
+        },
+        {
+          "word": "feature",
+          "weight": 7
+        },
+        {
+          "word": "user",
+          "weight": 6
+        }
       ]
     },
     {
@@ -598,10 +3819,22 @@
       "domain": "data-science",
       "base_title": "Data Scientist",
       "verbs": [
-        { "word": "model",            "weight": 8 },
-        { "word": "prediction",       "weight": 9 },
-        { "word": "classification",   "weight": 9 },
-        { "word": "dataset",          "weight": 8 }
+        {
+          "word": "model",
+          "weight": 8
+        },
+        {
+          "word": "prediction",
+          "weight": 9
+        },
+        {
+          "word": "classification",
+          "weight": 9
+        },
+        {
+          "word": "dataset",
+          "weight": 8
+        }
       ]
     },
     {
@@ -609,10 +3842,22 @@
       "domain": "marketing",
       "base_title": "Growth Strategist",
       "verbs": [
-        { "word": "campaign",         "weight": 9 },
-        { "word": "conversion",       "weight": 9 },
-        { "word": "funnel",           "weight": 8 },
-        { "word": "audience",         "weight": 7 }
+        {
+          "word": "campaign",
+          "weight": 9
+        },
+        {
+          "word": "conversion",
+          "weight": 9
+        },
+        {
+          "word": "funnel",
+          "weight": 8
+        },
+        {
+          "word": "audience",
+          "weight": 7
+        }
       ]
     },
     {
@@ -620,10 +3865,22 @@
       "domain": "finance",
       "base_title": "Financial Analyst",
       "verbs": [
-        { "word": "investment",       "weight": 9 },
-        { "word": "portfolio",        "weight": 9 },
-        { "word": "valuation",        "weight": 10 },
-        { "word": "risk",             "weight": 8 }
+        {
+          "word": "investment",
+          "weight": 9
+        },
+        {
+          "word": "portfolio",
+          "weight": 9
+        },
+        {
+          "word": "valuation",
+          "weight": 10
+        },
+        {
+          "word": "risk",
+          "weight": 8
+        }
       ]
     },
     {
@@ -631,10 +3888,22 @@
       "domain": "nutrition",
       "base_title": "Registered Dietician",
       "verbs": [
-        { "word": "dietician",        "weight": 10 },
-        { "word": "dietitian",        "weight": 10 },
-        { "word": "clinical",         "weight": 8 },
-        { "word": "metabolic",        "weight": 9 }
+        {
+          "word": "dietician",
+          "weight": 10
+        },
+        {
+          "word": "dietitian",
+          "weight": 10
+        },
+        {
+          "word": "clinical",
+          "weight": 8
+        },
+        {
+          "word": "metabolic",
+          "weight": 9
+        }
       ]
     },
     {
@@ -642,10 +3911,22 @@
       "domain": "nutrition",
       "base_title": "Clinical Nutritionist",
       "verbs": [
-        { "word": "nutrition",        "weight": 8 },
-        { "word": "supplements",      "weight": 9 },
-        { "word": "probiotic",        "weight": 8 },
-        { "word": "deficiency",       "weight": 7 }
+        {
+          "word": "nutrition",
+          "weight": 8
+        },
+        {
+          "word": "supplements",
+          "weight": 9
+        },
+        {
+          "word": "probiotic",
+          "weight": 8
+        },
+        {
+          "word": "deficiency",
+          "weight": 7
+        }
       ]
     },
     {
@@ -653,11 +3934,26 @@
       "domain": "nutrition",
       "base_title": "Sports Nutritionist",
       "verbs": [
-        { "word": "nutritionist",     "weight": 10 },
-        { "word": "meal",             "weight": 8 },
-        { "word": "diet",             "weight": 8 },
-        { "word": "macro",            "weight": 9 },
-        { "word": "training",         "weight": 7 }
+        {
+          "word": "nutritionist",
+          "weight": 10
+        },
+        {
+          "word": "meal",
+          "weight": 8
+        },
+        {
+          "word": "diet",
+          "weight": 8
+        },
+        {
+          "word": "macro",
+          "weight": 9
+        },
+        {
+          "word": "training",
+          "weight": 7
+        }
       ]
     },
     {
@@ -665,10 +3961,22 @@
       "domain": "education",
       "base_title": "Curriculum Designer",
       "verbs": [
-        { "word": "curriculum",       "weight": 10 },
-        { "word": "course",           "weight": 9 },
-        { "word": "teach",            "weight": 8 },
-        { "word": "assessment",       "weight": 8 }
+        {
+          "word": "curriculum",
+          "weight": 10
+        },
+        {
+          "word": "course",
+          "weight": 9
+        },
+        {
+          "word": "teach",
+          "weight": 8
+        },
+        {
+          "word": "assessment",
+          "weight": 8
+        }
       ]
     },
     {
@@ -676,10 +3984,22 @@
       "domain": "legal",
       "base_title": "Legal Strategist",
       "verbs": [
-        { "word": "contract",         "weight": 9 },
-        { "word": "compliance",       "weight": 9 },
-        { "word": "regulation",       "weight": 8 },
-        { "word": "liability",        "weight": 8 }
+        {
+          "word": "contract",
+          "weight": 9
+        },
+        {
+          "word": "compliance",
+          "weight": 9
+        },
+        {
+          "word": "regulation",
+          "weight": 8
+        },
+        {
+          "word": "liability",
+          "weight": 8
+        }
       ]
     },
     {
@@ -687,10 +4007,22 @@
       "domain": "devops",
       "base_title": "Platform Engineer",
       "verbs": [
-        { "word": "infrastructure",   "weight": 9 },
-        { "word": "terraform",        "weight": 9 },
-        { "word": "monitoring",       "weight": 8 },
-        { "word": "cloud",            "weight": 7 }
+        {
+          "word": "infrastructure",
+          "weight": 9
+        },
+        {
+          "word": "terraform",
+          "weight": 9
+        },
+        {
+          "word": "monitoring",
+          "weight": 8
+        },
+        {
+          "word": "cloud",
+          "weight": 7
+        }
       ]
     },
     {
@@ -698,10 +4030,22 @@
       "domain": "ai-ml",
       "base_title": "AI Researcher",
       "verbs": [
-        { "word": "alignment",        "weight": 10 },
-        { "word": "safety",           "weight": 9 },
-        { "word": "agi",              "weight": 10 },
-        { "word": "intelligence",     "weight": 8 }
+        {
+          "word": "alignment",
+          "weight": 10
+        },
+        {
+          "word": "safety",
+          "weight": 9
+        },
+        {
+          "word": "agi",
+          "weight": 10
+        },
+        {
+          "word": "intelligence",
+          "weight": 8
+        }
       ]
     },
     {
@@ -709,10 +4053,22 @@
       "domain": "ai-ml",
       "base_title": "LLM Engineer",
       "verbs": [
-        { "word": "llm",              "weight": 10 },
-        { "word": "transformer",      "weight": 9 },
-        { "word": "inference",        "weight": 8 },
-        { "word": "rlhf",             "weight": 9 }
+        {
+          "word": "llm",
+          "weight": 10
+        },
+        {
+          "word": "transformer",
+          "weight": 9
+        },
+        {
+          "word": "inference",
+          "weight": 8
+        },
+        {
+          "word": "rlhf",
+          "weight": 9
+        }
       ]
     },
     {
@@ -720,10 +4076,22 @@
       "domain": "medical",
       "base_title": "Physician",
       "verbs": [
-        { "word": "diagnosis",        "weight": 10 },
-        { "word": "treatment",        "weight": 9 },
-        { "word": "patient",          "weight": 8 },
-        { "word": "clinical",         "weight": 7 }
+        {
+          "word": "diagnosis",
+          "weight": 10
+        },
+        {
+          "word": "treatment",
+          "weight": 9
+        },
+        {
+          "word": "patient",
+          "weight": 8
+        },
+        {
+          "word": "clinical",
+          "weight": 7
+        }
       ]
     },
     {
@@ -731,10 +4099,22 @@
       "domain": "scientific-research",
       "base_title": "Research Scientist",
       "verbs": [
-        { "word": "hypothesis",       "weight": 10 },
-        { "word": "experiment",       "weight": 9 },
-        { "word": "analysis",         "weight": 8 },
-        { "word": "publication",      "weight": 7 }
+        {
+          "word": "hypothesis",
+          "weight": 10
+        },
+        {
+          "word": "experiment",
+          "weight": 9
+        },
+        {
+          "word": "analysis",
+          "weight": 8
+        },
+        {
+          "word": "publication",
+          "weight": 7
+        }
       ]
     },
     {
@@ -742,10 +4122,22 @@
       "domain": "cybersecurity",
       "base_title": "Security Analyst",
       "verbs": [
-        { "word": "vulnerability",    "weight": 10 },
-        { "word": "threat",           "weight": 9 },
-        { "word": "firewall",         "weight": 8 },
-        { "word": "encryption",       "weight": 9 }
+        {
+          "word": "vulnerability",
+          "weight": 10
+        },
+        {
+          "word": "threat",
+          "weight": 9
+        },
+        {
+          "word": "firewall",
+          "weight": 8
+        },
+        {
+          "word": "encryption",
+          "weight": 9
+        }
       ]
     },
     {
@@ -753,10 +4145,22 @@
       "domain": "ecommerce",
       "base_title": "E-commerce Manager",
       "verbs": [
-        { "word": "inventory",        "weight": 9 },
-        { "word": "conversion",       "weight": 8 },
-        { "word": "logistics",        "weight": 7 },
-        { "word": "marketplace",      "weight": 7 }
+        {
+          "word": "inventory",
+          "weight": 9
+        },
+        {
+          "word": "conversion",
+          "weight": 8
+        },
+        {
+          "word": "logistics",
+          "weight": 7
+        },
+        {
+          "word": "marketplace",
+          "weight": 7
+        }
       ]
     },
     {
@@ -764,14 +4168,38 @@
       "domain": "real-estate",
       "base_title": "Real Estate Agent",
       "verbs": [
-        { "word": "agent",            "weight": 10 },
-        { "word": "realtor",          "weight": 10 },
-        { "word": "estate",           "weight": 9 },
-        { "word": "property",         "weight": 9 },
-        { "word": "brokerage",        "weight": 9 },
-        { "word": "listing",          "weight": 8 },
-        { "word": "mortgage",         "weight": 8 },
-        { "word": "valuation",        "weight": 8 }
+        {
+          "word": "agent",
+          "weight": 10
+        },
+        {
+          "word": "realtor",
+          "weight": 10
+        },
+        {
+          "word": "estate",
+          "weight": 9
+        },
+        {
+          "word": "property",
+          "weight": 9
+        },
+        {
+          "word": "brokerage",
+          "weight": 9
+        },
+        {
+          "word": "listing",
+          "weight": 8
+        },
+        {
+          "word": "mortgage",
+          "weight": 8
+        },
+        {
+          "word": "valuation",
+          "weight": 8
+        }
       ]
     },
     {
@@ -779,10 +4207,22 @@
       "domain": "workplace-productivity",
       "base_title": "Workplace Strategist",
       "verbs": [
-        { "word": "culture",          "weight": 10 },
-        { "word": "productivity",     "weight": 10 },
-        { "word": "remote",           "weight": 9 },
-        { "word": "collaboration",    "weight": 8 }
+        {
+          "word": "culture",
+          "weight": 10
+        },
+        {
+          "word": "productivity",
+          "weight": 10
+        },
+        {
+          "word": "remote",
+          "weight": 9
+        },
+        {
+          "word": "collaboration",
+          "weight": 8
+        }
       ]
     },
     {
@@ -790,10 +4230,22 @@
       "domain": "workplace-productivity",
       "base_title": "Organizational Analyst",
       "verbs": [
-        { "word": "performance",      "weight": 9 },
-        { "word": "engagement",       "weight": 10 },
-        { "word": "burnout",          "weight": 9 },
-        { "word": "metrics",          "weight": 8 }
+        {
+          "word": "performance",
+          "weight": 9
+        },
+        {
+          "word": "engagement",
+          "weight": 10
+        },
+        {
+          "word": "burnout",
+          "weight": 9
+        },
+        {
+          "word": "metrics",
+          "weight": 8
+        }
       ]
     },
     {
@@ -801,12 +4253,30 @@
       "domain": "travel",
       "base_title": "Travel Planner",
       "verbs": [
-        { "word": "itinerary", "weight": 10 },
-        { "word": "trip",      "weight": 9 },
-        { "word": "vacation",  "weight": 9 },
-        { "word": "travel",    "weight": 8 },
-        { "word": "tour",      "weight": 8 },
-        { "word": "holiday",   "weight": 8 }
+        {
+          "word": "itinerary",
+          "weight": 10
+        },
+        {
+          "word": "trip",
+          "weight": 9
+        },
+        {
+          "word": "vacation",
+          "weight": 9
+        },
+        {
+          "word": "travel",
+          "weight": 8
+        },
+        {
+          "word": "tour",
+          "weight": 8
+        },
+        {
+          "word": "holiday",
+          "weight": 8
+        }
       ]
     },
     {
@@ -814,10 +4284,76 @@
       "domain": "travel",
       "base_title": "Itinerary Specialist",
       "verbs": [
-        { "word": "itinerary",   "weight": 10 },
-        { "word": "sightseeing", "weight": 9 },
-        { "word": "destination", "weight": 8 },
-        { "word": "schedule",    "weight": 7 }
+        {
+          "word": "itinerary",
+          "weight": 10
+        },
+        {
+          "word": "sightseeing",
+          "weight": 9
+        },
+        {
+          "word": "destination",
+          "weight": 8
+        },
+        {
+          "word": "schedule",
+          "weight": 7
+        }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "creative",
+      "base_title": "Creative Director & Narrative Architect",
+      "verbs": [
+        {
+          "word": "story",
+          "weight": 10
+        },
+        {
+          "word": "narrative",
+          "weight": 9
+        },
+        {
+          "word": "character",
+          "weight": 9
+        },
+        {
+          "word": "script",
+          "weight": 8
+        },
+        {
+          "word": "novel",
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "priority": 5,
+      "domain": "health-fitness",
+      "base_title": "Strength & Conditioning Specialist",
+      "verbs": [
+        {
+          "word": "workout",
+          "weight": 10
+        },
+        {
+          "word": "exercise",
+          "weight": 9
+        },
+        {
+          "word": "strength",
+          "weight": 9
+        },
+        {
+          "word": "hypertrophy",
+          "weight": 9
+        },
+        {
+          "word": "fitness",
+          "weight": 8
+        }
       ]
     }
   ],
@@ -829,9 +4365,50 @@
       "is_forbidden": true,
       "description": "Gluten containing grains",
       "trigger": [
-        [{ "word": "avoid", "weight": 6, "synonyms": ["avoiding", "exclude", "excluding"] }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "avoiding", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "gluten", "weight": 10 }],
-        [{ "word": "gluten", "weight": 8 }, { "word": "free", "weight": 6 }]
+        [
+          {
+            "word": "avoid",
+            "weight": 6,
+            "synonyms": [
+              "avoiding",
+              "exclude",
+              "excluding"
+            ]
+          },
+          {
+            "word": "gluten",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "no",
+            "weight": 5,
+            "synonyms": [
+              "avoid",
+              "avoiding",
+              "cant",
+              "don't",
+              "intolerant",
+              "without",
+              "free from"
+            ]
+          },
+          {
+            "word": "gluten",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "gluten",
+            "weight": 8
+          },
+          {
+            "word": "free",
+            "weight": 6
+          }
+        ]
       ]
     },
     {
@@ -841,8 +4418,26 @@
       "is_forbidden": false,
       "description": "High carbohydrate loading protocol",
       "trigger": [
-        [{ "word": "high", "weight": 7 }, { "word": "carb", "weight": 9 }],
-        [{ "word": "loading", "weight": 8 }, { "word": "carbohydrate", "weight": 10 }]
+        [
+          {
+            "word": "high",
+            "weight": 7
+          },
+          {
+            "word": "carb",
+            "weight": 9
+          }
+        ],
+        [
+          {
+            "word": "loading",
+            "weight": 8
+          },
+          {
+            "word": "carbohydrate",
+            "weight": 10
+          }
+        ]
       ]
     },
     {
@@ -852,10 +4447,55 @@
       "is_forbidden": true,
       "description": "All dairy products",
       "trigger": [
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from", "lactose-free"] }, { "word": "dairy", "weight": 10 }],
-        [{ "word": "avoid", "weight": 6 }, { "word": "dairy", "weight": 10 }],
-        [{ "word": "dairy", "weight": 8 }, { "word": "free", "weight": 6 }],
-        [{ "word": "lactose", "weight": 8 }, { "word": "free", "weight": 6 }]
+        [
+          {
+            "word": "no",
+            "weight": 5,
+            "synonyms": [
+              "avoid",
+              "cant",
+              "don't",
+              "intolerant",
+              "without",
+              "free from",
+              "lactose-free"
+            ]
+          },
+          {
+            "word": "dairy",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "avoid",
+            "weight": 6
+          },
+          {
+            "word": "dairy",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "dairy",
+            "weight": 8
+          },
+          {
+            "word": "free",
+            "weight": 6
+          }
+        ],
+        [
+          {
+            "word": "lactose",
+            "weight": 8
+          },
+          {
+            "word": "free",
+            "weight": 6
+          }
+        ]
       ]
     },
     {
@@ -865,7 +4505,16 @@
       "is_forbidden": false,
       "description": "Low fiber dietary approach",
       "trigger": [
-        [{ "word": "low", "weight": 7 }, { "word": "fiber", "weight": 9 }]
+        [
+          {
+            "word": "low",
+            "weight": 7
+          },
+          {
+            "word": "fiber",
+            "weight": 9
+          }
+        ]
       ]
     },
     {
@@ -875,8 +4524,34 @@
       "is_forbidden": true,
       "description": "Nightshade vegetables (tomatoes, peppers, eggplant, potatoes)",
       "trigger": [
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "intolerant", "without", "free from"] }, { "word": "nightshades", "weight": 10 }],
-        [{ "word": "avoid", "weight": 6 }, { "word": "nightshades", "weight": 10 }]
+        [
+          {
+            "word": "no",
+            "weight": 5,
+            "synonyms": [
+              "avoid",
+              "cant",
+              "don't",
+              "intolerant",
+              "without",
+              "free from"
+            ]
+          },
+          {
+            "word": "nightshades",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "avoid",
+            "weight": 6
+          },
+          {
+            "word": "nightshades",
+            "weight": 10
+          }
+        ]
       ]
     },
     {
@@ -886,9 +4561,32 @@
       "is_forbidden": false,
       "description": "Budget-constrained approach",
       "trigger": [
-        [{ "word": "low", "weight": 6 }, { "word": "budget", "weight": 9 }],
-        [{ "word": "bootstrap", "weight": 10 }],
-        [{ "word": "minimal", "weight": 7 }, { "word": "investment", "weight": 8 }]
+        [
+          {
+            "word": "low",
+            "weight": 6
+          },
+          {
+            "word": "budget",
+            "weight": 9
+          }
+        ],
+        [
+          {
+            "word": "bootstrap",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "minimal",
+            "weight": 7
+          },
+          {
+            "word": "investment",
+            "weight": 8
+          }
+        ]
       ]
     },
     {
@@ -898,8 +4596,22 @@
       "is_forbidden": false,
       "description": "SaaS business model focus",
       "trigger": [
-        [{ "word": "saas", "weight": 10 }],
-        [{ "word": "subscription", "weight": 9 }, { "word": "model", "weight": 7 }]
+        [
+          {
+            "word": "saas",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "subscription",
+            "weight": 9
+          },
+          {
+            "word": "model",
+            "weight": 7
+          }
+        ]
       ]
     },
     {
@@ -909,8 +4621,26 @@
       "is_forbidden": false,
       "description": "Production-grade code quality required",
       "trigger": [
-        [{ "word": "production", "weight": 9 }, { "word": "ready", "weight": 8 }],
-        [{ "word": "production", "weight": 9 }, { "word": "grade", "weight": 8 }]
+        [
+          {
+            "word": "production",
+            "weight": 9
+          },
+          {
+            "word": "ready",
+            "weight": 8
+          }
+        ],
+        [
+          {
+            "word": "production",
+            "weight": 9
+          },
+          {
+            "word": "grade",
+            "weight": 8
+          }
+        ]
       ]
     },
     {
@@ -920,8 +4650,44 @@
       "is_forbidden": true,
       "description": "No external API dependencies",
       "trigger": [
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "external", "weight": 8 }, { "word": "api", "weight": 9 }],
-        [{ "word": "no", "weight": 5, "synonyms": ["avoid", "cant", "don't", "without", "zero"] }, { "word": "dependencies", "weight": 9 }]
+        [
+          {
+            "word": "no",
+            "weight": 5,
+            "synonyms": [
+              "avoid",
+              "cant",
+              "don't",
+              "without",
+              "zero"
+            ]
+          },
+          {
+            "word": "external",
+            "weight": 8
+          },
+          {
+            "word": "api",
+            "weight": 9
+          }
+        ],
+        [
+          {
+            "word": "no",
+            "weight": 5,
+            "synonyms": [
+              "avoid",
+              "cant",
+              "don't",
+              "without",
+              "zero"
+            ]
+          },
+          {
+            "word": "dependencies",
+            "weight": 9
+          }
+        ]
       ]
     },
     {
@@ -931,8 +4697,22 @@
       "is_forbidden": false,
       "description": "GDPR compliance required",
       "trigger": [
-        [{ "word": "gdpr", "weight": 10 }],
-        [{ "word": "data", "weight": 6 }, { "word": "privacy", "weight": 9 }]
+        [
+          {
+            "word": "gdpr",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "data",
+            "weight": 6
+          },
+          {
+            "word": "privacy",
+            "weight": 9
+          }
+        ]
       ]
     },
     {
@@ -942,8 +4722,22 @@
       "is_forbidden": false,
       "description": "Strictly vegetarian dining options and meal recommendations only",
       "trigger": [
-        [{ "word": "vegetarian", "weight": 10 }],
-        [{ "word": "veg", "weight": 8 }, { "word": "only", "weight": 6 }]
+        [
+          {
+            "word": "vegetarian",
+            "weight": 10
+          }
+        ],
+        [
+          {
+            "word": "veg",
+            "weight": 8
+          },
+          {
+            "word": "only",
+            "weight": 6
+          }
+        ]
       ]
     },
     {
@@ -953,9 +4747,36 @@
       "is_forbidden": false,
       "description": "Strict budget ceiling optimization across transit, lodging, and activities",
       "trigger": [
-        [{ "word": "under", "weight": 6 }, { "word": "inr", "weight": 9 }],
-        [{ "word": "under", "weight": 6 }, { "word": "budget", "weight": 8 }],
-        [{ "word": "optimize", "weight": 7 }, { "word": "cost", "weight": 8 }]
+        [
+          {
+            "word": "under",
+            "weight": 6
+          },
+          {
+            "word": "inr",
+            "weight": 9
+          }
+        ],
+        [
+          {
+            "word": "under",
+            "weight": 6
+          },
+          {
+            "word": "budget",
+            "weight": 8
+          }
+        ],
+        [
+          {
+            "word": "optimize",
+            "weight": 7
+          },
+          {
+            "word": "cost",
+            "weight": 8
+          }
+        ]
       ]
     }
   ]

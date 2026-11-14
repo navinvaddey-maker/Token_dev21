@@ -1,4 +1,11 @@
-use crate::types::{AlgorithmOutput, WmSlot};
+//! Schema Filling & Deterministic Scope Injection (`ARCHITECTURE.md` §1.2, §1.4, §1.5).
+//!
+//! Resolves NULLs in task, role, context, constraints, and deliverables using layered
+//! priors (`WmSlot`, session `delta_tokens`, and domain knowledge) combined with
+//! `ScenarioSignal` across all 22 canonical domains.
+
+use crate::classifier::signal::ScenarioSignal;
+use crate::types::{AlgorithmOutput, Constraint, Deliverable, Mode, WmSlot};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
@@ -49,12 +56,16 @@ lazy_static! {
     };
 }
 
-/// Injects deterministic scope suggestions based on inferred task/deliverable/context
+/// Injects deterministic scope suggestions based on inferred task/deliverable/context.
 #[derive(Debug, Default)]
 pub struct DeterminismScopeInjector;
 
 impl DeterminismScopeInjector {
-    /// Returns scope injection suggestions for the given context
+    /// Returns scope injection suggestions for the given context.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn inject(
         task: &Option<String>,
         deliverable: &Option<String>,
@@ -110,8 +121,12 @@ pub struct SchemaFilling {
 }
 
 impl SchemaFilling {
+    /// Creates a new `SchemaFilling` instance with default domain vocabulary priors.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn new() -> Self {
-        // Initialize with some domain knowledge examples
         let mut domain_knowledge = HashMap::new();
         domain_knowledge.insert(
             "task".to_string(),
@@ -154,9 +169,13 @@ impl SchemaFilling {
     }
 
     /// Fill NULLs in task, deliverable, context using specified number of layers.
-    /// layers = 1 (Gentle): only use WM slots
-    /// layers = 3 (Aggressive): WM + session history + domain knowledge
-    /// If output is provided and layers == 3, scope_injections will be set in the output.
+    ///
+    /// - `layers = 1` (Gentle): only use WM slots
+    /// - `layers = 2` (Balanced): WM + session history + implicit domain deliverables
+    /// - `layers = 3` (Aggressive): WM + session history + domain knowledge + scope injections
+    ///
+    /// # Panics
+    /// Never.
     pub fn fill(
         &self,
         wm_slots: &[WmSlot],
@@ -176,8 +195,7 @@ impl SchemaFilling {
         sources.push(wm_texts.clone()); // Layer 1: always include WM
 
         if layers >= 2 {
-            // Layer 2: would include session history (passed separately in real implementation)
-            // For now, we'll use delta_tokens as a proxy for recent novel tokens
+            // Layer 2: session delta_tokens
             sources.push(delta_tokens.to_vec());
         }
 
@@ -189,29 +207,30 @@ impl SchemaFilling {
         // Flatten all sources
         let all_sources: Vec<String> = sources.into_iter().flatten().collect();
 
-        let (locks, expected_output, mode) = if let Some(o) = output.as_ref() {
+        let (locks, expected_output, mode, scenario) = if let Some(o) = output.as_ref() {
             (
                 o.constraint_locks.clone(),
                 o.expected_deliverables.clone(),
                 o.mode.clone(),
+                o.scenario.clone(),
             )
         } else {
-            (Vec::new(), Vec::new(), None)
+            (Vec::new(), Vec::new(), None, None)
         };
 
-        let constraints: Vec<crate::types::Constraint> = locks
+        let constraints: Vec<Constraint> = locks
             .iter()
-            .map(|l| crate::types::Constraint {
+            .map(|l| Constraint {
                 name: l.text.clone(),
             })
             .collect();
-        let mut deliverables: Vec<crate::types::Deliverable> = expected_output
+        let mut deliverables: Vec<Deliverable> = expected_output
             .iter()
-            .map(|d| crate::types::Deliverable { name: d.clone() })
+            .map(|d| Deliverable { name: d.clone() })
             .collect();
 
         let task = self.infer_task(&wm_texts, &all_sources);
-        let role = self.infer_role(&wm_texts, &all_sources);
+        let role = self.infer_role(&wm_texts, &all_sources, scenario.as_ref());
         let context = self.infer_context(&wm_texts, &all_sources, &cluster_texts);
 
         // Determine what was inferred vs what was NULL
@@ -219,13 +238,19 @@ impl SchemaFilling {
         let task_inferred = task.is_some();
 
         if layers >= 2 {
-            Self::infer_implicit_deliverables(&task, &constraints, &mode, &mut deliverables);
+            Self::infer_implicit_deliverables(
+                &task,
+                &constraints,
+                &mode,
+                scenario.as_ref(),
+                &all_sources,
+                &mut deliverables,
+            );
         }
 
         // If layers == 3 (Aggressive) and output is provided, compute and attach scope injections
         if layers == 3 {
             if let Some(out) = output {
-                // Clone the values needed for scope injection to avoid moving them
                 let task_clone = task.clone();
                 let context_clone = context.clone();
                 let injections =
@@ -245,48 +270,166 @@ impl SchemaFilling {
         }
     }
 
+    /// Infers concise domain-specific deliverables when `mode` is `Balanced` or `Aggressive`.
+    ///
+    /// # Panics
+    /// Never.
     fn infer_implicit_deliverables(
         task: &Option<String>,
-        constraints: &[crate::types::Constraint],
-        mode: &Option<crate::types::Mode>,
-        deliverables: &mut Vec<crate::types::Deliverable>,
+        constraints: &[Constraint],
+        mode: &Option<Mode>,
+        scenario: Option<&ScenarioSignal>,
+        all_sources: &[String],
+        deliverables: &mut Vec<Deliverable>,
     ) {
-        let allow = matches!(
-            mode,
-            Some(crate::types::Mode::Balanced) | Some(crate::types::Mode::Aggressive)
-        );
+        let allow = matches!(mode, Some(Mode::Balanced) | Some(Mode::Aggressive));
         if !allow {
             return;
         }
+
         let task_text = task.as_deref().unwrap_or("").to_lowercase();
         let constraint_text: String = constraints
             .iter()
             .map(|c| c.name.to_lowercase())
             .collect::<Vec<_>>()
             .join(" ");
-        let meal_plan = task_text.contains("meal")
-            || task_text.contains("plan")
-            || task_text.contains("nutrition");
-        let dietary = ["fiber", "dairy", "nightshade", "carb", "macro"]
+        let source_text: String = all_sources
             .iter()
-            .any(|k| constraint_text.contains(k));
-        if meal_plan && dietary {
-            for extra in ["shopping_list", "substitution_guide"] {
-                if !deliverables.iter().any(|d| d.name == extra) {
-                    deliverables.push(crate::types::Deliverable {
-                        name: extra.to_string(),
-                    });
-                }
+            .map(|s| s.to_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let combined = format!("{task_text} {constraint_text} {source_text}");
+        let domain = scenario.map(|s| s.domain.as_str()).unwrap_or("");
+
+        let push_unique = |list: &mut Vec<Deliverable>, item: &str| {
+            if !list.iter().any(|d| d.name.eq_ignore_ascii_case(item)) {
+                list.push(Deliverable {
+                    name: item.to_string(),
+                });
             }
+        };
+
+        // 1. Nutrition / Dietary meal plan
+        let meal_plan = domain == "nutrition"
+            || combined.contains("meal")
+            || combined.contains("nutrition")
+            || (combined.contains("plan")
+                && ["diet", "calorie", "protein", "macro"]
+                    .iter()
+                    .any(|k| combined.contains(k)));
+        let dietary = [
+            "fiber",
+            "dairy",
+            "nightshade",
+            "carb",
+            "macro",
+            "calorie",
+            "vegan",
+            "keto",
+        ]
+        .iter()
+        .any(|k| combined.contains(k));
+        if meal_plan && dietary {
+            push_unique(deliverables, "shopping_list");
+            push_unique(deliverables, "substitution_guide");
+        }
+
+        // Only infer domain deliverables when deliverables list is still empty (or under 2 items)
+        // to keep Balanced Mode concise.
+        if deliverables.len() >= 2 {
+            return;
+        }
+
+        if matches!(
+            domain,
+            "software" | "software-engineering" | "devops" | "devops-infra" | "tech" | "computers"
+        ) || [
+            "kubernetes",
+            "microservice",
+            "backend",
+            "dockerfile",
+            "pipeline",
+            "rust",
+            "python",
+        ]
+        .iter()
+        .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "architecture_outline");
+            push_unique(deliverables, "verification_steps");
+        } else if domain == "finance"
+            || [
+                "portfolio",
+                "asset allocation",
+                "cashflow",
+                "retirement",
+                "sharpe",
+            ]
+            .iter()
+            .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "risk_breakdown");
+            push_unique(deliverables, "allocation_summary");
+        } else if domain == "legal"
+            || [
+                "contract",
+                "statute",
+                "indemnification",
+                "gdpr",
+                "hipaa",
+                "nda",
+            ]
+            .iter()
+            .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "statutory_basis");
+            push_unique(deliverables, "compliance_checklist");
+        } else if matches!(domain, "medical" | "health" | "pharma")
+            || ["clinical", "patient", "diagnosis", "symptom", "biomarker"]
+                .iter()
+                .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "clinical_considerations");
+            push_unique(deliverables, "safety_precautions");
+        } else if domain == "travel"
+            || ["itinerary", "vacation", "sightseeing", "flight", "hotel"]
+                .iter()
+                .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "daily_itinerary");
+            push_unique(deliverables, "logistics_summary");
+        } else if domain == "education"
+            || ["curriculum", "syllabus", "pedagogy", "lesson", "student"]
+                .iter()
+                .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "learning_objectives");
+            push_unique(deliverables, "practice_exercises");
+        } else if matches!(
+            domain,
+            "business" | "business-strategy" | "marketing" | "ecommerce"
+        ) || ["go-to-market", "monetize", "campaign", "revenue", "startup"]
+            .iter()
+            .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "action_plan");
+            push_unique(deliverables, "kpi_metrics");
+        } else if domain == "real-estate"
+            || ["property", "mortgage", "cap rate", "reit", "multifamily"]
+                .iter()
+                .any(|k| combined.contains(k))
+        {
+            push_unique(deliverables, "market_comparables");
+            push_unique(deliverables, "roi_projection");
         }
     }
 
-    /// Checks if all texts are vague/uninformative (e.g., "unknown", "thing", etc.)
+    /// Checks if all texts are vague/uninformative (e.g., "unknown", "thing", etc.).
     fn all_texts_vague(&self, texts: &[String]) -> bool {
         if texts.is_empty() {
             return true;
         }
-        let vague_words = vec![
+        let vague_words = [
             "unknown",
             "thing",
             "something",
@@ -302,7 +445,6 @@ impl SchemaFilling {
     }
 
     fn infer_task(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
-        // Look for action-oriented keywords in WM or sources
         let task_keywords = [
             "build",
             "create",
@@ -312,6 +454,14 @@ impl SchemaFilling {
             "design",
             "write",
             "code",
+            "analyze",
+            "evaluate",
+            "plan",
+            "debug",
+            "optimize",
+            "explain",
+            "summarize",
+            "review",
         ];
         for keyword in task_keywords {
             if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword)) {
@@ -319,44 +469,163 @@ impl SchemaFilling {
             }
         }
 
-        // Robust fallback chain:
-        // Try domain knowledge first
         if let Some(t) = self.domain_knowledge.get("task") {
             return Some(t.clone());
         }
 
-        // Then try first meaningful WM slot
         if !self.all_texts_vague(wm_texts) {
             if let Some(t) = wm_texts.first() {
                 return Some(t.clone());
             }
         }
 
-        // Final fallback to guarantee task resolution (prevent NULL task)
         Some("Analyze and process the provided context".to_string())
     }
 
-    fn infer_role(&self, wm_texts: &[String], _all_sources: &[String]) -> Option<String> {
-        // Look for domain/role keywords
-        let role_map = [
-            ("code", "Expert Software Engineer"),
-            ("develop", "Expert Software Engineer"),
-            ("design", "Architecture Specialist"),
-            ("legal", "Legal Advisor"),
-            ("finance", "Financial Analyst"),
+    /// Infers the most specific domain persona/role from `ScenarioSignal` first,
+    /// then falls back to expanded keyword matching across all 22 canonical domains.
+    fn infer_role(
+        &self,
+        wm_texts: &[String],
+        all_sources: &[String],
+        scenario: Option<&ScenarioSignal>,
+    ) -> Option<String> {
+        // 1. Check ScenarioSignal first (`primary_role` or `domain` mapping across all 22 canonical domains)
+        if let Some(sig) = scenario {
+            if let Some(ref primary) = sig.primary_role {
+                let trimmed = primary.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+            if let Some(mapped) = Self::role_for_canonical_domain(&sig.domain) {
+                return Some(mapped.to_string());
+            }
+        }
+
+        // 2. Expanded keyword matching across WM slots and all sources
+        let role_map: &[(&str, &str)] = &[
+            ("kubernetes", "DevOps & Cloud Architect"),
+            ("docker", "DevOps & Cloud Architect"),
+            ("devops", "DevOps & Cloud Architect"),
+            ("terraform", "DevOps & Cloud Architect"),
+            ("pipeline", "DevOps & Cloud Architect"),
+            ("cybersecurity", "Cybersecurity Architect"),
+            ("vulnerability", "Cybersecurity Architect"),
+            ("encryption", "Cybersecurity Architect"),
+            ("firewall", "Cybersecurity Architect"),
+            ("security", "Cybersecurity Architect"),
+            ("transformer", "AI/ML Systems Architect"),
+            ("neural", "AI/ML Systems Architect"),
+            ("llm", "AI/ML Systems Architect"),
+            ("machine learning", "AI/ML Systems Architect"),
+            ("dataset", "Senior Data Scientist"),
+            ("regression", "Senior Data Scientist"),
+            ("nutrition", "Registered Sports & Clinical Dietitian"),
+            ("meal", "Registered Sports & Clinical Dietitian"),
+            ("calorie", "Registered Sports & Clinical Dietitian"),
+            ("macro", "Registered Sports & Clinical Dietitian"),
+            ("diet", "Registered Sports & Clinical Dietitian"),
+            ("pharma", "Pharmaceutical Strategy & Regulatory Specialist"),
+            ("biotech", "Pharmaceutical Strategy & Regulatory Specialist"),
+            ("clinical", "Clinical Medical Specialist"),
+            ("patient", "Clinical Medical Specialist"),
+            ("diagnosis", "Clinical Medical Specialist"),
+            ("medical", "Clinical Medical Specialist"),
+            ("hospital", "Clinical Medical Specialist"),
+            ("health", "Healthcare & Wellness Specialist"),
+            ("wellness", "Healthcare & Wellness Specialist"),
+            ("itinerary", "Senior Travel & Logistics Planner"),
+            ("travel", "Senior Travel & Logistics Planner"),
+            ("vacation", "Senior Travel & Logistics Planner"),
+            ("flight", "Senior Travel & Logistics Planner"),
+            ("hotel", "Senior Travel & Logistics Planner"),
+            ("curriculum", "Curriculum & Instructional Designer"),
+            ("syllabus", "Curriculum & Instructional Designer"),
+            ("pedagogy", "Curriculum & Instructional Designer"),
+            ("teach", "Curriculum & Instructional Designer"),
+            ("course", "Curriculum & Instructional Designer"),
+            ("mortgage", "Real Estate Investment Strategist"),
+            ("reit", "Real Estate Investment Strategist"),
+            ("property", "Real Estate Investment Strategist"),
+            ("real estate", "Real Estate Investment Strategist"),
+            ("legal", "Senior Legal Advisor"),
+            ("contract", "Senior Legal Advisor"),
+            ("statute", "Senior Legal Advisor"),
+            ("compliance", "Senior Legal Advisor"),
+            ("portfolio", "Chartered Financial Analyst"),
+            ("investment", "Chartered Financial Analyst"),
+            ("revenue", "Chartered Financial Analyst"),
+            ("finance", "Chartered Financial Analyst"),
+            ("ecommerce", "E-Commerce Growth Architect"),
+            ("shopify", "E-Commerce Growth Architect"),
+            ("storefront", "E-Commerce Growth Architect"),
+            ("marketing", "Growth Marketing Strategist"),
+            ("campaign", "Growth Marketing Strategist"),
+            ("seo", "Growth Marketing Strategist"),
+            ("brand", "Growth Marketing Strategist"),
+            ("business", "Senior Business Strategist"),
+            ("startup", "Senior Business Strategist"),
+            ("monetize", "Senior Business Strategist"),
+            ("kernel", "Computer Systems Architect"),
+            ("cpu", "Computer Systems Architect"),
+            ("linux", "Computer Systems Architect"),
+            ("physics", "Lead Research Scientist"),
             ("biology", "Research Biologist"),
-            ("data", "Data Scientist"),
+            ("chemistry", "Lead Research Scientist"),
+            ("experiment", "Lead Research Scientist"),
+            ("code", "Expert Software Engineer"),
+            ("python", "Expert Software Engineer"),
+            ("rust", "Expert Software Engineer"),
+            ("develop", "Expert Software Engineer"),
+            ("function", "Expert Software Engineer"),
+            ("design", "Architecture Specialist"),
+            ("data", "Senior Data Scientist"),
             ("write", "Professional Copywriter"),
         ];
 
         for (keyword, role) in role_map {
-            if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword)) {
-                return Some(role.to_string());
+            if wm_texts.iter().any(|t| t.to_lowercase().contains(keyword))
+                || all_sources
+                    .iter()
+                    .any(|t| t.to_lowercase().contains(keyword))
+            {
+                return Some((*role).to_string());
             }
         }
 
         // Fallback to a general expert role
         Some("Domain Expert".to_string())
+    }
+
+    /// Maps any of the 22 canonical domains (and common aliases) to a domain-accurate persona title.
+    #[must_use]
+    pub fn role_for_canonical_domain(domain: &str) -> Option<&'static str> {
+        match domain.to_lowercase().as_str() {
+            "software" | "software-engineering" | "tech" => Some("Principal Software Architect"),
+            "computers" => Some("Computer Systems Architect"),
+            "devops" | "devops-infra" => Some("Staff Site Reliability & DevOps Engineer"),
+            "ai-ml" => Some("AI/ML Systems Architect"),
+            "data-science" => Some("Principal Data Scientist"),
+            "cybersecurity" => Some("Principal Security Architect"),
+            "finance" => Some("Chartered Financial Analyst"),
+            "legal" => Some("Senior Legal Counsel"),
+            "business" | "business-strategy" => Some("Senior Business Strategist"),
+            "marketing" => Some("Growth Marketing Strategist"),
+            "ecommerce" => Some("E-Commerce Growth Architect"),
+            "real-estate" => Some("Real Estate Investment Strategist"),
+            "medical" => Some("Clinical Medical Specialist"),
+            "health" | "health-fitness" => Some("Clinical Health & Wellness Specialist"),
+            "pharma" => Some("Pharmaceutical Strategy & Regulatory Specialist"),
+            "nutrition" | "sports-nutrition" => Some("Registered Sports & Clinical Dietitian"),
+            "education" => Some("Curriculum & Instructional Designer"),
+            "travel" => Some("Senior Travel & Logistics Planner"),
+            "science" | "scientific-research" => Some("Lead Research Scientist"),
+            "workplace-productivity" => Some("Organizational & Productivity Strategist"),
+            "creative" | "creative-writing" => Some("Principal Creative Director & Writer"),
+            "career-growth" => Some("Executive Career Strategist"),
+            _ => None,
+        }
     }
 
     fn infer_context(
@@ -365,13 +634,9 @@ impl SchemaFilling {
         _all_sources: &[String],
         cluster_texts: &[String],
     ) -> Vec<String> {
-        // Context is remaining relevant information
         let mut context = Vec::new();
+        let vague_words = ["unknown", "thing", "something", "anything", "etc"];
 
-        // Define words that are too vague to be considered context
-        let vague_words = vec!["unknown", "thing", "something", "anything", "etc"];
-
-        // Add WM texts that aren't task, have sufficient length, and are not vague
         for text in wm_texts {
             let lower = text.to_lowercase();
             if text.len() >= 3
@@ -383,7 +648,6 @@ impl SchemaFilling {
             }
         }
 
-        // Add some cluster labels as context (up to 2)
         for text in cluster_texts.iter().take(2) {
             context.push(text.clone());
         }
@@ -403,13 +667,14 @@ impl SchemaFilling {
     }
 }
 
+/// Output produced by [`SchemaFilling::fill`].
 #[derive(Debug, Default)]
 pub struct FillResult {
     pub task: Option<String>,
     pub role: Option<String>,
     pub context: Vec<String>,
-    pub constraints: Vec<crate::types::Constraint>,
-    pub output: Vec<crate::types::Deliverable>,
+    pub constraints: Vec<Constraint>,
+    pub output: Vec<Deliverable>,
     pub null_fields: Vec<String>,
     pub task_inferred: bool,
 }
