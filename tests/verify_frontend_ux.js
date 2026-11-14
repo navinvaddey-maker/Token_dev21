@@ -458,6 +458,34 @@ async function runTestSuite() {
     win.toggleDiffView();
     assert(outputBox.innerHTML.includes('diff-removed'), 'E2E: Pruning diff visible on final output');
 
+    // 9. Aggressive Deep Architect expansion telemetry (outputTokens > inputTokens)
+    win.State.currentMode = 'aggressive';
+    win.State.lastResult = {
+        id: 'aggr-deep-architect-1',
+        token_original: 512,
+        token_final: 974,
+        token_saved: 0,
+        savings_pct: 0,
+        tes_score: 0.96,
+        optimized_prompt: '# ROLE: REAL ESTATE & MORTGAGE GUIDE\n\n# EXECUTION PHASES:\n1. **Financial Readiness** (1-2 weeks): Prep\n2. **Pre-Approval** (1 week): Lender\n3. **Home Search** (2-6 weeks): Tour\n4. **Escrow & Closing** (30 days): Close\n\n# VALIDATION:\n1. DTI check — Verify ratio (calc)\n2. Inspection check — Review report (audit)\n3. Closing disclosure — Confirm fees (verify)\n\n# SUCCESS CRITERIA:\n- Conceptually clear explanation of residential home-buying and mortgage process at the target audience level.'
+    };
+    win.renderResult(win.State.lastResult);
+    assert(
+        doc.getElementById('output-saving-pct').textContent === 'Deep Architect',
+        `Deep Architect: Saving pill shows "Deep Architect" (got "${doc.getElementById('output-saving-pct').textContent}")`
+    );
+    assert(
+        costSaved.textContent === '~3,000 tok output target · 4 Phases · 3 QA Gates',
+        `Deep Architect: Footer shows depth & structure telemetry (got "${costSaved.textContent}")`
+    );
+    // Switching model pricing must not clobber Deep Architect telemetry
+    modelSelect.value = '0.003';
+    win.updateModelPricing();
+    assert(
+        costSaved.textContent === '~3,000 tok output target · 4 Phases · 3 QA Gates',
+        `Deep Architect: Model pricing switch preserves depth telemetry (got "${costSaved.textContent}")`
+    );
+
     // Final Summary
     console.log('\n======================================================');
     console.log(` Results: ${passed} PASSED | ${failed} FAILED`);

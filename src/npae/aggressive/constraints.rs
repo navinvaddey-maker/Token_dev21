@@ -183,6 +183,62 @@ fn extract_verbatim_spans(raw: &str) -> (Vec<String>, Vec<String>) {
     .into_iter()
     .collect();
 
+    // Pronouns and non-concrete filler tokens that must not form dangling `[AVOID] Exclude <pronoun>` rules.
+    let pronoun_or_filler: HashSet<&str> = [
+        "them",
+        "it",
+        "this",
+        "that",
+        "these",
+        "those",
+        "him",
+        "her",
+        "us",
+        "me",
+        "you",
+        "they",
+        "he",
+        "she",
+        "we",
+        "i",
+        "one",
+        "ones",
+        "something",
+        "anything",
+        "everything",
+        "nothing",
+        "someone",
+        "anyone",
+        "everyone",
+        "none",
+        "such",
+        "all",
+        "both",
+        "either",
+        "neither",
+        "more",
+        "less",
+        "most",
+        "least",
+        "so",
+        "here",
+        "there",
+        "now",
+        "well",
+        "too",
+        "very",
+        "just",
+        "really",
+        "actually",
+        "being",
+        "having",
+        "doing",
+        "making",
+        "getting",
+    ]
+    .into_iter()
+    .collect();
+
     // Clean punctuation into clause boundaries
     let tokens: Vec<&str> = raw.split_whitespace().collect();
     let n = tokens.len();
@@ -205,7 +261,10 @@ fn extract_verbatim_spans(raw: &str) -> (Vec<String>, Vec<String>) {
                 let w_raw = tokens[j];
                 let w_clean = w_raw.trim_matches(|c: char| !c.is_alphanumeric() && c != '-');
                 let w_low = w_clean.to_lowercase();
-                if w_clean.is_empty() || stop_boundary.contains(w_low.as_str()) {
+                if w_clean.is_empty()
+                    || stop_boundary.contains(w_low.as_str())
+                    || pronoun_or_filler.contains(w_low.as_str())
+                {
                     break;
                 }
                 span_words.push(w_clean.to_string());
@@ -214,7 +273,12 @@ fn extract_verbatim_spans(raw: &str) -> (Vec<String>, Vec<String>) {
                 }
                 j += 1;
             }
-            if !span_words.is_empty() {
+            // Require at least one concrete non-pronoun noun/term of >= 2 chars before emitting.
+            let has_concrete_term = span_words.iter().any(|w| {
+                let wl = w.to_lowercase();
+                w.len() >= 2 && !pronoun_or_filler.contains(wl.as_str())
+            });
+            if !span_words.is_empty() && has_concrete_term {
                 let phrase = format!("Exclude {}", span_words.join(" "));
                 if !forbidden.contains(&phrase) {
                     forbidden.push(phrase);
@@ -313,5 +377,27 @@ mod tests {
         // Synonym match: multi-word "free from"
         let (_, f4) = extract_constraints("Make it free from gluten", &taxonomy, &constraints);
         assert_eq!(f4, vec!["Gluten containing grains"]);
+    }
+
+    #[test]
+    fn test_avoid_pronoun_filtered_out_while_concrete_preserved() {
+        let (_, f_pronoun) = extract_constraints(
+            "Please include any common rookie mistakes first-time homebuyers make so we can avoid them.",
+            &[],
+            &[],
+        );
+        assert!(
+            f_pronoun.is_empty(),
+            "Expected no dangling [AVOID] for 'avoid them', got: {:?}",
+            f_pronoun
+        );
+
+        let (_, f_concrete) = extract_constraints(
+            "Plan a meal with no dairy and without processed sugar.",
+            &[],
+            &[],
+        );
+        assert!(f_concrete.iter().any(|x| x.contains("dairy")));
+        assert!(f_concrete.iter().any(|x| x.contains("processed sugar")));
     }
 }

@@ -442,7 +442,40 @@ function updateModelPricing() {
 }
 
 /**
- * Computes and renders estimated dollar cost savings per 1k runs.
+ * Extracts phase and validation QA gate counts from an Aggressive Deep Architect prompt.
+ */
+function extractArchitectMetrics(promptText) {
+    if (!promptText) return { phaseCount: 0, validationCount: 0 };
+    const phaseSection = promptText.match(/# EXECUTION PHASES:\s*([\s\S]*?)(?=\n# [A-Z]|$)/i);
+    const valSection = promptText.match(/# VALIDATION:\s*([\s\S]*?)(?=\n# [A-Z]|$)/i);
+    const phaseMatches = phaseSection ? phaseSection[1].match(/^\d+\.\s+/gm) : null;
+    const valMatches = valSection ? valSection[1].match(/^\d+\.\s+/gm) : null;
+    return {
+        phaseCount: phaseMatches ? phaseMatches.length : 0,
+        validationCount: valMatches ? valMatches.length : 0,
+    };
+}
+
+/**
+ * Returns true when the current result represents an Aggressive Deep Architect expansion
+ * rather than a token-reducing compression.
+ */
+function isArchitectExpansionResult(result) {
+    if (!result) return false;
+    const mode = State.currentMode || document.getElementById('mode')?.value || 'balanced';
+    const orig = result.token_original || 0;
+    const final = result.token_final || 0;
+    const saved = result.token_saved || 0;
+    const promptText = result.optimized_prompt || '';
+    return (
+        (mode === 'aggressive' && (final >= orig || saved <= 0)) ||
+        (final > orig && /# (?:EXECUTION PHASES|VALIDATION|SUCCESS CRITERIA)/i.test(promptText))
+    );
+}
+
+/**
+ * Computes and renders estimated dollar cost savings per 1k runs,
+ * or Deep Architect output-depth telemetry when in Aggressive expansion mode.
  * Formula: CostSaved = (savedTokens / 1000) * rate * 1000 = savedTokens * rate
  */
 function updateCostMetrics() {
@@ -451,6 +484,12 @@ function updateCostMetrics() {
 
     if (!State.lastResult) {
         costSavedEl.textContent = '$0.00 saved / 1k runs';
+        return;
+    }
+
+    if (isArchitectExpansionResult(State.lastResult)) {
+        const { phaseCount, validationCount } = extractArchitectMetrics(State.lastResult.optimized_prompt || '');
+        costSavedEl.textContent = `~3,000 tok output target · ${phaseCount} Phases · ${validationCount} QA Gates`;
         return;
     }
 
@@ -769,13 +808,14 @@ function renderResult(result) {
     const elBar = document.getElementById('token-progress-bar');
     const elPct = document.getElementById('token-saving-pct');
 
+    const isArchitect = isArchitectExpansionResult(result);
     if (elTokCount) elTokCount.textContent = `${final} tokens`;
-    if (elSavingPct) elSavingPct.textContent = `${pct}% saved`;
+    if (elSavingPct) elSavingPct.textContent = isArchitect ? 'Deep Architect' : `${pct}% saved`;
     if (elOrig) elOrig.textContent = orig.toLocaleString();
     if (elFinal) elFinal.textContent = final.toLocaleString();
     if (elSaved) elSaved.textContent = saved.toLocaleString();
     if (elBar) elBar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
-    if (elPct) elPct.textContent = `${pct}% saved`;
+    if (elPct) elPct.textContent = isArchitect ? 'Deep Architect' : `${pct}% saved`;
 
     // TES quality badge update (R3)
     const tesScore = result.tes_score !== undefined ? result.tes_score : 0.97;

@@ -2800,10 +2800,25 @@ fn infer_success_criteria(profile: &IntentProfile, raw: &str) -> Vec<String> {
 
         // EXPLAIN Intent (Domain-Agnostic but pedagogical)
         (super::intent::IntentClass::Explain, _) => {
-            let subject = profile
-                .dynamic_subject
-                .clone()
-                .unwrap_or_else(|| "concept".into());
+            let subject = if profile.domain == "real-estate"
+                && matches!(
+                    profile.perspective,
+                    super::intent::ActorPerspective::Consumer
+                ) {
+                "residential home-buying and mortgage process".to_string()
+            } else {
+                profile
+                    .dynamic_subject
+                    .clone()
+                    .filter(|s| !s.trim().is_empty())
+                    .unwrap_or_else(|| {
+                        if profile.domain != "general" && !profile.domain.is_empty() {
+                            profile.domain.replace('-', " ")
+                        } else {
+                            "concept".to_string()
+                        }
+                    })
+            };
             criteria.push(
                 format!(
                     "Conceptually clear explanation of {} at the target audience level.",
