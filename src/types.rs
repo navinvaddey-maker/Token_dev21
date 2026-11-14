@@ -163,6 +163,9 @@ pub struct AlgorithmOutput {
     #[serde(default)]
     pub force_compact_generation: bool,
     pub enrichment: Option<EnrichmentContext>,
+    /// Final rendered output text produced by Stage 6A/6B, evaluated by honest scorers (SCS, SFS).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rendered_output: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

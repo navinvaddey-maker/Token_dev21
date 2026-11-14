@@ -10,12 +10,29 @@ pub struct AggressiveRequest {
     pub rag_top_k: Option<usize>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Controls how [`StructuredPrompt`] is rendered into `optimized_prompt` in Aggressive mode.
+///
+/// // ARCH: Grounding Harness (GAP-42) — opt-in harness rendering keeps `Crisp` as the default.
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum RenderStyle {
+    /// Compact markdown sections (`# ROLE`, `# CONTEXT`, `# CONSTRAINTS`, …). Default.
+    #[default]
+    Crisp,
+    /// XML-fenced grounding harness with numbered `[F#]` facts inside `<facts trust="untrusted">`
+    /// and a strict `FOUND` / `PARTIAL_MATCH` / `NOT_FOUND` output contract.
+    Harness,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct NpaeConfig {
     pub ambiguity_threshold: Option<f32>,
     pub max_questions: Option<u8>,
     pub confidence_threshold: Option<f32>,
     pub skip_stage: Option<String>,
+    /// Optional rendering mode (`crisp` default, or `harness` for strict `[F#]` fact grounding).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_style: Option<RenderStyle>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -35,6 +52,9 @@ pub struct StructuredPromptResponse {
     pub scoring_result: crate::types::ScoringResult,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hallucination_report: Option<crate::npae::hallucination::guard::HallucinationReport>,
+    /// Numbered `[F#]` facts emitted when `render_style == RenderStyle::Harness` (omitted when empty).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grounding_facts: Vec<crate::npae::grounding::verifier::NumberedFact>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

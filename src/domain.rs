@@ -232,6 +232,7 @@ pub async fn compress_new(
         max_questions: req.npae_max_questions,
         confidence_threshold: req.npae_confidence_threshold,
         skip_stage: None,
+        render_style: req.npae_render_style,
     };
 
     let orchestrator_response = state

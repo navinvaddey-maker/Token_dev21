@@ -1,45 +1,76 @@
+//! Token Efficiency Scorer (`ARCHITECTURE.md` §1.3, §4).
+//!
+//! Measures compression efficiency in consistent token units while penalizing
+//! structural validation issues.
+
 use crate::scoring::weights::IssueWeights;
 use crate::types::{AlgorithmOutput, FieldValidationIssue};
+use crate::utils::tokens::estimate_tokens;
 
-/// TokenEfficiencyScorer (TES) — Measures how efficiently the engine compresses
+/// `TokenEfficiencyScorer` (TES) — Measures how efficiently the engine compresses
 /// while preserving task-essential content.
 ///
-/// v2 Fix (GAP-A01): The v1 scorer was INVERTED — it rewarded no-compression
-/// (output/input = 1.0 → score 10.0) and penalized good compression (0.5 → 5.0).
-///
-/// v2 scoring logic (Refined):
+/// Scoring logic:
+/// - Normalizes input and output token counts into identical units (`estimate_tokens`)
 /// - Measures compression savings: `savings = 1.0 - (output / input)`
-/// - Rewards efficient compression while penalizing both under-compression
-///   (wasted tokens) and extreme over-compression (likely content loss).
-/// - Sweet spot: 30-60% savings → score 8.0-9.0.
+/// - Rewards efficient compression while penalizing under-compression or expansion.
 /// - Preservation factor: Scaled by field validation issues.
 pub struct TokenEfficiencyScorer;
 
 impl TokenEfficiencyScorer {
-    /// Creates a new TokenEfficiencyScorer instance
+    /// Creates a new `TokenEfficiencyScorer` instance.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 }
 
+impl Default for TokenEfficiencyScorer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TokenEfficiencyScorer {
-    /// Calculates the TES score in 0.0–10.0 range.
+    /// Calculates the TES score in `0.0..=10.0` range.
     ///
-    /// Scoring formula (v2):
+    /// Scoring formula:
+    /// ```text
     ///   base = f(compression_savings, preservation_factor)
     ///   tes  = base * (1.0 - issue_penalty)
+    /// ```
     ///
-    /// Where:
-    ///   compression_savings = 1.0 - (output_tokens / input_tokens)
-    ///   preservation_factor = bonus for keeping content within useful range
-    ///   issue_penalty = field validation issues reduce score
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn score(
         output: &AlgorithmOutput,
         field_issues: &[FieldValidationIssue],
     ) -> (f32, Vec<FieldValidationIssue>) {
+        // ARCH: Balanced Mode Contract (E3) — TES must compare input and output in identical token units.
+        // FIX: `lexical.rs` sets `input_token_count = original_word_count`, whereas `stage6b.rs` sets
+        // `output_token_count = estimate_tokens(&final_response)`. When `normalization` is present,
+        // compute input tokens via `estimate_tokens(&norm.normalized_text)` so both sides use `estimate_tokens`.
+        let effective_input_tokens = output
+            .normalization
+            .as_ref()
+            .filter(|n| !n.normalized_text.trim().is_empty())
+            .map(|n| estimate_tokens(&n.normalized_text))
+            .unwrap_or(output.input_token_count);
+
+        let effective_output_tokens = output
+            .rendered_output
+            .as_ref()
+            .filter(|r| !r.trim().is_empty())
+            .map(|r| estimate_tokens(r))
+            .unwrap_or(output.output_token_count);
+
         let raw = Self::calculate_raw(
-            output.input_token_count,
-            output.output_token_count,
+            effective_input_tokens,
+            effective_output_tokens,
             field_issues,
         );
         let tes = (raw * 10.0).clamp(0.0, 10.0);

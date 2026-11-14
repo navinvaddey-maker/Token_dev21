@@ -1,60 +1,49 @@
+//! Semantic Completeness Scorer (`ARCHITECTURE.md` §1.3, §4).
+//!
+//! Evaluates whether all user intent (constraints, deliverables, resolved ambiguities)
+//! is preserved in the active output text and resolved schema, without falling back
+//! to pre-sparse `clean_tokens`.
+
 use crate::types::AlgorithmOutput;
 
-/// Semantic Completeness Score (SCS) — v2 implementation
+/// Semantic Completeness Score (SCS) — v2 implementation.
 ///
 /// Measures whether all user intent (explicit + implicit) is present in the output.
 ///
-/// v2 Formula (from ARCHITECTURE_v2.md):
+/// Formula:
+/// ```text
 ///   SCS = (
-///     constraints_preserved / constraints_total × 0.4 +
-///     deliverables_present / deliverables_expected × 0.4 +
-///     ambiguities_resolved / ambiguities_flagged × 0.2
-///   ) × 10
-///
-/// v1 Bug (GAP-A02): SCS only checked if role/context/task were Some — always
-/// scored 10.0 for non-trivial prompts. This was a meaningless signal.
-///
-/// v2 Fix: Now evaluates constraint preservation, schema completeness,
-/// ambiguity resolution, and working memory utilization.
+///     constraints_preserved / constraints_total * 0.4 +
+///     deliverables_present / deliverables_expected * 0.4 +
+///     ambiguities_resolved / ambiguities_flagged * 0.2
+///   ) * 10
+/// ```
 pub struct SemanticCompletenessScorer;
 
 impl SemanticCompletenessScorer {
+    /// Computes the Semantic Completeness Score in `[0.0, 10.0]` and any penalty explanations.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn score(out: &AlgorithmOutput) -> (f32, Vec<String>) {
         let mut penalties = Vec::new();
 
         // ── Dimension 1: Constraint Preservation (40% weight) ──────────────
         let constraints_total = out.constraint_locks.len();
         let constraint_ratio = if constraints_total > 0 {
-            let schema_text = format!(
-                "{} {} {} {} {}",
-                out.resolved_schema.role.as_deref().unwrap_or(""),
-                out.resolved_schema.context.as_deref().unwrap_or(""),
-                out.resolved_schema.task.as_deref().unwrap_or(""),
-                out.resolved_schema
-                    .constraints
-                    .iter()
-                    .map(|c| c.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-                out.resolved_schema
-                    .output
-                    .iter()
-                    .map(|d| d.name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" "),
-            )
-            .to_lowercase();
+            // ARCH: Balanced Mode Contract (E1) — evaluate active output, NEVER pre-sparse `clean_tokens`.
+            // FIX: Removed fallback to `out.clean_tokens` which masked dropped constraints in Stage 1/6A.
+            // When `force_compact_generation` is true, check against `rendered_output` (or `sparse_tokens`
+            // + `resolved_schema.constraints`); when false, check against `rendered_output` or `schema_text`.
+            let active_text = Self::active_output_text(out);
 
             let preserved = out
                 .constraint_locks
                 .iter()
                 .filter(|c| {
                     let ct = c.text.to_lowercase();
-                    schema_text.contains(&ct)
-                        || out
-                            .clean_tokens
-                            .iter()
-                            .any(|t| t.to_lowercase().contains(&ct))
+                    Self::text_contains_constraint(&active_text, &ct)
                 })
                 .count();
 
@@ -116,6 +105,81 @@ impl SemanticCompletenessScorer {
         let score = (raw_score * 10.0).clamp(0.0, 10.0);
 
         (score, penalties)
+    }
+
+    /// Constructs the lowercased active output text against which constraint preservation is verified.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
+    pub fn active_output_text(out: &AlgorithmOutput) -> String {
+        if let Some(ref rendered) = out.rendered_output {
+            if !rendered.trim().is_empty() {
+                return rendered.to_lowercase();
+            }
+        }
+
+        if out.force_compact_generation {
+            let sparse_part = out
+                .sparse_tokens
+                .iter()
+                .map(|t| t.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let constraints_part = out
+                .resolved_schema
+                .constraints
+                .iter()
+                .map(|c| c.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("{sparse_part} {constraints_part}").to_lowercase()
+        } else {
+            format!(
+                "{} {} {} {} {}",
+                out.resolved_schema.role.as_deref().unwrap_or(""),
+                out.resolved_schema.context.as_deref().unwrap_or(""),
+                out.resolved_schema.task.as_deref().unwrap_or(""),
+                out.resolved_schema
+                    .constraints
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                out.resolved_schema
+                    .output
+                    .iter()
+                    .map(|d| d.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
+            .to_lowercase()
+        }
+    }
+
+    /// Checks whether `active_text` (already lowercased) contains `constraint_lower` either as
+    /// a substring or as a contiguous word sequence (ignoring punctuation).
+    fn text_contains_constraint(active_text: &str, constraint_lower: &str) -> bool {
+        if active_text.contains(constraint_lower) {
+            return true;
+        }
+        let target_words: Vec<&str> = constraint_lower
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if target_words.is_empty() {
+            return true;
+        }
+        let active_words: Vec<&str> = active_text
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if target_words.len() == 1 {
+            return active_words.contains(&target_words[0]);
+        }
+        active_words
+            .windows(target_words.len())
+            .any(|w| w == target_words.as_slice())
     }
 }
 
@@ -280,5 +344,33 @@ mod tests {
         // task is None, so deliverable_ratio = 0.5
         // score = (1.0*0.4 + 0.5*0.4 + 1.0*0.2) * 10 = 8.0
         assert_eq!(score, 8.0);
+    }
+
+    #[test]
+    fn test_scs_does_not_credit_clean_tokens_when_missing_from_active_output() {
+        let output = AlgorithmOutput {
+            resolved_schema: CompressionSchema {
+                role: Some("Expert".into()),
+                context: Some("CSV parser".into()),
+                task: Some("Write function".into()),
+                constraints: Vec::new(),
+                output: Vec::new(),
+            },
+            clean_tokens: vec!["must".into(), "not".into(), "pandas".into()],
+            sparse_tokens: vec![],
+            constraint_locks: vec![ConstraintToken {
+                text: "no pandas".into(),
+                weight: 1.0,
+            }],
+            force_compact_generation: true,
+            ..Default::default()
+        };
+        let (score, penalties) = SemanticCompletenessScorer::score(&output);
+        assert!(
+            score <= 6.0,
+            "Constraint present only in clean_tokens must NOT be credited, got {}",
+            score
+        );
+        assert!(penalties.iter().any(|p| p.contains("Constraint loss")));
     }
 }

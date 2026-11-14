@@ -5,8 +5,8 @@ Project      : token_compress_engine
 Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
-Version      : 3.3.0 (Unified Canonical Spec, Reality Audit & NPAE Multi-Domain/Slot Accuracy Upgrade)
-Last updated : 2026-11-02 by Antigravity (Gemini 4 Argon)
+Version      : 3.5.0 (Unified Canonical Spec, Balanced Mode Contract, Reality Audit, NPAE Accuracy & Grounding Harness)
+Last updated : 2026-11-13 by Antigravity (Gemini 4 Argon)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
@@ -111,6 +111,37 @@ The resulting `ScenarioSignal` and NPAE rule profile inject:
 - **Fast-path stage routing**:
   - `Stage 0B`: Uses `(domain, task_type)` to fast-path topology classification (`Hierarchical`, `Network`, `Linear`).
   - `Stage 4`: Injects composed primary role, secondary domain, and constraint locks.
+
+### 1.5 The Balanced Mode Contract (Canonical Specification — GAP-F1)
+
+`Mode::Balanced` is the measured pruning and structured fidelity path ("Measured pruning with full context fidelity"). Unlike `Aggressive` (which expands prompts into a comprehensive multi-phase NPAE blueprint) and `Gentle` (which performs conservative light cleanup), `Balanced` is governed by an explicit end-to-end contract across Stages 1, 2, 6A, and 6B:
+
+1. **Target Savings Band**:
+   - Achieves **30–55% token reduction** on conversational or verbose prompts (`input_tokens ≥ 15`) while guaranteeing **100% preservation** of hard constraints, negations, and numerical bounds.
+   - Output is strictly capped within the input token budget (`output_token_count ≤ input_token_count`), preventing structured expansion from degrading token efficiency.
+
+2. **Protected Token Classes (Stage 1 Sparse Coding)**:
+   - **Negations & Modals**: `not`, `no`, `never`, `without`, `don't`, `dont`, `cannot`, `can't`, `avoid`, `exclude` are locked at salience `1.0` and unconditionally added to `survivors`.
+   - **Comparative & Bound Qualifiers**: `under`, `over`, `below`, `above`, `must`, `only`, `least`, `most` are locked at salience `1.0`.
+   - **Numerical Values & Units**: Any token containing ASCII digits or currency/unit markers adjacent to digits (e.g., `1800`, `80`, `200`, `usd`, `cal`, `words`) is locked at salience `1.0`.
+   - **Multi-Word Constraint Locks (`constraint_locks`)**: Multi-word `ConstraintToken` phrases extracted in Stage -1 (e.g., `"no dairy"`, `"must not use pandas"`, `"under 80 usd"`) are matched via contiguous subsequence span matching (case-insensitive, punctuation-stripped) as well as significant constituent lock tokens in both `apply()` and `apply_tree()`, locking every constituent token at salience `1.0`.
+
+3. **Conversational Filler Stripping (Stage 1 Salience)**:
+   - Greeting and sign-off filler tokens (`hi`, `hello`, `hey`, `there`, `basically`, `wondering`, `please`, `help`, `really`, `thanks`, `thank`, `advance`, `much`, `appreciated`, `kindly`, `could`, `would`) are down-weighted (`0.05` conversational stop-list) and excluded from the positional lead/trail bonus (`i < 3 || i >= total - 3`), ensuring conversational fluff is pruned first rather than protected by position.
+   - `syntactic_score` and `domain_specificity` operate on lowercased tokens (boosting action verbs, technical/domain terms, numbers, and structural nouns) so Stage 0A/lexical lowercasing does not zero out salience features.
+
+4. **Mode-Aware Routing & Stage 1 Keep Ratio Consistency (Stages 1 & 2)**:
+   - **Case-Insensitive Mode Normalization**: `forced_mode` is normalized via `.to_lowercase()` in both `PipelineOrchestrator` and `Stage1::run()`, ensuring `"Balanced"`, `"BALANCED"`, and `"balanced"` all apply the canonical **45% base keep ratio** (plus protected lock survivors).
+   - **Unconditional Stage 2 Predictive Coding**: Even when `forced_mode` is explicitly provided, `Stage2::run()` executes predictive error calculation so `delta_tokens` and `error_score` are always populated for Layer 2 schema filling and continuous `update_schema()` learning, before applying the normalized `forced_mode` override.
+   - **Auto-Selected Balanced Re-Run**: When `forced_mode` is `None` and Stage 2 auto-selects `Mode::Balanced` (after Stage 1 initially ran with a topology proxy ratio), Stage 1 re-runs with `Some("balanced")` so `Balanced` always receives its canonical 45% keep ratio.
+   - **Tree-Mode Original Index Tracking**: `SparseCoding::apply_tree()` tracks original token indices across descending salience sorts and preserves exact token positions in both `apply()` and `apply_tree()`.
+
+5. **Budgeted Structured Rendering (Stage 6A) & Honest Quality Scoring (Stage 6B)**:
+   - **Budgeted Structured Prompt (Stage 6A)**: Instead of pasting the unpruned `user_prompt` into `**Task:**` and appending verbose boilerplate sections that exceed the input token count, `Stage6a::run()` constructs `**Task:**` from the compressed sparse core (`sparse_tokens`) and selectively includes `**Constraints:**` (for any lock not already verbatim in `Task`) and `**Deliverables:**` within the input token budget, omitting verbose `**Inferred Context:**`, `**Warnings:**`, or redundant `**Role:**` headers when they would cause token expansion.
+   - **Constraint-Safe Compact Fallback**: If `force_compact_generation` is triggered by Stage 6B, `Stage6a` builds the compact prompt from `sparse_tokens` and explicitly appends any missing `constraint_locks` (`; Constraints: <missing locks>`), ensuring compact mode never degrades into an ungrounded bag of words that drops constraints.
+   - **Consistent `estimate_tokens` Units in TES**: `TokenEfficiencyScorer` (TES) and `Stage6b` evaluate `input_token_count` and `output_token_count` in identical `estimate_tokens()` units (`words × 1.3`), eliminating unit mismatch between raw word counts and BPE token estimates.
+   - **Active-Output Verification in SCS & SFS**: `SemanticCompletenessScorer` (SCS) verifies `constraint_locks` directly against the active shipped output (`sparse_tokens` + `resolved_schema.constraints` in compact mode, or rendered `schema_text` in structured mode) rather than falling back to pre-sparse `clean_tokens`. `SemanticFidelityScorer` (SFS) penalizes any dropped negation or boundary lock.
+   - **Best-Candidate Tracking & Loop Remediation in Stage 6B**: `Stage6b` runs `remediate_hallucination` inside correction iterations whenever `!new_report.passed` and tracks the highest-scoring non-expanding candidate across cycles so a later correction iteration never overwrites a superior candidate.
 
 ---
 
@@ -217,14 +248,14 @@ User compresses prompt
 | Pipeline stages | 7 (0A–6B) | 8 (−1, 0A–6B) | 8 stages present; dual paths share identical scoring and quality guardrails |
 | Embedding model | None | None mentioned | Unified 384-dim FNV-1a feature hashing engine shared between RAG and ORY classification |
 | RAG integration | Not present | Not present | **Wired (GAP-31 Fixed)**: `EnrichmentContext` retrieved in `domain.rs` & rendered in Stage 6A |
-| Mode differentiation | Dead code (v1 bug) | Fixed via composite routing | Aggressive→NPAE path; Gentle/Balanced→Legacy path. Both fully guarded. |
-| Scoring | TES + SFS | TES + SFS + SCS | **Unified (GAP-33 Fixed)**: TES + SFS + SCS computed on both Aggressive and Legacy paths |
-| HallucinationGuard | Not present | Not present | **Unified (GAP-33 Fixed)**: Tri-layer guard + Stage 6B correction loop run on ALL paths |
+| Mode differentiation | Dead code (v1 bug) | Fixed via composite routing | Aggressive→NPAE path; Gentle/Balanced→Budgeted Legacy path with Balanced Mode Contract (§1.5). Both fully guarded. |
+| Scoring | TES + SFS | TES + SFS + SCS | **Unified & Honest (GAP-33, GAP-47 Fixed)**: TES (consistent `estimate_tokens` units) + SFS (negation/lock fidelity) + SCS (active output verification) on all paths |
+| HallucinationGuard | Not present | Not present | **Unified (GAP-33, GAP-47 Fixed)**: Tri-layer guard + Stage 6B correction loop with in-loop remediation and best-candidate retention |
 | OryEngine | Not present | Not present | Exists in `src/npae/ory/` — meta-orchestrator with PatternMemory. Unified with RAG embeddings. |
-| Stage 6B | `stage6b.rs` (spec) | `stage6b.rs` (spec) | **Implemented (`src/pipeline/stage6b.rs`)**: Dedicated modular correction loop for quality guardrails. |
+| Stage 6B | `stage6b.rs` (spec) | `stage6b.rs` (spec) | **Implemented (`src/pipeline/stage6b.rs`)**: Dedicated modular correction loop with best-candidate tracking across cycles. |
 | CorrectionCycle | Real correction | Targeted per-axis | **Implemented (GAP-014 Fixed)**: `calculate_improvement_delta()` calculates empirical pre- vs post-correction score deltas. |
 | Learning loop | Hebbian/Competitive | Same | FeedbackDetector wired (GAP-017 fixed). LearningEngine functional. |
-| CONSTRAINT_LOCK | Stage 1 | All stages | Stored in `output.constraint_locks`. Enforced in Stage 1 & validated downstream. |
+| CONSTRAINT_LOCK | Stage 1 | All stages | Stored in `output.constraint_locks`. Multi-word phrases, negations, qualifiers, and numbers locked at salience `1.0` in Stage 1 (`GAP-43`, `GAP-44`) & verified against active output in Stage 6A/6B (`GAP-46`, `GAP-47`). |
 | Role & Domain Classification | None / Heuristic | Stage 0B Pattern | **Implemented (GAP-41)**: 5-Layer Intent × Vertical composition (`intent_rule.rs`) + Gated Centroid Embedding Fallback (`detect_domain` + `ScenarioClassifier`) |
 
 ---
@@ -244,6 +275,13 @@ User compresses prompt
 | GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | 🟡 Medium | `rag/ingest.rs:240` |
 | GAP-38 | PatternMemory lost on restart unless `save_to_db()` explicitly called | ✅ **RESOLVED** | `main.rs` & `npae/ory/memory.rs` — Background periodic flush (every 5 min) + graceful shutdown hook |
 | GAP-39 | No ANN index — full-table cosine scan degrades beyond 10K chunks | 🟡 Medium | `rag/store.rs:212` |
+| GAP-42 | LLM answers not grounded/verified; HallucinationGuard checks only our prompt, not the LLM output | ✅ **RESOLVED** | `npae/aggressive/structurer.rs` (harness renderer), `npae/grounding/verifier.rs`, `POST /api/npae/verify` |
+| GAP-43 | Balanced Mode Sparse Coding: unprotected negations/qualifiers/numbers & positional bias keeping conversational filler (Gaps B1, B4, B5) | ✅ **RESOLVED** | `algorithms/sparse_coding.rs` — Negations, modal qualifiers, and numeric tokens locked at salience `1.0`; conversational filler down-weighted (`0.05`) without positional bonus; lowercase syntactic/domain scoring |
+| GAP-44 | Multi-Word Constraint Lock Protection: single-token matching dropped multi-word `ConstraintToken` phrases (Gap B2) | ✅ **RESOLVED** | `algorithms/sparse_coding.rs` — Contiguous subsequence phrase matching & constituent token locking in `apply()` and `apply_tree()` |
+| GAP-45 | Tree-Mode Index Misalignment & Position Tracking: `apply_tree` indexed `tokens` with sorted `scored` indices, dropping highest-salience tokens (Gaps B3, B7) | ✅ **RESOLVED** | `algorithms/sparse_coding.rs` — Original token index tracking in `apply()` and `apply_tree()` |
+| GAP-46 | Budgeted Stage 6A Structured Rendering & Constraint-Safe Compact Fallback (Gaps A1, A2, A4, F1) | ✅ **RESOLVED** | `pipeline/stage6a.rs` — Sparse-core `**Task:**` construction, token-budgeted `**Constraints:**` / `**Deliverables:**` sections, and lock-preserving compact mode |
+| GAP-47 | Honest TES/SCS/SFS Scoring & Stage 6B Best-Candidate Tracking: SCS checked pre-sparse `clean_tokens`, SFS ignored negation loss, TES mixed word/token units (Gaps E1–E5) | ✅ **RESOLVED** | `scoring/scs.rs`, `scoring/sfs.rs`, `scoring/tes.rs`, `pipeline/stage6b.rs` — Active-output SCS/SFS verification, unified `estimate_tokens` units in TES, loop hallucination remediation, and best-candidate retention |
+| GAP-48 | Stage 1/2 Mode Routing & Case Consistency: case-sensitive `"Balanced"` match, skipped Stage 2 `delta_tokens` when forced, and missing 45% re-run on auto-selected Balanced (Gaps C1, C2, C4) | ✅ **RESOLVED** | `pipeline/stage1.rs`, `pipeline/orchestrator.rs` — Case-insensitive mode normalization, unconditional Stage 2 predictive error computation, and Stage 1 45% re-run when Stage 2 auto-selects `Mode::Balanced` |
 
 ---
 
@@ -311,6 +349,14 @@ L3 Constraint:    CONSTRAINT_LOCK tokens from Stage -1 missing from final output
                   → this is a definitive error, not a warning
                   → trigger Stage 6B correction on SemanticCompleteness axis
 ```
+
+#### Layer 4 — Grounding Harness (Aggressive Mode, Opt-In — GAP-42)
+
+- `NpaeConfig.render_style = Harness` renders numbered `<facts trust="untrusted">` (`[F1]`, `[F2]`, …) and an explicit `<output_contract>` requiring `FOUND [F#]`, `PARTIAL_MATCH [F#]`, or `NOT_FOUND` ("Not present in provided data") for every entry in `<requested_items>`.
+- Retrieved RAG facts and user context are XML-escaped and fenced inside `<facts trust="untrusted">`, with `<rules priority="highest">` instructing the downstream LLM to treat `<facts>` strictly as untrusted data, never executable instructions (Rules §9 prompt-injection defense).
+- Stage 6B (`TaskEssential` correction) preserves `<rules>`, `<facts>`, `<constraints>`, `<requested_items>`, and `<output_contract>` when `render_style == Harness`, compacting only optional roadmap/question blocks.
+- Verification is a separate, deterministic, LLM-free step (`src/npae/grounding/verifier.rs`, exposed via `POST /api/npae/verify`) that checks downstream LLM answers for valid status contracts, existing `[F#]` citations, lexical support overlap, verbatim numeric/date grounding, and missing requested items.
+- Default `Crisp` rendering remains unchanged.
 
 ### 7.3 Fine-Tuning a Learned Model (If Replacing/Augmenting the Engine)
 
@@ -463,4 +509,22 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Added `EMBED_CACHE` (`DashMap`) for keyword and sentence-exemplar embeddings (GAP-37, 17× speedup), moved intent classification into `tokio::task::spawn_blocking`, and wired multi-label `secondary_domains` into `PromptRole.secondary` and `persona_constraints` (`intent.rs`, `engine.rs`, `structurer.rs`).
     - Added deterministic verbatim exclusion and quantitative bound extraction in `constraints.rs` (100% constraint recall on golden set).
     - Added per-domain required slot detection in `ambiguity.rs` and high-information-gain slot questions in `questions.rs`.
+
+[2026-11-05] [Antigravity / Gemini 4 Argon] ARCHITECTURE.md
+  Implemented Opt-In Grounding Harness & Deterministic LLM Answer Verifier (GAP-42):
+    - Added `RenderStyle` (`Crisp` default, `Harness` opt-in) to `NpaeConfig` (`npae/schema/types.rs`) and threaded through `CompressRequest`, `domain.rs`, `orchestrator.rs`, and `AggressiveEngine::run`.
+    - Implemented `render_harness_prompt()`, `collect_grounding_facts()`, and `derive_requested_items()` in `npae/aggressive/structurer.rs` with XML-escaped `<facts trust="untrusted">` fencing and `FOUND` / `PARTIAL_MATCH` / `NOT_FOUND` answer contract.
+    - Guarded Stage 6B `TaskEssential` correction in `npae/aggressive/engine.rs` so harness rules, facts, and output contract are never stripped.
+    - Implemented deterministic, LLM-free answer verifier in `npae/grounding/verifier.rs` and exposed `POST /api/npae/verify` in `api.rs`.
+    - Added golden evaluation suite (`tests/eval_grounding_harness.rs`) measuring verifier precision/recall, prompt-injection resistance, and `Crisp` vs `Harness` scoring metrics.
+
+[2026-11-13] [Antigravity / Gemini 4 Argon] ARCHITECTURE.md
+  Defined Balanced Mode Contract (§1.5, GAP-F1) & Resolved Balanced Mode Audit Gaps (GAP-43 through GAP-48):
+    - GAP-F1 / §1.5: Added canonical Balanced Mode Contract specifying the 30–55% target savings band, protected token classes, conversational filler stripping, mode-aware Stage 1/2 routing, budgeted Stage 6A structured rendering, and honest Stage 6B quality scoring.
+    - GAP-43 & GAP-44 FIXED (`src/algorithms/sparse_coding.rs`): Locked negations (`not`, `no`, `never`, `without`, `don't`, `avoid`), bound qualifiers (`under`, `over`, `below`, `must`, `only`), numerical tokens/units, and multi-word `ConstraintToken` phrases (`constraint_locks`) at salience `1.0`; down-weighted greeting/sign-off filler (`0.05`) without blind positional bonuses; updated `syntactic_score` and `domain_specificity` for lowercased tokens.
+    - GAP-45 FIXED (`src/algorithms/sparse_coding.rs`): Fixed `apply_tree()` sorted-index misalignment bug and preserved original token indices in both `apply()` and `apply_tree()`.
+    - GAP-46 FIXED (`src/pipeline/stage6a.rs`): Implemented budgeted structured rendering for Balanced/Gentle modes (sparse-core `**Task:**` + preserved `**Constraints:**` and `**Deliverables:**` within the input token budget) and ensured `force_compact_generation` retains all `constraint_locks`.
+    - GAP-47 FIXED (`src/scoring/scs.rs`, `src/scoring/sfs.rs`, `src/scoring/tes.rs`, `src/pipeline/stage6b.rs`): Removed pre-sparse `clean_tokens` fallback in SCS to verify active output text, added negation/constraint lock fidelity checks in SFS, unified `estimate_tokens` units across input and output in TES, and added in-loop hallucination remediation plus best-candidate retention in Stage 6B.
+    - GAP-48 FIXED (`src/pipeline/stage1.rs`, `src/pipeline/orchestrator.rs`): Normalized `forced_mode` case-insensitively in Stage 1 and Orchestrator, executed Stage 2 predictive error (`delta_tokens`, `error_score`) unconditionally even when mode is forced, and re-ran Stage 1 with the 45% keep ratio whenever Stage 2 auto-selects `Mode::Balanced`.
+    - Added integration verification suite (`tests/test_balanced_mode.rs`) and unit tests in `sparse_coding.rs`.
 ```

@@ -1,3 +1,8 @@
+//! Quality Scoring Module (`ARCHITECTURE.md` §1.3, §4).
+//!
+//! Coordinates independent evaluation across TES (Token Efficiency), SFS (Schema Fidelity),
+//! and SCS (Semantic Completeness) and identifies the lowest failing axis for Stage 6B.
+
 pub mod scs;
 pub mod sfs;
 pub mod tes;
@@ -5,19 +10,18 @@ pub mod weights;
 
 use crate::types::{AlgorithmOutput, FieldValidationIssue, ScoreAxis, ScoringResult};
 
-/// Computes the complete ScoringResult by evaluating TES, SFS, and SCS.
+/// Computes the complete `ScoringResult` by evaluating TES, SFS, and SCS independently.
 ///
-/// Weighting: No aggregate. Each axis evaluated independently.
-///
-/// @param output - Algorithm output context.
-/// @param issues - Field validation issues.
-/// @returns ScoringResult containing independent scores and correction trigger.
+/// # Panics
+/// Never.
+#[must_use]
 pub fn compute_scoring_result(
     output: &AlgorithmOutput,
     issues: &[FieldValidationIssue],
 ) -> ScoringResult {
+    // ARCH: Balanced Mode Contract (E1, E2, E3) — all three scorers evaluate the active output.
     let (tes, _) = tes::TokenEfficiencyScorer::score(output, issues);
-    let (sfs, _) = sfs::SemanticFidelityScorer::score(issues);
+    let (sfs, _) = sfs::SemanticFidelityScorer::score_with_output(output, issues);
     let (scs, _) = scs::SemanticCompletenessScorer::score(output);
 
     let threshold = 6.0;

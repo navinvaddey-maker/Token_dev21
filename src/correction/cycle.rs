@@ -1,3 +1,8 @@
+//! Targeted Correction Cycle (`ARCHITECTURE.md` §1.2, §1.3, §4).
+//!
+//! Adjusts pipeline parameters and schema fields in response to the lowest
+//! failing score axis (`TaskEssential`, `SchemaFidelity`, `SemanticCompleteness`).
+
 use crate::types::{AlgorithmOutput, ScoreAxis, TextCorrection};
 
 /// Maximum correction iterations per request (Stage 6B).
@@ -5,9 +10,8 @@ pub const MAX_CORRECTION_CYCLES: u32 = 2;
 
 /// Applies a targeted pipeline adjustment for the failing score axis.
 ///
-/// @param out - Mutable pipeline state.
-/// @param axis - Which dimension failed the threshold.
-/// @returns Human-readable correction steps applied.
+/// # Panics
+/// Never.
 pub fn apply_targeted_correction(
     out: &mut AlgorithmOutput,
     axis: &ScoreAxis,
@@ -16,6 +20,7 @@ pub fn apply_targeted_correction(
 
     match axis {
         ScoreAxis::SchemaFidelity => {
+            // ARCH: Balanced Mode Contract (A1, E4) — preserve constraints in schema without discarding compact state unnecessarily.
             out.force_compact_generation = false;
             merge_reconstruction_into_schema(out);
             corrections.push(TextCorrection {
@@ -38,7 +43,10 @@ pub fn apply_targeted_correction(
             });
         }
         ScoreAxis::TaskEssential => {
+            // ARCH: Balanced Mode Contract (A2) — even when switching to compact generation, merge
+            // constraint locks into schema so Stage 6A compact renderer retains every constraint.
             out.force_compact_generation = true;
+            merge_reconstruction_into_schema(out);
             corrections.push(TextCorrection {
                 original: String::new(),
                 corrected: "Switched to compact generation to reduce token expansion".to_string(),
@@ -52,6 +60,9 @@ pub fn apply_targeted_correction(
 }
 
 /// Ensures constraint locks and expected deliverables appear in the resolved schema.
+///
+/// # Panics
+/// Never.
 pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
     for lock in &out.constraint_locks {
         let name = lock.text.clone();
@@ -82,6 +93,9 @@ pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
 }
 
 /// Adds implicit deliverables for Balanced/Aggressive when constraints imply them.
+///
+/// # Panics
+/// Never.
 pub fn infer_implicit_deliverables(out: &mut AlgorithmOutput) {
     let mode = out.mode.as_ref();
     let allow_infer = matches!(

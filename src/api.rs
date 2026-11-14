@@ -106,6 +106,7 @@ pub fn router(state: AppState) -> Router {
     let npae_routes = Router::new()
         .route("/api/v1/compress", post(npae_compress))
         .route("/api/v1/aggressive", post(npae_aggressive))
+        .route("/api/npae/verify", post(npae_verify_grounding))
         .route(
             "/api/v1/hallucination-check",
             post(npae_hallucination_check),
@@ -179,7 +180,7 @@ async fn health_check() -> Result<axum::response::Response, AppError> {
 
 // ── Compression endpoint ───────────────────────────────────────────────────
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct CompressRequest {
     pub raw_text: String,
     pub task: Option<String>,
@@ -195,6 +196,8 @@ pub struct CompressRequest {
     pub npae_ambiguity_threshold: Option<f32>,
     pub npae_max_questions: Option<u8>,
     pub npae_confidence_threshold: Option<f32>,
+    #[serde(default)]
+    pub npae_render_style: Option<crate::npae::schema::types::RenderStyle>,
 }
 
 async fn compress(
@@ -417,12 +420,7 @@ async fn npae_aggressive(
     State(state): State<AppState>,
     Json(req): Json<AggressiveRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    let empty_cfg = crate::npae::schema::types::NpaeConfig {
-        ambiguity_threshold: None,
-        max_questions: None,
-        confidence_threshold: None,
-        skip_stage: None,
-    };
+    let empty_cfg = crate::npae::schema::types::NpaeConfig::default();
     let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
 
     let mut enrichment = crate::types::EnrichmentContext::default();
@@ -498,6 +496,19 @@ async fn npae_hallucination_check(
     let report =
         crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
             .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok((StatusCode::OK, Json(report)).into_response())
+}
+
+/// Verifies a downstream LLM response against numbered `[F#]` grounding facts (`GAP-42`).
+///
+/// # Errors
+/// Returns [`AppError::Validation`] if `llm_answer` is empty.
+async fn npae_verify_grounding(
+    State(_state): State<AppState>,
+    Json(req): Json<crate::npae::grounding::verifier::VerifyGroundingRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let report = crate::npae::grounding::verifier::verify_grounding(&req)
+        .map_err(|e| AppError::Validation(e.to_string()))?;
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 

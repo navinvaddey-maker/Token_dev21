@@ -2,7 +2,7 @@ use super::grammar::GrammarCorrector;
 use super::rag_context::DerivedRagContext;
 use crate::npae::compression::types::CompressedRepr;
 use crate::npae::schema::types::{
-    CompressionMeta, NpaeConfig, ProcessingMeta, StructuredPromptResponse,
+    CompressionMeta, NpaeConfig, ProcessingMeta, RenderStyle, StructuredPromptResponse,
 };
 use std::time::Instant;
 
@@ -135,9 +135,28 @@ impl AggressiveEngine {
 
         let aggressive_ms = t_start.elapsed().as_millis() as u64;
 
-        // Render final optimized prompt for UI
-        let optimized_prompt =
-            super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt);
+        // Render final optimized prompt according to requested RenderStyle (Crisp by default).
+        // ARCH: Grounding Harness (GAP-42) — Harness style fences untrusted facts and binds the
+        // downstream LLM to FOUND / PARTIAL_MATCH / NOT_FOUND; Crisp behavior is unchanged.
+        let render_style = cfg.render_style.unwrap_or_default();
+        let grounding_facts = if render_style == RenderStyle::Harness {
+            super::structurer::collect_grounding_facts(&structured, raw, derived_rag.as_ref())
+        } else {
+            Vec::new()
+        };
+        let optimized_prompt = match render_style {
+            RenderStyle::Crisp => {
+                super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt)
+            }
+            RenderStyle::Harness => super::structurer::render_harness_prompt_with_options(
+                &structured,
+                &questions,
+                raw,
+                Some(&user_prompt),
+                derived_rag.as_ref(),
+                false,
+            ),
+        };
 
         // Post-generation validation using Hallucination Guard (including RAG facts as trusted context)
         let guard_cfg = &structured.hallucination_guard;
@@ -217,9 +236,25 @@ impl AggressiveEngine {
             if let Some(axis) = &scoring_result.correction_axis {
                 match axis {
                     crate::types::ScoreAxis::TaskEssential => {
-                        // TES low: Strip non-essential questions / render crisp compact prompt
-                        final_prompt =
-                            super::structurer::render_crisp_prompt(&structured, &[], &user_prompt);
+                        // TES low: Strip optional roadmap/questions, but when Harness is active
+                        // NEVER strip <rules>, <facts>, <requested_items>, or <output_contract> (GAP-42).
+                        final_prompt = match render_style {
+                            RenderStyle::Crisp => super::structurer::render_crisp_prompt(
+                                &structured,
+                                &[],
+                                &user_prompt,
+                            ),
+                            RenderStyle::Harness => {
+                                super::structurer::render_harness_prompt_with_options(
+                                    &structured,
+                                    &[],
+                                    raw,
+                                    Some(&user_prompt),
+                                    derived_rag.as_ref(),
+                                    true,
+                                )
+                            }
+                        };
                     }
                     crate::types::ScoreAxis::SchemaFidelity => {
                         // SFS low: Remediate structural omissions
@@ -230,11 +265,23 @@ impl AggressiveEngine {
                     }
                     crate::types::ScoreAxis::SemanticCompleteness => {
                         // SCS low: Ensure questions and constraints are fully rendered
-                        final_prompt = super::structurer::render_crisp_prompt(
-                            &structured,
-                            &questions,
-                            &user_prompt,
-                        );
+                        final_prompt = match render_style {
+                            RenderStyle::Crisp => super::structurer::render_crisp_prompt(
+                                &structured,
+                                &questions,
+                                &user_prompt,
+                            ),
+                            RenderStyle::Harness => {
+                                super::structurer::render_harness_prompt_with_options(
+                                    &structured,
+                                    &questions,
+                                    raw,
+                                    Some(&user_prompt),
+                                    derived_rag.as_ref(),
+                                    false,
+                                )
+                            }
+                        };
                     }
                 }
             } else if !guard_report.passed {
@@ -290,6 +337,7 @@ impl AggressiveEngine {
             },
             scoring_result,
             hallucination_report: Some(guard_report),
+            grounding_facts,
         })
     }
 }

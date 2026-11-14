@@ -26,6 +26,7 @@ async fn test_npae_config_override_threading() {
         max_questions: Some(1),
         confidence_threshold: Some(0.8),
         skip_stage: None,
+        render_style: None,
     };
 
     let resp_high = orchestrator
@@ -55,6 +56,7 @@ async fn test_npae_config_override_threading() {
         max_questions: Some(1),
         confidence_threshold: Some(0.8),
         skip_stage: None,
+        render_style: None,
     };
 
     let resp_low = orchestrator

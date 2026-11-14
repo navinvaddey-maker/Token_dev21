@@ -1,3 +1,7 @@
+//! Stage 1: Signal Reduction (Lexical Compression → Sparse Coding).
+//!
+//! Implements ARCHITECTURE.md §1.2 (Stage 1) and §1.5 (Balanced Mode Contract).
+
 use crate::{
     algorithms::{lexical::LexicalCompression, sparse_coding::SparseCoding},
     types::AlgorithmOutput,
@@ -11,7 +15,10 @@ pub struct Stage1 {
 }
 
 impl Stage1 {
-    /// Creates a new Stage1 instance
+    /// Creates a new `Stage1` instance.
+    ///
+    /// # Panics
+    /// Never panics.
     pub fn new() -> Self {
         Self {
             lexical: LexicalCompression::default(),
@@ -19,8 +26,12 @@ impl Stage1 {
         }
     }
 
-    /// Processes input through Stage 1: Signal Reduction
-    /// Now mode-aware based on forced_mode or topology classification.
+    /// Processes input through Stage 1: Signal Reduction.
+    ///
+    /// Mode-aware based on normalized `forced_mode` or topology classification proxy.
+    ///
+    /// # Panics
+    /// Never panics.
     pub fn run(
         &self,
         raw_prompt: &str,
@@ -51,8 +62,11 @@ impl Stage1 {
         let profile = router.configure(&routing_topology);
         let sparse_mode = profile.sparse_mode;
 
-        // Determine keep_ratio based on mode or topology proxy
-        let keep_ratio = match forced_mode {
+        // ARCH: Balanced Mode Contract — case-insensitive mode resolution for Stage 1 keep_ratio.
+        // FIX: Gap C2 — normalize `forced_mode` to lowercase so "Balanced", "BALANCED", and "balanced"
+        // all resolve to the 45% midpoint keep ratio instead of falling through to the topology proxy.
+        let normalized_mode = forced_mode.map(|m| m.trim().to_lowercase());
+        let keep_ratio = match normalized_mode.as_deref() {
             Some("gentle") => self.sparse.gentle_keep_ratio,
             Some("aggressive") => self.sparse.aggressive_keep_ratio,
             Some("balanced") => {

@@ -1,3 +1,9 @@
+//! Pipeline Orchestrator — executes all active pipeline stages (-1 through 6B)
+//! and routes between NPAE Aggressive and Legacy Balanced/Gentle paths.
+//!
+//! Implements ARCHITECTURE.md §1.2 (Pipeline Stages), §1.3 (Dual Routing Split),
+//! and §1.5 (Balanced Mode Contract).
+
 use dashmap::DashMap;
 use std::sync::Arc;
 
@@ -171,20 +177,37 @@ impl PipelineOrchestrator {
 
         // Stage 1: Signal Reduction (Lexical Compression → Sparse Coding)
         let topology = output.topology.clone().unwrap_or_default();
-        self.stage1
-            .run(&normalized, &mut output, &topology, forced_mode);
+        let normalized_forced_mode = forced_mode.map(|m| m.trim().to_lowercase());
+        self.stage1.run(
+            &normalized,
+            &mut output,
+            &topology,
+            normalized_forced_mode.as_deref(),
+        );
 
         // Stage 2: Boundary Detection (Predictive Coding → mode decision)
-        if let Some(fm) = forced_mode {
-            let m = match fm.to_lowercase().as_str() {
+        // ARCH: Balanced Mode Contract — always run Stage 2 so `delta_tokens` and `error_score`
+        // are populated for Layer 2 schema filling and session learning (Gap C4).
+        // FIX: Gaps C1, C2, C4 — run Stage 2 unconditionally, apply normalized forced_mode override,
+        // and if auto-routing selected Mode::Balanced, re-run Stage 1 with "balanced" keep ratio (45%).
+        self.stage2.run(session, &mut output);
+
+        if let Some(ref fm) = normalized_forced_mode {
+            let m = match fm.as_str() {
                 "aggressive" => Mode::Aggressive,
                 "gentle" => Mode::Gentle,
                 "balanced" => Mode::Balanced,
                 _ => Mode::Balanced,
             };
             output.mode = Some(m);
-        } else {
+        } else if output.mode.as_ref() == Some(&Mode::Balanced) {
+            // FIX: Gap C1 — Stage 1 initially ran with a topology proxy ratio (30% or 60%).
+            // Re-run Stage 1 with Some("balanced") so Balanced mode gets its 45% keep ratio,
+            // then refresh delta_tokens against the updated sparse_tokens while preserving Mode::Balanced.
+            self.stage1
+                .run(&normalized, &mut output, &topology, Some("balanced"));
             self.stage2.run(session, &mut output);
+            output.mode = Some(Mode::Balanced);
         }
 
         // Stage 3: Context Management (Seeding WM from locks and clusters)
@@ -203,6 +226,7 @@ impl PipelineOrchestrator {
                     .and_then(|c| c.confidence_threshold)
                     .or(Some(0.75)),
                 skip_stage: npae_config.and_then(|c| c.skip_stage.clone()),
+                render_style: npae_config.and_then(|c| c.render_style),
             };
 
             let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&normalized)

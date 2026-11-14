@@ -60,6 +60,21 @@ impl GrammarCorrector {
         let mut corrections = Vec::new();
         let mut chars: Vec<char> = masked.chars().collect();
 
+        // FIX: Compute exact character-offset spans for every `__NUM_PROT_{i}__` placeholder in
+        // `masked`. Checking `original_span.contains("__NUM_PROT_")` missed sub-token lints where
+        // `harper_core` linted `NUM` -> `Nu` or `PROT` -> `Plot` individually, corrupting numbers
+        // into `__Nu_Plot_0__` whenever total edits stayed under the 30% fallback threshold.
+        let mut placeholder_char_spans: Vec<(usize, usize)> = Vec::new();
+        for (key, _) in &placeholders {
+            for (byte_pos, _) in masked.match_indices(key.as_str()) {
+                let char_start = masked
+                    .get(..byte_pos)
+                    .map_or(0, |prefix| prefix.chars().count());
+                let char_end = char_start + key.chars().count();
+                placeholder_char_spans.push((char_start, char_end));
+            }
+        }
+
         // Sort lints in reverse order of span so character replacements don't shift earlier offsets
         let mut sorted_lints = lints;
         sorted_lints.sort_by(|a, b| b.span.start.cmp(&a.span.start));
@@ -80,12 +95,46 @@ impl GrammarCorrector {
                 let end = lint.span.end;
 
                 if start <= end && end <= chars.len() {
+                    // Never touch any span overlapping a numeric/date/currency placeholder.
+                    if placeholder_char_spans
+                        .iter()
+                        .any(|&(ps, pe)| start < pe && end > ps)
+                    {
+                        continue;
+                    }
+
                     let original_span: String = chars[start..end].iter().collect();
 
-                    // Skip replacing if span contains placeholder markers
                     if original_span.contains("__NUM_PROT_")
                         || replacement_str.contains("__NUM_PROT_")
                     {
+                        continue;
+                    }
+
+                    // FIX: Preserve mixed-case technical identifiers/units (e.g. `eGFR`, `mL`,
+                    // `SaaS`, `RPO`) and data-format keywords (`json`, `yaml`, `xml`, `sql`) so
+                    // spellcheck never rewrites domain terms (`eGFR` -> `e'er`, `json` -> `son`).
+                    let span_trimmed = original_span.trim();
+                    let has_internal_upper = span_trimmed.chars().skip(1).any(char::is_uppercase);
+                    let is_protected_tech_term = matches!(
+                        span_trimmed.to_lowercase().as_str(),
+                        "json"
+                            | "yaml"
+                            | "xml"
+                            | "csv"
+                            | "toml"
+                            | "sql"
+                            | "html"
+                            | "grpc"
+                            | "graphql"
+                            | "egfr"
+                            | "ml"
+                            | "min"
+                            | "rpo"
+                            | "rto"
+                            | "sla"
+                    );
+                    if has_internal_upper || is_protected_tech_term {
                         continue;
                     }
 

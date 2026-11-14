@@ -162,7 +162,7 @@
             border-radius: 24px;
             padding: 36px 40px;
             box-shadow: var(--glass-card-shadow);
-            max-width: 860px;
+            max-width: 1160px;
             width: 100%;
             position: relative;
             z-index: 2;
@@ -438,6 +438,8 @@
             color: var(--accent-text);
             background: var(--copy-bg);
             border: 1px solid var(--copy-border);
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .copy-btn:hover {
             background: rgba(0, 242, 254, 0.2);
@@ -827,6 +829,467 @@
             z-index: -1;
             pointer-events: none;
         }
+
+        /* ── R1-R5 Workbench Redesign Styles ─────────────── */
+        .header-right-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .sandbox-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+        .icon-btn-header {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--head-text);
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .icon-btn-header:hover {
+            border-color: var(--accent-text);
+            transform: translateY(-1px);
+        }
+
+        /* ── 2-Column Split Workbench ─────────────────────── */
+        .workbench-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            align-items: stretch;
+            margin-top: 14px;
+        }
+        .pane-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .pane-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 34px;
+        }
+        .pane-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+        }
+        .token-pill {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+        }
+
+        /* ── Presets Strip ─────────────────────────────────── */
+        .preset-strip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .preset-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .preset-chip {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            font-weight: 500;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--body-text);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .preset-chip:hover {
+            border-color: var(--accent-text);
+            color: var(--head-text);
+            background: var(--tag-bg);
+        }
+
+        /* ── Textarea & Dropzone ───────────────────────────── */
+        .textarea-dropzone-wrap {
+            position: relative;
+            width: 100%;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+        }
+        .workbench-textarea {
+            display: block;
+            min-height: 220px;
+            height: 240px;
+            resize: vertical;
+            width: 100%;
+            font-family: 'Inter', sans-serif;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        .drop-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(8, 13, 24, 0.88);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 2px dashed var(--accent-text);
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            z-index: 10;
+            color: var(--head-text);
+            font-size: 13px;
+            font-weight: 600;
+            pointer-events: none;
+        }
+        .textarea-dropzone-wrap.drop-active .drop-overlay {
+            display: flex;
+        }
+
+        /* ── Meta & Ingestion Row ──────────────────────────── */
+        .pane-meta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .file-upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px dashed var(--glass-border);
+            background: var(--card-sub-bg);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .file-upload-btn:hover {
+            border-color: var(--accent-text);
+            color: var(--head-text);
+        }
+        .domain-chip {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .domain-chip strong {
+            color: var(--accent-text);
+            font-weight: 600;
+        }
+
+        /* ── Segmented Mode Selection Pills ───────────────── */
+        .segmented-mode-pills {
+            display: inline-flex;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 3px;
+        }
+        .mode-pill {
+            padding: 6px 14px;
+            border-radius: 7px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .mode-pill:hover {
+            color: var(--head-text);
+        }
+        .mode-pill.active {
+            background: var(--btn-grad);
+            color: var(--btn-text);
+            font-weight: 700;
+            box-shadow: 0 2px 8px var(--accent-glow);
+        }
+
+        .pane-controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .pane-actions-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .clear-btn {
+            padding: 12px 18px;
+            font-size: 13px;
+            border-radius: 12px;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .clear-btn:hover {
+            border-color: var(--inp-border);
+            color: var(--head-text);
+        }
+        .workbench-compress-btn {
+            flex: 1;
+            margin-top: 0 !important;
+        }
+
+        /* ── Output Pane & Diffs ──────────────────────────── */
+        .tes-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            border-radius: 99px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .diff-toggle-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+        }
+        .diff-toggle-label input[type="checkbox"] {
+            accent-color: var(--accent-text);
+            cursor: pointer;
+        }
+        .diff-removed {
+            display: block;
+            color: #ef4444;
+            text-decoration: line-through;
+            opacity: 0.8;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            background: rgba(239, 68, 68, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border-left: 3px solid #ef4444;
+        }
+        .crisp-tag {
+            color: var(--accent-text, #00f2fe);
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .workbench-output {
+            min-height: 220px;
+            height: 240px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            line-height: 1.6;
+            padding: 16px;
+            background: var(--inp-bg);
+            border-radius: 14px;
+            border: 1px solid var(--inp-border);
+            color: var(--head-text);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* ── Non-Blocking Inline Progress Skeleton ────────── */
+        .skeleton-wrap {
+            padding: 16px;
+            background: var(--card-sub-bg);
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 8px;
+        }
+        .inline-progress-bar {
+            height: 4px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .inline-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--btn-grad);
+            transition: width 0.3s ease;
+        }
+        .skeleton-status {
+            font-size: 12px;
+            color: var(--accent-text);
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .skeleton-line {
+            height: 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(0, 242, 254, 0.12) 50%, rgba(255, 255, 255, 0.04) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.8s infinite linear;
+        }
+        .shimmer-w80 { width: 80%; }
+        .shimmer-w100 { width: 100%; }
+        .shimmer-w60 { width: 60%; }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* ── Telemetry & Pricing Bar ──────────────────────── */
+        .telemetry-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--card-sub-bg);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            flex-wrap: wrap;
+        }
+        .telemetry-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+        .stat-tok {
+            color: var(--head-text);
+            font-weight: 600;
+        }
+        .stat-pct {
+            color: #10b981;
+            font-weight: 700;
+        }
+        .stat-cost {
+            color: var(--accent-text);
+            font-weight: 700;
+        }
+        .model-select-compact {
+            font-size: 11.5px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: var(--inp-bg);
+            border: 1px solid var(--inp-border);
+            color: var(--head-text);
+        }
+
+        /* ── Auth Gate Card ───────────────────────────────── */
+        .auth-gate-card {
+            padding: 36px 24px;
+            text-align: center;
+            background: var(--card-sub-bg);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .auth-gate-icon { font-size: 36px; }
+        .auth-gate-title { font-size: 16px; font-weight: 700; color: var(--head-text); }
+        .auth-gate-desc { font-size: 13px; color: var(--text-muted); max-width: 360px; line-height: 1.5; }
+
+        /* ── Responsive Layout Breakpoints (R5) ─────────────── */
+        @media (max-width: 900px) {
+            .glass-card {
+                max-width: 100%;
+                padding: 24px 20px;
+            }
+            .workbench-split {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .workbench-textarea, .workbench-output {
+                min-height: 180px;
+                height: 190px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .stats-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .segmented-mode-pills {
+                width: 100%;
+                display: flex;
+            }
+            .mode-pill {
+                flex: 1;
+                text-align: center;
+                padding: 8px 4px;
+                font-size: 11.5px;
+            }
+            .telemetry-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .pane-actions-row {
+                width: 100%;
+            }
+            .clear-btn {
+                padding: 10px 14px;
+            }
+        }
     </style>
 </head>
 <body class="theme-night">
@@ -851,17 +1314,25 @@
                 </div>
                 <div class="tc-logo-text">Oryx<span>Intel</span></div>
             </div>
-            <div class="engine-badge">
-                <span class="engine-pulse-dot"></span>
-                <span>CRISP v3 Active</span>
+            <div class="header-right-group">
+                <div class="engine-badge">
+                    <span class="engine-pulse-dot"></span>
+                    <span>CRISP v3 Active</span>
+                </div>
+                <span class="sandbox-badge" id="sandbox-badge">● Sandbox Ready</span>
+                <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin" aria-label="Customize Skin">🎨</button>
             </div>
         </div>
 
         <h1 class="tc-headline">Oryx Intelligence Engine</h1>
         <p class="tc-sub">CRISP framework · Semantic compression · Zero-hallucination retention</p>
 
-        <!-- ── Auth Section ──────────────────────────────── -->
-        <div id="auth-section">
+        <!-- ── Auth Section (Non-blocking Dialog / Popover) ── -->
+        <div id="auth-section" style="display: none; margin-bottom: 24px; padding: 22px; background: var(--card-sub-bg); border: 1px solid var(--glass-border); border-radius: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <h3 style="font-size: 15px; color: var(--head-text); font-weight: 700; margin: 0;">Account Access</h3>
+                <button type="button" class="btn-ghost" onclick="closeAuthSection()" style="padding: 4px 10px; font-size: 12px;">✕ Close</button>
+            </div>
             <div class="auth-tabs">
                 <button class="auth-tab active" onclick="switchAuthTab('login')" id="tab-login">Login</button>
                 <button class="auth-tab" onclick="switchAuthTab('register')" id="tab-register">Register</button>
@@ -911,13 +1382,13 @@
             </form>
         </div>
 
-        <!-- ── Main Section ──────────────────────────────── -->
-        <div id="main-section" style="display: none;">
+        <!-- ── Main Section (R1: Unblocked by Default) ────── -->
+        <div id="main-section" style="display: block;">
             <div class="user-bar">
-                <div class="user-info">Signed in as <strong id="display-username"></strong></div>
+                <div class="user-info" id="user-status-text">Operating in <strong id="display-username" style="color: #10b981;">Zero-Auth Sandbox</strong></div>
                 <div style="display: flex; gap: 8px;">
                     <a href="/admin.html" id="admin-link" class="btn-ghost" style="display: none; text-decoration: none;">🛡️ Admin</a>
-                    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+                    <button type="button" class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthSection()">Sign In / Register</button>
                 </div>
             </div>
 
@@ -926,96 +1397,160 @@
                 <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask">Ask (RAG)</button>
                 <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
                 <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
-                <button class="nav-tab" id="btn-custom-skin" style="margin-left: auto;">🎨 Skin</button>
             </div>
 
-            <!-- ── Compress Tab ── -->
+            <!-- ── Compress Tab (2-Column Split Workbench) ── -->
             <div class="tab-content active" id="tab-compress">
-                <div class="tag">CRISP Optimization</div>
-                
-                <div class="form-row">
-                    <label for="prompt-input" class="section-label">
-                        <span>Raw Prompt</span>
-                        <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
-                    </label>
-                    <textarea id="prompt-input" class="tc-textarea" placeholder="Paste your lengthy prompt here to compress tokens without losing meaning..."></textarea>
-                    <div id="prompt-error" style="color: #ef4444; font-size: 12px; margin-top: 5px; display: none;">Prompt must be at least 8 words.</div>
-                </div>
-                
-                <div class="form-row" style="display: none;">
-                    <label for="task-input" class="section-label">Task Description</label>
-                    <input type="text" id="task-input" class="tc-input" placeholder="What should the AI do with this prompt?" value="Optimize prompt">
-                </div>
+                <div class="tag">CRISP Optimization · Dual-Column Workbench</div>
 
-                <div class="form-row">
-                    <label for="mode" class="section-label">Compression Mode</label>
-                    <div class="select-wrap">
-                        <select id="mode" class="tc-select">
-                            <option value="balanced">Balanced — Measured pruning with full context fidelity</option>
-                            <option value="gentle">Gentle — Minimal trimming, preserves exact phrase phrasing</option>
-                            <option value="aggressive">Aggressive — Maximum token reduction & structural distillation</option>
+                <!-- 1-Click Sample Presets (R1) placed above split so input & output boxes align side-by-side -->
+                <div class="preset-strip" style="margin-top: 10px;">
+                    <span class="preset-label">Try sample:</span>
+                    <button type="button" class="preset-chip" data-preset="house" id="preset-house" onclick="loadPreset('house')">🏠 Buying a House</button>
+                    <button type="button" class="preset-chip" data-preset="bug" id="preset-bug" onclick="loadPreset('bug')">🐛 Bug Report</button>
+                    <button type="button" class="preset-chip" data-preset="legal" id="preset-legal" onclick="loadPreset('legal')">⚖️ Contract Review</button>
+                </div>
+                
+                <div class="workbench-split" data-workbench-split id="workbench-container">
+                    <!-- Left Column: Raw Input Pane -->
+                    <div class="pane-column pane-left" id="input-pane">
+                        <div class="pane-header">
+                            <span class="pane-title">Raw Input</span>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
+                                <span id="input-token-counter" class="token-pill">0 tokens</span>
+                            </div>
+                        </div>
+
+                        <!-- Drag-and-Drop Ingestion Wrapper (R4) -->
+                        <div class="textarea-dropzone-wrap" id="dropzone" data-dropzone>
+                            <textarea id="prompt-input" class="tc-textarea workbench-textarea" placeholder="Paste your lengthy prompt here, or drag & drop a PDF, TXT, or MD file..."></textarea>
+                            <div id="drop-overlay" class="drop-overlay">
+                                <span style="font-size: 26px;">📄</span>
+                                <span>Drop .pdf, .txt, or .md to extract text</span>
+                            </div>
+                        </div>
+                        <div id="prompt-error" style="color: #ef4444; font-size: 12px; margin-top: -6px; display: none;">Prompt must be at least 8 words.</div>
+
+                        <!-- File Ingestion & Auto-Detected Domain (R4, R5) -->
+                        <div class="pane-meta-row">
+                            <label class="file-upload-btn" for="file-input">
+                                <span>📄 Attach PDF / TXT / MD</span>
+                                <input type="file" id="file-input" accept=".pdf,.txt,.md" style="display: none;" onchange="handleFileSelect(event)">
+                            </label>
+                            <div class="domain-chip" id="domain-chip" data-domain>
+                                Auto-detected domain: <strong id="domain-name">General</strong>
+                            </div>
+                        </div>
+
+                        <!-- Hidden legacy inputs for compatibility -->
+                        <input type="text" id="task-input" value="Optimize prompt" style="display: none;">
+                        <select id="use-case" style="display: none;">
+                            <option value="">Auto-detect</option>
+                            <option value="generic">Generic</option>
+                            <option value="code">Code</option>
+                            <option value="ticket">Support Ticket</option>
+                            <option value="legal">Legal</option>
+                            <option value="resume">Resume</option>
+                            <option value="research">Research</option>
+                            <option value="transcript">Transcript</option>
+                            <option value="financial">Financial</option>
                         </select>
-                        <div class="select-chevron">▼</div>
-                    </div>
-                </div>
 
-                <div class="form-row" style="display:none;">
-                    <label for="use-case">Use Case</label>
-                    <select id="use-case">
-                        <option value="">Auto-detect</option>
-                        <option value="generic">Generic</option>
-                        <option value="code">Code</option>
-                        <option value="ticket">Support Ticket</option>
-                        <option value="legal">Legal</option>
-                        <option value="resume">Resume</option>
-                        <option value="research">Research</option>
-                        <option value="transcript">Transcript</option>
-                        <option value="financial">Financial</option>
-                    </select>
-                </div>
-
-                <button class="tc-compress-btn" onclick="compress()" id="compress-btn" disabled>
-                    ⚡ Compress Prompt
-                </button>
-                <div class="shortcut-hint">
-                    Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress
-                </div>
-
-                <!-- Result Section -->
-                <div id="result-section" style="display:none;">
-                    <hr class="divider">
-                    
-                    <div class="stats-row">
-                        <div class="stat-card">
-                            <div class="stat-val" id="stat-original">0</div>
-                            <div class="stat-lbl">Original Tokens</div>
+                        <!-- Controls Row: Segmented Mode Pills (R5) -->
+                        <div class="pane-controls-row">
+                            <div class="segmented-mode-pills" id="mode-pills" role="radiogroup" aria-label="Compression Mode">
+                                <button type="button" class="mode-pill" data-mode="gentle" id="pm-gentle" onclick="selectMode('gentle')">Gentle</button>
+                                <button type="button" class="mode-pill active" data-mode="balanced" id="pm-balanced" onclick="selectMode('balanced')">Balanced</button>
+                                <button type="button" class="mode-pill" data-mode="aggressive" id="pm-aggressive" onclick="selectMode('aggressive')">Aggressive</button>
+                            </div>
+                            <input type="hidden" id="mode" value="balanced">
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-val" id="stat-final">0</div>
-                            <div class="stat-lbl">Final Tokens</div>
+
+                        <div class="pane-actions-row">
+                            <button type="button" class="clear-btn" onclick="clearInput()">Clear</button>
+                            <button type="button" class="tc-compress-btn workbench-compress-btn" onclick="compress()" id="compress-btn" disabled>
+                                ⚡ Compress Prompt
+                            </button>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-val positive" id="stat-saved">0</div>
-                            <div class="stat-lbl">Tokens Saved</div>
+                        <div class="shortcut-hint" style="margin-top: 2px;">
+                            Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress
                         </div>
                     </div>
 
-                    <div class="progress-bar-wrap">
-                        <div class="progress-bar-fill" id="token-progress-bar"></div>
-                    </div>
-                    <div class="progress-label">
-                        <span>Efficiency Ratio</span>
-                        <span id="token-saving-pct" style="color: var(--accent-text); font-weight: 600;">0% saved</span>
-                    </div>
-                    
-                    <div class="section-label">Optimized Prompt (CRISP Engine Output)</div>
-                    <div class="output-box" id="result-output"></div>
-                    
-                    <div class="feedback-row">
-                        <span id="feedback-status" style="font-size: 12px; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
-                        <button class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
-                        <button class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
-                        <button class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
+                    <!-- Right Column: CRISP Output Pane (R2, R3, R5) -->
+                    <div class="pane-column pane-right" id="output-pane">
+                        <div class="pane-header">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="pane-title">CRISP Optimized</span>
+                                <span class="tes-badge" id="tes-score" data-tes="0.97">TES 0.97 Hallucination-Free</span>
+                            </div>
+                            <label class="diff-toggle-label">
+                                <input type="checkbox" id="diff-toggle" checked onchange="toggleDiffView()">
+                                <span>Show pruning diff</span>
+                            </label>
+                        </div>
+
+                        <!-- Output Box with Non-Blocking Inline Progress (R5) -->
+                        <div id="output-container" class="output-container">
+                            <div id="inline-progress" class="skeleton-wrap" style="display: none;">
+                                <div class="inline-progress-bar">
+                                    <div class="inline-progress-fill" id="inline-progress-fill"></div>
+                                </div>
+                                <div class="skeleton-status">
+                                    <span class="engine-pulse-dot" style="display: inline-block;"></span>
+                                    <span id="inline-status-text">Mapping Prompt Topology...</span>
+                                </div>
+                                <div class="skeleton-line shimmer-w80"></div>
+                                <div class="skeleton-line shimmer-w100"></div>
+                                <div class="skeleton-line shimmer-w60"></div>
+                            </div>
+                            <div id="result-output" class="output-box workbench-output"><span class="text-placeholder" style="color: var(--text-muted); opacity: 0.85;">Enter a prompt on the left to preview CRISP compression...</span></div>
+                        </div>
+
+                        <!-- Result Section & Live Telemetry (R3) -->
+                        <div id="result-section" style="display: block;">
+                            <div class="stats-row" style="display: none;">
+                                <div class="stat-card">
+                                    <div class="stat-val" id="stat-original">0</div>
+                                    <div class="stat-lbl">Original Tokens</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-val" id="stat-final">0</div>
+                                    <div class="stat-lbl">Final Tokens</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-val positive" id="stat-saved">0</div>
+                                    <div class="stat-lbl">Tokens Saved</div>
+                                </div>
+                            </div>
+                            <div class="progress-bar-wrap" style="display: none;">
+                                <div class="progress-bar-fill" id="token-progress-bar"></div>
+                            </div>
+                            <span id="token-saving-pct" style="display: none;">0% saved</span>
+
+                            <div class="telemetry-bar">
+                                <div class="telemetry-stats">
+                                    <span id="output-token-count" class="stat-tok">0 tokens</span>
+                                    <span id="output-saving-pct" class="stat-pct">0% saved</span>
+                                    <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <select id="model-select" class="tc-select model-select-compact" onchange="updateModelPricing()">
+                                        <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
+                                        <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
+                                        <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
+                                    </select>
+                                    <button type="button" class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
+                                </div>
+                            </div>
+
+                            <div class="feedback-row" style="margin-top: 8px;">
+                                <span id="feedback-status" style="font-size: 12px; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
+                                <button type="button" class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
+                                <button type="button" class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1141,12 +1676,24 @@
             <!-- ── History Tab ── -->
             <div class="tab-content" id="tab-history-content">
                 <div class="section-label">Compression History</div>
+                <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
+                    <div class="auth-gate-icon">🔒</div>
+                    <div class="auth-gate-title">Save Compression History</div>
+                    <div class="auth-gate-desc">Create a free account or sign in to persist and search past prompt compression history across devices.</div>
+                    <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
+                </div>
                 <div id="history-list"></div>
             </div>
 
             <!-- ── Stats Tab ── -->
             <div class="tab-content" id="tab-stats-content">
                 <div class="section-label">Usage Statistics</div>
+                <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
+                    <div class="auth-gate-icon">📊</div>
+                    <div class="auth-gate-title">Personal Usage Analytics</div>
+                    <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency, and cost reductions over time.</div>
+                    <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
+                </div>
                 <div class="stats-row" id="global-stats"></div>
             </div>
 
@@ -1185,11 +1732,11 @@
 <script src="neuron_animation.js?v=4"></script>
 <script src="dev_engine.js?v=4"></script>
 <script src="prompt_optimizer.js?v=4"></script>
-<script src="mock_api.js?v=4"></script>
-<script src="app.js?v=9"></script>
+<script src="mock_api.js?v=5"></script>
+<script src="app.js?v=10"></script>
 
-    <!-- Zero-RAM Vector Neural Progress Overlay -->
-    <div id="neuro-progress-overlay">
+    <!-- Legacy Progress Overlay (Suppressed for R5 non-blocking inline skeleton) -->
+    <div id="neuro-progress-overlay" style="display: none !important; pointer-events: none;">
         <canvas id="neuron-canvas"></canvas>
         <div class="brain-loader">
             <svg class="vector-neural-ring" viewBox="0 0 100 100">
