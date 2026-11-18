@@ -17,13 +17,17 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = '/'; // Redirect to login if no token or not admin
         return;
     }
-    
+
     document.getElementById('admin-username').textContent = State.username;
     const avatarEl = document.getElementById('admin-avatar');
     if (avatarEl && State.username) {
         avatarEl.textContent = State.username.charAt(0).toUpperCase();
     }
     initEventListeners();
+    initHudClock();
+    initCommandPalette();
+    initHollywoodCanvases();
+    initAutoSync();
     loadOverview();
 });
 
@@ -80,7 +84,7 @@ function initEventListeners() {
 
 function switchSection(sectionId) {
     State.currentSection = sectionId;
-    
+
     // Update navUI
     document.querySelectorAll('.nav-links li').forEach(li => {
         li.classList.toggle('active', li.getAttribute('data-section') === sectionId);
@@ -119,7 +123,7 @@ async function apiFetch(url, options = {}) {
         }
     };
     const response = await fetch(url, { ...defaultOptions, ...options });
-    
+
     if (response.status === 401 || response.status === 403) {
         window.location.href = '/';
         return;
@@ -134,31 +138,356 @@ async function apiFetch(url, options = {}) {
     return response.json();
 }
 
-// ── Overview Section ────────────────────────────────────────────────────────
+// ── Overview Section (Mission Control HUD) ──────────────────────────────────
+
+function initHudClock() {
+    const clockEl = document.getElementById('hud-utc-clock');
+    if (!clockEl) return;
+    const tick = () => {
+        const now = new Date();
+        clockEl.textContent = now.toISOString().slice(11, 19) + ' UTC';
+    };
+    tick();
+    setInterval(tick, 1000);
+}
+
+function initCommandPalette() {
+    const modal = document.getElementById('cmd-palette-modal');
+    const input = document.getElementById('cmd-palette-input');
+    const list = document.getElementById('cmd-palette-list');
+    const btn = document.getElementById('btn-cmd-palette');
+    if (!modal || !input || !list) return;
+
+    const commands = [
+        { label: 'Overview — Mission Control HUD', hint: 'Section', action: () => switchSection('overview') },
+        { label: 'User Management — Accounts & Roles', hint: 'Section', action: () => switchSection('users') },
+        { label: 'Global History — Pipeline Runs', hint: 'Section', action: () => switchSection('history') },
+        { label: 'Feedback Signals — Quality & Sentiment', hint: 'Section', action: () => switchSection('feedback') },
+        { label: 'RAG Knowledge Base — Vector Docs', hint: 'Section', action: () => switchSection('rag') },
+        { label: 'Ask (RAG) — Internal Query Console', hint: 'Section', action: () => switchSection('ask') },
+        { label: 'Sync HUD Telemetry Now', hint: 'Action', action: () => loadOverview() },
+        { label: 'Return to Oryx Studio', hint: 'Link', action: () => { window.location.href = '/'; } },
+    ];
+
+    const renderList = (q = '') => {
+        const query = q.trim().toLowerCase();
+        const matches = commands.filter(c => c.label.toLowerCase().includes(query) || c.hint.toLowerCase().includes(query));
+        list.innerHTML = '';
+        matches.forEach((cmd, idx) => {
+            const row = document.createElement('div');
+            row.className = 'cmd-palette-item' + (idx === 0 ? ' selected' : '');
+            row.innerHTML = `<span>${cmd.label}</span><span class="hud-panel-tag">${cmd.hint}</span>`;
+            row.addEventListener('click', () => {
+                close();
+                cmd.action();
+            });
+            list.appendChild(row);
+        });
+    };
+
+    const open = () => {
+        modal.classList.add('open');
+        input.value = '';
+        renderList('');
+        setTimeout(() => input.focus(), 10);
+    };
+    const close = () => modal.classList.remove('open');
+
+    if (btn) btn.addEventListener('click', open);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    input.addEventListener('input', (e) => renderList(e.target.value));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') close();
+        if (e.key === 'Enter') {
+            const first = list.querySelector('.cmd-palette-item');
+            if (first) first.click();
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            if (modal.classList.contains('open')) close();
+            else open();
+        }
+    });
+}
+
+function formatHudDate(val) {
+    if (!val) return '--';
+    const raw = String(val).trim();
+    // Normalize SQLite "YYYY-MM-DD HH:MM:SS" into ISO UTC so Safari/WebKit parses it reliably.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(raw)
+        ? raw.replace(' ', 'T') + (raw.endsWith('Z') ? '' : 'Z')
+        : raw;
+    const dt = new Date(normalized);
+    return Number.isNaN(dt.getTime()) ? raw : dt.toLocaleString();
+}
+
+function copyHudValue(text, el) {
+    if (!text || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return;
+    navigator.clipboard.writeText(text).then(() => {
+        if (el) {
+            const prev = el.textContent;
+            el.textContent = '✓ Copied';
+            setTimeout(() => { el.textContent = prev; }, 1200);
+        }
+    }).catch(() => { });
+}
+
+function renderHudPerformance(sysPerf, engagement, errMetrics) {
+    const panel = document.getElementById('hud-perf-panel');
+    if (!panel) return;
+
+    const avgLatencyMs = sysPerf?.avg_latency_ms !== undefined
+        ? Number(sysPerf.avg_latency_ms)
+        : Number(sysPerf?.avg_processing_time_seconds ?? 0) * 1000;
+    const activeUsers = Number(
+        engagement?.active_users_24h ??
+        sysPerf?.active_users_last_hour ??
+        engagement?.total_active_users ??
+        0
+    );
+    const totalUsers = Number((document.getElementById('stat-total-users')?.textContent || '0').replace(/,/g, '')) || 0;
+    const engPct = totalUsers > 0 ? Math.min(100, Math.round((activeUsers / totalUsers) * 100)) : 0;
+    const errRate = Number(errMetrics?.error_rate ?? errMetrics?.percentage_with_warnings ?? 0);
+    const healthPct = Math.max(0, Math.min(100, Math.round(100 - errRate)));
+    const latencyPct = Math.min(100, Math.max(8, Math.round((avgLatencyMs / 500) * 100)));
+
+    panel.innerHTML = `
+        <div class="hud-meter-row">
+            <div class="hud-meter-label"><span>Pipeline Health</span><span>${healthPct}%</span></div>
+            <div class="hud-meter-track"><div class="hud-meter-fill" style="width:${healthPct}%; background: linear-gradient(90deg, #10b981, #22d3ee);"></div></div>
+        </div>
+        <div class="hud-meter-row">
+            <div class="hud-meter-label"><span>Avg Engine Latency</span><span>${avgLatencyMs > 0 ? `${avgLatencyMs.toFixed(0)} ms` : 'Nominal'}</span></div>
+            <div class="hud-meter-track"><div class="hud-meter-fill" style="width:${latencyPct}%;"></div></div>
+        </div>
+        <div class="hud-meter-row">
+            <div class="hud-meter-label"><span>Active User Engagement</span><span>${activeUsers} active (${engPct}%)</span></div>
+            <div class="hud-meter-track"><div class="hud-meter-fill" style="width:${Math.max(6, engPct)}%; background: linear-gradient(90deg, #a855f7, #3b82f6);"></div></div>
+        </div>
+    `;
+}
+
+function initAutoSync() {
+    const btn = document.getElementById('btn-auto-sync');
+    State.autoSync = true;
+    setInterval(() => {
+        if (State.autoSync && State.currentSection === 'overview') {
+            loadOverview();
+        }
+    }, 10000);
+    if (btn) {
+        btn.addEventListener('click', () => {
+            State.autoSync = !State.autoSync;
+            btn.textContent = State.autoSync ? 'AUTO-SYNC: ON' : 'AUTO-SYNC: OFF';
+            btn.style.opacity = State.autoSync ? '1' : '0.6';
+        });
+    }
+}
+
+function initHollywoodCanvases() {
+    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const radar = document.getElementById('hud-radar-canvas');
+    const wave = document.getElementById('hud-wave-canvas');
+
+    let angle = 0;
+    let phase = 0;
+    const stageNodes = ['S0', 'S1', 'S2', 'NPAE', 'ORY', 'GUARD'];
+
+    const drawRadar = () => {
+        if (!radar || !radar.getContext) return;
+        const ctx = radar.getContext('2d');
+        if (!ctx) return;
+        const w = radar.width;
+        const h = radar.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxR = Math.min(cx, cy) - 18;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // Concentric rings
+        [0.33, 0.66, 1].forEach(frac => {
+            ctx.beginPath();
+            ctx.arc(cx, cy, maxR * frac, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(34, 211, 238, 0.16)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+
+        // Crosshairs
+        ctx.beginPath();
+        ctx.moveTo(cx - maxR, cy);
+        ctx.lineTo(cx + maxR, cy);
+        ctx.moveTo(cx, cy - maxR);
+        ctx.lineTo(cx, cy + maxR);
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.1)';
+        ctx.stroke();
+
+        // Sweep sector
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        const grad = ctx.createLinearGradient(0, 0, maxR, 0);
+        grad.addColorStop(0, 'rgba(34, 211, 238, 0.35)');
+        grad.addColorStop(1, 'rgba(34, 211, 238, 0.02)');
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, maxR, -0.45, 0);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.restore();
+
+        // Pipeline stage nodes around perimeter
+        stageNodes.forEach((lbl, idx) => {
+            const a = (idx / stageNodes.length) * Math.PI * 2 - Math.PI / 2;
+            const nx = cx + Math.cos(a) * (maxR * 0.78);
+            const ny = cy + Math.sin(a) * (maxR * 0.78);
+            const dist = Math.abs(((angle % (Math.PI * 2)) - (a + Math.PI * 2) % (Math.PI * 2)));
+            const active = dist < 0.55;
+
+            ctx.beginPath();
+            ctx.arc(nx, ny, active ? 4.5 : 3, 0, Math.PI * 2);
+            ctx.fillStyle = active ? '#34d399' : '#22d3ee';
+            ctx.fill();
+
+            ctx.fillStyle = active ? '#f8fafc' : '#94a3b8';
+            ctx.font = '600 9px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(lbl, nx, ny - 8);
+        });
+
+        // Core pulse
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#22d3ee';
+        ctx.fill();
+    };
+
+    const drawWave = () => {
+        if (!wave || !wave.getContext) return;
+        const ctx = wave.getContext('2d');
+        if (!ctx) return;
+        const w = wave.width;
+        const h = wave.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // Center baseline
+        ctx.beginPath();
+        ctx.moveTo(0, h / 2);
+        ctx.lineTo(w, h / 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Primary cyan carrier + secondary emerald savings harmonic
+        [
+            { amp: 20, freq: 0.025, speed: 1, color: '#22d3ee' },
+            { amp: 13, freq: 0.04, speed: 1.6, color: '#34d399' },
+        ].forEach(ch => {
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 4) {
+                const env = Math.sin((x / w) * Math.PI);
+                const y = h / 2 + Math.sin(x * ch.freq + phase * ch.speed) * ch.amp * env;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = ch.color;
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+        });
+    };
+
+    drawRadar();
+    drawWave();
+    if (!reduced && typeof requestAnimationFrame === 'function') {
+        const tick = () => {
+            angle += 0.025;
+            phase += 0.08;
+            drawRadar();
+            drawWave();
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }
+}
+
+function renderHudLiveFeed(records) {
+    const feed = document.getElementById('hud-live-feed');
+    if (!feed) return;
+    if (!Array.isArray(records) || records.length === 0) {
+        feed.innerHTML = '<div class="hud-kpi-sub">Awaiting pipeline executions... <span class="hud-cursor"></span></div>';
+        return;
+    }
+    feed.innerHTML = records.slice(0, 6).map(r => {
+        const uid = String(r.user_id || '').slice(0, 8);
+        const orig = Number(r.token_original) || 0;
+        const fin = Number(r.token_final) || 0;
+        const saved = Number(r.tokens_saved) || 0;
+        const mode = String(r.mode || 'balanced').toUpperCase();
+        const t = r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--';
+        return `
+            <div class="hud-ops-line">
+                <div class="hud-ops-top">
+                    <span>[OK] USR:${uid}</span>
+                    <span class="hud-panel-tag">${mode}</span>
+                </div>
+                <div class="hud-ops-detail">
+                    <span>${orig} → ${fin} tok <strong style="color:#34d399;">(+${saved})</strong></span>
+                    <span>${t}</span>
+                </div>
+            </div>`;
+    }).join('') + '<div class="hud-kpi-sub" style="margin-top:4px;">STREAMING LIVE <span class="hud-cursor"></span></div>';
+}
 
 async function loadOverview() {
+    const t0 = performance.now();
     try {
-        const [stats, analytics, learning, errMetrics] = await Promise.all([
+        const [stats, analytics, learning, errMetrics, sysPerf, engagement, recentHist] = await Promise.all([
             apiFetch('/api/admin/stats'),
             apiFetch('/api/admin/compression-analytics').catch(() => null),
             apiFetch('/api/admin/learning-engine-stats').catch(() => null),
-            apiFetch('/api/admin/error-metrics').catch(() => null)
+            apiFetch('/api/admin/error-metrics').catch(() => null),
+            apiFetch('/api/admin/system-performance').catch(() => null),
+            apiFetch('/api/admin/user-engagement').catch(() => null),
+            apiFetch('/api/admin/history?limit=6').catch(() => [])
         ]);
-        document.getElementById('stat-total-users').textContent = stats.total_users;
-        document.getElementById('stat-total-compressions').textContent = stats.total_compressions;
-        document.getElementById('stat-total-tokens-saved').textContent = stats.total_tokens_saved;
+
+        const rtt = Math.max(1, Math.round(performance.now() - t0));
+        const latEl = document.getElementById('hud-latency');
+        if (latEl) latEl.textContent = `RTT ${rtt} ms`;
+
+        document.getElementById('stat-total-users').textContent = Number(stats.total_users || 0).toLocaleString();
+        document.getElementById('stat-total-compressions').textContent = Number(stats.total_compressions || 0).toLocaleString();
+        const totalSaved = Number(stats.total_tokens_saved || 0);
+        document.getElementById('stat-total-tokens-saved').textContent = totalSaved.toLocaleString();
+
+        const costSub = document.getElementById('hud-cost-sub');
+        if (costSub) {
+            costSub.textContent = `~$${((totalSaved / 1000) * 0.005).toFixed(2)} est. GPT-4o savings`;
+        }
 
         const learningEl = document.getElementById('stat-learning-updates');
         if (learningEl && learning) {
-            learningEl.textContent = learning.total_updates ?? learning.active_patterns ?? 0;
+            const clusterHits = Array.isArray(learning.cluster_distribution)
+                ? learning.cluster_distribution.reduce((sum, c) => sum + Number(c.total_hits || 0), 0)
+                : 0;
+            const updatesVal = learning.total_updates ?? learning.active_patterns ?? (clusterHits || learning.total_clusters || 0);
+            learningEl.textContent = Number(updatesVal).toLocaleString();
         }
         const errEl = document.getElementById('stat-error-rate');
+        const errSub = document.getElementById('hud-error-sub');
         if (errEl && errMetrics) {
-            const rate = errMetrics.error_rate !== undefined ? `${Number(errMetrics.error_rate).toFixed(1)}%` : '0%';
-            errEl.textContent = rate;
+            const rateNum = Number(errMetrics.error_rate ?? errMetrics.percentage_with_warnings ?? 0);
+            errEl.textContent = `${rateNum.toFixed(1)}%`;
+            if (errSub) errSub.textContent = rateNum < 2 ? 'NOMINAL' : 'ELEVATED';
         }
 
         renderUsageChart(analytics);
+        renderHudPerformance(sysPerf, engagement, errMetrics);
+        renderHudLiveFeed(recentHist);
     } catch (err) {
         console.error('Failed to load stats:', err);
     }
@@ -168,17 +497,29 @@ function renderUsageChart(analytics) {
     const ctx = document.getElementById('usageChart').getContext('2d');
     if (window.myChart) window.myChart.destroy();
 
-    const series = Array.isArray(analytics?.daily_counts) && analytics.daily_counts.length > 0
-        ? analytics.daily_counts
-        : [{ label: 'Total', count: Number(document.getElementById('stat-total-compressions')?.textContent || 0) }];
+    let series = [];
+    if (Array.isArray(analytics?.daily_counts) && analytics.daily_counts.length > 0) {
+        series = analytics.daily_counts.map(s => ({
+            label: s.label || s.date || 'Day',
+            count: s.count ?? s.compressions ?? 0
+        }));
+    } else if (Array.isArray(analytics?.by_use_case_and_mode) && analytics.by_use_case_and_mode.length > 0) {
+        series = analytics.by_use_case_and_mode.slice(0, 8).map(item => ({
+            label: `${item.use_case || 'general'} (${item.mode || 'balanced'})`,
+            count: Number(item.compression_count || 0)
+        }));
+    } else {
+        const total = Number((document.getElementById('stat-total-compressions')?.textContent || '0').replace(/,/g, '')) || 0;
+        series = [{ label: 'Total', count: total }];
+    }
 
     window.myChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: series.map(s => s.label || s.date || 'Day'),
+            labels: series.map(s => s.label),
             datasets: [{
                 label: 'Compressions',
-                data: series.map(s => s.count ?? s.compressions ?? 0),
+                data: series.map(s => s.count),
                 borderColor: '#22d3ee',
                 backgroundColor: 'rgba(34, 211, 238, 0.12)',
                 fill: true,
@@ -202,38 +543,59 @@ function renderUsageChart(analytics) {
 // ── User Management Section ──────────────────────────────────────────────────
 
 async function loadUsers() {
+    const tbody = document.getElementById('users-tbody');
     try {
-        State.users = await apiFetch('/api/admin/users');
-        renderUsers();
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Loading users...</td></tr>';
+        const data = await apiFetch('/api/admin/users');
+        State.users = Array.isArray(data) ? data : [];
+        renderUsers(document.getElementById('user-search')?.value || '');
     } catch (err) {
         console.error('Failed to load users:', err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="empty-row" style="color:#f87171;">Failed to load users: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
 function renderUsers(filter = '') {
     const tbody = document.getElementById('users-tbody');
-    const filtered = State.users.filter(u => 
-        u.username.toLowerCase().includes(filter.toLowerCase()) || 
-        u.email.toLowerCase().includes(filter.toLowerCase())
+    const q = String(filter || '').trim().toLowerCase();
+    const filtered = (State.users || []).filter(u =>
+        String(u.id || '').toLowerCase().includes(q) ||
+        String(u.username || '').toLowerCase().includes(q) ||
+        String(u.email || '').toLowerCase().includes(q) ||
+        String(u.business_type || '').toLowerCase().includes(q)
     );
 
-    tbody.innerHTML = filtered.map(u => `
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No matching users found.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(u => {
+        const uid = String(u.id || '');
+        const shortId = uid.length > 10 ? `${uid.substring(0, 8)}…` : uid;
+        return `
         <tr>
-            <td>${escapeHtml(u.username)}</td>
-            <td>${escapeHtml(u.email)}</td>
-            <td><span class="badge">${escapeHtml(u.business_type)}</span></td>
-            <td>${new Date(u.created_at).toLocaleDateString()}</td>
+            <td><span class="hud-mono-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" onclick="copyHudValue('${escapeHtml(uid)}', this)">${escapeHtml(shortId)}</span></td>
+            <td>${escapeHtml(u.username || '')}</td>
+            <td>${escapeHtml(u.email || '')}</td>
+            <td><span class="badge">${escapeHtml(u.business_type || 'Developer')}</span></td>
+            <td style="font-family:'JetBrains Mono',monospace; font-size:12px;">${escapeHtml(formatHudDate(u.created_at))}</td>
             <td>
-                <button class="action-btn edit-btn" onclick="openEditModal('${escapeHtml(u.id)}', '${escapeHtml(u.business_type)}')">Edit</button>
-                <button class="action-btn delete-btn" onclick="deleteUser('${escapeHtml(u.id)}')">Delete</button>
+                <button class="action-btn edit-btn" onclick="openEditModal('${escapeHtml(uid)}', '${escapeHtml(u.business_type || '')}')">Edit</button>
+                <button class="action-btn delete-btn" onclick="deleteUser('${escapeHtml(uid)}')">Delete</button>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 function openEditModal(id, type) {
     document.getElementById('edit-user-id').value = id;
-    document.getElementById('edit-business-type').value = type;
+    const sel = document.getElementById('edit-business-type');
+    if (sel) {
+        const lower = String(type || '').toLowerCase();
+        const match = Array.from(sel.options).find(opt => opt.value.toLowerCase() === lower);
+        sel.value = match ? match.value : 'Developer';
+    }
     document.getElementById('edit-user-modal').classList.add('active');
 }
 
@@ -268,26 +630,50 @@ async function deleteUser(id) {
 // ── Global History Section ───────────────────────────────────────────────────
 
 async function loadHistory() {
+    const tbody = document.getElementById('history-tbody');
     try {
-        State.history = await apiFetch('/api/admin/history');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Loading global history...</td></tr>';
+        const data = await apiFetch('/api/admin/history');
+        State.history = Array.isArray(data) ? data : [];
         renderHistory();
     } catch (err) {
         console.error('Failed to load history:', err);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="empty-row" style="color:#f87171;">Failed to load history: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
 function renderHistory() {
     const tbody = document.getElementById('history-tbody');
-    tbody.innerHTML = State.history.map(h => `
+    const q = (document.getElementById('admin-history-search')?.value || '').trim().toLowerCase();
+    const modeFilter = (document.getElementById('admin-history-mode')?.value || 'all').toLowerCase();
+
+    const rows = (State.history || []).filter(h => {
+        const m = String(h.mode || 'balanced').toLowerCase();
+        const uc = String(h.use_case || 'generic').toLowerCase();
+        if (modeFilter !== 'all' && m !== modeFilter) return false;
+        if (q && !String(h.user_id || '').toLowerCase().includes(q) && !m.includes(q) && !uc.includes(q)) return false;
+        return true;
+    });
+
+    if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No matching global history records.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = rows.map(h => {
+        const uid = String(h.user_id || '');
+        const shortUid = uid.length > 10 ? `${uid.substring(0, 8)}…` : uid;
+        return `
         <tr>
-            <td title="${h.user_id}">${h.user_id.substring(0, 8)}...</td>
-            <td>${h.token_original}</td>
-            <td>${h.token_final}</td>
-            <td style="color: #4ade80">+${h.tokens_saved}</td>
-            <td><span class="badge">${h.mode}</span></td>
-            <td>${new Date(h.created_at).toLocaleString()}</td>
-        </tr>
-    `).join('');
+            <td><span class="hud-mono-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" onclick="copyHudValue('${escapeHtml(uid)}', this)">${escapeHtml(shortUid)}</span></td>
+            <td><span class="badge">${escapeHtml(h.use_case || 'generic')}</span></td>
+            <td style="font-variant-numeric:tabular-nums;">${Number(h.token_original || 0).toLocaleString()}</td>
+            <td style="font-variant-numeric:tabular-nums;">${Number(h.token_final || 0).toLocaleString()}</td>
+            <td style="color: #34d399; font-weight:600; font-variant-numeric:tabular-nums;">+${Number(h.tokens_saved || 0).toLocaleString()}</td>
+            <td><span class="badge">${escapeHtml(h.mode || 'balanced')}</span></td>
+            <td style="font-family:'JetBrains Mono',monospace; font-size:12px;">${escapeHtml(formatHudDate(h.created_at))}</td>
+        </tr>`;
+    }).join('');
 }
 
 // ── Feedback Signals Section ─────────────────────────────────────────────────
@@ -312,21 +698,22 @@ function renderFeedback(data) {
     if (!data) return;
 
     const totalEl = document.getElementById('stat-total-feedback');
-    if (totalEl) totalEl.textContent = data.total_feedback_signals || 0;
+    if (totalEl) totalEl.textContent = Number(data.total_feedback_signals || 0).toLocaleString();
 
     const tbodyType = document.getElementById('feedback-type-tbody');
     if (tbodyType) {
-        if (!data.feedback_by_type || data.feedback_by_type.length === 0) {
+        if (!Array.isArray(data.feedback_by_type) || data.feedback_by_type.length === 0) {
             tbodyType.innerHTML = '<tr><td colspan="3" class="empty-row">No feedback signals recorded yet.</td></tr>';
         } else {
             tbodyType.innerHTML = data.feedback_by_type.map(item => {
-                const avg = Number(item.avg_value || 0).toFixed(2);
-                const avgColor = avg > 0 ? '#4ade80' : (avg < 0 ? '#f87171' : '#94a3b8');
+                const avgNum = Number(item.avg_value || 0);
+                const avg = avgNum.toFixed(2);
+                const avgColor = avgNum > 0 ? '#4ade80' : (avgNum < 0 ? '#f87171' : '#94a3b8');
                 return `
                     <tr>
-                        <td><span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">${item.signal_type}</span></td>
-                        <td>${item.signal_count}</td>
-                        <td style="color: ${avgColor}; font-weight: 600;">${avg > 0 ? '+' + avg : avg}</td>
+                        <td><span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">${escapeHtml(item.signal_type || 'unknown')}</span></td>
+                        <td style="font-variant-numeric:tabular-nums;">${Number(item.signal_count || 0).toLocaleString()}</td>
+                        <td style="color: ${avgColor}; font-weight: 600; font-variant-numeric:tabular-nums;">${avgNum > 0 ? '+' + avg : avg}</td>
                     </tr>
                 `;
             }).join('');
@@ -335,18 +722,19 @@ function renderFeedback(data) {
 
     const tbodyUseCase = document.getElementById('feedback-usecase-tbody');
     if (tbodyUseCase) {
-        if (!data.feedback_by_use_case || data.feedback_by_use_case.length === 0) {
+        if (!Array.isArray(data.feedback_by_use_case) || data.feedback_by_use_case.length === 0) {
             tbodyUseCase.innerHTML = '<tr><td colspan="4" class="empty-row">No use case feedback recorded yet.</td></tr>';
         } else {
             tbodyUseCase.innerHTML = data.feedback_by_use_case.map(item => {
-                const avg = Number(item.avg_value || 0).toFixed(2);
-                const avgColor = avg > 0 ? '#4ade80' : (avg < 0 ? '#f87171' : '#94a3b8');
+                const avgNum = Number(item.avg_value || 0);
+                const avg = avgNum.toFixed(2);
+                const avgColor = avgNum > 0 ? '#4ade80' : (avgNum < 0 ? '#f87171' : '#94a3b8');
                 return `
                     <tr>
-                        <td><strong>${item.use_case || 'general'}</strong></td>
-                        <td><span class="badge">${item.signal_type}</span></td>
-                        <td>${item.signal_count}</td>
-                        <td style="color: ${avgColor}; font-weight: 600;">${avg > 0 ? '+' + avg : avg}</td>
+                        <td><strong>${escapeHtml(item.use_case || 'general')}</strong></td>
+                        <td><span class="badge">${escapeHtml(item.signal_type || 'unknown')}</span></td>
+                        <td style="font-variant-numeric:tabular-nums;">${Number(item.signal_count || 0).toLocaleString()}</td>
+                        <td style="color: ${avgColor}; font-weight: 600; font-variant-numeric:tabular-nums;">${avgNum > 0 ? '+' + avg : avg}</td>
                     </tr>
                 `;
             }).join('');
@@ -480,11 +868,11 @@ async function handleRagUpload() {
 
     const uploadBtn = document.getElementById('upload-btn');
     uploadBtn.setAttribute('disabled', 'true');
-    
+
     const progressDiv = document.getElementById('rag-progress');
     const progressFill = document.getElementById('progress-fill');
     const progressLabel = document.getElementById('progress-label');
-    
+
     progressDiv.classList.remove('hidden');
     progressFill.style.width = '10%';
     progressLabel.textContent = 'Preparing file upload...';
@@ -521,12 +909,12 @@ async function handleRagUpload() {
         }
 
         const data = await response.json();
-        
+
         progressFill.style.width = '100%';
         progressLabel.textContent = 'Ingestion initiated!';
-        
+
         showRagToast(data.message || 'PDF accepted. Processing runs in the background.', 'success');
-        
+
         setTimeout(() => {
             clearFileSelect();
             loadRag();
@@ -546,7 +934,7 @@ async function loadRag() {
         if (tbody.innerHTML === '' || tbody.innerHTML.includes('empty-row')) {
             tbody.innerHTML = '<tr><td colspan="8" class="empty-row">Loading documents…</td></tr>';
         }
-        
+
         const docs = await apiFetch('/api/admin/rag/documents');
         State.ragDocs = docs;
         renderRagDocs();

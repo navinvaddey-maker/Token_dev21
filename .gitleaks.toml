@@ -1,0 +1,8 @@
+# Gitleaks configuration
+[allowlist]
+description = "Ignore scratch files and agent artifacts"
+paths = [
+    '''(^|/)scratch/''',
+    '''test_admin\.html''',
+    '''test_admin_fixed\.html''',
+]

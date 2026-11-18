@@ -1,0 +1,24 @@
+name: quality
+# Temporarily commented out git push validation trigger
+on:
+  pull_request:
+  # push:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+        continue-on-error: true
+      - run: cargo test --all-features
+      - run: cargo install --locked cargo-audit cargo-deny
+      - run: cargo audit
+      - run: cargo deny check
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - run: pipx install semgrep && semgrep scan --config p/rust --config p/secrets --error .

@@ -745,6 +745,280 @@
             text-transform: uppercase;
         }
 
+        /* ── Insights Bento Dashboard (2026 Telemetry UI) ─── */
+        .insights-shell {
+            container-type: inline-size;
+            width: 100%;
+        }
+        .insights-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .insights-subtitle {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .insights-refresh-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 99px;
+            border: 1px solid var(--glass-border);
+            background: var(--card-sub-bg);
+            color: var(--body-text);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .insights-refresh-btn:hover {
+            border-color: var(--accent-text);
+            color: var(--head-text);
+        }
+        .insights-bento {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 8px;
+        }
+        .bento-card {
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 18px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+            min-width: 0;
+        }
+        .bento-card:hover {
+            border-color: var(--accent-glow);
+        }
+        .bento-span-6 { grid-column: span 6; }
+        .bento-span-3 { grid-column: span 3; }
+        .bento-span-7 { grid-column: span 7; }
+        .bento-span-5 { grid-column: span 5; }
+        .bento-span-12 { grid-column: span 12; }
+        .bento-eyebrow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+        .bento-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 99px;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+            font-variant-numeric: tabular-nums;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .bento-badge.positive {
+            background: rgba(16, 185, 129, 0.14);
+            color: var(--stat-pos);
+        }
+        .bento-hero-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 36px;
+            font-weight: 800;
+            line-height: 1.05;
+            color: var(--stat-pos);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+        .bento-kpi-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--head-text);
+            font-variant-numeric: tabular-nums;
+        }
+        .bento-kpi-foot {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            margin-top: auto;
+        }
+        .bento-cost-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--divider);
+            margin-top: auto;
+        }
+        .bento-cost-readout {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .bento-cost-amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--head-text);
+            font-variant-numeric: tabular-nums;
+        }
+        .bento-cost-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .bento-model-pills {
+            display: inline-flex;
+            padding: 3px;
+            border-radius: 10px;
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+            gap: 2px;
+        }
+        .bento-model-pill {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .bento-model-pill.active {
+            background: var(--tag-bg);
+            color: var(--accent-text);
+        }
+        .bento-chart-wrap {
+            width: 100%;
+            min-height: 165px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .bento-chart-svg {
+            width: 100%;
+            height: 165px;
+            overflow: visible;
+        }
+        .bento-legend {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .bento-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        .mode-stack-bar {
+            display: flex;
+            height: 10px;
+            border-radius: 99px;
+            overflow: hidden;
+            background: var(--prog-track);
+            gap: 2px;
+        }
+        .mode-stack-seg {
+            height: 100%;
+            transition: width 0.35s ease;
+        }
+        .bento-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .bento-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 12.5px;
+            color: var(--body-text);
+        }
+        .bento-row-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .domain-bar-track {
+            flex: 1;
+            height: 6px;
+            border-radius: 99px;
+            background: var(--prog-track);
+            overflow: hidden;
+        }
+        .domain-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: var(--prog-fill);
+        }
+        .top-run-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+        }
+        .top-run-preview {
+            font-size: 12.5px;
+            color: var(--head-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 340px;
+        }
+        .top-run-tags {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .insights-empty {
+            text-align: center;
+            padding: 40px 20px;
+            align-items: center;
+        }
+        @container (max-width: 780px) {
+            .bento-span-6, .bento-span-3, .bento-span-7, .bento-span-5 {
+                grid-column: span 12;
+            }
+            .top-run-preview { max-width: 210px; }
+        }
+        @media (max-width: 780px) {
+            .bento-span-6, .bento-span-3, .bento-span-7, .bento-span-5 {
+                grid-column: span 12;
+            }
+        }
+
         /* ── Progress Bar ─────────────────────────────────── */
         .progress-bar-wrap {
             height: 6px;
@@ -820,26 +1094,180 @@
             border: 1px solid rgba(16, 185, 129, 0.25);
         }
 
-        /* ── History Items ────────────────────────────────── */
+        /* ── History Timeline (Modern Bento Activity Feed) ── */
+        .history-shell {
+            container-type: inline-size;
+            width: 100%;
+        }
+        .history-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .history-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .history-search-wrap {
+            position: relative;
+            flex: 1;
+            min-width: 210px;
+        }
+        .history-search-wrap .tc-input {
+            width: 100%;
+            padding: 8px 12px 8px 32px;
+            font-size: 12.5px;
+        }
+        .history-search-icon {
+            position: absolute;
+            left: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+        .history-group-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin: 16px 0 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .history-group-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--divider);
+        }
         .history-item {
-            padding: 16px;
+            padding: 15px 18px;
             background: var(--card-sub-bg);
             border: 1px solid var(--glass-border);
-            border-radius: 12px;
+            border-radius: 14px;
             margin-bottom: 10px;
-            transition: transform 0.15s, border-color 0.15s;
-            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
         }
         .history-item:hover {
-            transform: translateY(-2px);
-            border-color: rgba(0, 242, 254, 0.3);
+            border-color: var(--accent-glow);
+        }
+        .history-item-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .history-item-badges {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .history-item-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+        .history-preview {
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--head-text);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            cursor: pointer;
         }
         .history-meta {
             display: flex;
+            align-items: center;
             justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
             font-size: 11.5px;
             color: var(--text-muted);
-            margin-top: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--divider);
+        }
+        .history-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .history-btn {
+            border: 1px solid var(--glass-border);
+            background: var(--inp-bg);
+            color: var(--body-text);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 11.5px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .history-btn:hover {
+            border-color: var(--accent-text);
+            color: var(--head-text);
+        }
+        .history-btn.primary {
+            background: var(--tag-bg);
+            color: var(--accent-text);
+            border-color: transparent;
+        }
+        .history-diff-drawer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--divider);
+        }
+        .history-diff-pane {
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-width: 0;
+        }
+        .history-diff-pane-title {
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .history-diff-pane pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
+            line-height: 1.45;
+            color: var(--body-text);
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        @container (max-width: 720px) {
+            .history-diff-drawer { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            .history-diff-drawer { grid-template-columns: 1fr; }
         }
 
         /* ── Toast Notifications ──────────────────────────── */
@@ -1875,29 +2303,59 @@
 
             <!-- ── History Tab ── -->
             <div class="tab-content" id="tab-history-content">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                    <div class="section-label" style="margin:0;">Prompt History</div>
-                    <input type="text" id="history-search" class="tc-input" placeholder="Search prompts or topics..." oninput="filterHistory(this.value)" style="max-width:260px;padding:8px 12px;font-size:12.5px;">
+                <div class="history-shell">
+                    <div class="history-toolbar">
+                        <div>
+                            <div class="section-label" style="margin:0;">Prompt Compression Timeline</div>
+                            <div class="insights-subtitle">Inspect side-by-side diffs, copy optimized CRISP prompts, or reload into Workbench.</div>
+                        </div>
+                        <span class="bento-badge" id="history-summary-pill">0 runs</span>
+                    </div>
+                    <div class="history-controls">
+                        <div class="history-search-wrap">
+                            <span class="history-search-icon">⌕</span>
+                            <input type="text" id="history-search" class="tc-input" placeholder="Search prompts, CRISP outputs, or domains..." oninput="filterHistory(this.value)">
+                        </div>
+                        <div class="bento-model-pills" role="group" aria-label="Filter history by mode">
+                            <button type="button" class="bento-model-pill active" data-history-mode="all" onclick="setHistoryModeFilter('all')">All</button>
+                            <button type="button" class="bento-model-pill" data-history-mode="gentle" onclick="setHistoryModeFilter('gentle')">Light Polish</button>
+                            <button type="button" class="bento-model-pill" data-history-mode="balanced" onclick="setHistoryModeFilter('balanced')">Smart Trim</button>
+                            <button type="button" class="bento-model-pill" data-history-mode="aggressive" onclick="setHistoryModeFilter('aggressive')">Deep Blueprint</button>
+                        </div>
+                        <select id="history-sort" class="tc-select" onchange="setHistorySort(this.value)" aria-label="Sort history" style="width:auto; min-width:140px; padding:7px 12px; font-size:12px;">
+                            <option value="newest">Newest first</option>
+                            <option value="saved">Most tokens saved</option>
+                            <option value="ratio">Highest % reduction</option>
+                        </select>
+                    </div>
+                    <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
+                        <div class="auth-gate-icon">🔒</div>
+                        <div class="auth-gate-title">Save Compression History</div>
+                        <div class="auth-gate-desc">Create a free account or sign in to persist and search past prompt compression history across devices.</div>
+                        <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
+                    </div>
+                    <div id="history-list"></div>
                 </div>
-                <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
-                    <div class="auth-gate-icon">🔒</div>
-                    <div class="auth-gate-title">Save Compression History</div>
-                    <div class="auth-gate-desc">Create a free account or sign in to persist and search past prompt compression history across devices.</div>
-                    <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
-                </div>
-                <div id="history-list"></div>
             </div>
 
             <!-- ── Stats Tab ── -->
             <div class="tab-content" id="tab-stats-content">
-                <div class="section-label">Usage Statistics</div>
-                <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
-                    <div class="auth-gate-icon">📊</div>
-                    <div class="auth-gate-title">Personal Usage Analytics</div>
-                    <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency, and cost reductions over time.</div>
-                    <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
+                <div class="insights-shell">
+                    <div class="insights-header">
+                        <div>
+                            <div class="section-label" style="margin-bottom: 0;">Compression Telemetry &amp; Insights</div>
+                            <div class="insights-subtitle">Cumulative token efficiency, 14-day trajectory, and model cost impact.</div>
+                        </div>
+                        <button type="button" class="insights-refresh-btn" id="insights-refresh-btn" onclick="loadStats()">↻ Refresh</button>
+                    </div>
+                    <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
+                        <div class="auth-gate-icon">📊</div>
+                        <div class="auth-gate-title">Personal Usage Analytics</div>
+                        <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency, and cost reductions over time.</div>
+                        <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
+                    </div>
+                    <div class="insights-bento" id="global-stats"></div>
                 </div>
-                <div class="stats-row" id="global-stats"></div>
             </div>
 
         </div> <!-- End Main Section -->

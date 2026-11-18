@@ -1079,84 +1079,528 @@ function copyResult() {
     });
 }
 
-// ── History ─────────────────────────────────────────────────────────────────
+// ── History Timeline ────────────────────────────────────────────────────────
 
 let cachedHistoryRecords = [];
+const HistoryState = {
+    query: '',
+    mode: 'all',
+    sort: 'newest',
+    expandedIds: new Set(),
+};
 
 async function loadHistory() {
     if (!State.token) return;
     try {
         const records = await API.history();
         cachedHistoryRecords = Array.isArray(records) ? records : [];
-        renderHistoryList(cachedHistoryRecords);
+        applyHistoryFilters();
     } catch (err) {
         showToast(err.message, 'error');
     }
 }
 
 function filterHistory(query) {
-    const q = (query || '').trim().toLowerCase();
-    if (!q) return renderHistoryList(cachedHistoryRecords);
-    const filtered = cachedHistoryRecords.filter(r =>
-        (r.original_prompt || '').toLowerCase().includes(q) ||
-        (r.use_case || '').toLowerCase().includes(q)
-    );
+    HistoryState.query = (query || '').trim().toLowerCase();
+    applyHistoryFilters();
+}
+
+function setHistoryModeFilter(mode) {
+    HistoryState.mode = mode || 'all';
+    document.querySelectorAll('[data-history-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-history-mode') === HistoryState.mode);
+    });
+    applyHistoryFilters();
+}
+
+function setHistorySort(sortKey) {
+    HistoryState.sort = sortKey || 'newest';
+    applyHistoryFilters();
+}
+
+function resetHistoryFilters() {
+    HistoryState.query = '';
+    HistoryState.mode = 'all';
+    HistoryState.sort = 'newest';
+    const searchEl = document.getElementById('history-search');
+    if (searchEl) searchEl.value = '';
+    const sortEl = document.getElementById('history-sort');
+    if (sortEl) sortEl.value = 'newest';
+    setHistoryModeFilter('all');
+}
+
+function getHistoryReductionPct(r) {
+    const orig = Number(r.token_original) || 0;
+    const saved = Number(r.tokens_saved) || 0;
+    return orig > 0 ? Math.max(0, Math.round((saved / orig) * 100)) : 0;
+}
+
+function applyHistoryFilters() {
+    let filtered = cachedHistoryRecords.slice();
+    if (HistoryState.mode !== 'all') {
+        filtered = filtered.filter(r => String(r.mode || 'balanced').toLowerCase() === HistoryState.mode);
+    }
+    if (HistoryState.query) {
+        const q = HistoryState.query;
+        filtered = filtered.filter(r =>
+            (r.original_prompt || '').toLowerCase().includes(q) ||
+            (r.optimized_prompt || '').toLowerCase().includes(q) ||
+            (r.use_case || '').toLowerCase().includes(q) ||
+            (r.mode || '').toLowerCase().includes(q)
+        );
+    }
+    if (HistoryState.sort === 'saved') {
+        filtered.sort((a, b) => (Number(b.tokens_saved) || 0) - (Number(a.tokens_saved) || 0));
+    } else if (HistoryState.sort === 'ratio') {
+        filtered.sort((a, b) => getHistoryReductionPct(b) - getHistoryReductionPct(a));
+    } else {
+        filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    }
     renderHistoryList(filtered);
+}
+
+function getHistoryDateGroup(dateValue) {
+    const dt = new Date(dateValue);
+    if (Number.isNaN(dt.getTime())) return 'Earlier';
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfTarget = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    const diffDays = Math.round((startOfToday - startOfTarget) / 86400000);
+    if (diffDays <= 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays <= 7) return 'Last 7 Days';
+    return 'Earlier';
+}
+
+function toggleHistoryExpand(recordId) {
+    if (HistoryState.expandedIds.has(recordId)) {
+        HistoryState.expandedIds.delete(recordId);
+    } else {
+        HistoryState.expandedIds.add(recordId);
+    }
+    applyHistoryFilters();
+}
+
+function restoreHistoryPrompt(recordId) {
+    const r = cachedHistoryRecords.find(item => String(item.id) === String(recordId));
+    if (!r) return;
+    const input = document.getElementById('prompt-input');
+    if (input) input.value = r.original_prompt || '';
+    validatePromptLength();
+    switchTab('compress');
+}
+
+function copyHistoryOptimized(recordId, btnEl) {
+    const r = cachedHistoryRecords.find(item => String(item.id) === String(recordId));
+    if (!r) return;
+    const text = r.optimized_prompt || r.original_prompt || '';
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        showToast('Clipboard unavailable in this browser context', 'error');
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        if (btnEl) {
+            const origLabel = btnEl.textContent;
+            btnEl.textContent = '✓ Copied';
+            setTimeout(() => { btnEl.textContent = origLabel; }, 1600);
+        }
+    }).catch(err => showToast('Failed to copy: ' + err.message, 'error'));
 }
 
 function renderHistoryList(records) {
     const list = document.getElementById('history-list');
+    const summaryPill = document.getElementById('history-summary-pill');
     if (!list) return;
-    if (!records.length) {
-        list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No compression history yet</p>';
+
+    const totalSavedInView = records.reduce((acc, r) => acc + Math.max(0, Number(r.tokens_saved) || 0), 0);
+    if (summaryPill) {
+        summaryPill.textContent = `${records.length} ${records.length === 1 ? 'run' : 'runs'} · +${totalSavedInView.toLocaleString()} tok saved`;
+    }
+
+    if (!cachedHistoryRecords.length) {
+        list.innerHTML = `
+            <div class="bento-card insights-empty">
+                <div class="auth-gate-icon">🕒</div>
+                <div class="auth-gate-title">No Compression History Yet</div>
+                <div class="auth-gate-desc">Your past prompt optimizations will appear here with side-by-side CRISP diffs and one-click restore.</div>
+                <button type="button" class="tc-compress-btn" onclick="switchTab('compress')" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
+            </div>`;
         return;
     }
+
+    if (!records.length) {
+        list.innerHTML = `
+            <div class="bento-card insights-empty">
+                <div class="auth-gate-title">No Matching Runs</div>
+                <div class="auth-gate-desc">Try clearing your search query or switching the mode filter.</div>
+                <button type="button" class="history-btn primary" onclick="resetHistoryFilters()" style="padding: 8px 16px;">Reset Filters</button>
+            </div>`;
+        return;
+    }
+
     list.innerHTML = '';
-    records.forEach(r => {
+    let lastGroup = null;
+
+    records.forEach((r, idx) => {
+        const recId = String(r.id || `hist-${idx}`);
+        if (HistoryState.sort === 'newest') {
+            const grp = getHistoryDateGroup(r.created_at);
+            if (grp !== lastGroup) {
+                lastGroup = grp;
+                const grpHeader = document.createElement('div');
+                grpHeader.className = 'history-group-label';
+                grpHeader.textContent = grp;
+                list.appendChild(grpHeader);
+            }
+        }
+
+        const modeKey = String(r.mode || 'balanced').toLowerCase();
+        const modeMeta = INSIGHTS_MODE_META[modeKey] || { label: modeKey, color: 'var(--accent-text)' };
+        const origTok = Number(r.token_original) || 0;
+        const finalTok = Number(r.token_final) || 0;
+        const savedTok = Number(r.tokens_saved) || 0;
+        const pct = getHistoryReductionPct(r);
+        const isExpanded = HistoryState.expandedIds.has(recId);
+        const dt = new Date(r.created_at);
+        const timeStr = Number.isNaN(dt.getTime()) ? '' : dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
         const item = document.createElement('div');
         item.className = 'history-item';
-        item.addEventListener('click', () => {
-            const input = document.getElementById('prompt-input');
-            if (input) input.value = r.original_prompt || '';
-            validatePromptLength();
-            switchTab('compress');
-        });
+        item.setAttribute('data-history-id', recId);
+
+        const head = document.createElement('div');
+        head.className = 'history-item-head';
+        head.innerHTML = `
+            <div class="history-item-badges">
+                <span class="bento-badge"><span class="bento-dot" style="background:${modeMeta.color};"></span>${escapeHtml(modeMeta.label)}</span>
+                <span class="bento-badge">${escapeHtml(r.use_case || 'generic')}</span>
+                <span class="bento-badge ${savedTok > 0 ? 'positive' : ''}">+${savedTok.toLocaleString()} tok (-${pct}%)</span>
+            </div>
+            <span class="history-item-time">${escapeHtml(timeStr)}</span>
+        `;
 
         const preview = document.createElement('div');
-        preview.style.cssText = 'font-size:0.9rem;color:var(--head-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-        const orig = r.original_prompt || '';
-        preview.textContent = orig.substring(0, 100) + (orig.length > 100 ? '...' : '');
+        preview.className = 'history-preview';
+        preview.textContent = r.original_prompt || '';
+        preview.title = 'Click to inspect Original vs. Optimized CRISP prompt';
+        preview.addEventListener('click', () => toggleHistoryExpand(recId));
 
         const meta = document.createElement('div');
         meta.className = 'history-meta';
-        meta.innerHTML = `<span><span class="badge badge-accent">${escapeHtml(r.use_case || 'general')}</span> <span class="badge badge-success">${Number(r.tokens_saved || 0)} saved</span></span><span>${new Date(r.created_at).toLocaleDateString()}</span>`;
 
+        const tokInfo = document.createElement('span');
+        tokInfo.className = 'bento-row-meta';
+        tokInfo.textContent = `${origTok.toLocaleString()} → ${finalTok.toLocaleString()} tok`;
+
+        const actions = document.createElement('div');
+        actions.className = 'history-actions';
+
+        const inspectBtn = document.createElement('button');
+        inspectBtn.type = 'button';
+        inspectBtn.className = 'history-btn';
+        inspectBtn.textContent = isExpanded ? 'Hide Diff' : 'Inspect Diff';
+        inspectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleHistoryExpand(recId);
+        });
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'history-btn';
+        copyBtn.textContent = 'Copy CRISP';
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyHistoryOptimized(recId, copyBtn);
+        });
+
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
+        restoreBtn.className = 'history-btn primary';
+        restoreBtn.textContent = 'Load in Workbench';
+        restoreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            restoreHistoryPrompt(recId);
+        });
+
+        actions.appendChild(inspectBtn);
+        actions.appendChild(copyBtn);
+        actions.appendChild(restoreBtn);
+        meta.appendChild(tokInfo);
+        meta.appendChild(actions);
+
+        item.appendChild(head);
         item.appendChild(preview);
         item.appendChild(meta);
+
+        if (isExpanded) {
+            const drawer = document.createElement('div');
+            drawer.className = 'history-diff-drawer';
+            drawer.innerHTML = `
+                <div class="history-diff-pane">
+                    <div class="history-diff-pane-title">Original Prompt (${origTok} tok)</div>
+                    <pre>${escapeHtml(r.original_prompt || '')}</pre>
+                </div>
+                <div class="history-diff-pane">
+                    <div class="history-diff-pane-title">Optimized CRISP (${finalTok} tok)</div>
+                    <pre>${escapeHtml(r.optimized_prompt || '')}</pre>
+                </div>
+            `;
+            item.appendChild(drawer);
+        }
+
         list.appendChild(item);
     });
 }
 
-// ── Stats ───────────────────────────────────────────────────────────────────
+// ── Stats & Insights Bento Dashboard ───────────────────────────────────────
+
+const INSIGHTS_MODELS = {
+    gpt4o: { label: 'GPT-4o', ratePer1k: 0.005 },
+    claude35: { label: 'Claude 3.5', ratePer1k: 0.003 },
+    gemini25: { label: 'Gemini 2.5', ratePer1k: 0.00125 },
+};
+
+const INSIGHTS_MODE_META = {
+    gentle: { label: 'Light Polish', color: '#38bdf8' },
+    balanced: { label: 'Smart Trim', color: '#10b981' },
+    aggressive: { label: 'Deep Blueprint', color: '#a855f7' },
+};
+
+/**
+ * Updates the active pricing target on the Insights Hero card without re-fetching.
+ */
+function setInsightsModel(modelKey) {
+    if (!INSIGHTS_MODELS[modelKey]) return;
+    State.insightsModel = modelKey;
+    if (State.lastStats) {
+        renderInsightsBento(State.lastStats);
+    }
+}
+
+/**
+ * Builds a responsive pure-SVG 14-day token trajectory chart (Original vs. Saved).
+ */
+function buildInsightsTrajectorySvg(dailySeries) {
+    if (!Array.isArray(dailySeries) || dailySeries.length === 0) {
+        return '<div class="bento-kpi-foot" style="text-align:center; padding: 48px 0;">Run compressions over multiple days to unlock your 14-day trajectory.</div>';
+    }
+
+    const w = 560;
+    const h = 165;
+    const padX = 16;
+    const padTop = 14;
+    const padBot = 24;
+    const plotW = w - padX * 2;
+    const plotH = h - padTop - padBot;
+
+    const maxVal = Math.max(
+        1,
+        ...dailySeries.map(d => Math.max(Number(d.original_tokens) || 0, Number(d.tokens_saved) || 0))
+    );
+
+    const stepX = dailySeries.length > 1 ? plotW / (dailySeries.length - 1) : 0;
+    const xAt = (idx) => (dailySeries.length === 1 ? padX + plotW / 2 : padX + idx * stepX);
+    const yAt = (val) => padTop + plotH - ((Number(val) || 0) / maxVal) * plotH;
+
+    const origPts = dailySeries.map((d, i) => `${xAt(i).toFixed(1)},${yAt(d.original_tokens).toFixed(1)}`);
+    const savedPts = dailySeries.map((d, i) => `${xAt(i).toFixed(1)},${yAt(d.tokens_saved).toFixed(1)}`);
+
+    const areaPath = dailySeries.length > 1
+        ? `M ${xAt(0).toFixed(1)},${(padTop + plotH).toFixed(1)} L ${savedPts.join(' L ')} L ${xAt(dailySeries.length - 1).toFixed(1)},${(padTop + plotH).toFixed(1)} Z`
+        : '';
+
+    const gridLines = [0.25, 0.5, 0.75, 1].map(frac => {
+        const y = (padTop + plotH * (1 - frac)).toFixed(1);
+        return `<line x1="${padX}" y1="${y}" x2="${w - padX}" y2="${y}" stroke="currentColor" stroke-opacity="0.08" stroke-dasharray="3 4" />`;
+    }).join('');
+
+    const dots = dailySeries.map((d, i) => {
+        const cx = xAt(i).toFixed(1);
+        const cySaved = yAt(d.tokens_saved).toFixed(1);
+        const dayLbl = escapeHtml(String(d.day || '').slice(5));
+        const tip = `${escapeHtml(String(d.day || ''))}: ${Number(d.runs) || 0} runs · ${Number(d.tokens_saved) || 0} saved / ${Number(d.original_tokens) || 0} orig tok`;
+        const showLabel = i === 0 || i === dailySeries.length - 1 || (dailySeries.length > 4 && i === Math.floor(dailySeries.length / 2));
+        return `
+            <g>
+                <circle cx="${cx}" cy="${cySaved}" r="4" fill="var(--stat-pos)" stroke="var(--surface-bg, #0b1120)" stroke-width="1.5">
+                    <title>${tip}</title>
+                </circle>
+                ${showLabel ? `<text x="${cx}" y="${h - 4}" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="JetBrains Mono, monospace">${dayLbl}</text>` : ''}
+            </g>`;
+    }).join('');
+
+    return `
+        <svg class="bento-chart-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="14-day token trajectory">
+            <defs>
+                <linearGradient id="insightsSavedGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--stat-pos)" stop-opacity="0.32" />
+                    <stop offset="100%" stop-color="var(--stat-pos)" stop-opacity="0.02" />
+                </linearGradient>
+            </defs>
+            ${gridLines}
+            ${areaPath ? `<path d="${areaPath}" fill="url(#insightsSavedGrad)" />` : ''}
+            ${dailySeries.length > 1 ? `<polyline fill="none" stroke="var(--text-muted)" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="4 3" points="${origPts.join(' ')}" />` : ''}
+            ${dailySeries.length > 1 ? `<polyline fill="none" stroke="var(--stat-pos)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" points="${savedPts.join(' ')}" />` : ''}
+            ${dots}
+        </svg>`;
+}
+
+/**
+ * Renders the Insights Bento Grid from server-aggregated stats payload.
+ */
+function renderInsightsBento(stats) {
+    const container = document.getElementById('global-stats');
+    if (!container) return;
+
+    const totalRuns = Number(stats.total_compressions) || 0;
+    if (totalRuns === 0) {
+        container.innerHTML = `
+            <div class="bento-card bento-span-12 insights-empty">
+                <div class="auth-gate-icon">✨</div>
+                <div class="auth-gate-title">No Compression Telemetry Yet</div>
+                <div class="auth-gate-desc">Run your first prompt optimization to unlock 14-day token trajectories, mode efficiency, and model cost savings.</div>
+                <button type="button" class="tc-compress-btn" onclick="switchTab('compress')" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
+            </div>
+        `;
+        return;
+    }
+
+    const totalSaved = Number(stats.total_tokens_saved) || 0;
+    const avgSaved = Math.round(Number(stats.avg_tokens_saved) || 0);
+    const totalOrig = Number(stats.total_original_tokens) || 0;
+    const totalFinal = Number(stats.total_final_tokens) || 0;
+    const bestSaved = Number(stats.best_tokens_saved) || 0;
+    const reductionPct = totalOrig > 0 ? Math.max(0, Math.round((totalSaved / totalOrig) * 1000) / 10) : 0;
+
+    const activeModelKey = State.insightsModel && INSIGHTS_MODELS[State.insightsModel] ? State.insightsModel : 'gpt4o';
+    const modelCfg = INSIGHTS_MODELS[activeModelKey];
+    const cumulativeDollars = ((totalSaved / 1000) * modelCfg.ratePer1k).toFixed(2);
+    const per1kDollars = (avgSaved * modelCfg.ratePer1k).toFixed(2);
+
+    const modelPillsHtml = Object.entries(INSIGHTS_MODELS).map(([key, cfg]) => `
+        <button type="button"
+            class="bento-model-pill ${key === activeModelKey ? 'active' : ''}"
+            data-insights-model="${key}"
+            onclick="setInsightsModel('${key}')">${escapeHtml(cfg.label)}</button>
+    `).join('');
+
+    const modes = Array.isArray(stats.mode_breakdown) ? stats.mode_breakdown : [];
+    const modeStackHtml = modes.length > 0
+        ? modes.map(m => {
+            const pct = totalRuns > 0 ? Math.max(4, (Number(m.count) / totalRuns) * 100) : 0;
+            const meta = INSIGHTS_MODE_META[m.mode] || { label: m.mode, color: 'var(--accent-text)' };
+            return `<div class="mode-stack-seg" style="width:${pct.toFixed(1)}%; background:${meta.color};" title="${escapeHtml(meta.label)}: ${Number(m.count)} runs"></div>`;
+        }).join('')
+        : '<div class="mode-stack-seg" style="width:100%; background:var(--prog-track);"></div>';
+
+    const modeRowsHtml = modes.length > 0
+        ? modes.map(m => {
+            const meta = INSIGHTS_MODE_META[m.mode] || { label: m.mode, color: 'var(--accent-text)' };
+            const pct = totalRuns > 0 ? Math.round((Number(m.count) / totalRuns) * 100) : 0;
+            return `
+                <div class="bento-row">
+                    <span><span class="bento-dot" style="background:${meta.color};"></span>${escapeHtml(meta.label)}</span>
+                    <span class="bento-row-meta">${Number(m.count)} (${pct}%) · +${Number(m.tokens_saved || 0).toLocaleString()} tok</span>
+                </div>`;
+        }).join('')
+        : '<div class="bento-kpi-foot">No mode data recorded.</div>';
+
+    const domains = Array.isArray(stats.domain_breakdown) ? stats.domain_breakdown : [];
+    const maxDomainSaved = Math.max(1, ...domains.map(d => Number(d.tokens_saved) || 0));
+    const domainRowsHtml = domains.length > 0
+        ? domains.map(d => {
+            const saved = Number(d.tokens_saved) || 0;
+            const barPct = Math.max(6, Math.round((saved / maxDomainSaved) * 100));
+            return `
+                <div class="bento-row">
+                    <span style="min-width: 96px; text-transform: capitalize;">${escapeHtml(String(d.domain || 'generic'))}</span>
+                    <div class="domain-bar-track"><div class="domain-bar-fill" style="width:${barPct}%"></div></div>
+                    <span class="bento-row-meta">${saved.toLocaleString()} tok</span>
+                </div>`;
+        }).join('')
+        : '<div class="bento-kpi-foot">No domain breakdown yet.</div>';
+
+    const topRuns = Array.isArray(stats.top_runs) ? stats.top_runs : [];
+    const topRunsHtml = topRuns.length > 0
+        ? topRuns.map(r => `
+            <div class="top-run-item">
+                <div style="min-width: 0;">
+                    <div class="top-run-preview">${escapeHtml(r.preview || 'Prompt run')}</div>
+                    <div class="top-run-tags">
+                        <span class="bento-badge">${escapeHtml(r.use_case || 'generic')}</span>
+                        <span>${escapeHtml((INSIGHTS_MODE_META[r.mode] || {}).label || r.mode || 'balanced')}</span>
+                        <span>· ${Number(r.token_original || 0)} → ${Number(r.token_final || 0)} tok</span>
+                    </div>
+                </div>
+                <span class="bento-badge positive">+${Number(r.tokens_saved || 0).toLocaleString()} tok</span>
+            </div>`).join('')
+        : '<div class="bento-kpi-foot">No top runs recorded yet.</div>';
+
+    container.innerHTML = `
+        <div class="bento-card bento-span-6">
+            <div class="bento-eyebrow">
+                <span>Net Token Savings</span>
+                <span class="bento-badge positive">-${reductionPct}% avg reduction</span>
+            </div>
+            <div class="bento-hero-val" id="insights-total-saved">${totalSaved.toLocaleString()}</div>
+            <div class="bento-cost-bar">
+                <div class="bento-cost-readout">
+                    <div class="bento-cost-amount" id="insights-cost-saved">$${cumulativeDollars} saved</div>
+                    <div class="bento-cost-sub">~$${per1kDollars} projected / 1k runs (${escapeHtml(modelCfg.label)})</div>
+                </div>
+                <div class="bento-model-pills" role="group" aria-label="Target model pricing">${modelPillsHtml}</div>
+            </div>
+        </div>
+
+        <div class="bento-card bento-span-3">
+            <div class="bento-eyebrow"><span>Total Runs</span></div>
+            <div class="bento-kpi-val" id="insights-total-runs">${totalRuns.toLocaleString()}</div>
+            <div class="bento-kpi-foot">Peak single run: +${bestSaved.toLocaleString()} tok</div>
+        </div>
+
+        <div class="bento-card bento-span-3">
+            <div class="bento-eyebrow"><span>Avg Saved / Run</span></div>
+            <div class="bento-kpi-val" id="insights-avg-saved">${avgSaved.toLocaleString()}</div>
+            <div class="bento-kpi-foot">${totalOrig.toLocaleString()} → ${totalFinal.toLocaleString()} tok total</div>
+        </div>
+
+        <div class="bento-card bento-span-7">
+            <div class="bento-eyebrow">
+                <span>14-Day Token Trajectory</span>
+                <span class="bento-legend">
+                    <span><span class="bento-dot" style="background:var(--text-muted);"></span>Original</span>
+                    <span><span class="bento-dot" style="background:var(--stat-pos);"></span>Saved</span>
+                </span>
+            </div>
+            <div class="bento-chart-wrap" id="insights-trajectory-chart">
+                ${buildInsightsTrajectorySvg(stats.daily_series || [])}
+            </div>
+        </div>
+
+        <div class="bento-card bento-span-5">
+            <div class="bento-eyebrow"><span>Compression Mode Mix</span></div>
+            <div class="mode-stack-bar">${modeStackHtml}</div>
+            <div class="bento-list">${modeRowsHtml}</div>
+        </div>
+
+        <div class="bento-card bento-span-5">
+            <div class="bento-eyebrow"><span>Top Domains</span></div>
+            <div class="bento-list">${domainRowsHtml}</div>
+        </div>
+
+        <div class="bento-card bento-span-7">
+            <div class="bento-eyebrow"><span>Peak Efficiency Runs</span></div>
+            <div class="bento-list">${topRunsHtml}</div>
+        </div>
+    `;
+}
 
 async function loadStats() {
     if (!State.token) return;
     try {
         const stats = await API.stats();
-        document.getElementById('global-stats').innerHTML = `
-            <div class="stat-card">
-                <div class="stat-val">${stats.total_compressions || 0}</div>
-                <div class="stat-lbl">Total Compressions</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-val positive">${stats.total_tokens_saved || 0}</div>
-                <div class="stat-lbl">Total Tokens Saved</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-val">${Math.round(stats.avg_tokens_saved || 0)}</div>
-                <div class="stat-lbl">Avg Tokens Saved</div>
-            </div>
-        `;
+        State.lastStats = stats;
+        renderInsightsBento(stats);
     } catch (err) {
         showToast(err.message, 'error');
     }

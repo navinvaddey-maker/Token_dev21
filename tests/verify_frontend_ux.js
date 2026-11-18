@@ -521,6 +521,141 @@ async function runTestSuite() {
         `Deep Architect: Model pricing switch preserves depth telemetry (got "${costSaved.textContent}")`
     );
 
+    // =========================================================================
+    // Suite 6: Insights Bento Dashboard Telemetry & Interactive Cost Switcher
+    // =========================================================================
+    console.log('\n--- Suite 6: Insights Bento Dashboard ---');
+    win.renderInsightsBento({ total_compressions: 0, total_tokens_saved: 0, avg_tokens_saved: 0 });
+    assert(
+        doc.querySelector('#global-stats .insights-empty') !== null,
+        'Insights: Empty state rendered when total_compressions is 0'
+    );
+
+    const mockStatsPayload = {
+        total_compressions: 12,
+        total_tokens_saved: 4000,
+        avg_tokens_saved: 333.3,
+        total_original_tokens: 10000,
+        total_final_tokens: 6000,
+        best_tokens_saved: 820,
+        mode_breakdown: [
+            { mode: 'balanced', count: 7, tokens_saved: 2400 },
+            { mode: 'aggressive', count: 3, tokens_saved: 1100 },
+            { mode: 'gentle', count: 2, tokens_saved: 500 },
+        ],
+        domain_breakdown: [
+            { domain: 'software', count: 6, tokens_saved: 2200 },
+            { domain: 'legal', count: 4, tokens_saved: 1200 },
+            { domain: 'real-estate', count: 2, tokens_saved: 600 },
+        ],
+        daily_series: [
+            { day: '2026-11-16', runs: 4, original_tokens: 3200, final_tokens: 1900, tokens_saved: 1300 },
+            { day: '2026-11-17', runs: 5, original_tokens: 4100, final_tokens: 2400, tokens_saved: 1700 },
+            { day: '2026-11-18', runs: 3, original_tokens: 2700, final_tokens: 1700, tokens_saved: 1000 },
+        ],
+        top_runs: [
+            { id: 'r1', use_case: 'software', mode: 'balanced', token_original: 1200, token_final: 380, tokens_saved: 820, preview: 'Refactor auth middleware...' },
+        ],
+    };
+    win.State.lastStats = mockStatsPayload;
+    win.renderInsightsBento(mockStatsPayload);
+
+    assert(
+        doc.getElementById('insights-total-saved').textContent.replace(/,/g, '') === '4000',
+        `Insights: Hero total saved rendered (got "${doc.getElementById('insights-total-saved').textContent}")`
+    );
+    assert(
+        doc.getElementById('insights-cost-saved').textContent === '$0.02 saved',
+        `Insights: GPT-4o default cumulative cost computed (got "${doc.getElementById('insights-cost-saved').textContent}")`
+    );
+    assert(
+        doc.querySelector('#insights-trajectory-chart svg.bento-chart-svg') !== null,
+        'Insights: 14-day SVG trajectory chart rendered'
+    );
+    assert(
+        doc.querySelectorAll('#global-stats .mode-stack-seg').length === 3,
+        'Insights: Segmented mode mix bar rendered 3 segments'
+    );
+    assert(
+        doc.querySelectorAll('#global-stats .top-run-item').length === 1,
+        'Insights: Top efficiency runs list rendered'
+    );
+
+    win.setInsightsModel('claude35');
+    assert(
+        doc.getElementById('insights-cost-saved').textContent === '$0.01 saved',
+        `Insights: Model switcher updates cumulative cost to Claude 3.5 ($0.01 saved, got "${doc.getElementById('insights-cost-saved').textContent}")`
+    );
+
+    // =========================================================================
+    // Suite 7: History Timeline Filtering, Inline Diff & Workbench Restore
+    // =========================================================================
+    console.log('\n--- Suite 7: History Timeline ---');
+    win.eval('cachedHistoryRecords = []; HistoryState.expandedIds.clear(); applyHistoryFilters();');
+    assert(
+        doc.querySelector('#history-list .insights-empty') !== null,
+        'History: Empty state rendered when no history records exist'
+    );
+
+    const nowIso = new Date().toISOString();
+    const mockHistory = [
+        {
+            id: 'h-1',
+            original_prompt: 'Please review this SaaS NDA agreement for indemnification clauses.',
+            optimized_prompt: '# ROLE: LEGAL COUNSEL\n# TASK: Audit NDA indemnification.',
+            tokens_saved: 420,
+            token_original: 800,
+            token_final: 380,
+            use_case: 'legal',
+            mode: 'aggressive',
+            created_at: nowIso,
+        },
+        {
+            id: 'h-2',
+            original_prompt: 'Fix Safari 401 cookie spin bug on /api/stats endpoint.',
+            optimized_prompt: '# ROLE: AUTH ENGINEER\n# TASK: Diagnose Safari SameSite cookie.',
+            tokens_saved: 150,
+            token_original: 400,
+            token_final: 250,
+            use_case: 'software',
+            mode: 'balanced',
+            created_at: nowIso,
+        },
+    ];
+    win.eval(`cachedHistoryRecords = ${JSON.stringify(mockHistory)}; HistoryState.expandedIds.clear(); resetHistoryFilters();`);
+
+    assert(
+        doc.querySelectorAll('#history-list .history-item').length === 2,
+        'History: Both timeline cards rendered'
+    );
+    assert(
+        doc.querySelector('#history-list .history-group-label')?.textContent === 'Today',
+        'History: Date group header "Today" rendered'
+    );
+    assert(
+        doc.getElementById('history-summary-pill').textContent.includes('2 runs'),
+        `History: Summary pill shows run count (got "${doc.getElementById('history-summary-pill').textContent}")`
+    );
+
+    win.setHistoryModeFilter('aggressive');
+    assert(
+        doc.querySelectorAll('#history-list .history-item').length === 1,
+        'History: Mode filter "aggressive" narrows list to 1 item'
+    );
+
+    win.setHistoryModeFilter('all');
+    win.toggleHistoryExpand('h-1');
+    assert(
+        doc.querySelector('[data-history-id="h-1"] .history-diff-drawer') !== null,
+        'History: Inline side-by-side Original vs. Optimized diff drawer opens on Inspect'
+    );
+
+    win.restoreHistoryPrompt('h-2');
+    assert(
+        doc.getElementById('prompt-input').value.includes('Safari 401 cookie'),
+        'History: Load in Workbench restores original prompt into #prompt-input'
+    );
+
     // Final Summary
     console.log('\n======================================================');
     console.log(` Results: ${passed} PASSED | ${failed} FAILED`);

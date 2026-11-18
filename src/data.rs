@@ -272,33 +272,168 @@ impl Repository {
 
     // ── Stats ──────────────────────────────────────────────────────────────
 
+    /// Returns aggregated compression telemetry, mode/domain breakdowns, 14-day daily series,
+    /// and top-saving runs for a given user.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` if any parameterized read query against `token_history` fails.
     pub async fn get_user_stats(
         pool: &DbPool,
         user_id: &str,
     ) -> Result<serde_json::Value, sqlx::Error> {
-        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM token_history WHERE user_id = $1")
+        let summary: (i64, i64, f64, i64, i64, i64) = sqlx::query_as(
+            "SELECT
+                COUNT(*),
+                COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0),
+                COALESCE(CAST(AVG(tokens_saved) AS REAL), 0.0),
+                COALESCE(CAST(SUM(token_original) AS INTEGER), 0),
+                COALESCE(CAST(SUM(token_final) AS INTEGER), 0),
+                COALESCE(CAST(MAX(tokens_saved) AS INTEGER), 0)
+             FROM token_history
+             WHERE user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+
+        let mode_rows: Vec<(String, i64, i64)> = sqlx::query_as(
+            "SELECT
+                COALESCE(NULLIF(LOWER(mode), ''), 'balanced'),
+                COUNT(*),
+                COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0)
+             FROM token_history
+             WHERE user_id = $1
+             GROUP BY 1
+             ORDER BY COUNT(*) DESC",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        let domain_rows: Vec<(String, i64, i64)> = sqlx::query_as(
+            "SELECT
+                COALESCE(NULLIF(use_case, ''), 'generic'),
+                COUNT(*),
+                COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0)
+             FROM token_history
+             WHERE user_id = $1
+             GROUP BY 1
+             ORDER BY SUM(tokens_saved) DESC
+             LIMIT 6",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        let daily_rows: Vec<(String, i64, i64, i64, i64)> = sqlx::query_as(
+            "SELECT
+                COALESCE(strftime('%Y-%m-%d', created_at), ''),
+                COUNT(*),
+                COALESCE(CAST(SUM(token_original) AS INTEGER), 0),
+                COALESCE(CAST(SUM(token_final) AS INTEGER), 0),
+                COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0)
+             FROM token_history
+             WHERE user_id = $1 AND created_at >= datetime('now', '-14 days')
+             GROUP BY 1
+             ORDER BY 1 ASC",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        let top_rows: Vec<(String, String, String, i64, i64, i64, String, String)> =
+            sqlx::query_as(
+                "SELECT
+                id,
+                COALESCE(NULLIF(use_case, ''), 'generic'),
+                COALESCE(NULLIF(LOWER(mode), ''), 'balanced'),
+                token_original,
+                token_final,
+                tokens_saved,
+                COALESCE(CAST(created_at AS TEXT), ''),
+                SUBSTR(original_prompt, 1, 120)
+             FROM token_history
+             WHERE user_id = $1
+             ORDER BY tokens_saved DESC
+             LIMIT 3",
+            )
             .bind(user_id)
-            .fetch_one(pool)
+            .fetch_all(pool)
             .await?;
 
-        let saved: (i64,) = sqlx::query_as(
-            "SELECT COALESCE(CAST(SUM(tokens_saved) AS INTEGER), 0) FROM token_history WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(pool)
-        .await?;
+        let mode_breakdown: Vec<Value> = mode_rows
+            .into_iter()
+            .map(|(mode, count, tokens_saved)| {
+                json!({
+                    "mode": mode,
+                    "count": count,
+                    "tokens_saved": tokens_saved,
+                })
+            })
+            .collect();
 
-        let avg_saved: (f64,) = sqlx::query_as(
-            "SELECT COALESCE(CAST(AVG(tokens_saved) AS REAL), 0.0) FROM token_history WHERE user_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(pool)
-        .await?;
+        let domain_breakdown: Vec<Value> = domain_rows
+            .into_iter()
+            .map(|(domain, count, tokens_saved)| {
+                json!({
+                    "domain": domain,
+                    "count": count,
+                    "tokens_saved": tokens_saved,
+                })
+            })
+            .collect();
+
+        let daily_series: Vec<Value> = daily_rows
+            .into_iter()
+            .map(|(day, runs, original_tokens, final_tokens, tokens_saved)| {
+                json!({
+                    "day": day,
+                    "runs": runs,
+                    "original_tokens": original_tokens,
+                    "final_tokens": final_tokens,
+                    "tokens_saved": tokens_saved,
+                })
+            })
+            .collect();
+
+        let top_runs: Vec<Value> = top_rows
+            .into_iter()
+            .map(
+                |(
+                    id,
+                    use_case,
+                    mode,
+                    token_original,
+                    token_final,
+                    tokens_saved,
+                    created_at,
+                    preview,
+                )| {
+                    json!({
+                        "id": id,
+                        "use_case": use_case,
+                        "mode": mode,
+                        "token_original": token_original,
+                        "token_final": token_final,
+                        "tokens_saved": tokens_saved,
+                        "created_at": created_at,
+                        "preview": preview,
+                    })
+                },
+            )
+            .collect();
 
         Ok(serde_json::json!({
-            "total_compressions": total.0,
-            "total_tokens_saved": saved.0,
-            "avg_tokens_saved":   avg_saved.0,
+            "total_compressions": summary.0,
+            "total_tokens_saved": summary.1,
+            "avg_tokens_saved": summary.2,
+            "total_original_tokens": summary.3,
+            "total_final_tokens": summary.4,
+            "best_tokens_saved": summary.5,
+            "mode_breakdown": mode_breakdown,
+            "domain_breakdown": domain_breakdown,
+            "daily_series": daily_series,
+            "top_runs": top_runs,
         }))
     }
 
@@ -605,17 +740,17 @@ impl Repository {
         .fetch_all(pool)
         .await?;
 
-        // Get feedback by use case (joining with token_history)
+        // Get feedback by use case (left-joining token_history so unlinked signals still appear)
         let feedback_by_use_case = sqlx::query_as::<_, (String, String, i64, Option<f64>)>(
             "SELECT 
-                   th.use_case,
+                   COALESCE(NULLIF(th.use_case, ''), 'general') as use_case,
                    fs.signal_type,
                    COUNT(*) as signal_count,
                    AVG(fs.value) as avg_value
                 FROM feedback_signals fs
-                JOIN token_history th ON fs.history_id = th.id
-                GROUP BY th.use_case, fs.signal_type
-                ORDER BY th.use_case, signal_count DESC",
+                LEFT JOIN token_history th ON fs.history_id = th.id
+                GROUP BY 1, fs.signal_type
+                ORDER BY 1, signal_count DESC",
         )
         .fetch_all(pool)
         .await?;

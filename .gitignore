@@ -48,3 +48,8 @@ src/bin/debug_*.rs
 /test_*.html
 /test_admin.html
 /test_admin_fixed.html
+
+# Agent & scratch files
+/scratch/
+scratch/
+
