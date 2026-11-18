@@ -1,3 +1,8 @@
+//! Grammar & Spelling Pre-Pass for the NPAE Aggressive Path (`GrammarCorrector`).
+//!
+//! // ARCH: ARCHITECTURE.md §1.3 — corrects typographical and grammatical errors in user prompts
+//! // while protecting numbers, currencies, dates, technical identifiers, and word boundaries.
+
 use crate::types::TextCorrection;
 use harper_core::linting::{LintGroup, Linter, Suggestion};
 use harper_core::spell::FstDictionary;
@@ -23,14 +28,20 @@ lazy_static! {
             \b[0-9]+(?:\.[0-9]+)?\b                      # Standard isolated numbers / floats
         )
         "
-    ).unwrap();
+    ).expect("invariant: valid static PROTECTED_RE regex literal");
 }
 
+/// Deterministic spelling and grammar corrector backed by `harper_core` with numeric/unit masking.
+#[derive(Debug)]
 pub struct GrammarCorrector;
 
 impl GrammarCorrector {
     /// Corrects spelling and grammatical errors in a prompt while strictly preserving numbers, dates, currency, and units.
     /// Also enforces a 30% maximum edit distance safety threshold.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn correct(raw_prompt: &str) -> (String, Vec<TextCorrection>) {
         let trimmed = raw_prompt.trim();
         if trimmed.is_empty() {
@@ -43,7 +54,10 @@ impl GrammarCorrector {
         let mut idx = 0;
 
         for cap in PROTECTED_RE.captures_iter(raw_prompt) {
-            let mat = cap.get(0).unwrap().as_str();
+            let Some(m) = cap.get(0) else {
+                continue;
+            };
+            let mat = m.as_str();
             let key = format!("__NUM_PROT_{}__", idx);
             idx += 1;
             masked = masked.replacen(mat, &key, 1);
@@ -81,13 +95,13 @@ impl GrammarCorrector {
 
         for lint in sorted_lints {
             if let Some(first_suggestion) = lint.suggestions.first() {
-                let replacement_str = match first_suggestion {
+                let mut replacement_str = match first_suggestion {
                     Suggestion::ReplaceWith(tokens) => tokens
                         .iter()
                         .map(|t| t.to_string())
                         .collect::<Vec<_>>()
                         .join(""),
-                    Suggestion::Remove => "".to_string(),
+                    Suggestion::Remove => String::new(),
                     _ => continue,
                 };
 
@@ -138,6 +152,41 @@ impl GrammarCorrector {
                         continue;
                     }
 
+                    // FIX: Prevent `harper_core` discourse-marker/wordiness lints from deleting
+                    // `"so"` (e.g. `"make so we"` -> `"makewe"`) or concatenating adjacent words
+                    // across splice boundaries without a separating space.
+                    if span_trimmed.eq_ignore_ascii_case("so") && replacement_str.trim().is_empty()
+                    {
+                        continue;
+                    }
+
+                    if replacement_str.is_empty() {
+                        if start > 0
+                            && end < chars.len()
+                            && chars[start - 1].is_alphabetic()
+                            && chars[end].is_alphabetic()
+                        {
+                            replacement_str = " ".to_string();
+                        }
+                    } else {
+                        if start > 0
+                            && start < end
+                            && chars[start - 1].is_alphabetic()
+                            && chars[start].is_whitespace()
+                            && replacement_str.starts_with(char::is_alphabetic)
+                        {
+                            replacement_str.insert(0, ' ');
+                        }
+                        if end < chars.len()
+                            && end > start
+                            && chars[end].is_alphabetic()
+                            && chars[end - 1].is_whitespace()
+                            && replacement_str.ends_with(char::is_alphabetic)
+                        {
+                            replacement_str.push(' ');
+                        }
+                    }
+
                     chars.splice(start..end, replacement_str.chars());
 
                     corrections.push(TextCorrection {
@@ -157,7 +206,7 @@ impl GrammarCorrector {
             corrected_masked = corrected_masked.replace(key, original_val);
         }
 
-        // 3.5. Domain typo corrections (e.g., dharma/dhrama -> pharma)
+        // 3.5. Domain & merged-word typo corrections (e.g., dharma/dhrama -> pharma, makewe -> make so we)
         let domain_typos = [
             ("dharma", "pharma"),
             ("dhrama", "pharma"),
@@ -166,6 +215,7 @@ impl GrammarCorrector {
             ("farmaceutical", "pharmaceutical"),
             ("biotak", "biotech"),
             ("softwear", "software"),
+            ("makewe", "make so we"),
         ];
 
         for (typo, fixed) in domain_typos {
@@ -226,6 +276,27 @@ mod tests {
             corrected2.contains("pharma"),
             "Expected dhrama to be corrected to pharma, got: {}",
             corrected2
+        );
+    }
+
+    #[test]
+    fn test_preserve_word_boundaries_and_fix_makewe() {
+        let sentence = "Please also include any common rookie mistakes first-time homebuyers make so we can avoid them!";
+        let (corrected, _) = GrammarCorrector::correct(sentence);
+        assert!(
+            !corrected.contains("makewe"),
+            "GrammarCorrector must not merge 'make so we' into 'makewe': {corrected}"
+        );
+        assert!(
+            corrected.contains("make so we"),
+            "Expected 'make so we' to be preserved, got: {corrected}"
+        );
+
+        let merged = "Include common mistakes homebuyers makewe can avoid them";
+        let (repaired, _) = GrammarCorrector::correct(merged);
+        assert!(
+            repaired.contains("make so we"),
+            "Expected 'makewe' to be repaired to 'make so we', got: {repaired}"
         );
     }
 }

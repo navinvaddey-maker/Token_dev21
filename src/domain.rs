@@ -159,6 +159,8 @@ pub async fn compress_new(
     };
 
     if req.rag_enabled.unwrap_or(false) {
+        // ARCH: ARCHITECTURE.md §3.1 — Keep `min_similarity: 0.25` in `/api/compress` to preserve
+        // recall on short FNV-1a feature-hashed chunks when `rag_enabled` is toggled on general prompts.
         let query = crate::rag::types::RetrievalQuery {
             query_text: req.raw_text.clone(),
             user_id: user_id_str.to_string(),
@@ -169,23 +171,8 @@ pub async fn compress_new(
         let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
         if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
             if !retrieved_chunks.is_empty() {
-                let mut rag_section = String::new();
-                rag_section.push_str("\n--- Retrieved Knowledge ---\n");
-                for res in &retrieved_chunks {
-                    let page_str = res
-                        .chunk
-                        .metadata
-                        .as_ref()
-                        .and_then(|m| m.page_number)
-                        .map(|p| format!(", Page {}", p))
-                        .unwrap_or_default();
-                    rag_section.push_str(&format!(
-                        "[Source: {}{}]\n{}\n\n",
-                        res.document_filename, page_str, res.chunk.content
-                    ));
-                }
-                rag_section.push_str("--- End Retrieved Knowledge ---\n");
-
+                // FIX: G-05 — Removed unused `rag_section` dead string builder; retrieved chunks
+                // flow through `EnrichmentContext` into Stage 6A and `DerivedRagContext`.
                 let chunks = retrieved_chunks
                     .into_iter()
                     .map(|res| crate::types::RagChunk {

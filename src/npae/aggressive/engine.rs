@@ -40,8 +40,14 @@ impl AggressiveEngine {
         let t_start = Instant::now();
 
         // 0. Isolate prompt and run grammar/spelling correction (preserving numbers/dates/units)
-        let (_, _, raw_user_prompt) = super::structurer::split_raw_input(raw);
+        let (raw_ctx_opt, _, raw_user_prompt) = super::structurer::split_raw_input(raw);
         let (user_prompt, _grammar_corrections) = GrammarCorrector::correct(&raw_user_prompt);
+        // FIX: G-05 — reconstruct the `Context: [...]` prefix alongside the grammar-corrected
+        // `user_prompt` so `render_crisp_prompt` renders `Semantic Context:` instead of dropping it.
+        let crisp_raw_input = match raw_ctx_opt.as_deref() {
+            Some(ctx) => format!("Context: [{ctx}]\n\n{user_prompt}"),
+            None => user_prompt.clone(),
+        };
 
         // Derive RAG context (250 token fact budget, repetition-free, no source citations)
         let derived_rag = enrichment
@@ -65,10 +71,14 @@ impl AggressiveEngine {
         .await
         .map_err(|e| format!("intent spawn_blocking join error: {e}"))??;
 
-        let mut ory_lock = ory_engine.lock().await;
+        let ory_lock = ory_engine.lock().await;
         let ory_result = ory_lock
             .process(&user_prompt, &config_guard)
             .map_err(|e| e.to_string())?;
+        // FIX: G-02 — release `ory_engine` mutex immediately after `process()` so StructurerRouter,
+        // `build_with_blueprint`, ambiguity scoring, HallucinationGuard, and Stage 6B cycles run
+        // without holding the global mutex across the request lifecycle.
+        drop(ory_lock);
 
         // Enhance Aggressive intent with Ory's deep learning
         // FIX: Step 1.1 — Canonicalize Ory's inferred domain through the config taxonomy
@@ -163,7 +173,7 @@ impl AggressiveEngine {
         };
         let optimized_prompt = match render_style {
             RenderStyle::Crisp => {
-                super::structurer::render_crisp_prompt(&structured, &questions, &user_prompt)
+                super::structurer::render_crisp_prompt(&structured, &questions, &crisp_raw_input)
             }
             RenderStyle::Harness => super::structurer::render_harness_prompt_with_options(
                 &structured,
@@ -243,6 +253,12 @@ impl AggressiveEngine {
         );
 
         // Stage 6B: Quality Guardrails & Targeted Correction Loop
+        // FIX: G-10 — preserve required clarifying questions when `amb.score > threshold` and
+        // track `(best_prompt, best_scoring, best_guard)` across cycles so correction iterations
+        // never degrade `guard_report.passed` or composite score.
+        let mut best_prompt = final_prompt.clone();
+        let mut best_scoring = scoring_result.clone();
+        let mut best_guard = guard_report.clone();
         let max_correction_cycles = 3;
         let mut cycle_num = 0;
 
@@ -250,21 +266,28 @@ impl AggressiveEngine {
             && cycle_num < max_correction_cycles
         {
             cycle_num += 1;
+            let questions_for_tes: &[crate::npae::schema::types::ClarifyingQuestion] =
+                if amb.score > threshold {
+                    &questions
+                } else {
+                    &[]
+                };
             if let Some(axis) = &scoring_result.correction_axis {
                 match axis {
                     crate::types::ScoreAxis::TaskEssential => {
-                        // TES low: Strip optional roadmap/questions, but when Harness is active
-                        // NEVER strip <rules>, <facts>, <requested_items>, or <output_contract> (GAP-42).
+                        // TES low: Strip optional roadmap, keep clarifying questions if ambiguous,
+                        // and when Harness is active NEVER strip <rules>, <facts>, <requested_items>,
+                        // or <output_contract> (GAP-42).
                         final_prompt = match render_style {
                             RenderStyle::Crisp => super::structurer::render_crisp_prompt(
                                 &structured,
-                                &[],
-                                &user_prompt,
+                                questions_for_tes,
+                                &crisp_raw_input,
                             ),
                             RenderStyle::Harness => {
                                 super::structurer::render_harness_prompt_with_options(
                                     &structured,
-                                    &[],
+                                    questions_for_tes,
                                     raw,
                                     Some(&user_prompt),
                                     derived_rag.as_ref(),
@@ -286,7 +309,7 @@ impl AggressiveEngine {
                             RenderStyle::Crisp => super::structurer::render_crisp_prompt(
                                 &structured,
                                 &questions,
-                                &user_prompt,
+                                &crisp_raw_input,
                             ),
                             RenderStyle::Harness => {
                                 super::structurer::render_harness_prompt_with_options(
@@ -315,6 +338,19 @@ impl AggressiveEngine {
             ) {
                 guard_report = new_report;
             }
+            if !guard_report.passed {
+                final_prompt = crate::npae::hallucination::guard::remediate_hallucination(
+                    &final_prompt,
+                    &guard_report,
+                );
+                if let Ok(remediated_report) = crate::npae::hallucination::guard::run_tri_layer(
+                    &final_prompt,
+                    &guard_source_text,
+                    guard_cfg,
+                ) {
+                    guard_report = remediated_report;
+                }
+            }
             scoring_result = compute_aggressive_scoring(
                 raw,
                 &final_prompt,
@@ -323,7 +359,22 @@ impl AggressiveEngine {
                 &questions,
                 rag_tokens,
             );
+
+            let candidate_avg =
+                (scoring_result.tes + scoring_result.sfs + scoring_result.scs) / 3.0;
+            let best_avg = (best_scoring.tes + best_scoring.sfs + best_scoring.scs) / 3.0;
+            let is_better = (guard_report.passed && !best_guard.passed)
+                || (guard_report.passed == best_guard.passed && candidate_avg >= best_avg);
+            if is_better {
+                best_prompt.clone_from(&final_prompt);
+                best_scoring = scoring_result.clone();
+                best_guard = guard_report.clone();
+            }
         }
+
+        final_prompt = best_prompt;
+        scoring_result = best_scoring;
+        guard_report = best_guard;
 
         // Final token accounting for UI
         let token_original = crate::utils::tokens::estimate_tokens(raw);
@@ -331,8 +382,13 @@ impl AggressiveEngine {
         let token_saved = token_original.saturating_sub(token_final);
 
         // 6. Record Outcome to Ory Engine Memory
-        if let Some(blueprint) = &ory_result.blueprint {
-            let _ = ory_lock.record_outcome(&ory_result.intent, blueprint, &scoring_result);
+        // FIX: G-02 — re-acquire `ory_engine` lock only when `guard_report.passed` so unverified
+        // or failed prompt expansions never pollute shared `PatternMemory`.
+        if guard_report.passed {
+            if let Some(blueprint) = &ory_result.blueprint {
+                let mut ory_lock = ory_engine.lock().await;
+                let _ = ory_lock.record_outcome(&ory_result.intent, blueprint, &scoring_result);
+            }
         }
 
         Ok(StructuredPromptResponse {
@@ -372,21 +428,29 @@ fn compute_aggressive_scoring(
     let net_token_final = token_final.saturating_sub(rag_tokens_added);
 
     // TES: Token efficiency (excluding injected RAG fact tokens so RAG enrichment is not penalized)
+    // FIX: G-10 — Aggressive mode is a blueprint expansion engine for short prompts. When
+    // `token_original < 80` and `net_token_final <= 450`, score efficiency against the target
+    // blueprint budget (`>= 6.5`) so Stage 6B does not misclassify normal short-prompt expansion
+    // as a `TaskEssential` failure.
     let tes_score = if token_original > 0 {
-        let savings = 1.0 - (net_token_final as f32 / token_original as f32);
-
-        let base = if savings < 0.0 {
-            (0.3 + savings * 0.4).max(0.1)
-        } else if savings <= 0.1 {
-            0.3 + savings * 2.0
-        } else if savings <= 0.6 {
-            0.5 + savings * 0.667
-        } else if savings <= 0.8 {
-            0.9 - (savings - 0.6) * 0.5
+        if token_original < 80 && net_token_final <= 450 {
+            ((1.0 - (net_token_final as f32 / 600.0).min(0.4)) * 10.0).clamp(6.5, 9.5)
         } else {
-            0.8 - (savings - 0.8) * 2.0
-        };
-        (base * 10.0).clamp(0.0, 10.0)
+            let savings = 1.0 - (net_token_final as f32 / token_original as f32);
+
+            let base = if savings < 0.0 {
+                (0.3 + savings * 0.4).max(0.1)
+            } else if savings <= 0.1 {
+                0.3 + savings * 2.0
+            } else if savings <= 0.6 {
+                0.5 + savings * 0.667
+            } else if savings <= 0.8 {
+                0.9 - (savings - 0.6) * 0.5
+            } else {
+                0.8 - (savings - 0.8) * 2.0
+            };
+            (base * 10.0).clamp(0.0, 10.0)
+        }
     } else {
         0.0
     };

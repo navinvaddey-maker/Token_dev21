@@ -1,23 +1,44 @@
+//! Tri-Layer Hallucination Guard & Deterministic Remediation (`guard`).
+//!
+//! // ARCH: ARCHITECTURE.md §1.2, §1.3 & §7.2 (G-09) — orchestrates L1 (self-critique),
+//! // L2 (confidence), and L3 (constraint) checks and applies targeted remediation while
+//! // preserving verbatim user task blocks (`# TASK / INSTRUCTION:` and `<task>...</task>`).
+
 use crate::npae::hallucination::l1_critique;
 use crate::npae::hallucination::l2_confidence;
 use crate::npae::hallucination::l3_constraint;
 use crate::npae::schema::types::HallucinationGuardConfig;
 use serde::{Deserialize, Serialize};
 
+/// Diagnostic outcome for a single layer (`1`, `2`, or `3`) of `HallucinationGuard`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LayerReport {
+    /// Layer identifier (`1`, `2`, or `3`).
     pub layer_id: u8,
+    /// `true` iff zero flags were raised by this layer.
     pub passed: bool,
+    /// Human-readable violation flags raised by this layer.
     pub flags: Vec<String>,
 }
 
+/// Combined tri-layer verification report returned by [`run_tri_layer`].
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HallucinationReport {
+    /// `true` iff all 3 layers passed.
     pub passed: bool,
+    /// Per-layer diagnostic reports (`[L1, L2, L3]`).
     pub layers: [LayerReport; 3],
+    /// Summary remediation guidance when `passed == false`.
     pub remediation: Option<String>,
 }
 
+/// Runs all three hallucination guard layers (`L1`, `L2`, `L3`) on `output`.
+///
+/// # Errors
+/// Returns `Err` if any underlying layer check fails.
+///
+/// # Panics
+/// Never.
 pub fn run_tri_layer(
     output: &str,
     original_prompt: &str,
@@ -56,12 +77,54 @@ fn derive_remediation(l1: &LayerReport, l2: &LayerReport, l3: &LayerReport) -> S
     "Unknown".into()
 }
 
+/// Strips `{` and `}` from non-task scaffolding only, preserving the user's verbatim task text.
+fn strip_braces_outside_task(output: &str) -> String {
+    if let Some(task_idx) = output.find("# TASK / INSTRUCTION:") {
+        let prefix = output[..task_idx]
+            .replace(['{', '}'], "")
+            .replace("Output Format: json", "Output Format: markdown")
+            .replace("Output Format: JSON", "Output Format: markdown");
+        let rest = &output[task_idx..];
+        if let Some(delim_idx) = rest.find("\n\n---\n") {
+            let task_part = &rest[..delim_idx];
+            let suffix = rest[delim_idx..].replace(['{', '}'], "");
+            return format!("{prefix}{task_part}{suffix}");
+        }
+        return format!("{prefix}{rest}");
+    }
+
+    if let Some(task_start) = output.find("<task>") {
+        let prefix = output[..task_start]
+            .replace(['{', '}'], "")
+            .replace("Output Format: json", "Output Format: markdown")
+            .replace("Output Format: JSON", "Output Format: markdown");
+        let rest = &output[task_start..];
+        if let Some(end_idx) = rest.find("</task>") {
+            let split_at = end_idx + "</task>".len();
+            let task_part = &rest[..split_at];
+            let suffix = rest[split_at..].replace(['{', '}'], "");
+            return format!("{prefix}{task_part}{suffix}");
+        }
+        return format!("{prefix}{rest}");
+    }
+
+    output.replace(['{', '}'], "")
+}
+
+/// Applies deterministic remediation to `output` for any failed layer in `report`.
+///
+/// // FIX: G-09 — never strips `{` or `}` from inside the user's own `# TASK / INSTRUCTION:` or
+/// // `<task>...</task>` block when remediating an L1 `"no json"` contradiction.
+///
+/// # Panics
+/// Never.
 pub fn remediate_hallucination(output: &str, report: &HallucinationReport) -> String {
     let mut corrected = output.to_string();
     if !report.passed {
         // Apply L1 contradiction correction: prompt forbids JSON, so remove JSON structural braces
+        // outside the user's verbatim task text.
         if !report.layers[0].passed {
-            corrected = corrected.replace("{", "").replace("}", "");
+            corrected = strip_braces_outside_task(&corrected);
         }
         // Apply L2 confidence correction: wrap low confidence claims (e.g. 'magic_token') with [UNCERTAIN]
         if !report.layers[1].passed {

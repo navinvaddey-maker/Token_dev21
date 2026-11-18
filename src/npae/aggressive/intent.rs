@@ -1191,7 +1191,14 @@ fn detect_output_preference(lower: &str) -> String {
     "markdown".to_string()
 }
 
-/// Derive temporal scope from input — replaces hardcoded "immediate"
+/// Derive temporal scope from input — replaces hardcoded "immediate".
+///
+/// // ARCH: ARCHITECTURE.md §1.4 — uses word/phrase-boundary checks (`has_word_or_phrase`) so
+/// // incidental words like `"closing day"` or `"for years and years"` do not falsely set
+/// // `phased_daily` or `phased_yearly`.
+///
+/// # Panics
+/// Never.
 fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
     // Phase-based signals
     let phase_signals = [
@@ -1202,8 +1209,11 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
         "sprint",
         "iteration",
         "milestone",
+        "step-by-step",
+        "entire process",
+        "from the very beginning",
     ];
-    let has_phases = phase_signals.iter().any(|s| lower.contains(s));
+    let has_phases = phase_signals.iter().any(|s| has_word_or_phrase(lower, s));
 
     // Multi-year and specific timeline patterns
     let specific_spans = [
@@ -1221,26 +1231,50 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
 
     let mut detected_scope = None;
     for span in &specific_spans {
-        if lower.contains(span) {
+        if has_word_or_phrase(lower, span) {
             detected_scope = Some(span.replace(' ', "_"));
             break;
         }
     }
 
-    // General timeline signals
+    // FIX: Replace raw `lower.contains(short)` with strict phrase/word-boundary checks so
+    // `"closing day"` or `"for years and years"` do not falsely trigger `"daily"` (`phased_daily`)
+    // or `"yearly"`.
     if detected_scope.is_none() {
-        let timeline_patterns = [
-            ("day", "daily"),
-            ("week", "weekly"),
-            ("month", "monthly"),
-            ("quarter", "quarterly"),
-            ("year", "yearly"),
-            ("hour", "hourly"),
+        let timeline_patterns: &[(&str, &[&str])] = &[
+            (
+                "daily",
+                &[
+                    "daily",
+                    "day-by-day",
+                    "day by day",
+                    "per day",
+                    "every day",
+                    "each day",
+                ],
+            ),
+            (
+                "weekly",
+                &["weekly", "week-by-week", "per week", "every week", "weeks"],
+            ),
+            (
+                "monthly",
+                &[
+                    "monthly",
+                    "month-by-month",
+                    "per month",
+                    "every month",
+                    "months",
+                ],
+            ),
+            ("quarterly", &["quarterly", "per quarter"]),
+            ("yearly", &["yearly", "annual", "annually", "per year"]),
+            ("hourly", &["hourly", "per hour"]),
         ];
 
-        for (short, long) in &timeline_patterns {
-            if lower.contains(long) || lower.contains(short) {
-                detected_scope = Some(long.to_string());
+        for &(scope_label, patterns) in timeline_patterns {
+            if patterns.iter().any(|&p| has_word_or_phrase(lower, p)) {
+                detected_scope = Some(scope_label.to_string());
                 break;
             }
         }
@@ -1252,21 +1286,23 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
         (true, Some(s)) => format!("phased_{s}"),
         (true, None) => "phased".to_string(),
         (false, Some(s)) => s,
-        (false, None) if lower.contains("long-term") || lower.contains("long term") => {
+        (false, None)
+            if has_word_or_phrase(lower, "long-term") || has_word_or_phrase(lower, "long term") =>
+        {
             "long_term".to_string()
         }
         (false, None)
-            if lower.contains("short-term")
-                || lower.contains("short term")
-                || lower.contains("quick") =>
+            if has_word_or_phrase(lower, "short-term")
+                || has_word_or_phrase(lower, "short term")
+                || has_word_or_phrase(lower, "quick") =>
         {
             "short_term".to_string()
         }
         (false, None)
-            if lower.contains("now")
-                || lower.contains("immediately")
-                || lower.contains("asap")
-                || lower.contains("urgent") =>
+            if has_word_or_phrase(lower, "now")
+                || has_word_or_phrase(lower, "immediately")
+                || has_word_or_phrase(lower, "asap")
+                || has_word_or_phrase(lower, "urgent") =>
         {
             "immediate".to_string()
         }
@@ -1331,7 +1367,13 @@ fn detect_knowledge_level(lower: &str, intent_confidence: f32) -> KnowledgeLevel
     }
 }
 
-/// Detect validation/quality assurance signals in the input
+/// Detect validation/quality assurance signals in the input.
+///
+/// // FIX: Use `has_word_or_phrase` instead of raw `lower.contains` so incidental substrings
+/// // like `"checks"` in `"what a home inspector actually checks"` do not trigger validation gates.
+///
+/// # Panics
+/// Never.
 fn detect_validation_signals(lower: &str) -> bool {
     let validation_signals = [
         "test",
@@ -1348,14 +1390,29 @@ fn detect_validation_signals(lower: &str) -> bool {
         "criteria",
         "acceptance",
     ];
-    validation_signals.iter().any(|s| lower.contains(s))
+    validation_signals
+        .iter()
+        .any(|s| has_word_or_phrase(lower, s))
 }
 
-/// Detect geography from input
+/// Detect geography from input.
+///
+/// // FIX: Use `has_word_or_phrase` and explicit US phrases (`"united states"`, `"in the us"`,
+/// // `"us market"`, `"usa"`, `"u.s."`) so `"us"` inside `"house"` / `"nervous"` or the English
+/// // pronoun `"us"` never falsely sets `Geography: United States`.
+///
+/// # Panics
+/// Never.
 fn detect_geography(lower: &str) -> Option<String> {
+    if lower.contains("u.s.") {
+        return Some("United States".to_string());
+    }
     let geos = [
         ("india", "India"),
-        ("us", "United States"),
+        ("united states", "United States"),
+        ("in the us", "United States"),
+        ("us market", "United States"),
+        ("us law", "United States"),
         ("usa", "United States"),
         ("uk", "United Kingdom"),
         ("europe", "Europe"),
@@ -1370,7 +1427,7 @@ fn detect_geography(lower: &str) -> Option<String> {
         ("international", "International"),
     ];
     for (signal, geo) in &geos {
-        if lower.contains(signal) {
+        if has_word_or_phrase(lower, signal) {
             return Some(geo.to_string());
         }
     }
@@ -1938,6 +1995,28 @@ mod tests {
         assert_eq!(
             detect_business_type(app_prompt, "software", ActorPerspective::Practitioner),
             Some("Digital Product".to_string())
+        );
+    }
+
+    #[test]
+    fn test_detect_temporal_scope_avoids_closing_day_false_positive() {
+        let homebuy_lower = "we have been saving up for years and years to get to this point, so it feels like a huge milestone in our lives. walk me through the entire process of buying a house from the very beginning and what happens on closing day";
+        let (scope, has_timeline, has_phases) = detect_temporal_scope(homebuy_lower);
+        assert_eq!(scope, "phased");
+        assert!(has_timeline);
+        assert!(has_phases);
+
+        let explicit_daily = "create a phased daily meal plan for every day";
+        let (daily_scope, _, _) = detect_temporal_scope(explicit_daily);
+        assert_eq!(daily_scope, "phased_daily");
+
+        // Ensure "house" / "nervous" / "checks" do not trigger Geography: United States or validation
+        let inspector_lower = "i'm pretty nervous to buy a house and want to understand what a home inspector actually checks";
+        assert_eq!(detect_geography(inspector_lower), None);
+        assert!(!detect_validation_signals(inspector_lower));
+        assert_eq!(
+            detect_geography("expand into the us market"),
+            Some("United States".to_string())
         );
     }
 }

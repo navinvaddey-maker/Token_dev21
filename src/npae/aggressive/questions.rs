@@ -122,6 +122,18 @@ fn score_gap(gap: &str, _repr: &CompressedRepr, id: u8, domain: &str) -> Clarify
             "What is the target system architecture or scope (web API, cloud IAM, network, or endpoint) and compliance framework?".into(),
             0.91,
         ),
+        ("missing_slot:real-estate:buyer_state_or_market", _) => (
+            "Which state/metro market are you buying in (to account for state-specific closing customs such as attorney vs. escrow states, transfer taxes, and inspection norms)?".into(),
+            0.94,
+        ),
+        ("missing_slot:real-estate:buyer_budget_and_down_payment", _) => (
+            "What is your target purchase price budget and available cash for down payment, closing costs (2%–5%), and post-closing reserves?".into(),
+            0.92,
+        ),
+        ("missing_slot:real-estate:buyer_credit_tier_and_income", _) => (
+            "What is your current credit score tier and approximate debt-to-income (DTI) profile (to tailor conventional vs. FHA loan eligibility and rate assumptions)?".into(),
+            0.90,
+        ),
         ("missing_slot:real-estate:location_or_property_type", _) => (
             "What is the target geographic market/jurisdiction and property type (residential, commercial, or multifamily)?".into(),
             0.90,

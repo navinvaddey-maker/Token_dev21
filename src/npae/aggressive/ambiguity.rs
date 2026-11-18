@@ -157,13 +157,24 @@ pub fn score_for_domain(
 
         let mut domain_slot_gaps = Vec::new();
         for dom in domains_to_check {
-            detect_missing_domain_slots(dom, &combined, &combined_words, &mut domain_slot_gaps);
+            detect_missing_domain_slots(
+                dom,
+                &combined,
+                &combined_words,
+                Some(prof.perspective),
+                &mut domain_slot_gaps,
+            );
         }
 
         if !domain_slot_gaps.is_empty() {
-            // Add up to 0.36 ambiguity score when critical domain slots are missing
-            let slot_penalty = (domain_slot_gaps.len() as f32 * 0.12).min(0.36);
+            // FIX: When critical domain baseline slots are missing (especially >= 2 slots on long
+            // narrative prompts >40 words), ensure `score` receives enough weight to exceed the
+            // 0.65 threshold and trigger high-information-gain clarifying questions.
+            let slot_penalty = (domain_slot_gaps.len() as f32 * 0.25).min(0.60);
             score += slot_penalty;
+            if domain_slot_gaps.len() >= 2 {
+                score = score.max(0.70);
+            }
             for g in domain_slot_gaps {
                 if !gap_zones.contains(&g) {
                     gap_zones.push(g);
@@ -200,6 +211,7 @@ fn detect_missing_domain_slots(
     domain: &str,
     text: &str,
     words: &HashSet<&str>,
+    perspective: Option<super::intent::ActorPerspective>,
     out_gaps: &mut Vec<String>,
 ) {
     match domain {
@@ -668,41 +680,115 @@ fn detect_missing_domain_slots(
             }
         }
         "real-estate" => {
-            let has_location_or_type = has_number(text)
-                || has_any_word_or_phrase(
+            let is_practitioner_licensing = has_any_word_or_phrase(
+                text,
+                words,
+                &[
+                    "licensing",
+                    "license",
+                    "pre-licensing",
+                    "broker sponsorship",
+                    "start a brokerage",
+                    "real estate agency",
+                    "become a real estate agent",
+                ],
+            );
+            let has_consumer_homebuy_terms = has_any_word_or_phrase(
+                text,
+                words,
+                &["house", "home", "homebuyer", "mortgage", "closing"],
+            );
+            let is_consumer = perspective == Some(super::intent::ActorPerspective::Consumer)
+                || (has_consumer_homebuy_terms && !is_practitioner_licensing);
+
+            if is_consumer {
+                // ARCH: ARCHITECTURE.md §1.4 — Consumer home-buying requires 3 concrete baseline
+                // slots (state/market, target purchase budget/down payment amount, and credit
+                // tier/DTI profile) rather than being trivially satisfied by the word `"house"`.
+                let has_buyer_geography = has_any_word_or_phrase(
                     text,
                     words,
                     &[
-                        "residential",
-                        "commercial",
-                        "multifamily",
-                        "single-family",
-                        "condo",
-                        "apartment",
-                        "house",
-                        "rental",
-                        "reit",
-                        "mortgage",
-                        "cap rate",
-                        "cashflow",
-                        "licensing",
-                        "license",
-                        "broker",
-                        "brokerage",
-                        "realtor",
-                        "agent",
-                        "india",
-                        "us",
-                        "usa",
-                        "uk",
+                        "austin",
                         "texas",
                         "california",
                         "new york",
                         "florida",
+                        "india",
+                        "uk",
+                        "canada",
+                        "state",
+                        "city",
+                        "county",
+                        "attorney state",
+                        "escrow state",
                     ],
                 );
-            if !has_location_or_type {
-                out_gaps.push("missing_slot:real-estate:location_or_property_type".into());
+                if !has_buyer_geography {
+                    out_gaps.push("missing_slot:real-estate:buyer_state_or_market".into());
+                }
+
+                let has_buyer_budget = has_number(text)
+                    || text.contains('$')
+                    || has_any_word_or_phrase(text, words, &["usd", "budget of"]);
+                if !has_buyer_budget {
+                    out_gaps.push("missing_slot:real-estate:buyer_budget_and_down_payment".into());
+                }
+
+                let has_buyer_credit_tier = has_any_word_or_phrase(
+                    text,
+                    words,
+                    &[
+                        "credit tier",
+                        "fico",
+                        "740",
+                        "700",
+                        "680",
+                        "620",
+                        "dti",
+                        "annual income",
+                    ],
+                );
+                if !has_buyer_credit_tier {
+                    out_gaps.push("missing_slot:real-estate:buyer_credit_tier_and_income".into());
+                }
+            } else {
+                let has_location_or_type = has_number(text)
+                    || has_any_word_or_phrase(
+                        text,
+                        words,
+                        &[
+                            "residential",
+                            "commercial",
+                            "multifamily",
+                            "single-family",
+                            "condo",
+                            "apartment",
+                            "house",
+                            "rental",
+                            "reit",
+                            "mortgage",
+                            "cap rate",
+                            "cashflow",
+                            "licensing",
+                            "license",
+                            "broker",
+                            "brokerage",
+                            "realtor",
+                            "agent",
+                            "india",
+                            "us",
+                            "usa",
+                            "uk",
+                            "texas",
+                            "california",
+                            "new york",
+                            "florida",
+                        ],
+                    );
+                if !has_location_or_type {
+                    out_gaps.push("missing_slot:real-estate:location_or_property_type".into());
+                }
             }
         }
         _ => {}

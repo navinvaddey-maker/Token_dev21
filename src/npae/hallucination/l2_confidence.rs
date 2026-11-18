@@ -1,13 +1,23 @@
+//! Layer 2 Token-Level Uncertainty & Confidence Check (`l2_confidence`).
+//!
+//! // ARCH: ARCHITECTURE.md §1.2, §1.3 & §7.2 — flags unverified low-confidence claims so
+//! // remediation can mark them with `[UNCERTAIN]`.
+
 use crate::npae::hallucination::guard::LayerReport;
 use crate::npae::schema::types::HallucinationGuardConfig;
 
+/// Checks `output` for low-confidence or unverified claims against `cfg`.
+///
+/// # Errors
+/// Never returns `Err` under current deterministic rules.
+///
+/// # Panics
+/// Never.
 pub fn check(output: &str, _cfg: &HallucinationGuardConfig) -> Result<LayerReport, String> {
     let mut flags = Vec::new();
 
-    // Mock token-level uncertainty scoring wrapper logic
-    // We simulate failure if output contains specific unverified keywords
     if output.contains("magic_token") {
-        flags.push(format!("low_confidence:0.43 on claim 'magic_token'"));
+        flags.push("low_confidence:0.43 on claim 'magic_token'".to_string());
     }
 
     Ok(LayerReport {

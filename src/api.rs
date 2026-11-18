@@ -416,6 +416,13 @@ async fn npae_compress(
     Ok((StatusCode::OK, Json(result)).into_response())
 }
 
+/// Executes Aggressive Mode compression and structuring via `POST /api/v1/aggressive`.
+///
+/// # Errors
+/// Returns [`AppError::Internal`] if compression or `AggressiveEngine::run` fails.
+///
+/// # Panics
+/// Never.
 async fn npae_aggressive(
     State(state): State<AppState>,
     Json(req): Json<AggressiveRequest>,
@@ -426,12 +433,14 @@ async fn npae_aggressive(
     let mut enrichment = crate::types::EnrichmentContext::default();
     if req.rag_enabled.unwrap_or(false) {
         let history_id = uuid::Uuid::new_v4().to_string();
+        // ARCH: ARCHITECTURE.md §7.2 — Raise Aggressive RAG similarity gate to 0.45 to filter low-relevance noise.
+        // FIX: G-04 — Raised `min_similarity` from 0.25 to 0.45 in `/api/v1/aggressive`.
         let query = crate::rag::types::RetrievalQuery {
             query_text: req.prompt.clone(),
             user_id: "default_user".to_string(),
             document_ids: req.rag_document_ids.clone(),
             top_k: req.rag_top_k.unwrap_or(5),
-            min_similarity: 0.25,
+            min_similarity: 0.45,
         };
         let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
         if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
@@ -466,6 +475,11 @@ async fn npae_aggressive(
         body: req.prompt.clone(),
     };
 
+    // ARCH: ARCHITECTURE.md §1.2 — Run Stage -1 `TokenReconstructor` so `constraint_locks` (`[STRICT]`)
+    // are enforced on `/api/v1/aggressive` identically to `/api/compress`.
+    // FIX: G-01 — Pass reconstructed input instead of `ReconstructedInput::default()`.
+    let reconstructed = state.pipeline.reconstruct_input(&req.prompt);
+
     let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
         &req.prompt,
         &repr,
@@ -473,7 +487,7 @@ async fn npae_aggressive(
         state.npae_config.clone(),
         state.ory_engine.clone(),
         &structurer,
-        &crate::types::ReconstructedInput::default(),
+        &reconstructed,
         Some(&enrichment),
     )
     .await
@@ -512,9 +526,76 @@ async fn npae_verify_grounding(
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 
+/// Returns the canonical NPAE 2.0.0 Draft 2020-12 JSON Schema contract (`GET /api/v1/schema`).
+///
+/// # Errors
+/// Never returns [`Err`].
+///
+/// # Panics
+/// Never.
 async fn npae_schema() -> Result<axum::response::Response, AppError> {
-    // Phase 7.4
-    let schema_json = serde_json::json!({ "version": "1.0", "message": "Schema endpoint stub" });
+    // ARCH: ARCHITECTURE.md §7.2 Layer 4 & G-08 — Expose strict Draft 2020-12 JSON Schema
+    // (`additionalProperties: false`) for downstream constrained decoding and verification.
+    // FIX: G-08 — Replaced schema endpoint stub with canonical NPAE 2.0.0 JSON Schema.
+    let schema_json = serde_json::json!({
+        "version": "2.0.0",
+        "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "title": "NpaeGroundedResponse",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "schema_version",
+                "status",
+                "items",
+                "clarification_needed"
+            ],
+            "properties": {
+                "schema_version": {
+                    "type": "string",
+                    "const": "2.0.0"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["GROUNDED", "PARTIAL", "ABSTAIN", "CLARIFICATION_REQUIRED"]
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["requested_item", "status", "answer", "cited_facts"],
+                        "properties": {
+                            "requested_item": { "type": "string" },
+                            "status": {
+                                "type": "string",
+                                "enum": ["FOUND", "PARTIAL_MATCH", "NOT_FOUND"]
+                            },
+                            "answer": { "type": "string" },
+                            "cited_facts": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "pattern": "^F[0-9]+$"
+                                }
+                            }
+                        }
+                    }
+                },
+                "clarification_needed": {
+                    "type": "boolean"
+                },
+                "clarifying_questions": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                },
+                "unverified_claims": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            }
+        }
+    });
     Ok((StatusCode::OK, Json(schema_json)).into_response())
 }
 

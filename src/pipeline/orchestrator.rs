@@ -127,6 +127,37 @@ impl PipelineOrchestrator {
         }
     }
 
+    /// Runs Stage -1 (`TokenReconstructor`) on `input` using the in-memory `ScenarioSignal`
+    /// fallback so direct endpoints (`/api/v1/aggressive`) preserve `constraint_locks` (`[STRICT]`).
+    ///
+    /// # Panics
+    /// Never.
+    pub fn reconstruct_input(&self, input: &str) -> crate::types::ReconstructedInput {
+        // ARCH: ARCHITECTURE.md §1.2 — Stage -1 constraint locks must execute across all Aggressive entrypoints.
+        // FIX: G-01 — Reconstruct input with scenario fallback and merge verbatim constraint spans
+        // (negations, numeric bounds, modal requirements) into `constraint_locks`.
+        let mut rec = self
+            .reconstructor
+            .run(input, self.resolve_scenario_fallback(input));
+        let (inclusions, forbidden) =
+            crate::npae::aggressive::constraints::extract_constraints(input, &[], &[]);
+        for span in inclusions.into_iter().chain(forbidden.into_iter()) {
+            let trimmed = span.trim();
+            if !trimmed.is_empty()
+                && !rec
+                    .constraint_locks
+                    .iter()
+                    .any(|c| c.text.eq_ignore_ascii_case(trimmed))
+            {
+                rec.constraint_locks.push(crate::types::ConstraintToken {
+                    text: trimmed.to_string(),
+                    weight: 1.0,
+                });
+            }
+        }
+        rec
+    }
+
     /// Resolves an in-memory `ScenarioSignal` fallback when upstream `ScenarioClassifier` abstains
     /// or no SQLite pool is wired.
     ///

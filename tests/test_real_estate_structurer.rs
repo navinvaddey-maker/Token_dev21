@@ -154,6 +154,44 @@ async fn test_buying_a_house_all_modes_clean_aggressive() {
                     .contains("residential home-buying and mortgage process"),
                 "Expected clean subject in # SUCCESS CRITERIA"
             );
+            assert!(
+                !r.optimized_prompt.contains("# CONTEXT: Hi there"),
+                "Must not emit greeting noise '# CONTEXT: Hi there':\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                !r.optimized_prompt
+                    .contains("Break down concept into fundamental components"),
+                "Must not emit generic fallback roadmap boilerplate:\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                !r.optimized_prompt.contains("phased_daily"),
+                "Must not emit false-positive 'phased_daily' timeline from 'closing day':\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                !r.optimized_prompt.contains("makewe"),
+                "Must not emit merged-word typo 'makewe':\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                r.optimized_prompt.contains("# CLARIFYING QUESTIONS:"),
+                "Expected '# CLARIFYING QUESTIONS:' for missing consumer homebuyer slots:\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                r.optimized_prompt.to_lowercase().contains("attorney")
+                    || r.optimized_prompt.to_lowercase().contains("escrow"),
+                "Expected 'attorney' or 'escrow' in assumptions/questions:\n{}",
+                r.optimized_prompt
+            );
+            assert!(
+                r.token_final < r.token_original,
+                "Expected net token reduction on 385-word home-buying prompt, got token_final={} >= token_original={}",
+                r.token_final,
+                r.token_original
+            );
         }
         OrchestratorResponse::Legacy(_) => {
             panic!("Expected Aggressive response for aggressive mode");

@@ -1100,3 +1100,125 @@ async fn test_multi_domain_consumer_vs_practitioner_separation() {
         resp.optimized_prompt
     );
 }
+
+#[tokio::test]
+async fn test_g11_g09_g01_regressions_plants_json_guard_and_constraint_locks() {
+    use dashmap::DashMap;
+    use std::sync::Arc;
+    use token_compress_engine::npae::aggressive::config::ConfigHandle;
+    use token_compress_engine::npae::aggressive::engine::AggressiveEngine;
+    use token_compress_engine::npae::aggressive::structurer::HttpStructurer;
+    use token_compress_engine::npae::schema::types::NpaeConfig;
+    use token_compress_engine::pipeline::orchestrator::PipelineOrchestrator;
+    use token_compress_engine::session::SessionHistory;
+    use token_compress_engine::types::OrchestratorResponse;
+    use tokio::sync::Mutex;
+
+    let config = ConfigLoader::load("config/unified.json").expect("load unified.json");
+    let config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(Mutex::new(OryEngine::new()));
+    let schema_priors = Arc::new(DashMap::new());
+    let orchestrator =
+        PipelineOrchestrator::build(schema_priors, config_handle.clone(), ory_engine.clone());
+    let npae_cfg = NpaeConfig::default();
+
+    // 1. G-11: "Explain how plants convert sunlight into energy" must produce 0 execution_phases
+    //    ("plants" must not match substring "plan").
+    let plants_prompt = "Explain how plants convert sunlight into energy";
+    let mut s_plants = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(plants_resp) = orchestrator
+        .process(
+            plants_prompt,
+            &mut s_plants,
+            None,
+            Some("aggressive"),
+            Some(&npae_cfg),
+            None,
+        )
+        .await
+        .expect("process plants prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+    assert_eq!(
+        plants_resp.structured_prompt.execution_phases.len(),
+        0,
+        "G-11: 'plants' must not trigger planning execution_phases, got: {:?}",
+        plants_resp.structured_prompt.execution_phases
+    );
+
+    // 2. G-09: "Rewrite this config {\"retries\": 3} as YAML, no json" must pass HallucinationGuard
+    //    and preserve {"retries": 3} in optimized_prompt.
+    let json_quote_prompt = "Rewrite this config {\"retries\": 3} as YAML, no json";
+    let mut s_json = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(json_resp) = orchestrator
+        .process(
+            json_quote_prompt,
+            &mut s_json,
+            None,
+            Some("aggressive"),
+            Some(&npae_cfg),
+            None,
+        )
+        .await
+        .expect("process json quote prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+    assert!(
+        json_resp
+            .hallucination_report
+            .as_ref()
+            .expect("hallucination_report present")
+            .passed,
+        "G-09: HallucinationGuard must pass when JSON braces belong to user task input: {:?}",
+        json_resp.hallucination_report
+    );
+    assert!(
+        json_resp.optimized_prompt.contains("{\"retries\": 3}"),
+        "G-09: User-quoted JSON snippet {{\"retries\": 3}} must be preserved in optimized_prompt:\n{}",
+        json_resp.optimized_prompt
+    );
+
+    // 3. G-01: PipelineOrchestrator::reconstruct_input preserves Stage -1 constraint_locks ([STRICT])
+    //    when passed into AggressiveEngine::run (as used by POST /api/v1/aggressive).
+    let lock_prompt =
+        "Build a Python ETL pipeline without pandas and under 500ms latency, must use asyncio";
+    let reconstructed = orchestrator.reconstruct_input(lock_prompt);
+    assert!(
+        !reconstructed.constraint_locks.is_empty(),
+        "G-01: Stage -1 reconstruct_input must extract non-empty constraint_locks"
+    );
+    let repr = run_parallel_pipeline(lock_prompt).expect("compression pipeline");
+    let structurer = HttpStructurer {
+        route: "/api/v1/aggressive".to_string(),
+        remote_addr: "127.0.0.1".to_string(),
+        body: lock_prompt.to_string(),
+    };
+    let lock_resp = AggressiveEngine::run(
+        lock_prompt,
+        &repr,
+        &npae_cfg,
+        config_handle,
+        ory_engine,
+        &structurer,
+        &reconstructed,
+        None,
+    )
+    .await
+    .expect("AggressiveEngine::run with Stage -1 reconstructed input");
+    assert!(
+        !lock_resp
+            .structured_prompt
+            .constraints
+            .required_inclusions
+            .is_empty(),
+        "G-01: Stage -1 constraint_locks must populate required_inclusions, got: {:?}",
+        lock_resp.structured_prompt.constraints.required_inclusions
+    );
+    assert!(
+        lock_resp.optimized_prompt.contains("- [STRICT]"),
+        "G-01: Rendered optimized_prompt must contain '- [STRICT]' constraint locks:\n{}",
+        lock_resp.optimized_prompt
+    );
+}

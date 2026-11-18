@@ -106,9 +106,19 @@ async fn main() -> anyhow::Result<()> {
     // Spawn ConfigEnricher background task
     let enricher_config_handle = npae_config.clone();
     tokio::task::spawn_blocking(move || {
-        let enricher = token_compress_engine::npae::aggressive::enricher::ConfigEnricher::new(
-            token_compress_engine::npae::aggressive::enricher::ReviewMode::AutoMerge,
-        );
+        // ARCH: ARCHITECTURE.md §6.6 & SL-4 — Default to `ReviewMode::HumanGate` so
+        // `config/unified.json` is never silently mutated in production unless `NPAE_AUTO_MERGE` is enabled.
+        // FIX: G-02 / SL-4 — Gate `ReviewMode::AutoMerge` behind `NPAE_AUTO_MERGE=true|1`.
+        let auto_merge = std::env::var("NPAE_AUTO_MERGE")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        let review_mode = if auto_merge {
+            token_compress_engine::npae::aggressive::enricher::ReviewMode::AutoMerge
+        } else {
+            token_compress_engine::npae::aggressive::enricher::ReviewMode::HumanGate
+        };
+        let enricher =
+            token_compress_engine::npae::aggressive::enricher::ConfigEnricher::new(review_mode);
         loop {
             std::thread::sleep(std::time::Duration::from_secs(60));
             if let Ok(mut store) =

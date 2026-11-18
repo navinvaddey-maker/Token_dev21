@@ -251,20 +251,48 @@ impl ScenarioModeRouter {
                                         let system_part =
                                             resp.output_text[sys_start..user_start].trim_end();
 
-                                        // Extract derived facts cleanly
+                                        // Extract derived facts cleanly with provenance
                                         let derived_rag = crate::npae::aggressive::rag_context::DerivedRagContext::derive(
                                             &filtered_chunks,
                                             question,
                                             250,
                                         );
 
+                                        // FIX: G-03 — Use `detailed_facts` provenance (with content-matching fallback)
+                                        // so `<source>` reflects the actual originating chunk's `metadata.source_file`
+                                        // rather than indexing `filtered_chunks.get(idx)`.
                                         let mut fact_chunks_xml = String::new();
                                         fact_chunks_xml.push_str("<context>\n");
-                                        if !derived_rag.facts.is_empty() {
+                                        if !derived_rag.detailed_facts.is_empty() {
+                                            for (idx, fact) in
+                                                derived_rag.detailed_facts.iter().enumerate()
+                                            {
+                                                let src = if !fact.source_file.trim().is_empty() {
+                                                    fact.source_file.clone()
+                                                } else {
+                                                    filtered_chunks
+                                                        .iter()
+                                                        .find(|c| {
+                                                            c.content.contains(fact.text.trim())
+                                                        })
+                                                        .and_then(|c| c.metadata.as_ref())
+                                                        .map(|m| m.source_file.clone())
+                                                        .unwrap_or_else(|| domain_cfg.label.clone())
+                                                };
+                                                fact_chunks_xml.push_str(&format!(
+                                                    "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
+                                                    idx + 1,
+                                                    src,
+                                                    idx + 1,
+                                                    fact.text.trim()
+                                                ));
+                                            }
+                                        } else if !derived_rag.facts.is_empty() {
                                             for (idx, fact) in derived_rag.facts.iter().enumerate()
                                             {
                                                 let src = filtered_chunks
-                                                    .get(idx)
+                                                    .iter()
+                                                    .find(|c| c.content.contains(fact.trim()))
                                                     .and_then(|c| c.metadata.as_ref())
                                                     .map(|m| m.source_file.clone())
                                                     .unwrap_or_else(|| domain_cfg.label.clone());
@@ -294,6 +322,39 @@ impl ScenarioModeRouter {
                                         }
                                         fact_chunks_xml.push_str("</context>");
 
+                                        // FIX: G-01 — Extract `# CONSTRAINTS:` lines produced by `orch.process()`
+                                        // and surface them under `# 4. AGGRESSIVE CONSTRAINT LOCKS` so Aggressive
+                                        // constraint locks are honored in Scenario mode.
+                                        let mut aggressive_constraints = Vec::new();
+                                        if let Some(c_pos) =
+                                            compressed_prompt.find("# CONSTRAINTS:")
+                                        {
+                                            let after_header = &compressed_prompt
+                                                [c_pos + "# CONSTRAINTS:".len()..];
+                                            for line in after_header.lines() {
+                                                let trimmed = line.trim();
+                                                if trimmed.is_empty() {
+                                                    if !aggressive_constraints.is_empty() {
+                                                        break;
+                                                    }
+                                                    continue;
+                                                }
+                                                if trimmed.starts_with("# ") {
+                                                    break;
+                                                }
+                                                aggressive_constraints.push(trimmed.to_string());
+                                            }
+                                        }
+                                        let constraints_section =
+                                            if aggressive_constraints.is_empty() {
+                                                String::new()
+                                            } else {
+                                                format!(
+                                                    "\n\n# 4. AGGRESSIVE CONSTRAINT LOCKS\n{}",
+                                                    aggressive_constraints.join("\n")
+                                                )
+                                            };
+
                                         let mut gaps_xml = String::new();
                                         gaps_xml.push_str("=== AUTOMATED PARAMETER ANALYSIS ===\n<metadata_gaps>\n");
                                         if gap_issues.is_empty() {
@@ -309,10 +370,11 @@ impl ScenarioModeRouter {
                                         gaps_xml.push_str("</metadata_gaps>\n");
 
                                         let clean_aggressive = format!(
-                                            "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}\n\n{}\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
+                                            "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}{}\n\n{}\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
                                             system_part,
                                             question.trim(),
                                             fact_chunks_xml.trim(),
+                                            constraints_section,
                                             gaps_xml.trim()
                                         );
                                         resp.output_text = clean_aggressive;
