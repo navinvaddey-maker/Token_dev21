@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | TokenCompress Engine</title>
+    <title>Admin Console | Oryx Studio</title>
+    <link rel="stylesheet" href="styles/tokens.css">
     <link rel="stylesheet" href="admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="dark-theme">
-    <nav class="sidebar">
+<body class="theme-dark">
+    <nav class="sidebar" id="admin-sidebar">
         <div class="logo">
             <span class="logo-icon">▲</span>
-            <span class="logo-text">TokenCompress Admin</span>
+            <span class="logo-text">Oryx Admin</span>
         </div>
         <ul class="nav-links">
             <li class="active" data-section="overview"><a href="#">Overview</a></li>
@@ -23,16 +24,20 @@
             <li data-section="ask"><a href="#">💬 Ask (RAG)</a></li>
         </ul>
         <div class="sidebar-footer">
+            <a href="/" class="back-studio-link">← Back to Studio</a>
             <button id="logout-btn">Logout</button>
         </div>
     </nav>
 
     <main class="content">
         <header>
-            <h1 id="section-title">Overview</h1>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+                <h1 id="section-title">Overview</h1>
+            </div>
             <div class="user-info">
                 <span id="admin-username">Admin</span>
-                <div class="avatar">N</div>
+                <div class="avatar" id="admin-avatar">A</div>
             </div>
         </header>
 
@@ -49,6 +54,14 @@
                 <div class="stat-card glass">
                     <h3>Total Tokens Saved</h3>
                     <p id="stat-total-tokens-saved">0</p>
+                </div>
+                <div class="stat-card glass">
+                    <h3>Learning Updates</h3>
+                    <p id="stat-learning-updates">0</p>
+                </div>
+                <div class="stat-card glass">
+                    <h3>Error Rate</h3>
+                    <p id="stat-error-rate">0%</p>
                 </div>
             </div>
 

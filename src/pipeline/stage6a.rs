@@ -322,11 +322,16 @@ impl Stage6a {
         }
 
         // Strict token ceiling (`<= input_tokens`) and target structured budget:
-        // Aim for <= 75% of `input_tokens` when `input_tokens >= 15` (so TES >= 6.0 and savings stay in the
-        // 30-55% target band), and `input_tokens.saturating_sub(1).max(1)` on shorter prompts so we never
-        // violate `output_token_count <= input_token_count`.
+        // Balanced aims for <= 75% of `input_tokens` when `input_tokens >= 15` (so TES >= 6.0 and savings
+        // stay in the 30-55% target band); Gentle allows up to 90% to preserve lighter-polish context;
+        // shorter prompts use `input_tokens.saturating_sub(1).max(1)` so we never expand.
+        let budget_ratio = if matches!(schema_filled.mode, Some(Mode::Gentle)) {
+            0.90
+        } else {
+            0.75
+        };
         let strict_budget = if input_tokens >= 15 {
-            ((input_tokens as f32) * 0.75).floor() as u32
+            ((input_tokens as f32) * budget_ratio).floor() as u32
         } else {
             input_tokens.saturating_sub(1).max(1)
         };

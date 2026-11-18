@@ -18,9 +18,11 @@ pub struct AggressiveRequest {
 pub enum RenderStyle {
     /// Compact markdown sections (`# ROLE`, `# CONTEXT`, `# CONSTRAINTS`, …). Default.
     #[default]
+    #[serde(alias = "Crisp", alias = "CRISP")]
     Crisp,
     /// XML-fenced grounding harness with numbered `[F#]` facts inside `<facts trust="untrusted">`
     /// and a strict `FOUND` / `PARTIAL_MATCH` / `NOT_FOUND` output contract.
+    #[serde(alias = "Harness", alias = "HARNESS")]
     Harness,
 }
 

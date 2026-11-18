@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     document.getElementById('admin-username').textContent = State.username;
+    const avatarEl = document.getElementById('admin-avatar');
+    if (avatarEl && State.username) {
+        avatarEl.textContent = State.username.charAt(0).toUpperCase();
+    }
     initEventListeners();
     loadOverview();
 });
@@ -38,8 +42,22 @@ function initEventListeners() {
         localStorage.removeItem('tce_token');
         localStorage.removeItem('tce_user_id');
         localStorage.removeItem('tce_username');
+        localStorage.removeItem('tce_business_type');
         window.location.href = '/';
     });
+
+    // Mobile sidebar toggle
+    const mobileBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('admin-sidebar');
+    if (mobileBtn && sidebar) {
+        mobileBtn.addEventListener('click', () => sidebar.classList.toggle('open'));
+    }
+
+    // Admin Ask (RAG)
+    const adminAskBtn = document.getElementById('admin-ask-btn');
+    if (adminAskBtn) {
+        adminAskBtn.addEventListener('click', handleAdminAsk);
+    }
 
     // Search
     document.getElementById('user-search').addEventListener('input', (e) => {
@@ -120,34 +138,49 @@ async function apiFetch(url, options = {}) {
 
 async function loadOverview() {
     try {
-        const stats = await apiFetch('/api/admin/stats');
+        const [stats, analytics, learning, errMetrics] = await Promise.all([
+            apiFetch('/api/admin/stats'),
+            apiFetch('/api/admin/compression-analytics').catch(() => null),
+            apiFetch('/api/admin/learning-engine-stats').catch(() => null),
+            apiFetch('/api/admin/error-metrics').catch(() => null)
+        ]);
         document.getElementById('stat-total-users').textContent = stats.total_users;
         document.getElementById('stat-total-compressions').textContent = stats.total_compressions;
         document.getElementById('stat-total-tokens-saved').textContent = stats.total_tokens_saved;
-        
-        // Mock data for usage chart since we don't have a time-series endpoint yet
-        // In a real app, I'd fetch /api/admin/usage-over-time
-        renderUsageChart();
+
+        const learningEl = document.getElementById('stat-learning-updates');
+        if (learningEl && learning) {
+            learningEl.textContent = learning.total_updates ?? learning.active_patterns ?? 0;
+        }
+        const errEl = document.getElementById('stat-error-rate');
+        if (errEl && errMetrics) {
+            const rate = errMetrics.error_rate !== undefined ? `${Number(errMetrics.error_rate).toFixed(1)}%` : '0%';
+            errEl.textContent = rate;
+        }
+
+        renderUsageChart(analytics);
     } catch (err) {
         console.error('Failed to load stats:', err);
     }
 }
 
-function renderUsageChart() {
+function renderUsageChart(analytics) {
     const ctx = document.getElementById('usageChart').getContext('2d');
-    
-    // Check if chart already exists
     if (window.myChart) window.myChart.destroy();
+
+    const series = Array.isArray(analytics?.daily_counts) && analytics.daily_counts.length > 0
+        ? analytics.daily_counts
+        : [{ label: 'Total', count: Number(document.getElementById('stat-total-compressions')?.textContent || 0) }];
 
     window.myChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            labels: series.map(s => s.label || s.date || 'Day'),
             datasets: [{
                 label: 'Compressions',
-                data: [12, 19, 3, 5, 2, 3, 9],
-                borderColor: '#38bdf8',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                data: series.map(s => s.count ?? s.compressions ?? 0),
+                borderColor: '#22d3ee',
+                backgroundColor: 'rgba(34, 211, 238, 0.12)',
                 fill: true,
                 tension: 0.4
             }]
@@ -186,13 +219,13 @@ function renderUsers(filter = '') {
 
     tbody.innerHTML = filtered.map(u => `
         <tr>
-            <td>${u.username}</td>
-            <td>${u.email}</td>
-            <td><span class="badge">${u.business_type}</span></td>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td><span class="badge">${escapeHtml(u.business_type)}</span></td>
             <td>${new Date(u.created_at).toLocaleDateString()}</td>
             <td>
-                <button class="action-btn edit-btn" onclick="openEditModal('${u.id}', '${u.business_type}')">Edit</button>
-                <button class="action-btn delete-btn" onclick="deleteUser('${u.id}')">Delete</button>
+                <button class="action-btn edit-btn" onclick="openEditModal('${escapeHtml(u.id)}', '${escapeHtml(u.business_type)}')">Edit</button>
+                <button class="action-btn delete-btn" onclick="deleteUser('${escapeHtml(u.id)}')">Delete</button>
             </td>
         </tr>
     `).join('');
@@ -571,6 +604,44 @@ async function deleteRagDoc(id) {
         loadRag();
     } catch (err) {
         alert('Failed to delete document: ' + err.message);
+    }
+}
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+}
+
+async function handleAdminAsk() {
+    const appMode = document.getElementById('admin-scenario-mode-select')?.value || 'Regular';
+    const domain = document.getElementById('admin-scenario-domain-select')?.value || null;
+    const style = document.getElementById('admin-scenario-style-select')?.value || 'balanced';
+    const question = document.getElementById('admin-scenario-query-input')?.value.trim();
+    const outSec = document.getElementById('admin-scenario-result-section');
+    const outEl = document.getElementById('admin-scenario-result-output');
+    const btn = document.getElementById('admin-ask-btn');
+
+    if (!question) return;
+    if (btn) btn.disabled = true;
+
+    try {
+        const resp = await apiFetch('/api/scenario/ask', {
+            method: 'POST',
+            body: JSON.stringify({
+                app_mode: appMode,
+                domain: appMode === 'Scenario' ? domain : null,
+                style: appMode === 'Regular' ? style : null,
+                question
+            })
+        });
+        if (outSec) outSec.style.display = 'block';
+        if (outEl) outEl.textContent = resp?.output_text || 'No response.';
+    } catch (err) {
+        if (outSec) outSec.style.display = 'block';
+        if (outEl) outEl.textContent = 'Query failed: ' + err.message;
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 

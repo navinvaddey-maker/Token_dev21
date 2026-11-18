@@ -6705,6 +6705,8 @@ dependencies = [
  "tracing-subscriber",
  "urlencoding",
  "uuid",
+ "xml-rs",
+ "zip 8.6.0",
 ]
 
 [[package]]

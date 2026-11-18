@@ -5,8 +5,8 @@ Project      : token_compress_engine
 Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
-Version      : 3.7.0 (3-Axis Intent Tensor D×P×I, Perspective-Keyed Templates, Strict Domain-Conditioned Feature Gating & Task Pruning)
-Last updated : 2026-11-14 by Antigravity (Gemini 4 Argon)
+Version      : 3.8.0 (Cloud vs Own Data Exclusive RAG Mode + Local Offline Companion Service)
+Last updated : 2026-11-18 by Antigravity (Gemini 4 Hydrogen)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
@@ -206,6 +206,19 @@ User → API (Axum) → Auth+RateLimit → Domain
                                        OryEngine.record_outcome()
                                        SQLite write
 ```
+
+### 2.1 Ask RAG Data Source Boundary (Cloud Data vs Own Data)
+
+The Ask (RAG) workspace (`static/index.html`, `static/app.js`, `static/rag_workspace.js`, `src/scenario/router.rs`) enforces an exclusive two-mode data source toggle (`data_source: "cloud" | "own"`):
+
+- **Cloud Data (`"cloud"`, default):** Preserves the existing workflow verbatim — documents are uploaded via `/api/rag/upload`, indexed into SQLite (`rag_documents`, `rag_chunks`, `rag_chunks_fts`), and retrieved server-side by `DocumentRetriever`.
+- **Own Data (`"own"`):** Raw `.pdf` and `.docx` files remain strictly on the user's machine inside a watched local folder indexed by the local companion binary (`src/bin/rag.rs` → `rag` / `rag.exe` backed by `src/rag/local.rs`).
+  - **Incremental Indexing:** Computes SHA-256 hashes of files in the watched folder and stores index metadata + embeddings locally (`.rag_local_index.json`), skipping unchanged files and pruning deleted files.
+  - **Hybrid Search:** Combines local `all-MiniLM-L6-v2` ONNX embeddings (`EmbeddingEngine`) with lexical BM25-style scoring via Reciprocal Rank Fusion (RRF, `k = 60.0`).
+  - **Strict JSON IPC Contract:** Served over `POST http://127.0.0.1:49152/retrieve` (plus `GET /health`) and `--stdin` JSON:
+    - Request: `{"query": string, "top_k": usize, "file_extensions": [".pdf", ".docx"]}`
+    - Response: `{"status": "ok", "query": string, "chunks": [{"source_file", "file_extension", "page_number", "chunk_index", "score", "content"}], "indexed_files": usize, "latency_ms": u64}`
+  - **Zero Cloud Storage:** The frontend queries `127.0.0.1:49152/retrieve` locally and sends only the retrieved top-$k$ `local_chunks` to `POST /api/scenario/ask` (`data_source = "own"`). `ScenarioModeRouter` skips server-side `DocumentRetriever` and assembles the prompt strictly from `local_chunks`.
 
 ---
 
@@ -588,4 +601,11 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Enforced strict domain-conditioned feature gating and word-boundary matching in `detect_business_type`, `is_wealth_engineering_query`, and `is_enterprise_business_query`, eliminating `"Digital Product"` (`"appraisal"`/`"appreciate"`) and `"Wealth-Engineering"` (`"learn"`/`"$500k"`) cross-domain hijacks.
     - Added perspective-keyed `phase_templates` (`"consumer:build"`, `"practitioner:build"`, `"investor:analyze"`) in `config/unified.json` across `real-estate`, `finance`, `legal`, and `education`, and wired composite perspective lookup into `SchemaRegistry` and `Structurer`.
     - Added deterministic `prune_task_instruction()` for `# TASK / INSTRUCTION:` header/filler pruning and calibrated Ory `DomainTransfer` gating in `src/npae/ory/registry.rs` and `src/npae/ory/architect.rs`.
+
+[2026-11-18] [Antigravity / Gemini 4 Hydrogen] ARCHITECTURE.md
+  Implemented Exclusive Cloud Data vs Own Data Ask RAG Mode & Local Offline Companion Service (v3.8.0):
+    - Added §2.1 defining the exclusive Cloud Data (`"cloud"`) vs Own Data (`"own"`) boundary.
+    - Added `src/rag/local.rs` and companion binary `src/bin/rag.rs` (`rag` / `rag.exe`) with local folder watching, SHA-256 incremental indexing (`.rag_local_index.json`), `.pdf` and `.docx` parsing, `all-MiniLM-L6-v2` + lexical RRF hybrid search, `POST http://127.0.0.1:49152/retrieve`, `GET /health`, and `--stdin` JSON IPC.
+    - Extended `ScenarioAskRequest` (`src/api.rs`) and `ScenarioModeRouter` (`src/scenario/router.rs`) to accept `data_source` and `local_chunks`, bypassing server-side `DocumentRetriever` when `data_source == "own"` while preserving the Cloud Data workflow verbatim.
+    - Updated Ask RAG UI (`static/index.html`, `static/app.js`, `static/rag_workspace.js`, `static/mock_api.js`) with an exclusive Cloud Data / Own Data toggle and local companion status indicator.
 ```

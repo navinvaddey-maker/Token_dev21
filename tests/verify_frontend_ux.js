@@ -183,15 +183,23 @@ async function runTestSuite() {
     assert(promptInput.value.includes('vendor SaaS agreement'), 'R1: "Contract Review" preset populated prompt textarea');
     assert(doc.getElementById('domain-name').textContent.includes('Legal'), 'R1: Legal preset set domain to Legal & Compliance');
 
-    // 2.2 R1: Selective Auth Gating
-    console.log('Testing R1: Selective Auth Gating...');
-    win.switchTab('history');
-    const historyGate = doc.getElementById('history-auth-gate');
-    assert(historyGate && historyGate.style.display !== 'none', 'R1: History tab displays auth gate for unauthenticated users');
+    // 2.2 R1: Guest Tab & Feature Gating (Optimize Prompt Only)
+    console.log('Testing R1: Guest Tab & Feature Gating...');
+    assert(doc.getElementById('nav-compress').style.display !== 'none' && !doc.getElementById('nav-compress').disabled, 'R1: Optimize Prompt tab is visible and enabled for Guests');
+    ['nav-ask', 'nav-history', 'nav-stats'].forEach(id => {
+        const el = doc.getElementById(id);
+        assert(el && el.style.display === 'none' && el.disabled === true, `R1: ${id} tab is hidden and disabled for Guests`);
+    });
+    assert(doc.getElementById('opt-rag-enabled').disabled === true && doc.getElementById('opt-harness-enabled').disabled === true, 'R1: RAG and Harness checkboxes are disabled for Guests');
+    assert(doc.getElementById('btn-feedback-up').disabled === true && doc.getElementById('btn-feedback-down').disabled === true, 'R1: Feedback buttons are disabled for Guests');
 
+    win.switchTab('ask');
+    assert(doc.getElementById('tab-compress').classList.contains('active') && !doc.getElementById('tab-ask-content').classList.contains('active'), 'R1: Guest cannot switch to Ask tab');
+    win.switchTab('history');
+    assert(doc.getElementById('tab-compress').classList.contains('active') && !doc.getElementById('tab-history-content').classList.contains('active'), 'R1: Guest cannot switch to History tab');
     win.switchTab('stats');
-    const statsGate = doc.getElementById('stats-auth-gate');
-    assert(statsGate && statsGate.style.display !== 'none', 'R1: Stats tab displays auth gate for unauthenticated users');
+    assert(doc.getElementById('tab-compress').classList.contains('active') && !doc.getElementById('tab-stats-content').classList.contains('active'), 'R1: Guest cannot switch to Stats tab');
+    win.closeAuthSection();
 
     win.switchTab('compress');
     assert(doc.getElementById('tab-compress').classList.contains('active'), 'R1: Compress tab remains open and unblocked');
@@ -274,8 +282,35 @@ async function runTestSuite() {
     const extractedPdfText = await win.extractVanillaPdfText(fakePdfFile);
     assert(extractedPdfText.includes('test invoice agreement'), `R4 PDF: Extracted text from raw PDF stream (got: "${extractedPdfText}")`);
 
-    // 2.6 R5: Mode Pills & Domain Detection
+    // 2.6 R5: Guest Mode Restrictions & Authenticated Mode Pills
     console.log('Testing R5: Mode Pills & Domain Detection...');
+    assert(doc.getElementById('pm-gentle').disabled === false && doc.getElementById('pm-gentle').classList.contains('active'), 'Guest Mode: Light Polish pill is enabled and active by default');
+    assert(doc.getElementById('pm-balanced').disabled === true && doc.getElementById('pm-aggressive').disabled === true, 'Guest Mode: Smart Trim and Deep Blueprint pills are disabled');
+
+    win.selectMode('aggressive');
+    assert(win.State.currentMode === 'gentle' && doc.getElementById('mode').value === 'gentle', 'Guest Mode: Attempting to select Aggressive keeps Gentle active');
+
+    // Verify 4th guest compression is blocked after 3 completed Light Polish runs
+    promptInput.value = 'one two three four five six seven eight nine ten';
+    win.validatePromptLength();
+    while (win.State.guestUses < 3) {
+        await win.compress(true);
+    }
+    const prevResult = win.State.lastResult;
+    await win.compress(false);
+    assert(win.State.lastResult === prevResult && doc.getElementById('auth-section').style.display === 'block', 'Guest Mode: 4th compression blocked after 3 Light Polish runs and opens sign-in');
+    win.closeAuthSection();
+
+    // Sign in to unlock all modes and unlimited compressions
+    win.State.token = 'test-token';
+    win.State.username = 'tester';
+    win.updateUserBar();
+    assert(doc.getElementById('sandbox-badge').textContent.includes('Live Engine'), 'Auth: Sandbox badge updates to Live Engine on sign-in');
+    assert(doc.getElementById('pm-balanced').disabled === false && doc.getElementById('pm-aggressive').disabled === false, 'Auth: Smart Trim and Deep Blueprint pills unlocked on sign-in');
+    assert(['nav-ask', 'nav-history', 'nav-stats'].every(id => doc.getElementById(id).style.display !== 'none' && doc.getElementById(id).disabled === false), 'Auth: Ask, History, and Insights tabs unlocked on sign-in');
+    assert(doc.getElementById('opt-rag-enabled').disabled === false && doc.getElementById('opt-harness-enabled').disabled === false, 'Auth: RAG and Harness checkboxes unlocked on sign-in');
+    assert(doc.getElementById('btn-feedback-up').disabled === false && doc.getElementById('btn-feedback-down').disabled === false, 'Auth: Feedback buttons unlocked on sign-in');
+
     win.selectMode('aggressive');
     assert(doc.getElementById('pm-aggressive').classList.contains('active'), 'R5: Aggressive mode pill marked active');
     assert(doc.getElementById('mode').value === 'aggressive', 'R5: Hidden #mode input updated to aggressive');

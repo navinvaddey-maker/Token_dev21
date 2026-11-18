@@ -5,6 +5,9 @@
 /**
  * Global application state.
  */
+const GUEST_MAX_USES = 3;
+const GUEST_USES_KEY = 'tce_guest_uses';
+
 const State = {
     userId: null,
     token: null,
@@ -12,9 +15,10 @@ const State = {
     businessType: null,
     lastResult: null,
     lastTs: null,
-    currentMode: 'balanced',
+    currentMode: 'gentle',
     currentModelRate: 0.005, // Default GPT-4o: $0.005 / 1k tokens ($5 / 1M)
-    showDiff: true
+    showDiff: true,
+    guestUses: 0
 };
 
 /**
@@ -123,6 +127,10 @@ async function handleLogin(e) {
         console.log('Login response business_type:', `"${data.business_type}"`);
         showMainSection();
         showToast('Welcome back, ' + data.username, 'success');
+        const promptInput = document.getElementById('prompt-input');
+        if (promptInput && promptInput.value.trim().split(/\s+/).filter(Boolean).length >= 8) {
+            compress(true);
+        }
     } catch (err) {
         console.error('Login error:', err);
         console.error('Login error stack:', err.stack);
@@ -202,6 +210,109 @@ function showMainSection() {
     if (typeof loadScenarioRegistry === 'function') loadScenarioRegistry();
 }
 
+function getGuestUses() {
+    try {
+        const stored = parseInt(localStorage.getItem(GUEST_USES_KEY) || '0', 10);
+        if (!Number.isNaN(stored) && stored >= 0) {
+            State.guestUses = Math.max(State.guestUses || 0, stored);
+        }
+    } catch (_) {}
+    return State.guestUses || 0;
+}
+
+function incrementGuestUses() {
+    const next = getGuestUses() + 1;
+    State.guestUses = next;
+    try {
+        localStorage.setItem(GUEST_USES_KEY, String(next));
+    } catch (_) {}
+    return next;
+}
+
+function syncModeAvailability() {
+    const isAuthed = Boolean(State.token);
+    const modeConfig = {
+        gentle: { label: 'Light Polish', title: 'Light Polish: conservative cleanup preserving structure' },
+        balanced: { label: 'Smart Trim', title: 'Smart Trim: balanced pruning with full context fidelity' },
+        aggressive: { label: 'Deep Blueprint', title: 'Deep Blueprint: expands your prompt into structured CRISP scaffolding for ~3,000-token comprehensive LLM output' }
+    };
+
+    if (!isAuthed) {
+        State.currentMode = 'gentle';
+    }
+
+    ['gentle', 'balanced', 'aggressive'].forEach(m => {
+        const btn = document.getElementById('pm-' + m);
+        if (!btn) return;
+        const locked = !isAuthed && m !== 'gentle';
+        btn.disabled = locked;
+        btn.classList.toggle('mode-pill-disabled', locked);
+        btn.textContent = locked ? `${modeConfig[m].label} 🔒` : modeConfig[m].label;
+        btn.title = locked ? `Sign in to unlock ${modeConfig[m].label}` : modeConfig[m].title;
+        const isActive = m === State.currentMode;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+
+    const hiddenMode = document.getElementById('mode');
+    if (hiddenMode) {
+        hiddenMode.value = State.currentMode;
+    }
+}
+
+function syncGuestFeatureAccess() {
+    const isAuthed = Boolean(State.token);
+
+    // Restrict Guests strictly to the Optimize Prompt tab.
+    ['ask', 'history', 'stats'].forEach(tab => {
+        const navBtn = document.getElementById('nav-' + tab);
+        if (!navBtn) return;
+        navBtn.style.display = isAuthed ? '' : 'none';
+        navBtn.disabled = !isAuthed;
+        navBtn.setAttribute('aria-disabled', isAuthed ? 'false' : 'true');
+    });
+
+    const compressNav = document.getElementById('nav-compress');
+    if (compressNav) {
+        compressNav.style.display = '';
+        compressNav.disabled = false;
+        compressNav.setAttribute('aria-disabled', 'false');
+    }
+
+    // Disable advanced server-backed options inside Optimize Prompt for Guests.
+    [
+        { inputId: 'opt-rag-enabled', labelId: 'opt-rag-label', hint: 'Sign in to unlock RAG grounding' },
+        { inputId: 'opt-harness-enabled', labelId: 'opt-harness-label', hint: 'Sign in to unlock Grounding Harness' }
+    ].forEach(({ inputId, labelId, hint }) => {
+        const el = document.getElementById(inputId);
+        const lbl = document.getElementById(labelId);
+        if (el) {
+            el.disabled = !isAuthed;
+            if (!isAuthed) el.checked = false;
+        }
+        if (lbl) {
+            lbl.style.opacity = isAuthed ? '1' : '0.5';
+            lbl.style.cursor = isAuthed ? 'pointer' : 'not-allowed';
+            lbl.title = isAuthed ? '' : hint;
+        }
+    });
+
+    ['btn-feedback-up', 'btn-feedback-down'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = !isAuthed;
+        btn.style.opacity = isAuthed ? '' : '0.5';
+        btn.title = isAuthed ? '' : 'Sign in to submit feedback';
+    });
+
+    if (!isAuthed) {
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id !== 'tab-compress') {
+            switchTab('compress');
+        }
+    }
+}
+
 /**
  * Updates the user bar display based on authentication status.
  */
@@ -209,18 +320,31 @@ function updateUserBar() {
     const statusText = document.getElementById('user-status-text');
     const toggleBtn = document.getElementById('auth-toggle-btn');
     const adminLink = document.getElementById('admin-link');
+    const sandboxBadge = document.getElementById('sandbox-badge');
 
     if (State.token && State.username) {
         if (statusText) statusText.innerHTML = `Signed in as <strong id="display-username">${escapeHtml(State.username)}</strong>`;
         if (toggleBtn) toggleBtn.textContent = 'Sign Out';
+        if (sandboxBadge) {
+            sandboxBadge.textContent = '● Live Engine';
+            sandboxBadge.classList.add('authenticated');
+        }
         if (adminLink) {
             adminLink.style.display = (State.businessType && State.businessType.trim().toLowerCase() === 'admin') ? 'inline-flex' : 'none';
         }
     } else {
-        if (statusText) statusText.innerHTML = `Operating in <strong id="display-username" style="color: #10b981;">Zero-Auth Sandbox</strong>`;
+        const remaining = Math.max(0, GUEST_MAX_USES - getGuestUses());
+        if (statusText) statusText.innerHTML = `Operating in <strong id="display-username" style="color: #10b981;">Guest Mode (${remaining}/${GUEST_MAX_USES} Light Polish left)</strong>`;
         if (toggleBtn) toggleBtn.textContent = 'Sign In / Register';
+        if (sandboxBadge) {
+            sandboxBadge.textContent = `● Guest Mode (${remaining}/${GUEST_MAX_USES} left)`;
+            sandboxBadge.classList.remove('authenticated');
+        }
         if (adminLink) adminLink.style.display = 'none';
     }
+
+    syncModeAvailability();
+    syncGuestFeatureAccess();
 }
 
 /**
@@ -230,7 +354,9 @@ function openAuthModal() {
     const authSec = document.getElementById('auth-section');
     if (authSec) {
         authSec.style.display = 'block';
-        authSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (typeof authSec.scrollIntoView === 'function') {
+            authSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 }
 
@@ -276,10 +402,17 @@ function onAuthExpired() {
 // ── Tabs & Navigation ───────────────────────────────────────────────────────
 
 /**
- * Switches primary tabs with selective authentication gating (R1).
- * Only History and Stats prompt unauthenticated users for credentials.
+ * Switches primary tabs. Unauthenticated Guests are restricted strictly to Optimize Prompt (`compress`).
  */
 function switchTab(tab) {
+    if (!State.token && tab !== 'compress') {
+        tab = 'compress';
+        if (typeof showToast === 'function') {
+            showToast('Sign in to access Ask My Docs, History, and Insights.', 'error');
+        }
+        if (typeof openAuthModal === 'function') openAuthModal();
+    }
+
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     const navBtn = document.getElementById('nav-' + tab);
@@ -293,6 +426,7 @@ function switchTab(tab) {
         const askContent = document.getElementById('tab-ask-content');
         if (askContent) askContent.classList.add('active');
         if (typeof loadScenarioRegistry === 'function') loadScenarioRegistry();
+        if (typeof RagWorkspace !== 'undefined') RagWorkspace.loadDocuments();
     } else if (tab === 'history') {
         const historyContent = document.getElementById('tab-history-content');
         if (historyContent) historyContent.classList.add('active');
@@ -355,22 +489,7 @@ function parsePresetsTxt(raw) {
  * Hydrates SAMPLE_PRESETS from `static/presets.txt` so all preset buttons retrieve data from one text file.
  */
 async function loadPresetsFromFile() {
-    if (typeof fetch !== 'function' || typeof window === 'undefined' || window.location.protocol === 'file:') {
-        return;
-    }
-    try {
-        const res = await fetch('presets.txt', { cache: 'no-store' });
-        if (!res.ok) return;
-        const raw = await res.text();
-        const parsed = parsePresetsTxt(raw);
-        Object.keys(parsed).forEach(k => {
-            SAMPLE_PRESETS[k] = parsed[k];
-            const btn = document.getElementById('preset-' + k);
-            if (btn && parsed[k].label) btn.textContent = parsed[k].label;
-        });
-    } catch (_) {
-        // Silent fallback to built-in SAMPLE_PRESETS
-    }
+    // Presets are hydrated directly from SAMPLE_PRESETS (no external presets.txt 404).
 }
 
 /**
@@ -406,11 +525,19 @@ function loadPreset(key) {
  * Selects a compression mode via segmented pills ('gentle' | 'balanced' | 'aggressive').
  */
 function selectMode(mode) {
+    if (!State.token && mode !== 'gentle') {
+        showToast('Guest mode only supports Light Polish. Sign in to unlock Smart Trim and Deep Blueprint.', 'error');
+        syncModeAvailability();
+        return;
+    }
+
     State.currentMode = mode;
     ['gentle', 'balanced', 'aggressive'].forEach(m => {
         const btn = document.getElementById('pm-' + m);
         if (btn) {
-            btn.classList.toggle('active', m === mode);
+            const isActive = m === mode;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
         }
     });
 
@@ -683,7 +810,10 @@ function clearInput() {
     const inlineProgress = document.getElementById('inline-progress');
     if (inlineProgress) inlineProgress.style.display = 'none';
     const btn = document.getElementById('compress-btn');
-    if (btn) btn.disabled = false;
+    if (btn) btn.disabled = true;
+
+    const tesEl = document.getElementById('tes-score');
+    if (tesEl) tesEl.textContent = 'Quality Ready';
 
     const tokEl = document.getElementById('output-token-count');
     const pctEl = document.getElementById('output-saving-pct');
@@ -708,7 +838,8 @@ async function compress(isSilent = false) {
 
     const promptInput = document.getElementById('prompt-input');
     const raw = promptInput ? promptInput.value.trim() : '';
-    const mode = State.currentMode || document.getElementById('mode')?.value || 'balanced';
+    const isGuest = !State.token;
+    const mode = isGuest ? 'gentle' : (State.currentMode || document.getElementById('mode')?.value || 'balanced');
     const domain = document.getElementById('domain-name')?.textContent || updateDetectedDomain(raw);
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
@@ -716,6 +847,14 @@ async function compress(isSilent = false) {
     const words = raw.split(/\s+/).filter(Boolean);
     if (words.length < 8) {
         return showToast('Raw Prompt must be at least 8 words', 'error');
+    }
+
+    if (isGuest && getGuestUses() >= GUEST_MAX_USES) {
+        showToast(`Guest limit reached (${GUEST_MAX_USES}/${GUEST_MAX_USES} Light Polish runs). Please sign in for unlimited access.`, 'error');
+        if (!isSilent && typeof openAuthModal === 'function') {
+            openAuthModal();
+        }
+        return;
     }
 
     const btn = document.getElementById('compress-btn');
@@ -754,6 +893,10 @@ async function compress(isSilent = false) {
 
     const minDelay = new Promise(r => setTimeout(r, isSilent ? 80 : 250));
 
+    const ragEnabled = !isGuest && (document.getElementById('opt-rag-enabled')?.checked || false);
+    const renderStyle = (!isGuest && document.getElementById('opt-harness-enabled')?.checked) ? 'harness' : 'crisp';
+    const ragDocIds = (typeof RagWorkspace !== 'undefined' && ragEnabled) ? RagWorkspace.getSelectedDocIds() : [];
+
     try {
         const [result] = await Promise.all([
             API.compress({
@@ -761,7 +904,10 @@ async function compress(isSilent = false) {
                 task: 'Optimize prompt',
                 use_case: domain,
                 mode: mode,
-                domain: domain
+                domain: domain,
+                rag_enabled: ragEnabled,
+                rag_document_ids: ragDocIds.length > 0 ? ragDocIds : undefined,
+                npae_render_style: renderStyle
             }),
             minDelay
         ]);
@@ -771,6 +917,10 @@ async function compress(isSilent = false) {
 
         State.lastResult = result;
         State.lastTs = Date.now();
+        if (isGuest) {
+            incrementGuestUses();
+            updateUserBar();
+        }
         renderResult(result);
         if (!isSilent) {
             showToast('Prompt compressed successfully', 'success');
@@ -820,11 +970,22 @@ function renderResult(result) {
     if (elBar) elBar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
     if (elPct) elPct.textContent = isArchitect ? architectPctLabel : `${pct}% saved`;
 
-    // TES quality badge update (R3)
-    const tesScore = result.tes_score !== undefined ? result.tes_score : 0.97;
+    // TES quality badge update (R3) — supports both Aggressive (tes_score) and Legacy (dual_score.tes)
+    const tesScore = result.tes_score !== undefined
+        ? result.tes_score
+        : (result.dual_score && result.dual_score.tes !== undefined ? result.dual_score.tes : 0.97);
     const elTes = document.getElementById('tes-score');
     if (elTes) {
-        elTes.textContent = `TES ${tesScore.toFixed(2)} Hallucination-Free`;
+        elTes.textContent = `TES ${Number(tesScore).toFixed(2)} Hallucination-Free`;
+    }
+
+    const qBreakdown = document.getElementById('quality-breakdown');
+    if (qBreakdown && result.dual_score) {
+        qBreakdown.innerHTML = `
+            <span>Efficiency (TES): <strong>${Number(result.dual_score.tes || 0).toFixed(2)}</strong></span>
+            <span>Meaning (SFS): <strong>${Number(result.dual_score.sfs || 0).toFixed(2)}</strong></span>
+            <span>Rules Kept (SCS): <strong>${Number(result.dual_score.scs || 0).toFixed(2)}</strong></span>
+        `;
     }
 
     // Live dollar cost savings calculation (R3)
@@ -847,24 +1008,27 @@ function renderResult(result) {
         }
     }
 
-    // Reset feedback row
+    // Reset feedback row (keep disabled in Guest mode)
+    const isAuthed = Boolean(State.token);
     const btnUp = document.getElementById('btn-feedback-up');
     const btnDown = document.getElementById('btn-feedback-down');
     const fbStatus = document.getElementById('feedback-status');
-    if (btnUp) {
-        btnUp.disabled = false;
-        btnUp.style.opacity = '1';
-        btnUp.style.outline = 'none';
-    }
-    if (btnDown) {
-        btnDown.disabled = false;
-        btnDown.style.opacity = '1';
-        btnDown.style.outline = 'none';
-    }
+    [btnUp, btnDown].forEach(btn => {
+        if (!btn) return;
+        btn.disabled = !isAuthed;
+        btn.style.opacity = isAuthed ? '1' : '0.5';
+        btn.style.outline = 'none';
+        btn.title = isAuthed ? '' : 'Sign in to submit feedback';
+    });
     if (fbStatus) fbStatus.style.display = 'none';
 }
 
 async function submitFeedback(rating) {
+    if (!State.token) {
+        showToast('Sign in to submit feedback.', 'error');
+        openAuthModal();
+        return;
+    }
     if (!State.lastResult) return;
     const btnUp = document.getElementById('btn-feedback-up');
     const btnDown = document.getElementById('btn-feedback-down');
@@ -895,7 +1059,8 @@ async function submitFeedback(rating) {
 }
 
 function copyResult() {
-    const text = document.getElementById('result-output')?.textContent;
+    const cleanPrompt = State.lastResult?.optimized_prompt;
+    const text = cleanPrompt || document.getElementById('result-output')?.textContent;
     if (!text) return showToast('No output to copy', 'error');
     navigator.clipboard.writeText(text).then(() => {
         showToast('Copied to clipboard!', 'success');
@@ -916,47 +1081,80 @@ function copyResult() {
 
 // ── History ─────────────────────────────────────────────────────────────────
 
+let cachedHistoryRecords = [];
+
 async function loadHistory() {
+    if (!State.token) return;
     try {
         const records = await API.history();
-        const list = document.getElementById('history-list');
-        if (!records.length) {
-            list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No compression history yet</p>';
-            return;
-        }
-        list.innerHTML = records.map(r => `
-            <div class="history-item" onclick="document.getElementById('prompt-input').value='${r.original_prompt.replace(/'/g, "\\'")}';switchTab('compress');">
-                <div style="font-size:0.9rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                    ${escapeHtml(r.original_prompt.substring(0, 100))}${r.original_prompt.length > 100 ? '...' : ''}
-                </div>
-                <div class="history-meta">
-                    <span><span class="badge badge-accent">${r.use_case}</span> <span class="badge badge-success">${r.tokens_saved} saved</span></span>
-                    <span>${new Date(r.created_at).toLocaleDateString()}</span>
-                </div>
-            </div>
-        `).join('');
+        cachedHistoryRecords = Array.isArray(records) ? records : [];
+        renderHistoryList(cachedHistoryRecords);
     } catch (err) {
         showToast(err.message, 'error');
     }
 }
 
+function filterHistory(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return renderHistoryList(cachedHistoryRecords);
+    const filtered = cachedHistoryRecords.filter(r =>
+        (r.original_prompt || '').toLowerCase().includes(q) ||
+        (r.use_case || '').toLowerCase().includes(q)
+    );
+    renderHistoryList(filtered);
+}
+
+function renderHistoryList(records) {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    if (!records.length) {
+        list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px;">No compression history yet</p>';
+        return;
+    }
+    list.innerHTML = '';
+    records.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.addEventListener('click', () => {
+            const input = document.getElementById('prompt-input');
+            if (input) input.value = r.original_prompt || '';
+            validatePromptLength();
+            switchTab('compress');
+        });
+
+        const preview = document.createElement('div');
+        preview.style.cssText = 'font-size:0.9rem;color:var(--head-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        const orig = r.original_prompt || '';
+        preview.textContent = orig.substring(0, 100) + (orig.length > 100 ? '...' : '');
+
+        const meta = document.createElement('div');
+        meta.className = 'history-meta';
+        meta.innerHTML = `<span><span class="badge badge-accent">${escapeHtml(r.use_case || 'general')}</span> <span class="badge badge-success">${Number(r.tokens_saved || 0)} saved</span></span><span>${new Date(r.created_at).toLocaleDateString()}</span>`;
+
+        item.appendChild(preview);
+        item.appendChild(meta);
+        list.appendChild(item);
+    });
+}
+
 // ── Stats ───────────────────────────────────────────────────────────────────
 
 async function loadStats() {
+    if (!State.token) return;
     try {
         const stats = await API.stats();
         document.getElementById('global-stats').innerHTML = `
             <div class="stat-card">
-                <div class="stat-value">${stats.total_compressions || 0}</div>
-                <div class="stat-label">Total Compressions</div>
+                <div class="stat-val">${stats.total_compressions || 0}</div>
+                <div class="stat-lbl">Total Compressions</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value green">${stats.total_tokens_saved || 0}</div>
-                <div class="stat-label">Total Tokens Saved</div>
+                <div class="stat-val positive">${stats.total_tokens_saved || 0}</div>
+                <div class="stat-lbl">Total Tokens Saved</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${Math.round(stats.avg_tokens_saved || 0)}</div>
-                <div class="stat-label">Avg Tokens Saved</div>
+                <div class="stat-val">${Math.round(stats.avg_tokens_saved || 0)}</div>
+                <div class="stat-lbl">Avg Tokens Saved</div>
             </div>
         `;
     } catch (err) {
@@ -1038,7 +1236,105 @@ function validatePromptLength() {
 
 // ── Init & Lifecycle ────────────────────────────────────────────────────────
 
+function initTheme() {
+    const saved = localStorage.getItem('oryx_theme') || 'theme-light';
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-morning', 'theme-afternoon');
+    document.body.classList.add(saved);
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) btn.textContent = saved === 'theme-dark' ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+    const isDark = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-night');
+    const next = isDark ? 'theme-light' : 'theme-dark';
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-morning', 'theme-afternoon');
+    document.body.classList.add(next);
+    localStorage.setItem('oryx_theme', next);
+    const btn = document.getElementById('btn-theme-toggle');
+    if (btn) btn.textContent = next === 'theme-dark' ? '☀️' : '🌙';
+}
+
+function initCustomSkinModal() {
+    const btn = document.getElementById('btn-custom-skin');
+    const modal = document.getElementById('skin-modal');
+    const closeBtn = document.getElementById('skin-modal-close');
+    const applyBtn = document.getElementById('skin-modal-apply');
+    const resetBtn = document.getElementById('skin-modal-reset');
+
+    const savedSkin = localStorage.getItem('na_ui_custom_skin');
+    if (savedSkin) {
+        try {
+            applyCustomSkinConfig(JSON.parse(savedSkin));
+        } catch (_) {}
+    }
+
+    if (!btn || !modal) return;
+
+    btn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+    });
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            const bgType = document.getElementById('skin-bg-type')?.value || 'dark';
+            const primaryColor = document.getElementById('skin-primary')?.value || '#00f2fe';
+            const config = bgType === 'dark'
+                ? {
+                    bg: '#0b1120',
+                    glassBg: 'rgba(17, 24, 39, 0.88)',
+                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #3b82f6)`,
+                    btnText: '#04192b',
+                    headText: '#f8fafc',
+                    bodyText: '#cbd5e1',
+                    accentText: primaryColor
+                }
+                : {
+                    bg: '#f8fafc',
+                    glassBg: 'rgba(255, 255, 255, 0.92)',
+                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #4f46e5)`,
+                    btnText: '#ffffff',
+                    headText: '#0f172a',
+                    bodyText: '#334155',
+                    accentText: primaryColor
+                };
+            localStorage.setItem('na_ui_custom_skin', JSON.stringify(config));
+            applyCustomSkinConfig(config);
+            modal.style.display = 'none';
+            showToast('Custom skin applied', 'success');
+        });
+    }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem('na_ui_custom_skin');
+            const root = document.documentElement;
+            ['--page-bg', '--glass-bg', '--btn-grad', '--btn-text', '--head-text', '--body-text', '--accent-text'].forEach(p => {
+                root.style.removeProperty(p);
+            });
+            initTheme();
+            modal.style.display = 'none';
+            showToast('Skin reset to default', 'success');
+        });
+    }
+}
+
+function applyCustomSkinConfig(config) {
+    const root = document.documentElement;
+    if (config.bg) root.style.setProperty('--page-bg', config.bg);
+    if (config.glassBg) root.style.setProperty('--glass-bg', config.glassBg);
+    if (config.btnGrad) root.style.setProperty('--btn-grad', config.btnGrad);
+    if (config.btnText) root.style.setProperty('--btn-text', config.btnText);
+    if (config.headText) root.style.setProperty('--head-text', config.headText);
+    if (config.bodyText) root.style.setProperty('--body-text', config.bodyText);
+    if (config.accentText) root.style.setProperty('--accent-text', config.accentText);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    initCustomSkinModal();
     loadPresetsFromFile();
     const token = localStorage.getItem('tce_token');
     const userId = localStorage.getItem('tce_user_id');
@@ -1107,15 +1403,6 @@ async function loadScenarioRegistry() {
 function handleScenarioModeChange(mode) {
     const qInput = document.getElementById('scenario-query-input');
     const resultSec = document.getElementById('scenario-result-section');
-    
-    if ((qInput && qInput.value.trim().length > 0) || (resultSec && resultSec.style.display !== 'none')) {
-        if (!confirm("Switching mode will reset current in-flight intake and results. Proceed?")) {
-            // Revert dropdown selection
-            const sel = document.getElementById('scenario-mode-select');
-            if (sel) sel.value = (mode === 'Scenario') ? 'Regular' : 'Scenario';
-            return;
-        }
-    }
 
     if (qInput) qInput.value = '';
     if (resultSec) resultSec.style.display = 'none';
@@ -1154,13 +1441,44 @@ function handleDomainChange(val) {
     }
 }
 
+async function buildScenarioAskPayload({ appMode, domainVal, styleVal, geoVal, question, mode }) {
+    const dataSource = (typeof RagWorkspace !== 'undefined' && typeof RagWorkspace.getDataSource === 'function')
+        ? RagWorkspace.getDataSource()
+        : 'cloud';
+
+    const payload = {
+        app_mode: appMode,
+        domain: appMode === 'Scenario' ? domainVal : null,
+        style: appMode === 'Regular' ? styleVal : null,
+        geography: appMode === 'Scenario' && geoVal ? geoVal : null,
+        question: question,
+        mode: mode || null,
+        data_source: dataSource,
+    };
+
+    if (dataSource === 'own') {
+        const localResp = await API.localRagRetrieve({
+            query: question,
+            top_k: 5,
+            file_extensions: ['.pdf', '.docx'],
+        });
+        payload.local_chunks = localResp.chunks || [];
+    }
+
+    return payload;
+}
+
 async function executeScenarioAsk() {
+    if (!State.token) {
+        showToast('Sign in to access Ask My Docs.', 'error');
+        openAuthModal();
+        return;
+    }
     const appMode   = document.getElementById('scenario-mode-select').value;
     const domainVal = document.getElementById('scenario-domain-select')?.value;
     const styleVal  = document.getElementById('scenario-style-select')?.value;
     const geoVal    = document.getElementById('scenario-geography-select')?.value;
     const question  = document.getElementById('scenario-query-input')?.value.trim();
-    const modeOpt   = document.getElementById('mode')?.value;
 
     if (!question) return showToast('Question text is required', 'error');
     if (appMode === 'Scenario' && !domainVal) return showToast('Mandatory domain selection required for Scenario mode', 'error');
@@ -1170,14 +1488,15 @@ async function executeScenarioAsk() {
     if (btn) btn.disabled = true;
 
     try {
-        const resp = await API.scenarioAsk({
-            app_mode: appMode,
-            domain: appMode === 'Scenario' ? domainVal : null,
-            style: appMode === 'Regular' ? styleVal : null,
-            geography: appMode === 'Scenario' && geoVal ? geoVal : null,
-            question: question,
+        const payload = await buildScenarioAskPayload({
+            appMode,
+            domainVal,
+            styleVal,
+            geoVal,
+            question,
             mode: null,
         });
+        const resp = await API.scenarioAsk(payload);
 
         renderScenarioResult(resp);
         showToast('Knowledge query complete', 'success');
@@ -1230,6 +1549,11 @@ function renderScenarioResult(resp) {
 let lastAggressivePromptText = '';
 
 async function executeScenarioAggressiveCompress() {
+    if (!State.token) {
+        showToast('Sign in to access Ask My Docs.', 'error');
+        openAuthModal();
+        return;
+    }
     console.log('[Scenario] executeScenarioAggressiveCompress triggered');
     const appModeEl = document.getElementById('scenario-mode-select');
     const appMode   = appModeEl ? appModeEl.value : 'Scenario';
@@ -1250,17 +1574,15 @@ async function executeScenarioAggressiveCompress() {
     }
 
     try {
-        const payload = {
-            app_mode: appMode,
-            domain: appMode === 'Scenario' ? domainVal : null,
-            style: appMode === 'Regular' ? styleVal : null,
-            geography: appMode === 'Scenario' && geoVal ? geoVal : null,
-            question: question,
+        const payload = await buildScenarioAskPayload({
+            appMode,
+            domainVal,
+            styleVal,
+            geoVal,
+            question,
             mode: 'aggressive',
-        };
-        console.log('[Scenario] Sending aggressive compression request:', payload);
+        });
         const resp = await API.scenarioAsk(payload);
-        console.log('[Scenario] Aggressive compression response received:', resp);
 
         const aggrSec = document.getElementById('scenario-aggressive-result-section');
         const aggrOutput = document.getElementById('scenario-aggressive-output');
@@ -1327,6 +1649,8 @@ if (typeof window !== 'undefined') {
     window.submitFeedback = submitFeedback;
     window.executeScenarioAggressiveCompress = executeScenarioAggressiveCompress;
     window.copyAggressivePrompt = copyAggressivePrompt;
+    window.toggleTheme = toggleTheme;
+    window.filterHistory = filterHistory;
 }
 if (typeof globalThis !== 'undefined') {
     globalThis.State = State;

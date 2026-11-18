@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles/tokens.css" />
     
     <style>
         /* ── Design Tokens & Themes ───────────────────────── */
@@ -102,6 +103,138 @@
         body.theme-snow {
             --page-bg: #f8fafc;
             --glass-bg: rgba(255, 255, 255, 0.92);
+        }
+
+        /* ── User RAG & Quality Drawer ────────────────────── */
+        .ask-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .ask-layout { grid-template-columns: 1fr; }
+        }
+        .rag-sidebar {
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .rag-source-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .rag-source-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 6px 8px;
+            border-radius: 7px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+        .rag-source-option input {
+            margin: 0;
+            accent-color: var(--accent, #00c2ff);
+        }
+        .rag-source-option.active {
+            background: var(--tag-bg);
+            color: var(--head-text);
+        }
+        .rag-local-card {
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .rag-doc-item {
+            background: var(--inp-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+        .rag-doc-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .rag-doc-meta { flex: 1; min-width: 0; }
+        .rag-doc-name {
+            font-weight: 600;
+            color: var(--head-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .rag-doc-sub { font-size: 11px; color: var(--text-muted); }
+        .rag-status-pill {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 99px;
+            text-transform: uppercase;
+            font-weight: 600;
+            background: var(--tag-bg);
+            color: var(--tag-text);
+        }
+        .rag-del-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .rag-del-btn:hover { color: var(--danger); }
+        .rag-empty-note {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+        .quality-breakdown {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: var(--card-sub-bg);
+            border: 1px solid var(--glass-border);
+            font-size: 11.5px;
+            color: var(--body-text);
+        }
+        .hidden {
+            display: none !important;
+        }
+        .adv-options-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 12px;
+            color: var(--body-text);
+            padding: 6px 2px;
+        }
+        .adv-options-row label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
         }
 
         /* ── Base Setup ───────────────────────────────────── */
@@ -849,6 +982,11 @@
             border: 1px solid rgba(16, 185, 129, 0.3);
             color: #10b981;
         }
+        .sandbox-badge.authenticated {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.35);
+            color: #38bdf8;
+        }
         .icon-btn-header {
             width: 34px;
             height: 34px;
@@ -1043,6 +1181,15 @@
             color: var(--btn-text);
             font-weight: 700;
             box-shadow: 0 2px 8px var(--accent-glow);
+        }
+        .mode-pill:disabled,
+        .mode-pill.mode-pill-disabled {
+            opacity: 0.42;
+            cursor: not-allowed;
+        }
+        .mode-pill:disabled:hover,
+        .mode-pill.mode-pill-disabled:hover {
+            color: var(--text-muted);
         }
 
         .pane-controls-row {
@@ -1292,7 +1439,7 @@
         }
     </style>
 </head>
-<body class="theme-night">
+<body class="theme-light">
 <div class="tc-root">
     <!-- Zero-RAM ambient background gradients -->
     <div class="bubble bubble-1"></div>
@@ -1312,20 +1459,21 @@
                         <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="#38bdf8" />
                     </svg>
                 </div>
-                <div class="tc-logo-text">Oryx<span>Intel</span></div>
+                <div class="tc-logo-text">Oryx<span>Studio</span></div>
             </div>
             <div class="header-right-group">
                 <div class="engine-badge">
                     <span class="engine-pulse-dot"></span>
-                    <span>CRISP v3 Active</span>
+                    <span>Prompt Engine Ready</span>
                 </div>
-                <span class="sandbox-badge" id="sandbox-badge">● Sandbox Ready</span>
+                <span class="sandbox-badge" id="sandbox-badge">● Guest Mode</span>
+                <button type="button" class="icon-btn-header" id="btn-theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">🌙</button>
                 <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin" aria-label="Customize Skin">🎨</button>
             </div>
         </div>
 
-        <h1 class="tc-headline">Oryx Intelligence Engine</h1>
-        <p class="tc-sub">CRISP framework · Semantic compression · Zero-hallucination retention</p>
+        <h1 class="tc-headline">Oryx Studio</h1>
+        <p class="tc-sub">Make any prompt shorter, clearer, and hallucination-free for ChatGPT, Claude &amp; Gemini</p>
 
         <!-- ── Auth Section (Non-blocking Dialog / Popover) ── -->
         <div id="auth-section" style="display: none; margin-bottom: 24px; padding: 22px; background: var(--card-sub-bg); border: 1px solid var(--glass-border); border-radius: 16px;">
@@ -1393,10 +1541,10 @@
             </div>
 
             <div class="nav-bar">
-                <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Compress</button>
-                <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask">Ask (RAG)</button>
-                <button class="nav-tab" onclick="switchTab('history')" id="nav-history">History</button>
-                <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats">Stats</button>
+                <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Optimize Prompt</button>
+                <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask" style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
+                <button class="nav-tab" onclick="switchTab('history')" id="nav-history" style="display: none;" disabled aria-disabled="true">History</button>
+                <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats" style="display: none;" disabled aria-disabled="true">Insights</button>
             </div>
 
             <!-- ── Compress Tab (2-Column Split Workbench) ── -->
@@ -1460,11 +1608,16 @@
                         <!-- Controls Row: Segmented Mode Pills (R5) -->
                         <div class="pane-controls-row">
                             <div class="segmented-mode-pills" id="mode-pills" role="radiogroup" aria-label="Compression Mode">
-                                <button type="button" class="mode-pill" data-mode="gentle" id="pm-gentle" onclick="selectMode('gentle')">Gentle</button>
-                                <button type="button" class="mode-pill active" data-mode="balanced" id="pm-balanced" onclick="selectMode('balanced')">Balanced</button>
-                                <button type="button" class="mode-pill" data-mode="aggressive" id="pm-aggressive" title="Deep Architect: expands your prompt into structured CRISP scaffolding for ~3,000-token comprehensive LLM output" onclick="selectMode('aggressive')">Aggressive (Deep Architect)</button>
+                                <button type="button" class="mode-pill active" data-mode="gentle" id="pm-gentle" aria-checked="true" onclick="selectMode('gentle')">Light Polish</button>
+                                <button type="button" class="mode-pill mode-pill-disabled" data-mode="balanced" id="pm-balanced" aria-checked="false" disabled title="Sign in to unlock Smart Trim" onclick="selectMode('balanced')">Smart Trim 🔒</button>
+                                <button type="button" class="mode-pill mode-pill-disabled" data-mode="aggressive" id="pm-aggressive" aria-checked="false" disabled title="Sign in to unlock Deep Blueprint" onclick="selectMode('aggressive')">Deep Blueprint 🔒</button>
                             </div>
-                            <input type="hidden" id="mode" value="balanced">
+                            <input type="hidden" id="mode" value="gentle">
+                        </div>
+
+                        <div class="adv-options-row">
+                            <label id="opt-rag-label" title="Sign in to unlock RAG grounding"><input type="checkbox" id="opt-rag-enabled" disabled> Ground with my PDFs</label>
+                            <label id="opt-harness-label" title="Sign in to unlock Grounding Harness"><input type="checkbox" id="opt-harness-enabled" disabled> Hallucination-Proof Contract</label>
                         </div>
 
                         <div class="pane-actions-row">
@@ -1482,14 +1635,15 @@
                     <div class="pane-column pane-right" id="output-pane">
                         <div class="pane-header">
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <span class="pane-title">CRISP Optimized</span>
-                                <span class="tes-badge" id="tes-score" data-tes="0.97">TES 0.97 Hallucination-Free</span>
+                                <span class="pane-title">AI-Ready Prompt</span>
+                                <span class="tes-badge" id="tes-score" data-tes="0.97" style="cursor:pointer;" onclick="document.getElementById('quality-breakdown').classList.toggle('hidden')" title="Click for quality breakdown">Quality Ready</span>
                             </div>
                             <label class="diff-toggle-label">
                                 <input type="checkbox" id="diff-toggle" checked onchange="toggleDiffView()">
-                                <span>Show pruning diff</span>
+                                <span>Highlight changes</span>
                             </label>
                         </div>
+                        <div id="quality-breakdown" class="quality-breakdown hidden"></div>
 
                         <!-- Output Box with Non-Blocking Inline Progress (R5) -->
                         <div id="output-container" class="output-container">
@@ -1547,8 +1701,8 @@
 
                             <div class="feedback-row" style="margin-top: 8px;">
                                 <span id="feedback-status" style="font-size: 12px; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
-                                <button type="button" class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')">👍 Useful</button>
-                                <button type="button" class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')">👎 Not Useful</button>
+                                <button type="button" class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')" disabled title="Sign in to submit feedback">👍 Useful</button>
+                                <button type="button" class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')" disabled title="Sign in to submit feedback">👎 Not Useful</button>
                             </div>
                         </div>
                     </div>
@@ -1557,7 +1711,51 @@
 
             <!-- ── Ask (RAG) Tab ── -->
             <div class="tab-content" id="tab-ask-content">
-                <div class="tag">Internal RAG Query</div>
+                <div class="tag">Ask My Docs · Grounded Knowledge</div>
+
+                <div class="ask-layout">
+                    <!-- Self-Service User Knowledge Base Sidebar -->
+                    <aside class="rag-sidebar">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                            <strong style="font-size:13px;color:var(--head-text);">Knowledge Source</strong>
+                        </div>
+                        <div class="rag-source-toggle" role="radiogroup" aria-label="RAG Data Source">
+                            <label class="rag-source-option active" id="rag-opt-cloud">
+                                <input type="radio" name="ask-data-source" value="cloud" checked onchange="RagWorkspace.setDataSource('cloud')">
+                                <span>☁️ Cloud Data</span>
+                            </label>
+                            <label class="rag-source-option" id="rag-opt-own">
+                                <input type="radio" name="ask-data-source" value="own" onchange="RagWorkspace.setDataSource('own')">
+                                <span>💻 Own Data</span>
+                            </label>
+                        </div>
+
+                        <div id="rag-cloud-panel" style="display:flex;flex-direction:column;gap:10px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                                <strong style="font-size:12px;color:var(--text-muted);">Cloud Knowledge Base</strong>
+                                <input type="file" id="user-rag-file-input" accept=".pdf" style="display:none;">
+                                <button type="button" id="user-rag-upload-btn" class="copy-btn" style="padding:4px 10px;font-size:11.5px;">+ Upload PDF</button>
+                            </div>
+                            <div id="user-rag-docs-list">
+                                <div class="rag-empty-note">Sign in to upload &amp; manage your own PDFs.</div>
+                            </div>
+                        </div>
+
+                        <div id="rag-own-panel" class="rag-local-card" style="display:none;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                                <strong style="font-size:12px;color:var(--head-text);">Local Companion</strong>
+                                <span id="local-rag-status-pill" class="rag-status-pill status-processing">checking</span>
+                            </div>
+                            <div id="local-rag-watch-dir" style="font-size:11px;color:var(--text-muted);word-break:break-all;">Endpoint: 127.0.0.1:49152</div>
+                            <div id="local-rag-counts" style="font-size:11px;color:var(--text-muted);">Waiting for local companion...</div>
+                            <div style="font-size:11px;color:var(--text-muted);line-height:1.4;">Raw <code>.pdf</code> &amp; <code>.docx</code> stay strictly on your machine. Only top-k text chunks are used for prompt assembly.</div>
+                            <button type="button" id="local-rag-refresh-btn" class="btn-ghost" onclick="RagWorkspace.checkLocalHealth()" style="width:100%;font-size:11.5px;padding:5px 8px;">↻ Check Local Status</button>
+                        </div>
+
+                        <button type="button" class="btn-ghost" onclick="RagWorkspace.openVerifyModal()" style="width:100%;font-size:12px;padding:7px 10px;">🛡️ Verify LLM Reply</button>
+                    </aside>
+
+                    <div>
                 
                 <div class="form-row">
                     <label for="scenario-mode-select" class="section-label">Pipeline Mode</label>
@@ -1671,11 +1869,16 @@
                         <div class="output-box" id="scenario-aggressive-output" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;"></div>
                     </div>
                 </div>
+                    </div>
+                </div>
             </div>
 
             <!-- ── History Tab ── -->
             <div class="tab-content" id="tab-history-content">
-                <div class="section-label">Compression History</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                    <div class="section-label" style="margin:0;">Prompt History</div>
+                    <input type="text" id="history-search" class="tc-input" placeholder="Search prompts or topics..." oninput="filterHistory(this.value)" style="max-width:260px;padding:8px 12px;font-size:12.5px;">
+                </div>
                 <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
                     <div class="auth-gate-icon">🔒</div>
                     <div class="auth-gate-title">Save Compression History</div>
@@ -1728,12 +1931,29 @@
     </div>
 </div>
 
-<script src="neuro_ambient.js?v=4"></script>
-<script src="neuron_animation.js?v=4"></script>
-<script src="dev_engine.js?v=4"></script>
-<script src="prompt_optimizer.js?v=4"></script>
-<script src="mock_api.js?v=5"></script>
-<script src="app.js?v=10"></script>
+<!-- ── Grounding Verifier Modal (GAP-42) ── -->
+<div id="verify-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(6px);">
+    <div class="glass-card" style="max-width: 560px; padding: 26px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h2 class="tc-headline" style="font-size: 18px; margin: 0;">Verify LLM Reply</h2>
+            <button type="button" class="btn-ghost" onclick="RagWorkspace.closeVerifyModal()" style="padding:4px 10px;">✕</button>
+        </div>
+        <div class="form-row">
+            <label class="section-label">Source Facts (one per line)</label>
+            <textarea id="verify-facts-input" class="tc-textarea" style="min-height:80px;" placeholder="Paste key facts from your docs..."></textarea>
+        </div>
+        <div class="form-row">
+            <label class="section-label">LLM Reply to Check</label>
+            <textarea id="verify-answer-input" class="tc-textarea" style="min-height:90px;" placeholder="Paste the AI's answer here..."></textarea>
+        </div>
+        <button type="button" class="tc-compress-btn" onclick="RagWorkspace.runVerify()" style="padding:10px;">Run Grounding Check</button>
+        <pre id="verify-result-box" class="output-box" style="display:none;margin-top:12px;max-height:180px;overflow:auto;font-size:11.5px;"></pre>
+    </div>
+</div>
+
+<script src="mock_api.js?v=6"></script>
+<script src="rag_workspace.js?v=1"></script>
+<script src="app.js?v=13"></script>
 
     <!-- Legacy Progress Overlay (Suppressed for R5 non-blocking inline skeleton) -->
     <div id="neuro-progress-overlay" style="display: none !important; pointer-events: none;">

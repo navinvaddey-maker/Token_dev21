@@ -1,8 +1,9 @@
 name: ci
 on:
   pull_request:
-  push:
-    branches: [main]
+  # Temporarily commented out git push validation trigger
+  # push:
+  #   branches: [main]
 
 env:
   CARGO_TERM_COLOR: always

@@ -33,13 +33,11 @@ const MockAPI = {
         };
         const currentMode = (mode || 'balanced').toLowerCase();
         const ratio = ratioMap[currentMode] || 0.58;
-        // ARCH: §5 NPAE Grounding & Evaluation — Cap output tokens at inTokens to prevent inversion
         const rawOut = Math.round(inTokens * ratio);
         const outTokens = Math.min(inTokens, Math.max(inTokens > 0 ? 1 : 0, rawOut));
         const savedTokens = Math.max(0, inTokens - outTokens);
         const savedPct = inTokens > 0 ? Math.round((savedTokens / inTokens) * 100) : 0;
 
-        // Structured domain execution plans
         const executionPlans = {
             'Real Estate & Finance': '1. Audit financial thresholds & debt ratios · 2. Model rate vs. down payment scenarios · 3. 3-phase execution roadmap',
             'Software Engineering': '1. Trace auth token lifecycle · 2. Inspect Safari SameSite/Partitioned cookie policy · 3. Patch 401 interception',
@@ -52,8 +50,7 @@ const MockAPI = {
         const plan = executionPlans[activeDomain] || executionPlans['General'];
         const trimmedSnippet = raw_text.length > 120 ? raw_text.slice(0, 117) + '...' : raw_text;
 
-        // Structured CRISP tagged output: [ROLE], [CONTEXT], [EXECUTION], [CONSTRAINTS]
-        const crispOutput = 
+        const crispOutput =
 `[ROLE] Principal ${activeDomain} Strategist
 [CONTEXT] ${trimmedSnippet}
 [EXECUTION] ${plan}
@@ -156,6 +153,73 @@ const API = {
 
     async scenarioAsk(req) {
         return this.call('/api/scenario/ask', {
+            method: 'POST',
+            body: JSON.stringify(req),
+        });
+    },
+
+    async ragUpload(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const headers = {};
+        if (typeof State !== 'undefined' && State.token) {
+            headers['Authorization'] = `Bearer ${State.token}`;
+        }
+        const r = await fetch('/api/rag/upload', { method: 'POST', headers, body: formData });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.error?.message || err.error || 'Upload failed');
+        }
+        return r.json();
+    },
+
+    async ragList() {
+        return this.call('/api/rag/documents');
+    },
+
+    async ragDelete(id) {
+        return this.call(`/api/rag/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    },
+
+    async localRagHealth(timeoutMs = 2000) {
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+        try {
+            const r = await fetch('http://127.0.0.1:49152/health', {
+                method: 'GET',
+                signal: ctrl ? ctrl.signal : undefined,
+            });
+            if (!r.ok) throw new Error(`Local companion health HTTP ${r.status}`);
+            return await r.json();
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    },
+
+    async localRagRetrieve({ query, top_k = 5, file_extensions = ['.pdf', '.docx'] }) {
+        // ARCH: §2.1 — Strict JSON IPC contract with local offline companion (127.0.0.1:49152).
+        const r = await fetch('http://127.0.0.1:49152/retrieve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: String(query || ''),
+                top_k: Number(top_k) || 5,
+                file_extensions: Array.isArray(file_extensions) ? file_extensions : ['.pdf', '.docx'],
+            }),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.error || `Local retrieval failed (HTTP ${r.status})`);
+        }
+        const payload = await r.json();
+        if (!payload || payload.status !== 'ok' || !Array.isArray(payload.chunks)) {
+            throw new Error('Local companion returned an invalid response schema.');
+        }
+        return payload;
+    },
+
+    async verifyGrounding(req) {
+        return this.call('/api/npae/verify', {
             method: 'POST',
             body: JSON.stringify(req),
         });

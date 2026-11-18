@@ -11,6 +11,18 @@ use super::pipeline::{
 };
 use super::registry::{ScenarioDomainRegistry, ScenarioStyleRegistry};
 
+/// Exclusive data source selector for Ask RAG (`ARCHITECTURE.md` §2.1).
+#[derive(Debug, Clone)]
+pub enum ScenarioDataSource {
+    /// Cloud Data: server-side SQLite RAG retrieval via `DocumentRetriever`.
+    Cloud,
+    /// Own Data: top-$k$ chunks retrieved locally from `rag` / `rag.exe` (`127.0.0.1:49152`).
+    Own {
+        /// Pre-retrieved chunks from the user's local folder; raw files never leave disk.
+        local_chunks: Vec<crate::types::RagChunk>,
+    },
+}
+
 pub struct ScenarioModeRouter {
     pub domain_registry: Arc<ScenarioDomainRegistry>,
     pub style_registry: Arc<ScenarioStyleRegistry>,
@@ -48,6 +60,41 @@ impl ScenarioModeRouter {
         retriever: &DocumentRetriever,
         orchestrator: Option<&crate::pipeline::orchestrator::PipelineOrchestrator>,
     ) -> Result<ScenarioResponse, String> {
+        self.route_and_execute_with_source(
+            app_mode,
+            domain_key,
+            style_key,
+            geography,
+            question,
+            user_id,
+            user_business_type,
+            compression_mode,
+            retriever,
+            orchestrator,
+            ScenarioDataSource::Cloud,
+        )
+        .await
+    }
+
+    /// Executes Ask RAG routing against an explicit exclusive data source (`Cloud` or `Own`).
+    ///
+    /// # Errors
+    /// Returns `Err` on validation, egress guard, or cloud retrieval failure.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn route_and_execute_with_source(
+        &self,
+        app_mode: &str,
+        domain_key: Option<&str>,
+        style_key: Option<&str>,
+        geography: Option<&str>,
+        question: &str,
+        user_id: &str,
+        user_business_type: &str,
+        compression_mode: Option<&str>,
+        retriever: &DocumentRetriever,
+        orchestrator: Option<&crate::pipeline::orchestrator::PipelineOrchestrator>,
+        data_source: ScenarioDataSource,
+    ) -> Result<ScenarioResponse, String> {
         info!("ScenarioModeRouter processing request: mode='{}', domain={:?}, style={:?}, geography={:?}", app_mode, domain_key, style_key, geography);
 
         if question.trim().is_empty() {
@@ -76,65 +123,77 @@ impl ScenarioModeRouter {
                     self.egress_guard.validate_tool_registration(tool, None)?;
                 }
 
-                let mut base_namespace = domain_cfg.rag_namespace.clone();
-                if let Some(geo) = geography {
-                    base_namespace = format!("{}_{}", base_namespace, geo.to_lowercase());
-                }
+                let is_own_data = matches!(data_source, ScenarioDataSource::Own { .. });
+                let (filtered_chunks, base_namespace) = match data_source {
+                    ScenarioDataSource::Own { local_chunks } => {
+                        // ARCH: §2.1 — Own Data mode bypasses server-side DocumentRetriever completely.
+                        (local_chunks, "local_own_data".to_string())
+                    }
+                    ScenarioDataSource::Cloud => {
+                        let mut base_namespace = domain_cfg.rag_namespace.clone();
+                        if let Some(geo) = geography {
+                            base_namespace = format!("{}_{}", base_namespace, geo.to_lowercase());
+                        }
 
-                let mut permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
-                    "scenario",
-                    Some(&base_namespace),
-                    user_business_type,
-                );
-                // FIX: D6 — accept documents whose ingested `domain` is one of this scenario
-                // domain's declared aliases (e.g. `legal` for `legal_docs`). Exact-match only, so
-                // other domains (e.g. a `legal` doc in a Finance scenario) stay isolated.
-                // ARCH: §1.4 — scenario domains isolate retrieval by namespace.
-                permitted_ns.extend(domain_cfg.document_domain_aliases.iter().cloned());
+                        let mut permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
+                            "scenario",
+                            Some(&base_namespace),
+                            user_business_type,
+                        );
+                        // FIX: D6 — accept documents whose ingested `domain` is one of this scenario
+                        // domain's declared aliases (e.g. `legal` for `legal_docs`). Exact-match only, so
+                        // other domains (e.g. a `legal` doc in a Finance scenario) stay isolated.
+                        // ARCH: §1.4 — scenario domains isolate retrieval by namespace.
+                        permitted_ns.extend(domain_cfg.document_domain_aliases.iter().cloned());
 
-                // RAG Retrieval restricted to domain namespace with pre-truncation filtering (D2)
-                let min_sim = domain_cfg.min_similarity.unwrap_or(0.40);
-                let query = RetrievalQuery {
-                    query_text: question.to_string(),
-                    user_id: user_id.to_string(),
-                    document_ids: None,
-                    top_k: 5,
-                    min_similarity: min_sim,
+                        // RAG Retrieval restricted to domain namespace with pre-truncation filtering (D2)
+                        let min_sim = domain_cfg.min_similarity.unwrap_or(0.40);
+                        let query = RetrievalQuery {
+                            query_text: question.to_string(),
+                            user_id: user_id.to_string(),
+                            document_ids: None,
+                            top_k: 5,
+                            min_similarity: min_sim,
+                        };
+
+                        let filter_fn = |res: &crate::rag::types::SearchResult| {
+                            ScenarioNamespaceGuard::is_chunk_permitted(
+                                res.document_domain.as_deref(),
+                                Some(&res.document_filename),
+                                &permitted_ns,
+                            ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
+                                question,
+                                &res.chunk.content,
+                            )
+                        };
+
+                        // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
+                        let retrieved = retriever
+                            .retrieve_filtered(&query, None, &filter_fn)
+                            .await
+                            .map_err(|e| format!("Retrieval Error: {}", e))?;
+
+                        let chunks: Vec<crate::types::RagChunk> = retrieved
+                            .into_iter()
+                            .map(|res| crate::types::RagChunk {
+                                domain_tag: res
+                                    .document_domain
+                                    .unwrap_or_else(|| "general".to_string()),
+                                content: res.chunk.content,
+                                metadata: Some(crate::types::ChunkMetadata {
+                                    page_number: res
+                                        .chunk
+                                        .metadata
+                                        .as_ref()
+                                        .and_then(|m| m.page_number)
+                                        .map(|p| p as u32),
+                                    source_file: res.document_filename,
+                                }),
+                            })
+                            .collect();
+                        (chunks, base_namespace)
+                    }
                 };
-
-                let filter_fn = |res: &crate::rag::types::SearchResult| {
-                    ScenarioNamespaceGuard::is_chunk_permitted(
-                        res.document_domain.as_deref(),
-                        Some(&res.document_filename),
-                        &permitted_ns,
-                    ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
-                        question,
-                        &res.chunk.content,
-                    )
-                };
-
-                // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
-                let retrieved = retriever
-                    .retrieve_filtered(&query, None, &filter_fn)
-                    .await
-                    .map_err(|e| format!("Retrieval Error: {}", e))?;
-
-                let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
-                    .into_iter()
-                    .map(|res| crate::types::RagChunk {
-                        domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
-                        content: res.chunk.content,
-                        metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res
-                                .chunk
-                                .metadata
-                                .as_ref()
-                                .and_then(|m| m.page_number)
-                                .map(|p| p as u32),
-                            source_file: res.document_filename,
-                        }),
-                    })
-                    .collect();
 
                 let parser_summary = ScenarioParser::parse(question, domain_cfg);
                 let (_ok, gap_issues) = ScenarioGapCheck::evaluate(question, domain_cfg);
@@ -150,6 +209,10 @@ impl ScenarioModeRouter {
                     question,
                     geography,
                 );
+                if is_own_data {
+                    resp.source_badge =
+                        "Source: own local folder only (127.0.0.1:49152)".to_string();
+                }
 
                 // GAP-S02 / GAP-42 Fix: In Aggressive mode, synthesize grounded evidence and strip raw chunk wrappers
                 if let (Some(cm), Some(orch)) = (compression_mode, orchestrator) {
@@ -295,62 +358,78 @@ impl ScenarioModeRouter {
                     .get_style(s_key)
                     .ok_or_else(|| format!("Validation Error: Unknown style '{}'.", s_key))?;
 
-                let permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
-                    "regular",
-                    None,
-                    user_business_type,
-                );
+                let is_own_data = matches!(data_source, ScenarioDataSource::Own { .. });
+                let (filtered_chunks, searched_ns) = match data_source {
+                    ScenarioDataSource::Own { local_chunks } => {
+                        // ARCH: §2.1 — Own Data mode bypasses server-side DocumentRetriever completely.
+                        (local_chunks, vec!["local_own_data".to_string()])
+                    }
+                    ScenarioDataSource::Cloud => {
+                        let permitted_ns = ScenarioNamespaceGuard::get_permitted_namespaces(
+                            "regular",
+                            None,
+                            user_business_type,
+                        );
 
-                let query = RetrievalQuery {
-                    query_text: question.to_string(),
-                    user_id: user_id.to_string(),
-                    document_ids: None,
-                    top_k: 5,
-                    min_similarity: 0.20,
+                        let query = RetrievalQuery {
+                            query_text: question.to_string(),
+                            user_id: user_id.to_string(),
+                            document_ids: None,
+                            top_k: 5,
+                            min_similarity: 0.20,
+                        };
+
+                        let filter_fn = |res: &crate::rag::types::SearchResult| {
+                            ScenarioNamespaceGuard::is_chunk_permitted(
+                                res.document_domain.as_deref(),
+                                Some(&res.document_filename),
+                                &permitted_ns,
+                            ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
+                                question,
+                                &res.chunk.content,
+                            )
+                        };
+
+                        // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
+                        let retrieved = retriever
+                            .retrieve_filtered(&query, None, &filter_fn)
+                            .await
+                            .map_err(|e| format!("Retrieval Error: {}", e))?;
+
+                        let chunks: Vec<crate::types::RagChunk> = retrieved
+                            .into_iter()
+                            .map(|res| crate::types::RagChunk {
+                                domain_tag: res
+                                    .document_domain
+                                    .unwrap_or_else(|| "general".to_string()),
+                                content: res.chunk.content,
+                                metadata: Some(crate::types::ChunkMetadata {
+                                    page_number: res
+                                        .chunk
+                                        .metadata
+                                        .as_ref()
+                                        .and_then(|m| m.page_number)
+                                        .map(|p| p as u32),
+                                    source_file: res.document_filename,
+                                }),
+                            })
+                            .collect();
+                        (chunks, permitted_ns)
+                    }
                 };
-
-                let filter_fn = |res: &crate::rag::types::SearchResult| {
-                    ScenarioNamespaceGuard::is_chunk_permitted(
-                        res.document_domain.as_deref(),
-                        Some(&res.document_filename),
-                        &permitted_ns,
-                    ) && ScenarioNamespaceGuard::is_chunk_content_relevant(
-                        question,
-                        &res.chunk.content,
-                    )
-                };
-
-                // FIX: D3 — propagate retrieval errors rather than masking as empty knowledge
-                let retrieved = retriever
-                    .retrieve_filtered(&query, None, &filter_fn)
-                    .await
-                    .map_err(|e| format!("Retrieval Error: {}", e))?;
-
-                let filtered_chunks: Vec<crate::types::RagChunk> = retrieved
-                    .into_iter()
-                    .map(|res| crate::types::RagChunk {
-                        domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
-                        content: res.chunk.content,
-                        metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res
-                                .chunk
-                                .metadata
-                                .as_ref()
-                                .and_then(|m| m.page_number)
-                                .map(|p| p as u32),
-                            source_file: res.document_filename,
-                        }),
-                    })
-                    .collect();
 
                 let mut resp = ScenarioRegularPipeline::run(
                     question,
                     style_cfg,
                     &self.prompts_dir,
                     &filtered_chunks,
-                    permitted_ns,
+                    searched_ns,
                     compression_mode,
                 );
+                if is_own_data {
+                    resp.source_badge =
+                        "Source: own local folder only (127.0.0.1:49152)".to_string();
+                }
 
                 // GAP-S02 Fix: Wire compression pipeline if compression_mode is specified and orchestrator is available
                 if let (Some(cm), Some(orch)) = (compression_mode, orchestrator) {

@@ -1,0 +1,66 @@
+/* Shared Design Tokens for Oryx Studio & Admin Console */
+:root,
+body.theme-light {
+    --page-bg: #f8fafc;
+    --surface-bg: #ffffff;
+    --surface-sub: #f1f5f9;
+    --glass-bg: rgba(255, 255, 255, 0.92);
+    --glass-border: #e2e8f0;
+    --glass-card-shadow: 0 12px 36px -8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+    --btn-grad: linear-gradient(135deg, #0ea5e9 0%, #4f46e5 100%);
+    --btn-text: #ffffff;
+    --accent-text: #0284c7;
+    --accent-glow: rgba(14, 165, 233, 0.22);
+    --head-text: #0f172a;
+    --body-text: #334155;
+    --text-muted: #64748b;
+    --stat-pos: #059669;
+    --inp-bg: #f8fafc;
+    --inp-border: #cbd5e1;
+    --inp-focus: #0284c7;
+    --inp-ring: rgba(2, 132, 199, 0.16);
+    --prog-fill: linear-gradient(90deg, #0ea5e9, #10b981);
+    --prog-track: #e2e8f0;
+    --tag-bg: rgba(14, 165, 233, 0.12);
+    --tag-text: #0369a1;
+    --divider: #e2e8f0;
+    --copy-bg: rgba(14, 165, 233, 0.1);
+    --copy-border: rgba(14, 165, 233, 0.3);
+    --card-sub-bg: #f1f5f9;
+    --danger: #dc2626;
+    --success: #059669;
+    --warning: #d97706;
+}
+
+body.theme-dark,
+body.theme-night {
+    --page-bg: #0b1120;
+    --surface-bg: #111827;
+    --surface-sub: #1e293b;
+    --glass-bg: rgba(17, 24, 39, 0.88);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-card-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --btn-grad: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+    --btn-text: #04192b;
+    --accent-text: #22d3ee;
+    --accent-glow: rgba(34, 211, 238, 0.24);
+    --head-text: #f8fafc;
+    --body-text: #cbd5e1;
+    --text-muted: #94a3b8;
+    --stat-pos: #34d399;
+    --inp-bg: rgba(15, 23, 42, 0.8);
+    --inp-border: rgba(255, 255, 255, 0.12);
+    --inp-focus: #22d3ee;
+    --inp-ring: rgba(34, 211, 238, 0.2);
+    --prog-fill: linear-gradient(90deg, #22d3ee, #10b981);
+    --prog-track: rgba(255, 255, 255, 0.08);
+    --tag-bg: rgba(34, 211, 238, 0.12);
+    --tag-text: #38bdf8;
+    --divider: rgba(255, 255, 255, 0.08);
+    --copy-bg: rgba(34, 211, 238, 0.12);
+    --copy-border: rgba(34, 211, 238, 0.28);
+    --card-sub-bg: rgba(255, 255, 255, 0.04);
+    --danger: #ef4444;
+    --success: #10b981;
+    --warning: #f59e0b;
+}

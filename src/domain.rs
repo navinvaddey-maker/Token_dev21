@@ -296,9 +296,30 @@ pub async fn compress_new(
             // In real app, we might want to log 'verbose' to a diagnostic sink here.
             tracing::debug!("Aggressive history logged: {}ms", duration_ms);
 
-            let mut json_resp = serde_json::to_value(resp).unwrap();
+            let tes = resp.scoring_result.tes;
+            let sfs = resp.scoring_result.sfs;
+            let scs = resp.scoring_result.scs;
+            let overall = (tes + sfs + scs) / 3.0;
+            let mut json_resp = serde_json::to_value(&resp).map_err(|e| {
+                AppError::Internal(format!("Failed to serialize aggressive response: {e}"))
+            })?;
             if let Some(obj) = json_resp.as_object_mut() {
+                // ARCH: §1.3 — Bind shared UI telemetry fields (`mode`, `tes_score`, `dual_score`, `warnings`)
+                // so Aggressive responses match the frontend contract consumed by `static/app.js`.
                 obj.insert("id".to_string(), serde_json::json!(history_id));
+                obj.insert("mode".to_string(), serde_json::json!("aggressive"));
+                obj.insert("tes_score".to_string(), serde_json::json!(tes));
+                obj.insert(
+                    "dual_score".to_string(),
+                    serde_json::json!({
+                        "tes": tes,
+                        "sfs": sfs,
+                        "scs": scs,
+                        "overall": overall,
+                    }),
+                );
+                obj.entry("warnings".to_string())
+                    .or_insert_with(|| serde_json::json!([]));
             }
 
             // 8. Implicit Signal Detection (Aggressive Mode branch)

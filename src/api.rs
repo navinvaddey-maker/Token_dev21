@@ -867,7 +867,8 @@ async fn scenario_get_registry(
         .into_response())
 }
 
-#[derive(serde::Deserialize)]
+/// Request payload for `POST /api/scenario/ask`.
+#[derive(Debug, serde::Deserialize)]
 pub struct ScenarioAskRequest {
     pub app_mode: String,
     pub domain: Option<String>,
@@ -875,6 +876,12 @@ pub struct ScenarioAskRequest {
     pub geography: Option<String>,
     pub question: String,
     pub mode: Option<String>,
+    /// Exclusive Ask RAG data source: `"cloud"` (default) or `"own"` (local companion).
+    #[serde(default)]
+    pub data_source: Option<String>,
+    /// Pre-retrieved top-$k$ chunks from `127.0.0.1:49152/retrieve` when `data_source == "own"`.
+    #[serde(default)]
+    pub local_chunks: Option<Vec<crate::rag::local::LocalRetrievedChunk>>,
 }
 
 async fn scenario_ask(
@@ -882,6 +889,49 @@ async fn scenario_ask(
     axum::Extension(user_id_str): axum::Extension<String>,
     Json(req): Json<ScenarioAskRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    let source_mode = req
+        .data_source
+        .as_deref()
+        .unwrap_or("cloud")
+        .trim()
+        .to_ascii_lowercase();
+
+    let scenario_source = match source_mode.as_str() {
+        "cloud" => {
+            if req.local_chunks.as_ref().is_some_and(|c| !c.is_empty()) {
+                return Err(AppError::Validation(
+                    "local_chunks cannot be provided when data_source is 'cloud'".to_string(),
+                ));
+            }
+            crate::scenario::ScenarioDataSource::Cloud
+        }
+        "own" => {
+            // ARCH: §2.1 — Own Data mode accepts only pre-retrieved top-k local chunks.
+            let mapped = req
+                .local_chunks
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|c| !c.content.trim().is_empty())
+                .map(|c| crate::types::RagChunk {
+                    domain_tag: "local_own_data".to_string(),
+                    content: c.content,
+                    metadata: Some(crate::types::ChunkMetadata {
+                        page_number: Some(c.page_number),
+                        source_file: c.source_file,
+                    }),
+                })
+                .collect();
+            crate::scenario::ScenarioDataSource::Own {
+                local_chunks: mapped,
+            }
+        }
+        other => {
+            return Err(AppError::Validation(format!(
+                "invalid data_source '{other}'; expected 'cloud' or 'own'"
+            )));
+        }
+    };
+
     let user = crate::data::Repository::find_user_by_id(&state.pool, &user_id_str)
         .await
         .map_err(AppError::Database)?;
@@ -893,7 +943,7 @@ async fn scenario_ask(
 
     let resp = state
         .scenario_router
-        .route_and_execute(
+        .route_and_execute_with_source(
             &req.app_mode,
             req.domain.as_deref(),
             req.style.as_deref(),
@@ -904,6 +954,7 @@ async fn scenario_ask(
             req.mode.as_deref(),
             &retriever,
             Some(&state.pipeline),
+            scenario_source,
         )
         .await
         .map_err(AppError::Engine)?;
