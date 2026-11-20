@@ -1149,7 +1149,26 @@ fn detect_output_preference(lower: &str) -> String {
         return "structured_markdown".to_string();
     }
 
-    // Data/API/schema signals → JSON
+    // Explicit structured text formats (respecting negations like "no yaml" / "no json")
+    let forbids = |fmt: &str| -> bool {
+        lower.contains(&format!("no {fmt}"))
+            || lower.contains(&format!("without {fmt}"))
+            || lower.contains(&format!("avoid {fmt}"))
+            || lower.contains(&format!("not {fmt}"))
+            || lower.contains(&format!("exclude {fmt}"))
+    };
+
+    if (lower.contains("yaml") || lower.contains("yml")) && !forbids("yaml") && !forbids("yml") {
+        return "yaml".to_string();
+    }
+    if lower.contains("csv") && !forbids("csv") {
+        return "csv".to_string();
+    }
+    if lower.contains("toml") && !forbids("toml") {
+        return "toml".to_string();
+    }
+
+    // Data/API/schema signals → JSON (never when user explicitly forbids JSON)
     let json_signals = [
         "json",
         "api response",
@@ -1158,7 +1177,7 @@ fn detect_output_preference(lower: &str) -> String {
         "endpoint",
         "data structure",
     ];
-    if json_signals.iter().any(|s| lower.contains(s)) {
+    if !forbids("json") && json_signals.iter().any(|s| lower.contains(s)) {
         return "json".to_string();
     }
 

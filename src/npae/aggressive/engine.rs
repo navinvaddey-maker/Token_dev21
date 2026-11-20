@@ -166,15 +166,20 @@ impl AggressiveEngine {
         // ARCH: Grounding Harness (GAP-42) — Harness style fences untrusted facts and binds the
         // downstream LLM to FOUND / PARTIAL_MATCH / NOT_FOUND; Crisp behavior is unchanged.
         let render_style = cfg.render_style.unwrap_or_default();
+        let target_model = cfg.target_model_family.unwrap_or_default();
         let grounding_facts = if render_style == RenderStyle::Harness {
             super::structurer::collect_grounding_facts(&structured, raw, derived_rag.as_ref())
         } else {
             Vec::new()
         };
         let optimized_prompt = match render_style {
-            RenderStyle::Crisp => {
-                super::structurer::render_crisp_prompt(&structured, &questions, &crisp_raw_input)
-            }
+            RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
+                &structured,
+                &questions,
+                &crisp_raw_input,
+                derived_rag.as_ref(),
+                target_model,
+            ),
             RenderStyle::Harness => super::structurer::render_harness_prompt_with_options(
                 &structured,
                 &questions,
@@ -279,10 +284,12 @@ impl AggressiveEngine {
                         // and when Harness is active NEVER strip <rules>, <facts>, <requested_items>,
                         // or <output_contract> (GAP-42).
                         final_prompt = match render_style {
-                            RenderStyle::Crisp => super::structurer::render_crisp_prompt(
+                            RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
                                 &structured,
                                 questions_for_tes,
                                 &crisp_raw_input,
+                                derived_rag.as_ref(),
+                                target_model,
                             ),
                             RenderStyle::Harness => {
                                 super::structurer::render_harness_prompt_with_options(
@@ -306,10 +313,12 @@ impl AggressiveEngine {
                     crate::types::ScoreAxis::SemanticCompleteness => {
                         // SCS low: Ensure questions and constraints are fully rendered
                         final_prompt = match render_style {
-                            RenderStyle::Crisp => super::structurer::render_crisp_prompt(
+                            RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
                                 &structured,
                                 &questions,
                                 &crisp_raw_input,
+                                derived_rag.as_ref(),
+                                target_model,
                             ),
                             RenderStyle::Harness => {
                                 super::structurer::render_harness_prompt_with_options(
@@ -455,53 +464,135 @@ fn compute_aggressive_scoring(
         0.0
     };
 
-    // SFS: Schema Fidelity
+    // SFS: Live Schema Fidelity evaluated directly against `final_prompt` (Phase C)
+    // Checks actual rendered structural blocks rather than static `structured` fields, and
+    // accepts `# OUTPUT BLUEPRINT:` / `<output_blueprint>` / `<output_contract>` as equivalent
+    // to `# EXECUTION PHASES:` so Explain/Debug/Artifact-Build prompts are never penalized for
+    // omitting waterfall timelines.
     let sfs_score = {
         let mut sfs = 0.0_f32;
-        let total_checks = 7.0_f32;
-        if !structured.role.primary.is_empty() {
+        let total_checks = 6.0_f32;
+        if final_prompt.contains("# ROLE:") || final_prompt.contains("<role>") {
             sfs += 1.0;
         }
-        if !structured.role.persona_anchor.is_empty() {
+        if final_prompt.contains("# TASK / INSTRUCTION:") || final_prompt.contains("<task>") {
             sfs += 1.0;
         }
-        if !structured.context.description.is_empty() {
-            sfs += 1.0;
-        }
-        if !structured.context.background.is_empty() {
-            sfs += 1.0;
-        }
-        if !structured.constraints.required_inclusions.is_empty()
-            || !structured.constraints.forbidden_topics.is_empty()
+        if final_prompt.contains("# CONTEXT:")
+            || final_prompt.contains("<context>")
+            || final_prompt.contains("# GROUNDING FACTS")
+            || final_prompt.contains("<facts")
+            || final_prompt.contains("<grounding_facts")
         {
             sfs += 1.0;
         }
-        if !structured.execution_phases.is_empty() {
+        let has_constraints_needed = !structured.constraints.required_inclusions.is_empty()
+            || !structured.constraints.forbidden_topics.is_empty();
+        if !has_constraints_needed
+            || final_prompt.contains("# CONSTRAINTS:")
+            || final_prompt.contains("<constraints>")
+        {
             sfs += 1.0;
         }
-        if !structured.success_criteria.is_empty() {
+        if final_prompt.contains("# OUTPUT BLUEPRINT:")
+            || final_prompt.contains("<output_blueprint>")
+            || final_prompt.contains("# EXECUTION PHASES:")
+            || final_prompt.contains("<execution_phases>")
+            || final_prompt.contains("<output_contract>")
+        {
+            sfs += 1.0;
+        }
+        if final_prompt.contains("# SUCCESS CRITERIA:")
+            || final_prompt.contains("<rules")
+            || final_prompt.contains("<execution_protocol>")
+            || final_prompt.contains("\n---\n")
+        {
             sfs += 1.0;
         }
         (sfs / total_checks * 10.0).clamp(0.0, 10.0)
     };
 
-    // SCS: Semantic Completeness
+    // SCS: Live Semantic Completeness evaluated directly against `final_prompt` (Phase C)
+    // Measures entity/number preservation from `raw`, rendered clarifying questions when ambiguous,
+    // rendered execution protocol, and rendered required inclusions.
     let scs_score = {
         let mut score = 10.0_f32;
-        if amb.score > 0.5 && questions.is_empty() {
+        let final_lower = final_prompt.to_lowercase();
+
+        // 1. Key entity & numeric preservation from user prompt
+        let (_, _, user_only) = super::structurer::split_raw_input(raw);
+        let key_tokens: Vec<String> = user_only
+            .split(|c: char| !c.is_alphanumeric() && c != '$' && c != '%' && c != '-')
+            .filter(|t| {
+                let len = t.len();
+                let has_digit = t.chars().any(|c| c.is_ascii_digit());
+                (has_digit && len >= 2)
+                    || (len >= 5
+                        && !matches!(
+                            t.to_lowercase().as_str(),
+                            "please"
+                                | "could"
+                                | "would"
+                                | "should"
+                                | "about"
+                                | "there"
+                                | "their"
+                                | "where"
+                                | "which"
+                                | "these"
+                                | "those"
+                                | "really"
+                                | "explain"
+                                | "build"
+                                | "create"
+                                | "write"
+                        ))
+            })
+            .map(str::to_lowercase)
+            .take(12)
+            .collect();
+        if !key_tokens.is_empty() {
+            let preserved = key_tokens
+                .iter()
+                .filter(|t| final_lower.contains(t.as_str()))
+                .count();
+            let ratio = preserved as f32 / key_tokens.len() as f32;
+            if ratio < 0.75 {
+                score -= (1.0 - ratio) * 3.0;
+            }
+        }
+
+        // 2. Ambiguity question coverage in rendered output
+        if amb.score > 0.65
+            && !questions.is_empty()
+            && !final_prompt.contains("# CLARIFYING QUESTIONS:")
+            && !final_prompt.contains("<questions>")
+            && !final_prompt.contains("<clarifying_questions>")
+        {
             score -= 2.0;
         }
-        if structured.success_criteria.is_empty() {
+
+        // 3. Execution protocol / rules rendered
+        if !final_prompt.contains("\n---\n")
+            && !final_prompt.contains("<rules")
+            && !final_prompt.contains("<execution_protocol>")
+        {
             score -= 1.5;
         }
-        if structured.dynamic_instruction.is_empty() {
-            score -= 2.0;
+
+        // 4. Required inclusions rendered
+        if !structured.constraints.required_inclusions.is_empty() {
+            let missing_inc = structured
+                .constraints
+                .required_inclusions
+                .iter()
+                .filter(|inc| !final_lower.contains(&inc.to_lowercase()))
+                .count();
+            if missing_inc > 0 {
+                score -= (missing_inc as f32 * 0.5).min(2.0);
+            }
         }
-        if structured.constraints.required_inclusions.is_empty()
-            && structured.constraints.forbidden_topics.is_empty()
-        {
-            score -= 1.0;
-        }
+
         score.clamp(0.0, 10.0)
     };
 

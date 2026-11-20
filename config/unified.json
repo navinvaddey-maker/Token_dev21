@@ -3268,7 +3268,7 @@
           {
             "phase_number": 1,
             "name": "Financial Readiness & Mortgage Pre-Approval",
-            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure fixed-rate mortgage pre-approval.",
+            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure mortgage pre-approval (evaluating fixed-rate vs. ARM structures).",
             "estimated_duration": "1-2 weeks",
             "deliverables": [
               "Affordability & DTI Budget Ceiling",
@@ -3408,7 +3408,7 @@
           {
             "phase_number": 1,
             "name": "Financial Readiness & Mortgage Pre-Approval",
-            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure fixed-rate mortgage pre-approval.",
+            "description": "Audit credit profile, debt-to-income (DTI) ratio, down-payment and closing-cost reserves, and secure mortgage pre-approval (evaluating fixed-rate vs. ARM structures).",
             "estimated_duration": "1-2 weeks",
             "deliverables": [
               "Affordability & DTI Budget Ceiling",

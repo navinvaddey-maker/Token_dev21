@@ -19,9 +19,17 @@ pub fn extract_non_task_scaffolding(output: &str) -> Option<String> {
     if let Some(task_idx) = output.find("# TASK / INSTRUCTION:") {
         let prefix = &output[..task_idx];
         let rest = &output[task_idx + "# TASK / INSTRUCTION:".len()..];
-        let suffix = rest
-            .find("\n\n---\n")
-            .map_or("", |end_idx| &rest[end_idx..]);
+        // `# TASK / INSTRUCTION:` may appear near the top (followed by `\n# <NEXT SECTION>`)
+        // or near the bottom (followed by `\n\n---\n`); take whichever delimiter comes first.
+        let next_header = rest.find("\n# ");
+        let next_rule = rest.find("\n\n---\n");
+        let end_idx = match (next_header, next_rule) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        let suffix = end_idx.map_or("", |idx| &rest[idx..]);
         return Some(format!("{prefix}\n{suffix}"));
     }
 

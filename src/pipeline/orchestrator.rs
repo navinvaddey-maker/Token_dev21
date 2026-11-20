@@ -401,6 +401,7 @@ impl PipelineOrchestrator {
                     .or(Some(0.75)),
                 skip_stage: npae_config.and_then(|c| c.skip_stage.clone()),
                 render_style: npae_config.and_then(|c| c.render_style),
+                target_model_family: npae_config.and_then(|c| c.target_model_family),
             };
 
             let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&normalized)

@@ -354,6 +354,7 @@ async fn test_harness_prompt_fencing_stage6b_guard_and_backward_compatibility() 
         confidence_threshold: Some(0.75),
         skip_stage: None,
         render_style: Some(RenderStyle::Harness),
+        target_model_family: None,
     };
     let resp_harness = orchestrator
         .process(
@@ -715,6 +716,7 @@ async fn test_g06_harness_task_xml_breakout_escaped() {
         confidence_threshold: Some(0.75),
         skip_stage: None,
         render_style: Some(RenderStyle::Harness),
+        target_model_family: None,
     };
     let mut session = SessionHistory::new(10);
     let resp = orchestrator

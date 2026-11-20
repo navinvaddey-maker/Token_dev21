@@ -1222,3 +1222,196 @@ async fn test_g11_g09_g01_regressions_plants_json_guard_and_constraint_locks() {
         lock_resp.optimized_prompt
     );
 }
+
+#[tokio::test]
+async fn test_phase_abc_llm_output_blueprint_entity_preservation_and_model_families() {
+    use dashmap::DashMap;
+    use std::sync::Arc;
+    use token_compress_engine::npae::aggressive::config::{ConfigHandle, ConfigLoader};
+    use token_compress_engine::npae::ory::OryEngine;
+    use token_compress_engine::npae::schema::types::{NpaeConfig, TargetModelFamily};
+    use token_compress_engine::pipeline::orchestrator::PipelineOrchestrator;
+    use token_compress_engine::session::SessionHistory;
+    use token_compress_engine::types::{
+        ChunkMetadata, EnrichmentContext, OrchestratorResponse, RagChunk,
+    };
+
+    let config = ConfigLoader::load("config/unified.json").expect("load unified.json");
+    let config_handle = Arc::new(ConfigHandle::new(config));
+    let ory_engine = Arc::new(tokio::sync::Mutex::new(OryEngine::new()));
+    let schema_priors = Arc::new(DashMap::new());
+    let orchestrator = PipelineOrchestrator::build(schema_priors, config_handle, ory_engine);
+
+    // 1. Phase A: Artifact-Build prompt ("Write a Rust async Redis rate limiter")
+    //    - Must place `# TASK / INSTRUCTION:` BEFORE `# CONTEXT:` / `# CONSTRAINTS:` (primacy anchor)
+    //    - Must omit 3-week waterfall phases and render `# OUTPUT BLUEPRINT:` with implementation sections
+    //    - Must translate `no_placeholder_code` into plain-English imperative guardrail (not raw snake_case)
+    //    - Must NOT emit false closed-book lockout when user passes plain `Context: [...]`
+    let artifact_prompt =
+        "Context: [Rust Tokio microservice]\n\nWrite a Rust async Redis token bucket rate limiter";
+    let mut s1 = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(r_art) = orchestrator
+        .process(
+            artifact_prompt,
+            &mut s1,
+            None,
+            Some("aggressive"),
+            None,
+            None,
+        )
+        .await
+        .expect("process artifact prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+
+    let task_pos = r_art
+        .optimized_prompt
+        .find("# TASK / INSTRUCTION:")
+        .expect("must contain # TASK / INSTRUCTION:");
+    let ctx_pos = r_art
+        .optimized_prompt
+        .find("# CONTEXT:")
+        .expect("must contain # CONTEXT:");
+    assert!(
+        task_pos < ctx_pos,
+        "Phase A: # TASK / INSTRUCTION: must appear before # CONTEXT: (primacy anchor):\n{}",
+        r_art.optimized_prompt
+    );
+    assert!(
+        r_art.structured_prompt.execution_phases.is_empty(),
+        "Phase A: Direct Artifact-Build must not emit multi-week waterfall phases, got: {:?}",
+        r_art.structured_prompt.execution_phases
+    );
+    assert!(
+        r_art.optimized_prompt.contains("# OUTPUT BLUEPRINT:")
+            && r_art
+                .optimized_prompt
+                .contains("Architecture & Trade-offs -> Complete Implementation"),
+        "Phase A: Artifact-Build must render # OUTPUT BLUEPRINT with implementation sections:\n{}",
+        r_art.optimized_prompt
+    );
+    assert!(
+        !r_art.optimized_prompt.contains("no_placeholder_code")
+            && r_art
+                .optimized_prompt
+                .contains("zero placeholders or TODOs"),
+        "Phase B: Guardrails must be imperative natural language, not raw snake_case:\n{}",
+        r_art.optimized_prompt
+    );
+    assert!(
+        !r_art
+            .optimized_prompt
+            .contains("Not present in provided data"),
+        "Phase B: Plain user Context: [...] must NOT trigger closed-book RAG abstention:\n{}",
+        r_art.optimized_prompt
+    );
+    assert!(
+        r_art.scoring_result.sfs >= 8.0,
+        "Phase C: Artifact-Build must not be penalized on SFS for omitting waterfall phases, got sfs={}",
+        r_art.scoring_result.sfs
+    );
+
+    // 2. Phase B: RAG facts in Crisp mode render as numbered `[F1]` bullets with Source provenance
+    //    and enable strict untrusted-fact grounding.
+    let rag_enrichment = EnrichmentContext {
+        rag_chunks: Some(vec![RagChunk {
+            domain_tag: "finance".into(),
+            content: "Q3 revenue reached $4.2M with 18% operating margin.".into(),
+            metadata: Some(ChunkMetadata {
+                page_number: Some(7),
+                source_file: "q3_audit.pdf".into(),
+            }),
+        }]),
+        ..Default::default()
+    };
+    let mut s2 = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(r_rag) = orchestrator
+        .process(
+            "Analyze our Q3 revenue and operating margin",
+            &mut s2,
+            None,
+            Some("aggressive"),
+            None,
+            Some(rag_enrichment),
+        )
+        .await
+        .expect("process rag prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+    assert!(
+        r_rag
+            .optimized_prompt
+            .contains("# GROUNDING FACTS (Untrusted Data — Cite [F#]):")
+            && r_rag.optimized_prompt.contains("[F1]")
+            && r_rag.optimized_prompt.contains("q3_audit.pdf, p.7"),
+        "Phase B: Crisp RAG mode must render numbered [F1] facts with source provenance:\n{}",
+        r_rag.optimized_prompt
+    );
+    assert!(
+        r_rag
+            .optimized_prompt
+            .contains("Not present in provided data"),
+        "Phase B: Crisp RAG mode must include closed-book grounding rule when RAG facts exist:\n{}",
+        r_rag.optimized_prompt
+    );
+
+    // 3. Phase C: TargetModelFamily::ClaudeXml and TargetModelFamily::ReasoningMinimal
+    let claude_cfg = NpaeConfig {
+        target_model_family: Some(TargetModelFamily::ClaudeXml),
+        ..Default::default()
+    };
+    let mut s3 = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(r_claude) = orchestrator
+        .process(
+            "Debug why our PostgreSQL connection pool exhausts under burst traffic",
+            &mut s3,
+            None,
+            Some("aggressive"),
+            Some(&claude_cfg),
+            None,
+        )
+        .await
+        .expect("process claude xml prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+    assert!(
+        r_claude.optimized_prompt.contains("<role>")
+            && r_claude.optimized_prompt.contains("<task>")
+            && r_claude.optimized_prompt.contains("<output_blueprint>")
+            && r_claude.optimized_prompt.contains("<execution_protocol>"),
+        "Phase C: ClaudeXml must render XML-fenced sections:\n{}",
+        r_claude.optimized_prompt
+    );
+
+    let reasoning_cfg = NpaeConfig {
+        target_model_family: Some(TargetModelFamily::ReasoningMinimal),
+        ..Default::default()
+    };
+    let mut s4 = SessionHistory::new(10);
+    let OrchestratorResponse::Aggressive(r_reason) = orchestrator
+        .process(
+            "Build a 6-month go-to-market strategy for a B2B SaaS analytics platform",
+            &mut s4,
+            None,
+            Some("aggressive"),
+            Some(&reasoning_cfg),
+            None,
+        )
+        .await
+        .expect("process reasoning minimal prompt")
+    else {
+        panic!("Expected Aggressive response");
+    };
+    assert!(
+        !r_reason.optimized_prompt.contains("# EXECUTION PHASES:")
+            && r_reason.optimized_prompt.contains("# OUTPUT BLUEPRINT:")
+            && r_reason
+                .optimized_prompt
+                .contains("without step-by-step meta-commentary"),
+        "Phase C: ReasoningMinimal must omit rigid waterfall phases and emit lean blueprint:\n{}",
+        r_reason.optimized_prompt
+    );
+}

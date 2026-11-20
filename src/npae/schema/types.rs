@@ -26,6 +26,33 @@ pub enum RenderStyle {
     Harness,
 }
 
+/// Target downstream LLM family for adaptive prompt formatting in Aggressive Crisp mode.
+///
+/// // ARCH: Phase C — Adapts rendering structure to model attention/instruction-following behavior
+/// // (`StandardMarkdown` default, `ClaudeXml` for XML-native models, `ReasoningMinimal` for
+/// // native chain-of-thought reasoning models).
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetModelFamily {
+    /// High-Signal CRISP Markdown (default; works well across GPT-4o, Gemini, and general LLMs).
+    #[default]
+    #[serde(
+        alias = "standard",
+        alias = "markdown",
+        alias = "gpt",
+        alias = "gemini"
+    )]
+    StandardMarkdown,
+    /// XML-fenced sections (`<role>`, `<task>`, `<context>`, `<constraints>`, `<output_blueprint>`)
+    /// tuned for Claude and XML-native frontier models.
+    #[serde(alias = "claude", alias = "xml")]
+    ClaudeXml,
+    /// Lean Goal + Hard Constraints + Evaluation Rubric + Output Blueprint without rigid
+    /// waterfall phases, tuned for reasoning models (o1/o3/o4, Gemini Thinking, DeepSeek-R1).
+    #[serde(alias = "reasoning", alias = "o1", alias = "o3", alias = "r1")]
+    ReasoningMinimal,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct NpaeConfig {
     pub ambiguity_threshold: Option<f32>,
@@ -35,6 +62,9 @@ pub struct NpaeConfig {
     /// Optional rendering mode (`crisp` default, or `harness` for strict `[F#]` fact grounding).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub render_style: Option<RenderStyle>,
+    /// Optional target LLM family for adaptive Crisp rendering (`standard_markdown` default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_model_family: Option<TargetModelFamily>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

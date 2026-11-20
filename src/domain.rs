@@ -220,6 +220,7 @@ pub async fn compress_new(
         confidence_threshold: req.npae_confidence_threshold,
         skip_stage: None,
         render_style: req.npae_render_style,
+        target_model_family: None,
     };
 
     let orchestrator_response = state
