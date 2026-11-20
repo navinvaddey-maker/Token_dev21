@@ -89,6 +89,8 @@ const RagWorkspace = {
                 const mode = health.neural_embeddings ? 'ONNX MiniLM' : 'Hash Fallback';
                 countsEl.textContent = `${health.indexed_files ?? 0} files · ${health.indexed_chunks ?? 0} chunks · ${mode}`;
             }
+            const cmdWrap = document.getElementById('local-rag-cmd-wrap');
+            if (cmdWrap) cmdWrap.classList.add('hidden');
             return health;
         } catch (err) {
             this.localConnected = false;
@@ -100,10 +102,33 @@ const RagWorkspace = {
                 watchEl.textContent = 'Endpoint: http://127.0.0.1:49152';
             }
             if (countsEl) {
-                countsEl.textContent = 'Start local companion: cargo run --bin rag -- --watch <folder>';
+                countsEl.textContent = 'Local companion is offline. Run this command to start it:';
             }
+            const cmdWrap = document.getElementById('local-rag-cmd-wrap');
+            if (cmdWrap) cmdWrap.classList.remove('hidden');
             return null;
         }
+    },
+
+    copyStartCommand() {
+        const cmd = document.getElementById('local-rag-start-cmd')?.textContent?.trim() || 'cargo run --bin rag -- --watch ./docs';
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            showToast('Clipboard unavailable in this browser context', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(cmd).then(() => {
+            const btn = document.getElementById('local-rag-copy-cmd-btn');
+            if (btn) {
+                const prev = btn.textContent;
+                btn.textContent = '✓ Command Copied';
+                btn.classList.add('btn-copied');
+                setTimeout(() => {
+                    btn.textContent = prev;
+                    btn.classList.remove('btn-copied');
+                }, 1800);
+            }
+            showToast('Local companion start command copied.', 'success');
+        }).catch(err => showToast('Copy failed: ' + err.message, 'error'));
     },
 
     async loadDocuments() {
@@ -227,12 +252,26 @@ const RagWorkspace = {
 
     openVerifyModal() {
         const modal = document.getElementById('verify-modal');
-        if (modal) modal.style.display = 'flex';
+        if (!modal) return;
+        if (typeof openDialogSafe === 'function') {
+            openDialogSafe(modal);
+        } else if (typeof modal.showModal === 'function') {
+            if (!modal.open) modal.showModal();
+        } else {
+            modal.style.display = 'flex';
+        }
     },
 
     closeVerifyModal() {
         const modal = document.getElementById('verify-modal');
-        if (modal) modal.style.display = 'none';
+        if (!modal) return;
+        if (typeof closeDialogSafe === 'function') {
+            closeDialogSafe(modal);
+        } else if (typeof modal.close === 'function') {
+            if (modal.open) modal.close();
+        } else {
+            modal.style.display = 'none';
+        }
     },
 
     async runVerify() {

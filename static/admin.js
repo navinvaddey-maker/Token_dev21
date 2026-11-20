@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (avatarEl && State.username) {
         avatarEl.textContent = State.username.charAt(0).toUpperCase();
     }
+    initAdminTheme();
     initEventListeners();
     initHudClock();
     initCommandPalette();
@@ -30,6 +31,39 @@ document.addEventListener('DOMContentLoaded', () => {
     initAutoSync();
     loadOverview();
 });
+
+function applyAdminTheme(themeClass) {
+    const normalized = (themeClass === 'theme-light') ? 'theme-light' : 'theme-dark';
+    const scheme = normalized === 'theme-dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', scheme);
+    document.documentElement.style.colorScheme = scheme;
+    document.body.classList.remove('theme-light', 'theme-dark', 'theme-night');
+    document.body.classList.add(normalized);
+    const btn = document.getElementById('btn-admin-theme');
+    if (btn) {
+        btn.textContent = normalized === 'theme-dark' ? '☀️' : '🌙';
+        btn.setAttribute('aria-label', normalized === 'theme-dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme');
+    }
+}
+
+function initAdminTheme() {
+    const saved = localStorage.getItem('oryx_theme');
+    if (saved) {
+        applyAdminTheme(saved);
+    } else {
+        const prefersDark = typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+            : true;
+        applyAdminTheme(prefersDark ? 'theme-dark' : 'theme-light');
+    }
+}
+
+function toggleAdminTheme() {
+    const isDark = document.body.classList.contains('theme-dark');
+    const next = isDark ? 'theme-light' : 'theme-dark';
+    localStorage.setItem('oryx_theme', next);
+    applyAdminTheme(next);
+}
 
 function initEventListeners() {
     // Nav links
@@ -55,6 +89,12 @@ function initEventListeners() {
     const sidebar = document.getElementById('admin-sidebar');
     if (mobileBtn && sidebar) {
         mobileBtn.addEventListener('click', () => sidebar.classList.toggle('open'));
+    }
+
+    // Shared Light/Dark Theme toggle
+    const themeBtn = document.getElementById('btn-admin-theme');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', toggleAdminTheme);
     }
 
     // Admin Ask (RAG)

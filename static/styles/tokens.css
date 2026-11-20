@@ -1,66 +1,302 @@
-/* Shared Design Tokens for Oryx Studio & Admin Console */
-:root,
-body.theme-light {
-    --page-bg: #f8fafc;
-    --surface-bg: #ffffff;
-    --surface-sub: #f1f5f9;
-    --glass-bg: rgba(255, 255, 255, 0.92);
-    --glass-border: #e2e8f0;
-    --glass-card-shadow: 0 12px 36px -8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
-    --btn-grad: linear-gradient(135deg, #0ea5e9 0%, #4f46e5 100%);
-    --btn-text: #ffffff;
-    --accent-text: #0284c7;
-    --accent-glow: rgba(14, 165, 233, 0.22);
-    --head-text: #0f172a;
-    --body-text: #334155;
-    --text-muted: #64748b;
-    --stat-pos: #059669;
-    --inp-bg: #f8fafc;
-    --inp-border: #cbd5e1;
-    --inp-focus: #0284c7;
-    --inp-ring: rgba(2, 132, 199, 0.16);
-    --prog-fill: linear-gradient(90deg, #0ea5e9, #10b981);
+/* Shared Design Tokens for Oryx Studio & Admin Console (2026 Operational System) */
+/* ARCH: Modern Web Guidance — color-scheme on :root with light-dark() + prefers-color-scheme fallback */
+
+:root {
+    color-scheme: light dark;
+
+    /* Core Light Palette */
+    --c-page-light: #f8fafc;
+    --c-surface-light: #ffffff;
+    --c-surface-sub-light: #f1f5f9;
+    --c-glass-light: rgba(255, 255, 255, 0.94);
+    --c-border-light: #e2e8f0;
+    --c-border-strong-light: #cbd5e1;
+    --c-head-light: #0f172a;
+    --c-body-light: #334155;
+    --c-muted-light: #52627a;
+    --c-accent-light: #0369a1;
+    --c-accent-strong-light: #0284c7;
+    --c-accent-glow-light: rgba(2, 132, 199, 0.2);
+    --c-btn-grad-light: linear-gradient(135deg, #0284c7 0%, #4338ca 100%);
+    --c-btn-text-light: #ffffff;
+    --c-inp-bg-light: #ffffff;
+    --c-tag-bg-light: rgba(2, 132, 199, 0.1);
+    --c-tag-text-light: #0369a1;
+    --c-pos-light: #047857;
+    --c-danger-light: #b91c1c;
+    --c-warning-light: #b45309;
+    --c-scroll-thumb-light: #94a3b8;
+    --c-scroll-track-light: #f1f5f9;
+
+    /* Core Dark Palette */
+    --c-page-dark: #090d16;
+    --c-surface-dark: #101624;
+    --c-surface-sub-dark: #161f33;
+    --c-glass-dark: rgba(16, 22, 36, 0.92);
+    --c-border-dark: rgba(148, 163, 184, 0.16);
+    --c-border-strong-dark: rgba(148, 163, 184, 0.28);
+    --c-head-dark: #f8fafc;
+    --c-body-dark: #cbd5e1;
+    --c-muted-dark: #94a3b8;
+    --c-accent-dark: #38bdf8;
+    --c-accent-strong-dark: #22d3ee;
+    --c-accent-glow-dark: rgba(56, 189, 248, 0.22);
+    --c-btn-grad-dark: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
+    --c-btn-text-dark: #061326;
+    --c-inp-bg-dark: #0c1220;
+    --c-tag-bg-dark: rgba(56, 189, 248, 0.14);
+    --c-tag-text-dark: #7dd3fc;
+    --c-pos-dark: #34d399;
+    --c-danger-dark: #f87171;
+    --c-warning-dark: #fbbf24;
+    --c-scroll-thumb-dark: #475569;
+    --c-scroll-track-dark: #0f172a;
+
+    /* Semantic Defaults (Light fallback for browsers without light-dark()) */
+    --page-bg: var(--c-page-light);
+    --surface-bg: var(--c-surface-light);
+    --surface-sub: var(--c-surface-sub-light);
+    --glass-bg: var(--c-glass-light);
+    --glass-border: var(--c-border-light);
+    --glass-card-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+    --btn-grad: var(--c-btn-grad-light);
+    --btn-text: var(--c-btn-text-light);
+    --accent-text: var(--c-accent-light);
+    --accent-glow: var(--c-accent-glow-light);
+    --head-text: var(--c-head-light);
+    --body-text: var(--c-body-light);
+    --text-muted: var(--c-muted-light);
+    --stat-pos: var(--c-pos-light);
+    --inp-bg: var(--c-inp-bg-light);
+    --inp-border: var(--c-border-strong-light);
+    --inp-focus: var(--c-accent-strong-light);
+    --inp-ring: rgba(2, 132, 199, 0.22);
+    --focus-ring: var(--c-accent-strong-light);
+    --prog-fill: linear-gradient(90deg, #0284c7, #10b981);
     --prog-track: #e2e8f0;
-    --tag-bg: rgba(14, 165, 233, 0.12);
-    --tag-text: #0369a1;
+    --tag-bg: var(--c-tag-bg-light);
+    --tag-text: var(--c-tag-text-light);
     --divider: #e2e8f0;
-    --copy-bg: rgba(14, 165, 233, 0.1);
-    --copy-border: rgba(14, 165, 233, 0.3);
+    --copy-bg: rgba(2, 132, 199, 0.08);
+    --copy-border: rgba(2, 132, 199, 0.28);
     --card-sub-bg: #f1f5f9;
-    --danger: #dc2626;
-    --success: #059669;
-    --warning: #d97706;
+    --danger: var(--c-danger-light);
+    --success: var(--c-pos-light);
+    --warning: var(--c-warning-light);
+    --scrollbar-thumb: var(--c-scroll-thumb-light);
+    --scrollbar-track: var(--c-scroll-track-light);
+
+    accent-color: var(--accent-text);
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
+@media (prefers-color-scheme: dark) {
+    :root {
+        --page-bg: var(--c-page-dark);
+        --surface-bg: var(--c-surface-dark);
+        --surface-sub: var(--c-surface-sub-dark);
+        --glass-bg: var(--c-glass-dark);
+        --glass-border: var(--c-border-dark);
+        --glass-card-shadow: 0 20px 56px -16px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        --btn-grad: var(--c-btn-grad-dark);
+        --btn-text: var(--c-btn-text-dark);
+        --accent-text: var(--c-accent-dark);
+        --accent-glow: var(--c-accent-glow-dark);
+        --head-text: var(--c-head-dark);
+        --body-text: var(--c-body-dark);
+        --text-muted: var(--c-muted-dark);
+        --stat-pos: var(--c-pos-dark);
+        --inp-bg: var(--c-inp-bg-dark);
+        --inp-border: var(--c-border-strong-dark);
+        --inp-focus: var(--c-accent-strong-dark);
+        --inp-ring: rgba(56, 189, 248, 0.24);
+        --focus-ring: var(--c-accent-strong-dark);
+        --prog-fill: linear-gradient(90deg, #38bdf8, #34d399);
+        --prog-track: rgba(255, 255, 255, 0.08);
+        --tag-bg: var(--c-tag-bg-dark);
+        --tag-text: var(--c-tag-text-dark);
+        --divider: rgba(148, 163, 184, 0.14);
+        --copy-bg: rgba(56, 189, 248, 0.1);
+        --copy-border: rgba(56, 189, 248, 0.28);
+        --card-sub-bg: rgba(255, 255, 255, 0.035);
+        --danger: var(--c-danger-dark);
+        --success: var(--c-pos-dark);
+        --warning: var(--c-warning-dark);
+        --scrollbar-thumb: var(--c-scroll-thumb-dark);
+        --scrollbar-track: var(--c-scroll-track-dark);
+    }
+}
+
+@supports (color: light-dark(white, black)) {
+    :root {
+        --page-bg: light-dark(var(--c-page-light), var(--c-page-dark));
+        --surface-bg: light-dark(var(--c-surface-light), var(--c-surface-dark));
+        --surface-sub: light-dark(var(--c-surface-sub-light), var(--c-surface-sub-dark));
+        --glass-bg: light-dark(var(--c-glass-light), var(--c-glass-dark));
+        --glass-border: light-dark(var(--c-border-light), var(--c-border-dark));
+        --btn-text: light-dark(var(--c-btn-text-light), var(--c-btn-text-dark));
+        --accent-text: light-dark(var(--c-accent-light), var(--c-accent-dark));
+        --accent-glow: light-dark(var(--c-accent-glow-light), var(--c-accent-glow-dark));
+        --head-text: light-dark(var(--c-head-light), var(--c-head-dark));
+        --body-text: light-dark(var(--c-body-light), var(--c-body-dark));
+        --text-muted: light-dark(var(--c-muted-light), var(--c-muted-dark));
+        --stat-pos: light-dark(var(--c-pos-light), var(--c-pos-dark));
+        --inp-bg: light-dark(var(--c-inp-bg-light), var(--c-inp-bg-dark));
+        --inp-border: light-dark(var(--c-border-strong-light), var(--c-border-strong-dark));
+        --inp-focus: light-dark(var(--c-accent-strong-light), var(--c-accent-strong-dark));
+        --focus-ring: light-dark(var(--c-accent-strong-light), var(--c-accent-strong-dark));
+        --tag-bg: light-dark(var(--c-tag-bg-light), var(--c-tag-bg-dark));
+        --tag-text: light-dark(var(--c-tag-text-light), var(--c-tag-text-dark));
+        --danger: light-dark(var(--c-danger-light), var(--c-danger-dark));
+        --success: light-dark(var(--c-pos-light), var(--c-pos-dark));
+        --warning: light-dark(var(--c-warning-light), var(--c-warning-dark));
+        --scrollbar-thumb: light-dark(var(--c-scroll-thumb-light), var(--c-scroll-thumb-dark));
+        --scrollbar-track: light-dark(var(--c-scroll-track-light), var(--c-scroll-track-dark));
+    }
+}
+
+/* Explicit Manual Theme Overrides (Synced with html[data-theme] and body.theme-*) */
+html[data-theme="light"],
+body.theme-light {
+    color-scheme: light;
+    --page-bg: var(--c-page-light);
+    --surface-bg: var(--c-surface-light);
+    --surface-sub: var(--c-surface-sub-light);
+    --glass-bg: var(--c-glass-light);
+    --glass-border: var(--c-border-light);
+    --glass-card-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+    --btn-grad: var(--c-btn-grad-light);
+    --btn-text: var(--c-btn-text-light);
+    --accent-text: var(--c-accent-light);
+    --accent-glow: var(--c-accent-glow-light);
+    --head-text: var(--c-head-light);
+    --body-text: var(--c-body-light);
+    --text-muted: var(--c-muted-light);
+    --stat-pos: var(--c-pos-light);
+    --inp-bg: var(--c-inp-bg-light);
+    --inp-border: var(--c-border-strong-light);
+    --inp-focus: var(--c-accent-strong-light);
+    --inp-ring: rgba(2, 132, 199, 0.22);
+    --focus-ring: var(--c-accent-strong-light);
+    --prog-fill: linear-gradient(90deg, #0284c7, #10b981);
+    --prog-track: #e2e8f0;
+    --tag-bg: var(--c-tag-bg-light);
+    --tag-text: var(--c-tag-text-light);
+    --divider: #e2e8f0;
+    --copy-bg: rgba(2, 132, 199, 0.08);
+    --copy-border: rgba(2, 132, 199, 0.28);
+    --card-sub-bg: #f1f5f9;
+    --danger: var(--c-danger-light);
+    --success: var(--c-pos-light);
+    --warning: var(--c-warning-light);
+    --scrollbar-thumb: var(--c-scroll-thumb-light);
+    --scrollbar-track: var(--c-scroll-track-light);
+}
+
+html[data-theme="dark"],
 body.theme-dark,
 body.theme-night {
-    --page-bg: #0b1120;
-    --surface-bg: #111827;
-    --surface-sub: #1e293b;
-    --glass-bg: rgba(17, 24, 39, 0.88);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-card-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
-    --btn-grad: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
-    --btn-text: #04192b;
-    --accent-text: #22d3ee;
-    --accent-glow: rgba(34, 211, 238, 0.24);
-    --head-text: #f8fafc;
-    --body-text: #cbd5e1;
-    --text-muted: #94a3b8;
-    --stat-pos: #34d399;
-    --inp-bg: rgba(15, 23, 42, 0.8);
-    --inp-border: rgba(255, 255, 255, 0.12);
-    --inp-focus: #22d3ee;
-    --inp-ring: rgba(34, 211, 238, 0.2);
-    --prog-fill: linear-gradient(90deg, #22d3ee, #10b981);
+    color-scheme: dark;
+    --page-bg: var(--c-page-dark);
+    --surface-bg: var(--c-surface-dark);
+    --surface-sub: var(--c-surface-sub-dark);
+    --glass-bg: var(--c-glass-dark);
+    --glass-border: var(--c-border-dark);
+    --glass-card-shadow: 0 20px 56px -16px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --btn-grad: var(--c-btn-grad-dark);
+    --btn-text: var(--c-btn-text-dark);
+    --accent-text: var(--c-accent-dark);
+    --accent-glow: var(--c-accent-glow-dark);
+    --head-text: var(--c-head-dark);
+    --body-text: var(--c-body-dark);
+    --text-muted: var(--c-muted-dark);
+    --stat-pos: var(--c-pos-dark);
+    --inp-bg: var(--c-inp-bg-dark);
+    --inp-border: var(--c-border-strong-dark);
+    --inp-focus: var(--c-accent-strong-dark);
+    --inp-ring: rgba(56, 189, 248, 0.24);
+    --focus-ring: var(--c-accent-strong-dark);
+    --prog-fill: linear-gradient(90deg, #38bdf8, #34d399);
     --prog-track: rgba(255, 255, 255, 0.08);
-    --tag-bg: rgba(34, 211, 238, 0.12);
-    --tag-text: #38bdf8;
-    --divider: rgba(255, 255, 255, 0.08);
-    --copy-bg: rgba(34, 211, 238, 0.12);
-    --copy-border: rgba(34, 211, 238, 0.28);
-    --card-sub-bg: rgba(255, 255, 255, 0.04);
-    --danger: #ef4444;
-    --success: #10b981;
-    --warning: #f59e0b;
+    --tag-bg: var(--c-tag-bg-dark);
+    --tag-text: var(--c-tag-text-dark);
+    --divider: rgba(148, 163, 184, 0.14);
+    --copy-bg: rgba(56, 189, 248, 0.1);
+    --copy-border: rgba(56, 189, 248, 0.28);
+    --card-sub-bg: rgba(255, 255, 255, 0.035);
+    --danger: var(--c-danger-dark);
+    --success: var(--c-pos-dark);
+    --warning: var(--c-warning-dark);
+    --scrollbar-thumb: var(--c-scroll-thumb-dark);
+    --scrollbar-track: var(--c-scroll-track-dark);
+}
+
+/* Global Accessible Focus Ring (:focus-visible) */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--focus-ring, CanvasText);
+    outline-offset: 2px;
+}
+
+/* Visually Hidden Utility (keeps skip links & SR context in accessibility tree) */
+.visually-hidden:where(:not(:focus-within, :active)) {
+    position: absolute !important;
+    clip-path: inset(50%) !important;
+    overflow: hidden !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    white-space: nowrap !important;
+}
+
+.skip-link:focus {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 10001;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--surface-bg);
+    color: var(--head-text);
+    border: 2px solid var(--focus-ring);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-decoration: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Windows Forced Colors / High Contrast Mode Resilience */
+@media (forced-colors: active) {
+    .glass-card,
+    .bento-card,
+    .history-item,
+    .rag-sidebar,
+    .telemetry-bar,
+    dialog.studio-dialog {
+        border: 1px solid CanvasText;
+    }
+
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+        outline: 2px solid Highlight;
+        outline-offset: 2px;
+    }
+
+    .mode-pill.active,
+    .nav-tab.active,
+    .bento-model-pill.active {
+        border: 2px solid Highlight;
+    }
+}
+
+/* Global Reduced-Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

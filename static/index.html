@@ -3,1845 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <meta name="description" content="Oryx Intelligence Engine — CRISP framework powered prompt & token optimization">
-    <title>Oryx Intelligence Engine</title>
+    <title>Oryx Studio — Prompt &amp; Token Optimization</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles/tokens.css" />
-    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles/tokens.css?v=20261120" />
+    <link rel="stylesheet" href="styles/studio.css?v=20261120" />
     <style>
-        /* ── Design Tokens & Themes ───────────────────────── */
-        :root, body.theme-night {
-            --page-bg: #070a12;
-            --glass-bg: rgba(13, 19, 33, 0.78);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-card-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
-            --btn-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            --btn-text: #051329;
-            --accent-text: #00f2fe;
-            --accent-glow: rgba(0, 242, 254, 0.25);
-            --head-text: #f8fafc;
-            --body-text: #94a3b8;
-            --text-muted: #64748b;
-            --stat-pos: #10b981;
-            --inp-bg: rgba(8, 13, 24, 0.65);
-            --inp-border: rgba(255, 255, 255, 0.1);
-            --inp-focus: #00f2fe;
-            --inp-ring: rgba(0, 242, 254, 0.18);
-            --prog-fill: linear-gradient(90deg, #00f2fe, #10b981);
-            --prog-track: rgba(255, 255, 255, 0.06);
-            --tag-bg: rgba(0, 242, 254, 0.12);
-            --tag-text: #38bdf8;
-            --divider: rgba(255, 255, 255, 0.08);
-            --copy-bg: rgba(0, 242, 254, 0.1);
-            --copy-border: rgba(0, 242, 254, 0.25);
-            --card-sub-bg: rgba(255, 255, 255, 0.03);
-            --danger: #ef4444;
-            --success: #10b981;
-        }
+        /* Critical-path desktop container & responsive breakpoints */
+        .glass-card { max-width: 1160px; }
 
-        body.theme-morning {
-            --page-bg: #f5f4ef;
-            --glass-bg: rgba(255, 255, 255, 0.82);
-            --glass-border: rgba(0, 0, 0, 0.08);
-            --glass-card-shadow: 0 24px 64px -12px rgba(180, 140, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
-            --btn-grad: linear-gradient(135deg, #ffd740, #f5a800);
-            --btn-text: #2a1a00;
-            --accent-text: #b47a00;
-            --accent-glow: rgba(245, 168, 0, 0.25);
-            --head-text: #111827;
-            --body-text: #4b5563;
-            --text-muted: #6b7280;
-            --stat-pos: #059669;
-            --inp-bg: rgba(255, 255, 255, 0.9);
-            --inp-border: rgba(200, 160, 0, 0.28);
-            --inp-focus: #f5a800;
-            --inp-ring: rgba(255, 215, 0, 0.2);
-            --prog-fill: linear-gradient(90deg, #ffd740, #f5a800);
-            --prog-track: rgba(200, 170, 0, 0.15);
-            --tag-bg: rgba(245, 168, 0, 0.14);
-            --tag-text: #b47a00;
-            --divider: rgba(0, 0, 0, 0.08);
-            --copy-bg: rgba(255, 220, 0, 0.14);
-            --copy-border: rgba(200, 160, 0, 0.3);
-            --card-sub-bg: rgba(0, 0, 0, 0.02);
-        }
-
-        body.theme-afternoon {
-            --page-bg: #0b1526;
-            --glass-bg: rgba(15, 28, 51, 0.8);
-            --glass-border: rgba(56, 189, 248, 0.12);
-            --glass-card-shadow: 0 24px 64px -12px rgba(2, 132, 199, 0.25), 0 0 0 1px rgba(56, 189, 248, 0.1);
-            --btn-grad: linear-gradient(135deg, #38bdf8, #0284c7);
-            --btn-text: #04192b;
-            --accent-text: #38bdf8;
-            --accent-glow: rgba(56, 189, 248, 0.25);
-            --head-text: #f0f9ff;
-            --body-text: #94a3b8;
-            --text-muted: #64748b;
-            --stat-pos: #34d399;
-            --inp-bg: rgba(10, 20, 38, 0.7);
-            --inp-border: rgba(56, 189, 248, 0.22);
-            --inp-focus: #38bdf8;
-            --inp-ring: rgba(56, 189, 248, 0.2);
-            --prog-fill: linear-gradient(90deg, #38bdf8, #0284c7);
-            --prog-track: rgba(56, 189, 248, 0.1);
-            --tag-bg: rgba(56, 189, 248, 0.15);
-            --tag-text: #38bdf8;
-            --divider: rgba(255, 255, 255, 0.08);
-            --copy-bg: rgba(56, 189, 248, 0.12);
-            --copy-border: rgba(56, 189, 248, 0.25);
-            --card-sub-bg: rgba(255, 255, 255, 0.03);
-        }
-
-        body.theme-rain {
-            --page-bg: #090e17;
-            --glass-bg: rgba(13, 20, 32, 0.85);
-        }
-
-        body.theme-snow {
-            --page-bg: #f8fafc;
-            --glass-bg: rgba(255, 255, 255, 0.92);
-        }
-
-        /* ── User RAG & Quality Drawer ────────────────────── */
-        .ask-layout {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
-        @media (max-width: 900px) {
-            .ask-layout { grid-template-columns: 1fr; }
-        }
-        .rag-sidebar {
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 14px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .rag-source-toggle {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 10px;
-            padding: 4px;
-        }
-        .rag-source-option {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            padding: 6px 8px;
-            border-radius: 7px;
-            font-size: 11.5px;
-            font-weight: 600;
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: background 0.15s ease, color 0.15s ease;
-        }
-        .rag-source-option input {
-            margin: 0;
-            accent-color: var(--accent, #00c2ff);
-        }
-        .rag-source-option.active {
-            background: var(--tag-bg);
-            color: var(--head-text);
-        }
-        .rag-local-card {
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 10px;
-            padding: 10px;
-            font-size: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .rag-doc-item {
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 10px;
-            padding: 8px 10px;
-        }
-        .rag-doc-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .rag-doc-meta { flex: 1; min-width: 0; }
-        .rag-doc-name {
-            font-weight: 600;
-            color: var(--head-text);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .rag-doc-sub { font-size: 11px; color: var(--text-muted); }
-        .rag-status-pill {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 99px;
-            text-transform: uppercase;
-            font-weight: 600;
-            background: var(--tag-bg);
-            color: var(--tag-text);
-        }
-        .rag-del-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .rag-del-btn:hover { color: var(--danger); }
-        .rag-empty-note {
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.45;
-        }
-        .quality-breakdown {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 8px 12px;
-            border-radius: 10px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            font-size: 11.5px;
-            color: var(--body-text);
-        }
-        .hidden {
-            display: none !important;
-        }
-        .adv-options-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 14px;
-            font-size: 12px;
-            color: var(--body-text);
-            padding: 6px 2px;
-        }
-        .adv-options-row label {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-        }
-
-        /* ── Base Setup ───────────────────────────────────── */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--page-bg);
-            color: var(--body-text);
-            min-height: 100vh;
-            overflow-x: hidden;
-            transition: background 0.6s ease, color 0.6s ease;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* ── High-Efficiency Ambient Background (0 CPU Churn) ── */
-        .tc-root {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            padding: 40px 20px 80px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Static GPU-accelerated ambient glows (no continuous blur recalculations) */
-        .bubble {
-            position: absolute;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0;
-            transform: translateZ(0);
-        }
-        .bubble-1 {
-            width: 520px;
-            height: 520px;
-            top: -180px;
-            left: 50%;
-            transform: translateX(-50%) translateZ(0);
-            background: radial-gradient(circle at center, rgba(0, 242, 254, 0.12) 0%, rgba(79, 172, 254, 0.04) 50%, transparent 75%);
-        }
-        .bubble-2 {
-            width: 440px;
-            height: 440px;
-            bottom: -120px;
-            right: 5%;
-            background: radial-gradient(circle at center, rgba(139, 92, 246, 0.1) 0%, rgba(0, 242, 254, 0.02) 50%, transparent 75%);
-        }
-
-        /* ── Glass Workbench Card ─────────────────────────── */
-        .glass-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border: 1px solid var(--glass-border);
-            border-radius: 24px;
-            padding: 36px 40px;
-            box-shadow: var(--glass-card-shadow);
-            max-width: 1160px;
-            width: 100%;
-            position: relative;
-            z-index: 2;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        /* ── Header & Branding ────────────────────────────── */
-        .tc-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        .tc-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .tc-logo-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 12px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 16px rgba(0, 242, 254, 0.15);
-        }
-        .tc-logo-text {
-            font-family: 'Syne', sans-serif;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--head-text);
-            letter-spacing: -0.4px;
-        }
-        .tc-logo-text span {
-            color: var(--accent-text);
-        }
-        .engine-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 99px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            background: var(--tag-bg);
-            color: var(--tag-text);
-            border: 1px solid var(--glass-border);
-        }
-        .engine-pulse-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #10b981;
-            box-shadow: 0 0 8px #10b981;
-            animation: pulseLight 2s infinite ease-in-out;
-        }
-        @keyframes pulseLight {
-            0%, 100% { opacity: 0.6; transform: scale(0.9); }
-            50% { opacity: 1; transform: scale(1.2); }
-        }
-
-        .tc-headline {
-            font-family: 'Syne', sans-serif;
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--head-text);
-            letter-spacing: -0.5px;
-            line-height: 1.25;
-            margin: 0 0 4px;
-        }
-        .tc-sub {
-            font-size: 13.5px;
-            font-weight: 400;
-            color: var(--body-text);
-            margin: 0 0 28px;
-        }
-
-        .section-label {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 11.5px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1.1px;
-            color: var(--accent-text);
-            margin-bottom: 8px;
-            margin-top: 14px;
-        }
-        .word-counter-pill {
-            font-size: 11px;
-            font-weight: 500;
-            font-family: 'JetBrains Mono', monospace;
-            padding: 2px 8px;
-            border-radius: 6px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            color: var(--text-muted);
-            text-transform: none;
-            letter-spacing: 0;
-            transition: color 0.2s, border-color 0.2s;
-        }
-        .word-counter-pill.badge-valid {
-            color: var(--success);
-            border-color: rgba(16, 185, 129, 0.35);
-        }
-
-        .tag {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 500;
-            background: var(--tag-bg);
-            color: var(--tag-text);
-            margin-bottom: 16px;
-        }
-
-        /* ── Input & Form Elements ────────────────────────── */
-        form { margin-bottom: 0; }
-        .form-row { margin-bottom: 16px; position: relative; }
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-
-        .tc-input, .tc-textarea {
-            width: 100%;
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            color: var(--head-text);
-            background: var(--inp-bg);
-            border: 1px solid var(--inp-border);
-            border-radius: 12px;
-            outline: none;
-            box-sizing: border-box;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-        }
-        .tc-input { padding: 12px 16px; }
-        .tc-textarea {
-            min-height: 130px;
-            padding: 14px 16px;
-            line-height: 1.6;
-            resize: vertical;
-        }
-        .tc-input:focus, .tc-textarea:focus {
-            border-color: var(--inp-focus);
-            box-shadow: 0 0 0 3px var(--inp-ring);
-        }
-        .tc-input::placeholder, .tc-textarea::placeholder { color: var(--text-muted); }
-
-        .select-wrap {
-            position: relative;
-            flex: 1;
-            min-width: 140px;
-        }
-        .tc-select {
-            width: 100%;
-            appearance: none;
-            padding: 12px 36px 12px 16px;
-            font-family: 'Inter', sans-serif;
-            font-size: 13.5px;
-            font-weight: 500;
-            color: var(--head-text);
-            background: var(--inp-bg);
-            border: 1px solid var(--inp-border);
-            border-radius: 12px;
-            outline: none;
-            cursor: pointer;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .tc-select:focus {
-            border-color: var(--inp-focus);
-            box-shadow: 0 0 0 3px var(--inp-ring);
-        }
-        .select-chevron {
-            position: absolute;
-            right: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            color: var(--accent-text);
-            font-size: 10px;
-        }
-
-        /* ── Action Buttons ───────────────────────────────── */
-        .tc-compress-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            padding: 14px 28px;
-            font-family: 'Syne', sans-serif;
-            font-size: 15px;
-            font-weight: 700;
-            letter-spacing: 0.2px;
-            color: var(--btn-text);
-            background: var(--btn-grad);
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            box-shadow: 0 4px 20px var(--accent-glow);
-            transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-            margin-top: 10px;
-        }
-        .tc-compress-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 24px var(--accent-glow);
-        }
-        .tc-compress-btn:active {
-            transform: scale(0.98);
-        }
-        .tc-compress-btn:disabled,
-        .tc-compress-btn[disabled] {
-            opacity: 0.45 !important;
-            cursor: not-allowed !important;
-            filter: grayscale(60%) !important;
-            pointer-events: none !important;
-            box-shadow: none !important;
-            transform: none !important;
-        }
-        .shortcut-hint {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            margin-top: 8px;
-            font-size: 11.5px;
-            color: var(--text-muted);
-        }
-        .shortcut-hint kbd {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-size: 10.5px;
-            color: var(--head-text);
-        }
-
-        .clear-btn, .copy-btn, .btn-ghost {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 8px 16px;
-            font-family: 'Inter', sans-serif;
-            font-size: 12.5px;
-            font-weight: 500;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        .clear-btn {
-            color: var(--body-text);
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-        }
-        .clear-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--head-text);
-        }
-        .copy-btn {
-            color: var(--accent-text);
-            background: var(--copy-bg);
-            border: 1px solid var(--copy-border);
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-        .copy-btn:hover {
-            background: rgba(0, 242, 254, 0.2);
-            color: #fff;
-        }
-        .copy-btn.btn-copied {
-            background: rgba(16, 185, 129, 0.2) !important;
-            border-color: rgba(16, 185, 129, 0.4) !important;
-            color: #10b981 !important;
-        }
-        .btn-success-sm {
-            padding: 7px 16px;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: #fff;
-            background: rgba(16, 185, 129, 0.85);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .btn-success-sm:hover { background: #10b981; }
-        .btn-danger-sm {
-            padding: 7px 16px;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: #fff;
-            background: rgba(239, 68, 68, 0.8);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .btn-danger-sm:hover { background: #ef4444; }
-        .btn-ghost {
-            background: transparent;
-            border: 1px solid var(--glass-border);
-            color: var(--body-text);
-        }
-        .btn-ghost:hover {
-            background: var(--card-sub-bg);
-            color: var(--head-text);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        /* ── Tabs & Nav ───────────────────────────────────── */
-        .auth-tabs {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 24px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            padding: 4px;
-            border-radius: 12px;
-        }
-        .auth-tab {
-            flex: 1;
-            padding: 9px;
-            text-align: center;
-            border: none;
-            background: transparent;
-            color: var(--body-text);
-            font-family: 'Inter', sans-serif;
-            font-size: 13.5px;
-            font-weight: 500;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .auth-tab.active {
-            background: var(--glass-bg);
-            color: var(--head-text);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-            border: 1px solid var(--glass-border);
-        }
-        .auth-form { display: none; animation: fadeIn 0.25s ease; }
-        .auth-form.active { display: block; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .user-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding: 12px 18px;
-            background: var(--card-sub-bg);
-            border-radius: 14px;
-            border: 1px solid var(--glass-border);
-        }
-        .user-info { font-size: 13px; color: var(--body-text); }
-        .user-info strong { color: var(--head-text); font-weight: 600; }
-
-        .nav-bar {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 24px;
-            border-bottom: 1px solid var(--divider);
-            padding-bottom: 8px;
-            flex-wrap: wrap;
-        }
-        .nav-tab {
-            padding: 8px 16px;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-family: 'Inter', sans-serif;
-            font-size: 13.5px;
-            font-weight: 500;
-            border-radius: 8px;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.2s;
-        }
-        .nav-tab:hover { color: var(--head-text); background: var(--card-sub-bg); }
-        .nav-tab.active {
-            color: var(--accent-text);
-            font-weight: 600;
-            background: var(--tag-bg);
-        }
-        .nav-tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -9px;
-            left: 15%;
-            width: 70%;
-            height: 2px;
-            background: var(--accent-text);
-            border-radius: 2px;
-            box-shadow: 0 0 8px var(--accent-text);
-        }
-        .tab-content { display: none; animation: fadeIn 0.25s ease; }
-        .tab-content.active { display: block; }
-
-        /* ── Metric Cards ─────────────────────────────────── */
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin: 20px 0 16px;
-        }
-        .stat-card {
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 14px;
-            padding: 16px 14px;
-            text-align: center;
-            transition: border-color 0.2s;
-        }
-        .stat-card:hover { border-color: rgba(255, 255, 255, 0.16); }
-        .stat-val {
-            font-family: 'Syne', sans-serif;
-            font-size: 26px;
-            font-weight: 700;
-            color: var(--head-text);
-            line-height: 1.1;
-            margin-bottom: 6px;
-        }
-        .stat-val.positive { color: var(--stat-pos); }
-        .stat-lbl {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-weight: 600;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-        }
-
-        /* ── Insights Bento Dashboard (2026 Telemetry UI) ─── */
-        .insights-shell {
-            container-type: inline-size;
-            width: 100%;
-        }
-        .insights-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-        .insights-subtitle {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-        .insights-refresh-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 99px;
-            border: 1px solid var(--glass-border);
-            background: var(--card-sub-bg);
-            color: var(--body-text);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: border-color 0.2s, color 0.2s;
-        }
-        .insights-refresh-btn:hover {
-            border-color: var(--accent-text);
-            color: var(--head-text);
-        }
-        .insights-bento {
-            display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap: 14px;
-            margin-top: 8px;
-        }
-        .bento-card {
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 18px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            transition: border-color 0.2s ease, transform 0.2s ease;
-            min-width: 0;
-        }
-        .bento-card:hover {
-            border-color: var(--accent-glow);
-        }
-        .bento-span-6 { grid-column: span 6; }
-        .bento-span-3 { grid-column: span 3; }
-        .bento-span-7 { grid-column: span 7; }
-        .bento-span-5 { grid-column: span 5; }
-        .bento-span-12 { grid-column: span 12; }
-        .bento-eyebrow {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.7px;
-            text-transform: uppercase;
-            color: var(--text-muted);
-        }
-        .bento-badge {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 9px;
-            border-radius: 99px;
-            background: var(--tag-bg);
-            color: var(--tag-text);
-            font-variant-numeric: tabular-nums;
-            text-transform: none;
-            letter-spacing: 0;
-        }
-        .bento-badge.positive {
-            background: rgba(16, 185, 129, 0.14);
-            color: var(--stat-pos);
-        }
-        .bento-hero-val {
-            font-family: 'Syne', sans-serif;
-            font-size: 36px;
-            font-weight: 800;
-            line-height: 1.05;
-            color: var(--stat-pos);
-            font-variant-numeric: tabular-nums;
-            letter-spacing: -0.02em;
-        }
-        .bento-kpi-val {
-            font-family: 'Syne', sans-serif;
-            font-size: 28px;
-            font-weight: 700;
-            line-height: 1.1;
-            color: var(--head-text);
-            font-variant-numeric: tabular-nums;
-        }
-        .bento-kpi-foot {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-variant-numeric: tabular-nums;
-            margin-top: auto;
-        }
-        .bento-cost-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 10px;
-            padding-top: 10px;
-            border-top: 1px solid var(--divider);
-            margin-top: auto;
-        }
-        .bento-cost-readout {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .bento-cost-amount {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--head-text);
-            font-variant-numeric: tabular-nums;
-        }
-        .bento-cost-sub {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .bento-model-pills {
-            display: inline-flex;
-            padding: 3px;
-            border-radius: 10px;
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-            gap: 2px;
-        }
-        .bento-model-pill {
-            border: none;
-            background: transparent;
-            color: var(--text-muted);
-            font-size: 11px;
-            font-weight: 600;
-            padding: 4px 8px;
-            border-radius: 7px;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s;
-        }
-        .bento-model-pill.active {
-            background: var(--tag-bg);
-            color: var(--accent-text);
-        }
-        .bento-chart-wrap {
-            width: 100%;
-            min-height: 165px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .bento-chart-svg {
-            width: 100%;
-            height: 165px;
-            overflow: visible;
-        }
-        .bento-legend {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 11px;
-            color: var(--text-muted);
-            text-transform: none;
-            letter-spacing: 0;
-        }
-        .bento-dot {
-            display: inline-block;
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            margin-right: 4px;
-        }
-        .mode-stack-bar {
-            display: flex;
-            height: 10px;
-            border-radius: 99px;
-            overflow: hidden;
-            background: var(--prog-track);
-            gap: 2px;
-        }
-        .mode-stack-seg {
-            height: 100%;
-            transition: width 0.35s ease;
-        }
-        .bento-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .bento-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            font-size: 12.5px;
-            color: var(--body-text);
-        }
-        .bento-row-meta {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11.5px;
-            color: var(--text-muted);
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-        .domain-bar-track {
-            flex: 1;
-            height: 6px;
-            border-radius: 99px;
-            background: var(--prog-track);
-            overflow: hidden;
-        }
-        .domain-bar-fill {
-            height: 100%;
-            border-radius: 99px;
-            background: var(--prog-fill);
-        }
-        .top-run-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 10px 12px;
-            border-radius: 12px;
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-        }
-        .top-run-preview {
-            font-size: 12.5px;
-            color: var(--head-text);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 340px;
-        }
-        .top-run-tags {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 4px;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-        .insights-empty {
-            text-align: center;
-            padding: 40px 20px;
-            align-items: center;
-        }
-        @container (max-width: 780px) {
-            .bento-span-6, .bento-span-3, .bento-span-7, .bento-span-5 {
-                grid-column: span 12;
-            }
-            .top-run-preview { max-width: 210px; }
-        }
-        @media (max-width: 780px) {
-            .bento-span-6, .bento-span-3, .bento-span-7, .bento-span-5 {
-                grid-column: span 12;
-            }
-        }
-
-        /* ── Progress Bar ─────────────────────────────────── */
-        .progress-bar-wrap {
-            height: 6px;
-            background: var(--prog-track);
-            border-radius: 99px;
-            overflow: hidden;
-            margin: 12px 0 6px;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            background: var(--prog-fill);
-            border-radius: 99px;
-            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            width: 0%;
-        }
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11.5px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-
-        /* ── Output Box ───────────────────────────────────── */
-        .output-box {
-            background: var(--inp-bg);
-            border: 1px solid var(--inp-border);
-            border-radius: 14px;
-            padding: 18px 20px;
-            font-size: 13px;
-            line-height: 1.65;
-            color: var(--head-text);
-            min-height: 80px;
-            font-family: 'JetBrains Mono', monospace;
-            word-break: break-word;
-            white-space: pre-wrap;
-            box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
-        }
-        .feedback-row {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 14px;
-            flex-wrap: wrap;
-        }
-
-        hr.divider {
-            border: none;
-            border-top: 1px solid var(--divider);
-            margin: 22px 0;
-        }
-
-        /* ── Badges ───────────────────────────────────────── */
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 99px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.2px;
-        }
-        .badge-accent {
-            background: rgba(0, 242, 254, 0.12);
-            color: #38bdf8;
-            border: 1px solid rgba(0, 242, 254, 0.25);
-        }
-        .badge-success {
-            background: rgba(16, 185, 129, 0.14);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.25);
-        }
-
-        /* ── History Timeline (Modern Bento Activity Feed) ── */
-        .history-shell {
-            container-type: inline-size;
-            width: 100%;
-        }
-        .history-toolbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 14px;
-        }
-        .history-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-        .history-search-wrap {
-            position: relative;
-            flex: 1;
-            min-width: 210px;
-        }
-        .history-search-wrap .tc-input {
-            width: 100%;
-            padding: 8px 12px 8px 32px;
-            font-size: 12.5px;
-        }
-        .history-search-icon {
-            position: absolute;
-            left: 11px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 12px;
-            color: var(--text-muted);
-            pointer-events: none;
-        }
-        .history-group-label {
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.7px;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin: 16px 0 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .history-group-label::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--divider);
-        }
-        .history-item {
-            padding: 15px 18px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 14px;
-            margin-bottom: 10px;
-            transition: border-color 0.2s ease, background 0.2s ease;
-        }
-        .history-item:hover {
-            border-color: var(--accent-glow);
-        }
-        .history-item-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 8px;
-        }
-        .history-item-badges {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .history-item-time {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: var(--text-muted);
-            font-variant-numeric: tabular-nums;
-        }
-        .history-preview {
-            font-size: 13px;
-            line-height: 1.45;
-            color: var(--head-text);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        .history-meta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-            font-size: 11.5px;
-            color: var(--text-muted);
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid var(--divider);
-        }
-        .history-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .history-btn {
-            border: 1px solid var(--glass-border);
-            background: var(--inp-bg);
-            color: var(--body-text);
-            border-radius: 8px;
-            padding: 4px 10px;
-            font-size: 11.5px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .history-btn:hover {
-            border-color: var(--accent-text);
-            color: var(--head-text);
-        }
-        .history-btn.primary {
-            background: var(--tag-bg);
-            color: var(--accent-text);
-            border-color: transparent;
-        }
-        .history-diff-drawer {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px dashed var(--divider);
-        }
-        .history-diff-pane {
-            background: var(--inp-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 10px;
-            padding: 10px 12px;
-            min-width: 0;
-        }
-        .history-diff-pane-title {
-            font-size: 10.5px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
-        .history-diff-pane pre {
-            margin: 0;
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11.5px;
-            line-height: 1.45;
-            color: var(--body-text);
-            max-height: 180px;
-            overflow-y: auto;
-        }
-        @container (max-width: 720px) {
-            .history-diff-drawer { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 720px) {
-            .history-diff-drawer { grid-template-columns: 1fr; }
-        }
-
-        /* ── Toast Notifications ──────────────────────────── */
-        .toast {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            padding: 14px 22px;
-            border-radius: 12px;
-            font-size: 13.5px;
-            font-weight: 500;
-            z-index: 10000;
-            animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            max-width: 380px;
-            box-shadow: 0 12px 36px rgba(0,0,0,0.35);
-            backdrop-filter: blur(12px);
-        }
-        .toast-error { 
-            background: rgba(220, 38, 38, 0.92);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        .toast-success { 
-            background: rgba(16, 185, 129, 0.92);
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* ── Zero-RAM Vector Neural HUD Overlay ──────────── */
-        #neuro-progress-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(7, 10, 18, 0.88);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            z-index: 9999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            font-family: 'Syne', sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-        .brain-loader {
-            width: 100px;
-            height: 100px;
-            position: relative;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        /* Lightweight SVG Neural Ring Loader (Zero Bitmap Memory) */
-        .vector-neural-ring {
-            width: 90px;
-            height: 90px;
-            animation: ringSpin 2.2s linear infinite;
-            will-change: transform;
-        }
-        @keyframes ringSpin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .vector-neural-ring circle {
-            fill: none;
-            stroke-width: 3.5;
-            stroke-linecap: round;
-        }
-        .ring-bg {
-            stroke: rgba(255, 255, 255, 0.08);
-        }
-        .ring-pulse {
-            stroke: var(--accent-text);
-            stroke-dasharray: 140, 200;
-            stroke-dashoffset: 0;
-            animation: ringDash 1.6s ease-in-out infinite;
-        }
-        @keyframes ringDash {
-            0% { stroke-dashoffset: 0; }
-            50% { stroke-dashoffset: -70; }
-            100% { stroke-dashoffset: -140; }
-        }
-        .brain-center-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #progress-status {
-            font-size: 1.15rem;
-            font-weight: 700;
-            letter-spacing: 0.8px;
-            text-transform: uppercase;
-            max-width: 480px;
-            color: #f8fafc;
-            margin-bottom: 8px;
-        }
-        .progress-subtext {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            font-family: 'Inter', sans-serif;
-            font-weight: 400;
-            max-width: 420px;
-        }
-        #neuron-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        /* ── R1-R5 Workbench Redesign Styles ─────────────── */
-        .header-right-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .sandbox-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 4px 10px;
-            border-radius: 99px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #10b981;
-        }
-        .sandbox-badge.authenticated {
-            background: rgba(56, 189, 248, 0.12);
-            border-color: rgba(56, 189, 248, 0.35);
-            color: #38bdf8;
-        }
-        .icon-btn-header {
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            color: var(--head-text);
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .icon-btn-header:hover {
-            border-color: var(--accent-text);
-            transform: translateY(-1px);
-        }
-
-        /* ── 2-Column Split Workbench ─────────────────────── */
-        .workbench-split {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            align-items: stretch;
-            margin-top: 14px;
-        }
-        .pane-column {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .pane-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 8px;
-            min-height: 34px;
-        }
-        .pane-title {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            color: var(--text-muted);
-        }
-        .token-pill {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            color: var(--text-muted);
-            padding: 2px 8px;
-            border-radius: 6px;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-        }
-
-        /* ── Presets Strip ─────────────────────────────────── */
-        .preset-strip {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
-        .preset-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-        .preset-chip {
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 11.5px;
-            font-weight: 500;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            color: var(--body-text);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            user-select: none;
-        }
-        .preset-chip:hover {
-            border-color: var(--accent-text);
-            color: var(--head-text);
-            background: var(--tag-bg);
-        }
-
-        /* ── Textarea & Dropzone ───────────────────────────── */
-        .textarea-dropzone-wrap {
-            position: relative;
-            width: 100%;
-            border-radius: 14px;
-            display: flex;
-            flex-direction: column;
-        }
-        .workbench-textarea {
-            display: block;
-            min-height: 220px;
-            height: 240px;
-            resize: vertical;
-            width: 100%;
-            font-family: 'Inter', sans-serif;
-            font-size: 13.5px;
-            line-height: 1.6;
-        }
-        .drop-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(8, 13, 24, 0.88);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            border: 2px dashed var(--accent-text);
-            border-radius: 12px;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            z-index: 10;
-            color: var(--head-text);
-            font-size: 13px;
-            font-weight: 600;
-            pointer-events: none;
-        }
-        .textarea-dropzone-wrap.drop-active .drop-overlay {
-            display: flex;
-        }
-
-        /* ── Meta & Ingestion Row ──────────────────────────── */
-        .pane-meta-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .file-upload-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11.5px;
-            padding: 5px 12px;
-            border-radius: 8px;
-            border: 1px dashed var(--glass-border);
-            background: var(--card-sub-bg);
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .file-upload-btn:hover {
-            border-color: var(--accent-text);
-            color: var(--head-text);
-        }
-        .domain-chip {
-            font-size: 11.5px;
-            color: var(--text-muted);
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .domain-chip strong {
-            color: var(--accent-text);
-            font-weight: 600;
-        }
-
-        /* ── Segmented Mode Selection Pills ───────────────── */
-        .segmented-mode-pills {
-            display: inline-flex;
-            background: var(--card-sub-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 10px;
-            padding: 3px;
-            gap: 3px;
-        }
-        .mode-pill {
-            padding: 6px 14px;
-            border-radius: 7px;
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .mode-pill:hover {
-            color: var(--head-text);
-        }
-        .mode-pill.active {
-            background: var(--btn-grad);
-            color: var(--btn-text);
-            font-weight: 700;
-            box-shadow: 0 2px 8px var(--accent-glow);
-        }
-        .mode-pill:disabled,
-        .mode-pill.mode-pill-disabled {
-            opacity: 0.42;
-            cursor: not-allowed;
-        }
-        .mode-pill:disabled:hover,
-        .mode-pill.mode-pill-disabled:hover {
-            color: var(--text-muted);
-        }
-
-        .pane-controls-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .pane-actions-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 4px;
-        }
-        .clear-btn {
-            padding: 12px 18px;
-            font-size: 13px;
-            border-radius: 12px;
-            background: transparent;
-            border: 1px solid var(--glass-border);
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .clear-btn:hover {
-            border-color: var(--inp-border);
-            color: var(--head-text);
-        }
-        .workbench-compress-btn {
-            flex: 1;
-            margin-top: 0 !important;
-        }
-
-        /* ── Output Pane & Diffs ──────────────────────────── */
-        .tes-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 3px 9px;
-            border-radius: 99px;
-            background: rgba(16, 185, 129, 0.12);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #10b981;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .diff-toggle-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11.5px;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
-        }
-        .diff-toggle-label input[type="checkbox"] {
-            accent-color: var(--accent-text);
-            cursor: pointer;
-        }
-        .diff-removed {
-            display: block;
-            color: #ef4444;
-            text-decoration: line-through;
-            opacity: 0.8;
-            margin-bottom: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11.5px;
-            background: rgba(239, 68, 68, 0.08);
-            padding: 4px 8px;
-            border-radius: 6px;
-            border-left: 3px solid #ef4444;
-        }
-        .crisp-tag {
-            color: var(--accent-text, #00f2fe);
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .workbench-output {
-            min-height: 220px;
-            height: 240px;
-            overflow-y: auto;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12.5px;
-            line-height: 1.6;
-            padding: 16px;
-            background: var(--inp-bg);
-            border-radius: 14px;
-            border: 1px solid var(--inp-border);
-            color: var(--head-text);
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        /* ── Non-Blocking Inline Progress Skeleton ────────── */
-        .skeleton-wrap {
-            padding: 16px;
-            background: var(--card-sub-bg);
-            border-radius: 14px;
-            border: 1px solid var(--glass-border);
-            margin-bottom: 8px;
-        }
-        .inline-progress-bar {
-            height: 4px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-bottom: 12px;
-        }
-        .inline-progress-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--btn-grad);
-            transition: width 0.3s ease;
-        }
-        .skeleton-status {
-            font-size: 12px;
-            color: var(--accent-text);
-            font-weight: 600;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .skeleton-line {
-            height: 12px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(0, 242, 254, 0.12) 50%, rgba(255, 255, 255, 0.04) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.8s infinite linear;
-        }
-        .shimmer-w80 { width: 80%; }
-        .shimmer-w100 { width: 100%; }
-        .shimmer-w60 { width: 60%; }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-
-        /* ── Telemetry & Pricing Bar ──────────────────────── */
-        .telemetry-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 12px 14px;
-            background: var(--card-sub-bg);
-            border-radius: 12px;
-            border: 1px solid var(--glass-border);
-            flex-wrap: wrap;
-        }
-        .telemetry-stats {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            flex-wrap: wrap;
-        }
-        .stat-tok {
-            color: var(--head-text);
-            font-weight: 600;
-        }
-        .stat-pct {
-            color: #10b981;
-            font-weight: 700;
-        }
-        .stat-cost {
-            color: var(--accent-text);
-            font-weight: 700;
-        }
-        .model-select-compact {
-            font-size: 11.5px;
-            padding: 6px 10px;
-            border-radius: 8px;
-            background: var(--inp-bg);
-            border: 1px solid var(--inp-border);
-            color: var(--head-text);
-        }
-
-        /* ── Auth Gate Card ───────────────────────────────── */
-        .auth-gate-card {
-            padding: 36px 24px;
-            text-align: center;
-            background: var(--card-sub-bg);
-            border-radius: 16px;
-            border: 1px solid var(--glass-border);
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-        .auth-gate-icon { font-size: 36px; }
-        .auth-gate-title { font-size: 16px; font-weight: 700; color: var(--head-text); }
-        .auth-gate-desc { font-size: 13px; color: var(--text-muted); max-width: 360px; line-height: 1.5; }
-
-        /* ── Responsive Layout Breakpoints (R5) ─────────────── */
         @media (max-width: 900px) {
             .glass-card {
                 max-width: 100%;
-                padding: 24px 20px;
+                padding: 1.5rem 1.25rem;
             }
-            .workbench-split {
+            .workbench-split,
+            .ask-layout {
                 grid-template-columns: 1fr;
-                gap: 20px;
+                gap: 1.25rem;
             }
-            .workbench-textarea, .workbench-output {
-                min-height: 180px;
-                height: 190px;
+            .workbench-textarea,
+            .workbench-output {
+                min-height: 13rem;
             }
         }
 
         @media (max-width: 640px) {
-            .stats-row {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
+            .stats-row,
             .form-grid {
                 grid-template-columns: 1fr;
-                gap: 12px;
+                gap: 0.75rem;
             }
             .segmented-mode-pills {
                 width: 100%;
@@ -1850,586 +44,580 @@
             .mode-pill {
                 flex: 1;
                 text-align: center;
-                padding: 8px 4px;
-                font-size: 11.5px;
+                padding: 0.5rem 0.25rem;
             }
             .telemetry-bar {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 10px;
+                gap: 0.65rem;
             }
             .pane-actions-row {
                 width: 100%;
-            }
-            .clear-btn {
-                padding: 10px 14px;
             }
         }
     </style>
 </head>
 <body class="theme-light">
+<a href="#main-content" class="skip-link visually-hidden">Skip to main content</a>
+<div id="toast-region" class="toast-region" role="status" aria-live="polite" aria-atomic="true"></div>
+
 <div class="tc-root">
-    <!-- Zero-RAM ambient background gradients -->
-    <div class="bubble bubble-1"></div>
-    <div class="bubble bubble-2"></div>
+    <!-- Subtle ambient canvas accents -->
+    <div class="bubble bubble-1" aria-hidden="true"></div>
+    <div class="bubble bubble-2" aria-hidden="true"></div>
 
     <div class="glass-card">
-        
-        <!-- Header -->
-        <div class="tc-header">
+        <!-- Header Landmark -->
+        <header class="tc-header">
             <div class="tc-logo">
-                <div class="tc-logo-icon">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="#00f2fe" stroke-width="1.8" />
-                        <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="#00f2fe" fill-opacity="0.25" />
-                        <circle cx="8.5" cy="11" r="1.8" fill="#00f2fe" />
-                        <circle cx="15.5" cy="11" r="1.8" fill="#00f2fe" />
-                        <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="#38bdf8" />
+                <div class="tc-logo-icon" aria-hidden="true">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="currentColor" stroke-width="1.8" style="color: var(--accent-text);" />
+                        <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="currentColor" fill-opacity="0.22" style="color: var(--accent-text);" />
+                        <circle cx="8.5" cy="11" r="1.7" fill="currentColor" style="color: var(--accent-text);" />
+                        <circle cx="15.5" cy="11" r="1.7" fill="currentColor" style="color: var(--accent-text);" />
+                        <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="currentColor" style="color: var(--accent-text);" />
                     </svg>
                 </div>
                 <div class="tc-logo-text">Oryx<span>Studio</span></div>
             </div>
             <div class="header-right-group">
                 <div class="engine-badge">
-                    <span class="engine-pulse-dot"></span>
+                    <span class="engine-pulse-dot" aria-hidden="true"></span>
                     <span>Prompt Engine Ready</span>
                 </div>
                 <span class="sandbox-badge" id="sandbox-badge">● Guest Mode</span>
+                <button type="button" class="icon-btn-header cmd-trigger-btn" id="btn-studio-cmd" onclick="openStudioCommandPalette()" title="Quick Actions (⌘K)" aria-label="Open Command Palette">⌘K</button>
                 <button type="button" class="icon-btn-header" id="btn-theme-toggle" onclick="toggleTheme()" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">🌙</button>
                 <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin" aria-label="Customize Skin">🎨</button>
             </div>
-        </div>
+        </header>
 
-        <h1 class="tc-headline">Oryx Studio</h1>
-        <p class="tc-sub">Make any prompt shorter, clearer, and hallucination-free for ChatGPT, Claude &amp; Gemini</p>
+        <main id="main-content" tabindex="-1">
+            <h1 class="tc-headline">Oryx Studio</h1>
+            <p class="tc-sub">Make any prompt shorter, clearer, and hallucination-free for ChatGPT, Claude &amp; Gemini</p>
 
-        <!-- ── Auth Section (Non-blocking Dialog / Popover) ── -->
-        <div id="auth-section" style="display: none; margin-bottom: 24px; padding: 22px; background: var(--card-sub-bg); border: 1px solid var(--glass-border); border-radius: 16px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                <h3 style="font-size: 15px; color: var(--head-text); font-weight: 700; margin: 0;">Account Access</h3>
-                <button type="button" class="btn-ghost" onclick="closeAuthSection()" style="padding: 4px 10px; font-size: 12px;">✕ Close</button>
+            <!-- ── Auth Overlay Section (Non-blocking modal overlay, preserves #auth-section) ── -->
+            <div id="auth-section" class="auth-overlay-shell" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title" style="display: none;">
+                <div class="auth-overlay-card">
+                    <div class="dialog-header">
+                        <h2 id="auth-dialog-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Account Access</h2>
+                        <button type="button" class="btn-ghost" onclick="closeAuthSection()" aria-label="Close Account Access">✕ Close</button>
+                    </div>
+                    <div class="auth-tabs" role="tablist" aria-label="Account actions">
+                        <button type="button" class="auth-tab active" role="tab" aria-selected="true" onclick="switchAuthTab('login')" id="tab-login">Login</button>
+                        <button type="button" class="auth-tab" role="tab" aria-selected="false" onclick="switchAuthTab('register')" id="tab-register">Register</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+                        <div class="form-row">
+                            <label for="login-username" class="section-label">Username</label>
+                            <input type="text" id="login-username" class="tc-input" autocomplete="username" placeholder="Enter username" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="login-password" class="section-label">Password</label>
+                            <input type="password" id="login-password" class="tc-input" autocomplete="current-password" placeholder="Enter password" required>
+                        </div>
+                        <button type="submit" class="tc-compress-btn" id="login-btn">Sign In</button>
+                    </form>
+
+                    <!-- Register Form -->
+                    <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
+                        <div class="form-row">
+                            <label for="reg-username" class="section-label">Username</label>
+                            <input type="text" id="reg-username" class="tc-input" autocomplete="username" placeholder="Choose a username" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="reg-email" class="section-label">Email</label>
+                            <input type="email" id="reg-email" class="tc-input" autocomplete="email" placeholder="your@email.com" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="reg-password" class="section-label">Password</label>
+                            <input type="password" id="reg-password" class="tc-input" autocomplete="new-password" placeholder="Choose a password" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="reg-business" class="section-label">Business Type</label>
+                            <div class="select-wrap">
+                                <select id="reg-business" class="tc-select">
+                                    <option value="Developer">Developer</option>
+                                    <option value="Business">Business</option>
+                                    <option value="Researcher">Researcher</option>
+                                    <option value="Legal">Legal</option>
+                                    <option value="Finance">Finance</option>
+                                </select>
+                                <div class="select-chevron" aria-hidden="true">▼</div>
+                            </div>
+                        </div>
+                        <button type="submit" class="tc-compress-btn" id="register-btn">Create Account</button>
+                    </form>
+                </div>
             </div>
-            <div class="auth-tabs">
-                <button class="auth-tab active" onclick="switchAuthTab('login')" id="tab-login">Login</button>
-                <button class="auth-tab" onclick="switchAuthTab('register')" id="tab-register">Register</button>
-            </div>
 
-            <!-- Login Form -->
-            <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
-                <div class="form-row">
-                    <label for="login-username" class="section-label">Username</label>
-                    <input type="text" id="login-username" class="tc-input" placeholder="Enter username" required>
-                </div>
-                <div class="form-row">
-                    <label for="login-password" class="section-label">Password</label>
-                    <input type="password" id="login-password" class="tc-input" placeholder="Enter password" required>
-                </div>
-                <button type="submit" class="tc-compress-btn" id="login-btn">Sign In</button>
-            </form>
-
-            <!-- Register Form -->
-            <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
-                <div class="form-row">
-                    <label for="reg-username" class="section-label">Username</label>
-                    <input type="text" id="reg-username" class="tc-input" placeholder="Choose a username" required>
-                </div>
-                <div class="form-row">
-                    <label for="reg-email" class="section-label">Email</label>
-                    <input type="email" id="reg-email" class="tc-input" placeholder="your@email.com" required>
-                </div>
-                <div class="form-row">
-                    <label for="reg-password" class="section-label">Password</label>
-                    <input type="password" id="reg-password" class="tc-input" placeholder="Choose a password" required>
-                </div>
-                <div class="form-row">
-                    <label for="reg-business" class="section-label">Business Type</label>
-                    <div class="select-wrap">
-                        <select id="reg-business" class="tc-select">
-                            <option value="Developer">Developer</option>
-                            <option value="Business">Business</option>
-                            <option value="Researcher">Researcher</option>
-                            <option value="Legal">Legal</option>
-                            <option value="Finance">Finance</option>
-                        </select>
-                        <div class="select-chevron">▼</div>
+            <!-- ── Main Section (R1: Unblocked by Default) ────── -->
+            <div id="main-section" style="display: block;">
+                <div class="user-bar">
+                    <div class="user-info" id="user-status-text">Operating in <strong id="display-username" style="color: var(--stat-pos);">Zero-Auth Sandbox</strong></div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <a href="/admin.html" id="admin-link" class="btn-ghost" style="display: none; text-decoration: none;">🛡️ Admin</a>
+                        <button type="button" class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthSection()">Sign In / Register</button>
                     </div>
                 </div>
-                <button type="submit" class="tc-compress-btn" id="register-btn">Create Account</button>
-            </form>
-        </div>
 
-        <!-- ── Main Section (R1: Unblocked by Default) ────── -->
-        <div id="main-section" style="display: block;">
-            <div class="user-bar">
-                <div class="user-info" id="user-status-text">Operating in <strong id="display-username" style="color: #10b981;">Zero-Auth Sandbox</strong></div>
-                <div style="display: flex; gap: 8px;">
-                    <a href="/admin.html" id="admin-link" class="btn-ghost" style="display: none; text-decoration: none;">🛡️ Admin</a>
-                    <button type="button" class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthSection()">Sign In / Register</button>
+                <nav class="nav-bar" role="tablist" aria-label="Workspace sections">
+                    <button type="button" class="nav-tab active" role="tab" aria-selected="true" aria-controls="tab-compress" onclick="switchTab('compress')" id="nav-compress">Optimize Prompt</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="tab-ask-content" onclick="switchTab('ask')" id="nav-ask" style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="tab-history-content" onclick="switchTab('history')" id="nav-history" style="display: none;" disabled aria-disabled="true">History</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false" aria-controls="tab-stats-content" onclick="switchTab('stats')" id="nav-stats" style="display: none;" disabled aria-disabled="true">Insights</button>
+                </nav>
+
+                <!-- ── Compress Tab (2-Column Split Workbench) ── -->
+                <div class="tab-content active" role="tabpanel" aria-labelledby="nav-compress" id="tab-compress">
+                    <div class="tag">CRISP Optimization · Dual-Column Workbench</div>
+
+                    <!-- 1-Click Sample Presets (R1) -->
+                    <div class="preset-strip">
+                        <span class="preset-label">Try sample:</span>
+                        <button type="button" class="preset-chip" data-preset="house" id="preset-house" onclick="loadPreset('house')">🏠 Buying a House</button>
+                        <button type="button" class="preset-chip" data-preset="bug" id="preset-bug" onclick="loadPreset('bug')">🐛 Bug Report</button>
+                        <button type="button" class="preset-chip" data-preset="legal" id="preset-legal" onclick="loadPreset('legal')">⚖️ Contract Review</button>
+                    </div>
+
+                    <div class="workbench-split" data-workbench-split id="workbench-container">
+                        <!-- Left Column: Raw Input Pane -->
+                        <div class="pane-column pane-left" id="input-pane">
+                            <div class="pane-header">
+                                <label for="prompt-input" class="pane-title">Raw Input</label>
+                                <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                    <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
+                                    <span id="input-token-counter" class="token-pill">0 tokens</span>
+                                </div>
+                            </div>
+
+                            <!-- Drag-and-Drop Ingestion Wrapper (R4) -->
+                            <div class="textarea-dropzone-wrap" id="dropzone" data-dropzone>
+                                <textarea id="prompt-input" class="tc-textarea workbench-textarea" aria-describedby="prompt-error" placeholder="Paste your lengthy prompt here, or drag &amp; drop a PDF, TXT, or MD file..."></textarea>
+                                <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+                                    <span style="font-size: 1.6rem;">📄</span>
+                                    <span>Drop .pdf, .txt, or .md to extract text</span>
+                                </div>
+                            </div>
+                            <div id="prompt-error" class="field-error" role="alert" style="display: none;">Prompt must be at least 8 words.</div>
+
+                            <!-- File Ingestion & Auto-Detected Domain (R4, R5) -->
+                            <div class="pane-meta-row">
+                                <label class="file-upload-btn" for="file-input">
+                                    <span>📄 Attach PDF / TXT / MD</span>
+                                    <input type="file" id="file-input" accept=".pdf,.txt,.md" class="visually-hidden" onchange="handleFileSelect(event)">
+                                </label>
+                                <div class="domain-chip" id="domain-chip" data-domain>
+                                    Auto-detected domain: <strong id="domain-name">General</strong>
+                                </div>
+                            </div>
+
+                            <!-- Hidden legacy inputs for compatibility -->
+                            <input type="text" id="task-input" value="Optimize prompt" style="display: none;" aria-hidden="true" tabindex="-1">
+                            <select id="use-case" style="display: none;" aria-hidden="true" tabindex="-1">
+                                <option value="">Auto-detect</option>
+                                <option value="generic">Generic</option>
+                                <option value="code">Code</option>
+                                <option value="ticket">Support Ticket</option>
+                                <option value="legal">Legal</option>
+                                <option value="resume">Resume</option>
+                                <option value="research">Research</option>
+                                <option value="transcript">Transcript</option>
+                                <option value="financial">Financial</option>
+                            </select>
+
+                            <!-- Controls Row: Segmented Mode Pills (R5) -->
+                            <div class="pane-controls-row">
+                                <div class="segmented-mode-pills" id="mode-pills" role="radiogroup" aria-label="Compression Mode">
+                                    <button type="button" role="radio" class="mode-pill active" data-mode="gentle" id="pm-gentle" aria-checked="true" onclick="selectMode('gentle')">Light Polish</button>
+                                    <button type="button" role="radio" class="mode-pill mode-pill-disabled" data-mode="balanced" id="pm-balanced" aria-checked="false" disabled title="Sign in to unlock Smart Trim" onclick="selectMode('balanced')">Smart Trim 🔒</button>
+                                    <button type="button" role="radio" class="mode-pill mode-pill-disabled" data-mode="aggressive" id="pm-aggressive" aria-checked="false" disabled title="Sign in to unlock Deep Blueprint" onclick="selectMode('aggressive')">Deep Blueprint 🔒</button>
+                                </div>
+                                <input type="hidden" id="mode" value="gentle">
+                            </div>
+
+                            <div class="adv-options-row">
+                                <label id="opt-rag-label" for="opt-rag-enabled" title="Sign in to unlock RAG grounding"><input type="checkbox" id="opt-rag-enabled" disabled> Ground with my PDFs</label>
+                                <label id="opt-harness-label" for="opt-harness-enabled" title="Sign in to unlock Grounding Harness"><input type="checkbox" id="opt-harness-enabled" disabled> Hallucination-Proof Contract</label>
+                            </div>
+
+                            <div class="pane-actions-row">
+                                <button type="button" class="clear-btn" onclick="clearInput()">Clear</button>
+                                <button type="button" class="tc-compress-btn workbench-compress-btn" onclick="compress()" id="compress-btn" disabled>
+                                    ⚡ Compress Prompt
+                                </button>
+                            </div>
+                            <div class="shortcut-hint">
+                                Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress · <kbd>⌘K</kbd> for quick actions
+                            </div>
+                        </div>
+
+                        <!-- Right Column: CRISP Output Pane (R2, R3, R5) -->
+                        <div class="pane-column pane-right" id="output-pane">
+                            <div class="pane-header">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span class="pane-title">AI-Ready Prompt</span>
+                                    <button type="button" class="tes-badge" id="tes-score" data-tes="0.97" aria-expanded="false" aria-controls="quality-breakdown" onclick="toggleQualityBreakdown()" title="Inspect quality score breakdown">Quality Ready</button>
+                                </div>
+                                <label class="diff-toggle-label" for="diff-toggle">
+                                    <input type="checkbox" id="diff-toggle" checked onchange="toggleDiffView()">
+                                    <span>Highlight changes</span>
+                                </label>
+                            </div>
+                            <div id="quality-breakdown" class="quality-breakdown hidden" role="region" aria-label="Quality Score Breakdown"></div>
+
+                            <!-- Output Box with Non-Blocking Inline Progress (R5) -->
+                            <div id="output-container" class="output-container">
+                                <div id="inline-progress" class="skeleton-wrap" style="display: none;" role="status" aria-live="polite">
+                                    <div class="inline-progress-bar">
+                                        <div class="inline-progress-fill" id="inline-progress-fill"></div>
+                                    </div>
+                                    <div class="skeleton-status">
+                                        <span class="engine-pulse-dot" style="display: inline-block;" aria-hidden="true"></span>
+                                        <span id="inline-status-text">Mapping Prompt Topology...</span>
+                                    </div>
+                                    <div class="skeleton-line shimmer-w80"></div>
+                                    <div class="skeleton-line shimmer-w100"></div>
+                                    <div class="skeleton-line shimmer-w60"></div>
+                                </div>
+                                <div id="result-output" class="output-box workbench-output" aria-live="polite"><span class="text-placeholder" style="color: var(--text-muted); opacity: 0.85;">Enter a prompt on the left to preview CRISP compression...</span></div>
+                            </div>
+
+                            <!-- Result Section & Live Telemetry (R3) -->
+                            <div id="result-section" style="display: block;">
+                                <div class="stats-row" style="display: none;">
+                                    <div class="stat-card">
+                                        <div class="stat-val" id="stat-original">0</div>
+                                        <div class="stat-lbl">Original Tokens</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-val" id="stat-final">0</div>
+                                        <div class="stat-lbl">Final Tokens</div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-val positive" id="stat-saved">0</div>
+                                        <div class="stat-lbl">Tokens Saved</div>
+                                    </div>
+                                </div>
+                                <div class="progress-bar-wrap" style="display: none;">
+                                    <div class="progress-bar-fill" id="token-progress-bar"></div>
+                                </div>
+                                <span id="token-saving-pct" style="display: none;">0% saved</span>
+
+                                <div class="telemetry-bar">
+                                    <div class="telemetry-stats">
+                                        <span id="output-token-count" class="stat-tok">0 tokens</span>
+                                        <span id="output-saving-pct" class="stat-pct">0% saved</span>
+                                        <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <label for="model-select" class="visually-hidden">Target model pricing</label>
+                                        <select id="model-select" class="tc-select model-select-compact" onchange="updateModelPricing()">
+                                            <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
+                                            <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
+                                            <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
+                                        </select>
+                                        <button type="button" class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
+                                    </div>
+                                </div>
+
+                                <div class="feedback-row">
+                                    <span id="feedback-status" style="font-size: 0.78rem; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
+                                    <button type="button" class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')" disabled title="Sign in to submit feedback">👍 Useful</button>
+                                    <button type="button" class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')" disabled title="Sign in to submit feedback">👎 Not Useful</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="nav-bar">
-                <button class="nav-tab active" onclick="switchTab('compress')" id="nav-compress">Optimize Prompt</button>
-                <button class="nav-tab" onclick="switchTab('ask')" id="nav-ask" style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
-                <button class="nav-tab" onclick="switchTab('history')" id="nav-history" style="display: none;" disabled aria-disabled="true">History</button>
-                <button class="nav-tab" onclick="switchTab('stats')" id="nav-stats" style="display: none;" disabled aria-disabled="true">Insights</button>
-            </div>
+                <!-- ── Ask (RAG) Tab ── -->
+                <div class="tab-content" role="tabpanel" aria-labelledby="nav-ask" id="tab-ask-content">
+                    <div class="tag">Ask My Docs · Grounded Knowledge</div>
 
-            <!-- ── Compress Tab (2-Column Split Workbench) ── -->
-            <div class="tab-content active" id="tab-compress">
-                <div class="tag">CRISP Optimization · Dual-Column Workbench</div>
-
-                <!-- 1-Click Sample Presets (R1) placed above split so input & output boxes align side-by-side -->
-                <div class="preset-strip" style="margin-top: 10px;">
-                    <span class="preset-label">Try sample:</span>
-                    <button type="button" class="preset-chip" data-preset="house" id="preset-house" onclick="loadPreset('house')">🏠 Buying a House</button>
-                    <button type="button" class="preset-chip" data-preset="bug" id="preset-bug" onclick="loadPreset('bug')">🐛 Bug Report</button>
-                    <button type="button" class="preset-chip" data-preset="legal" id="preset-legal" onclick="loadPreset('legal')">⚖️ Contract Review</button>
-                </div>
-                
-                <div class="workbench-split" data-workbench-split id="workbench-container">
-                    <!-- Left Column: Raw Input Pane -->
-                    <div class="pane-column pane-left" id="input-pane">
-                        <div class="pane-header">
-                            <span class="pane-title">Raw Input</span>
-                            <div style="display: flex; gap: 6px; align-items: center;">
-                                <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
-                                <span id="input-token-counter" class="token-pill">0 tokens</span>
+                    <div class="ask-layout">
+                        <!-- Self-Service User Knowledge Base Sidebar -->
+                        <aside class="rag-sidebar" aria-label="Knowledge Source">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+                                <strong style="font-size:0.84rem;color:var(--head-text);">Knowledge Source</strong>
                             </div>
-                        </div>
-
-                        <!-- Drag-and-Drop Ingestion Wrapper (R4) -->
-                        <div class="textarea-dropzone-wrap" id="dropzone" data-dropzone>
-                            <textarea id="prompt-input" class="tc-textarea workbench-textarea" placeholder="Paste your lengthy prompt here, or drag & drop a PDF, TXT, or MD file..."></textarea>
-                            <div id="drop-overlay" class="drop-overlay">
-                                <span style="font-size: 26px;">📄</span>
-                                <span>Drop .pdf, .txt, or .md to extract text</span>
+                            <div class="rag-source-toggle" role="radiogroup" aria-label="RAG Data Source">
+                                <label class="rag-source-option active" id="rag-opt-cloud">
+                                    <input type="radio" name="ask-data-source" value="cloud" checked onchange="RagWorkspace.setDataSource('cloud')">
+                                    <span>☁️ Cloud Data</span>
+                                </label>
+                                <label class="rag-source-option" id="rag-opt-own">
+                                    <input type="radio" name="ask-data-source" value="own" onchange="RagWorkspace.setDataSource('own')">
+                                    <span>💻 Own Data</span>
+                                </label>
                             </div>
-                        </div>
-                        <div id="prompt-error" style="color: #ef4444; font-size: 12px; margin-top: -6px; display: none;">Prompt must be at least 8 words.</div>
 
-                        <!-- File Ingestion & Auto-Detected Domain (R4, R5) -->
-                        <div class="pane-meta-row">
-                            <label class="file-upload-btn" for="file-input">
-                                <span>📄 Attach PDF / TXT / MD</span>
-                                <input type="file" id="file-input" accept=".pdf,.txt,.md" style="display: none;" onchange="handleFileSelect(event)">
-                            </label>
-                            <div class="domain-chip" id="domain-chip" data-domain>
-                                Auto-detected domain: <strong id="domain-name">General</strong>
+                            <div id="rag-cloud-panel" style="display:flex;flex-direction:column;gap:0.65rem;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+                                    <strong style="font-size:0.76rem;color:var(--text-muted);">Cloud Knowledge Base</strong>
+                                    <input type="file" id="user-rag-file-input" accept=".pdf" class="visually-hidden">
+                                    <button type="button" id="user-rag-upload-btn" class="copy-btn" style="padding:0.25rem 0.65rem;font-size:0.74rem;min-block-size:1.85rem;">+ Upload PDF</button>
+                                </div>
+                                <div id="user-rag-docs-list">
+                                    <div class="rag-empty-note">Sign in to upload &amp; manage your own PDFs.</div>
+                                </div>
                             </div>
-                        </div>
 
-                        <!-- Hidden legacy inputs for compatibility -->
-                        <input type="text" id="task-input" value="Optimize prompt" style="display: none;">
-                        <select id="use-case" style="display: none;">
-                            <option value="">Auto-detect</option>
-                            <option value="generic">Generic</option>
-                            <option value="code">Code</option>
-                            <option value="ticket">Support Ticket</option>
-                            <option value="legal">Legal</option>
-                            <option value="resume">Resume</option>
-                            <option value="research">Research</option>
-                            <option value="transcript">Transcript</option>
-                            <option value="financial">Financial</option>
-                        </select>
-
-                        <!-- Controls Row: Segmented Mode Pills (R5) -->
-                        <div class="pane-controls-row">
-                            <div class="segmented-mode-pills" id="mode-pills" role="radiogroup" aria-label="Compression Mode">
-                                <button type="button" class="mode-pill active" data-mode="gentle" id="pm-gentle" aria-checked="true" onclick="selectMode('gentle')">Light Polish</button>
-                                <button type="button" class="mode-pill mode-pill-disabled" data-mode="balanced" id="pm-balanced" aria-checked="false" disabled title="Sign in to unlock Smart Trim" onclick="selectMode('balanced')">Smart Trim 🔒</button>
-                                <button type="button" class="mode-pill mode-pill-disabled" data-mode="aggressive" id="pm-aggressive" aria-checked="false" disabled title="Sign in to unlock Deep Blueprint" onclick="selectMode('aggressive')">Deep Blueprint 🔒</button>
+                            <div id="rag-own-panel" class="rag-local-card" style="display:none;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+                                    <strong style="font-size:0.78rem;color:var(--head-text);">Local Companion</strong>
+                                    <span id="local-rag-status-pill" class="rag-status-pill status-processing">checking</span>
+                                </div>
+                                <div id="local-rag-watch-dir" style="font-size:0.72rem;color:var(--text-muted);word-break:break-all;">Endpoint: 127.0.0.1:49152</div>
+                                <div id="local-rag-counts" style="font-size:0.72rem;color:var(--text-muted);">Waiting for local companion...</div>
+                                <div id="local-rag-cmd-wrap" class="hidden" style="display:flex;flex-direction:column;gap:0.4rem;">
+                                    <code class="rag-cmd-snippet" id="local-rag-start-cmd">cargo run --bin rag -- --watch ./docs</code>
+                                    <button type="button" class="copy-btn" id="local-rag-copy-cmd-btn" onclick="RagWorkspace.copyStartCommand()" style="width:100%;font-size:0.72rem;padding:0.3rem 0.5rem;min-block-size:1.9rem;">📋 Copy Start Command</button>
+                                </div>
+                                <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.45;">Raw <code>.pdf</code> &amp; <code>.docx</code> stay strictly on your machine. Only top-k text chunks are used for prompt assembly.</div>
+                                <button type="button" id="local-rag-refresh-btn" class="btn-ghost" onclick="RagWorkspace.checkLocalHealth()" style="width:100%;font-size:0.74rem;padding:0.35rem 0.5rem;">↻ Check Local Status</button>
                             </div>
-                            <input type="hidden" id="mode" value="gentle">
-                        </div>
 
-                        <div class="adv-options-row">
-                            <label id="opt-rag-label" title="Sign in to unlock RAG grounding"><input type="checkbox" id="opt-rag-enabled" disabled> Ground with my PDFs</label>
-                            <label id="opt-harness-label" title="Sign in to unlock Grounding Harness"><input type="checkbox" id="opt-harness-enabled" disabled> Hallucination-Proof Contract</label>
-                        </div>
+                            <button type="button" class="btn-ghost" onclick="RagWorkspace.openVerifyModal()" style="width:100%;font-size:0.78rem;">🛡️ Verify LLM Reply</button>
+                        </aside>
 
-                        <div class="pane-actions-row">
-                            <button type="button" class="clear-btn" onclick="clearInput()">Clear</button>
-                            <button type="button" class="tc-compress-btn workbench-compress-btn" onclick="compress()" id="compress-btn" disabled>
-                                ⚡ Compress Prompt
+                        <div>
+                            <!-- Compact Horizontal RAG Controls Toolbar (P2) -->
+                            <div class="rag-controls-bar">
+                                <div class="form-row">
+                                    <label for="scenario-mode-select" class="section-label">Pipeline Mode</label>
+                                    <div class="select-wrap">
+                                        <select id="scenario-mode-select" class="tc-select" onchange="handleScenarioModeChange(this.value)">
+                                            <option value="Scenario">Scenario Mode</option>
+                                            <option value="Regular" selected>Regular Mode</option>
+                                        </select>
+                                        <div class="select-chevron" aria-hidden="true">▼</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row" id="domain-selector-row" style="display: none;">
+                                    <label for="scenario-domain-select" class="section-label">Domain Scope</label>
+                                    <div class="select-wrap">
+                                        <select id="scenario-domain-select" class="tc-select" onchange="handleDomainChange(this.value)">
+                                            <option value="" disabled selected>-- Select Domain --</option>
+                                            <option value="legal">Legal</option>
+                                            <option value="business">Business</option>
+                                            <option value="finance">Finance</option>
+                                        </select>
+                                        <div class="select-chevron" aria-hidden="true">▼</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row" id="geography-selector-row" style="display: none;">
+                                    <label for="scenario-geography-select" class="section-label">Geography</label>
+                                    <div class="select-wrap">
+                                        <select id="scenario-geography-select" class="tc-select">
+                                            <option value="">Any Region</option>
+                                            <option value="india">India</option>
+                                            <option value="us">United States</option>
+                                            <option value="uk">United Kingdom</option>
+                                        </select>
+                                        <div class="select-chevron" aria-hidden="true">▼</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-row" id="style-selector-row">
+                                    <label for="scenario-style-select" class="section-label">Output Style</label>
+                                    <div class="select-wrap">
+                                        <select id="scenario-style-select" class="tc-select">
+                                            <option value="balanced" selected>Balanced — Clear, measured response</option>
+                                            <option value="concise">Concise — Direct bulleted findings</option>
+                                            <option value="detailed">Detailed — Comprehensive synthesis</option>
+                                            <option value="aggressive">Aggressive — Assertive &amp; risk-focused</option>
+                                        </select>
+                                        <div class="select-chevron" aria-hidden="true">▼</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="helper-text" id="mode-helper" style="margin-bottom: 0.75rem;">Regular mode queries internal knowledge base with customized output styles &amp; citations.</div>
+
+                            <div class="form-row">
+                                <label for="scenario-query-input" class="section-label">Query / Intake</label>
+                                <textarea id="scenario-query-input" class="tc-textarea" placeholder="Ask a question against internal knowledge base..."></textarea>
+                            </div>
+
+                            <button type="button" class="tc-compress-btn" onclick="executeScenarioAsk()" id="ask-btn">
+                                🔍 Query Internal Knowledge Base
                             </button>
-                        </div>
-                        <div class="shortcut-hint" style="margin-top: 2px;">
-                            Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress
-                        </div>
-                    </div>
 
-                    <!-- Right Column: CRISP Output Pane (R2, R3, R5) -->
-                    <div class="pane-column pane-right" id="output-pane">
-                        <div class="pane-header">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span class="pane-title">AI-Ready Prompt</span>
-                                <span class="tes-badge" id="tes-score" data-tes="0.97" style="cursor:pointer;" onclick="document.getElementById('quality-breakdown').classList.toggle('hidden')" title="Click for quality breakdown">Quality Ready</span>
-                            </div>
-                            <label class="diff-toggle-label">
-                                <input type="checkbox" id="diff-toggle" checked onchange="toggleDiffView()">
-                                <span>Highlight changes</span>
-                            </label>
-                        </div>
-                        <div id="quality-breakdown" class="quality-breakdown hidden"></div>
+                            <div id="scenario-result-section" style="display:none; margin-top: 1.25rem;">
+                                <hr class="divider">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <span class="badge badge-accent" id="scenario-badge-source">Source: internal knowledge base only</span>
+                                    <span class="badge badge-success" id="scenario-badge-ns">Namespace: general</span>
+                                </div>
 
-                        <!-- Output Box with Non-Blocking Inline Progress (R5) -->
-                        <div id="output-container" class="output-container">
-                            <div id="inline-progress" class="skeleton-wrap" style="display: none;">
-                                <div class="inline-progress-bar">
-                                    <div class="inline-progress-fill" id="inline-progress-fill"></div>
-                                </div>
-                                <div class="skeleton-status">
-                                    <span class="engine-pulse-dot" style="display: inline-block;"></span>
-                                    <span id="inline-status-text">Mapping Prompt Topology...</span>
-                                </div>
-                                <div class="skeleton-line shimmer-w80"></div>
-                                <div class="skeleton-line shimmer-w100"></div>
-                                <div class="skeleton-line shimmer-w60"></div>
-                            </div>
-                            <div id="result-output" class="output-box workbench-output"><span class="text-placeholder" style="color: var(--text-muted); opacity: 0.85;">Enter a prompt on the left to preview CRISP compression...</span></div>
-                        </div>
+                                <div class="section-label" id="scenario-result-header">Response Output</div>
+                                <div class="output-box" id="scenario-result-output" style="font-family: 'Inter', sans-serif;"></div>
 
-                        <!-- Result Section & Live Telemetry (R3) -->
-                        <div id="result-section" style="display: block;">
-                            <div class="stats-row" style="display: none;">
-                                <div class="stat-card">
-                                    <div class="stat-val" id="stat-original">0</div>
-                                    <div class="stat-lbl">Original Tokens</div>
+                                <div id="scenario-citations-box" style="margin-top: 1rem; display: none;">
+                                    <div class="section-label">Retrieved Internal Citations</div>
+                                    <ul id="scenario-citations-list" style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; color: var(--text-muted);"></ul>
                                 </div>
-                                <div class="stat-card">
-                                    <div class="stat-val" id="stat-final">0</div>
-                                    <div class="stat-lbl">Final Tokens</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-val positive" id="stat-saved">0</div>
-                                    <div class="stat-lbl">Tokens Saved</div>
-                                </div>
-                            </div>
-                            <div class="progress-bar-wrap" style="display: none;">
-                                <div class="progress-bar-fill" id="token-progress-bar"></div>
-                            </div>
-                            <span id="token-saving-pct" style="display: none;">0% saved</span>
 
-                            <div class="telemetry-bar">
-                                <div class="telemetry-stats">
-                                    <span id="output-token-count" class="stat-tok">0 tokens</span>
-                                    <span id="output-saving-pct" class="stat-pct">0% saved</span>
-                                    <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                <!-- Aggressive Compression Conversion Action -->
+                                <div id="scenario-aggressive-cta" style="margin-top: 1.25rem; padding: 1.1rem; border-radius: 0.75rem; background: var(--tag-bg); border: 1px solid var(--copy-border);">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                                        <div>
+                                            <h3 style="margin: 0 0 0.25rem 0; font-size: 0.94rem; color: var(--head-text); display: flex; align-items: center; gap: 0.4rem;">
+                                                <span aria-hidden="true">⚡</span> Satisfied with Grounded Evidence?
+                                            </h3>
+                                            <p style="margin: 0; font-size: 0.82rem; color: var(--body-text);">
+                                                Convert to an ultra-clean prompt for LLMs: strips raw chunk wrappers and compresses context with zero hallucination.
+                                            </p>
+                                        </div>
+                                        <button type="button" class="tc-compress-btn" id="scenario-compress-aggressive-btn" onclick="executeScenarioAggressiveCompress()" style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.82rem; margin: 0;">
+                                            🔥 Compress in Aggressive Mode for LLM
+                                        </button>
+                                    </div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <select id="model-select" class="tc-select model-select-compact" onchange="updateModelPricing()">
-                                        <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
-                                        <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
-                                        <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
-                                    </select>
-                                    <button type="button" class="copy-btn" id="copy-result-btn" onclick="copyResult()">📋 Copy</button>
-                                </div>
-                            </div>
 
-                            <div class="feedback-row" style="margin-top: 8px;">
-                                <span id="feedback-status" style="font-size: 12px; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓ Feedback recorded</span>
-                                <button type="button" class="btn-success-sm" id="btn-feedback-up" onclick="submitFeedback('thumbs_up')" disabled title="Sign in to submit feedback">👍 Useful</button>
-                                <button type="button" class="btn-danger-sm" id="btn-feedback-down" onclick="submitFeedback('thumbs_down')" disabled title="Sign in to submit feedback">👎 Not Useful</button>
+                                <!-- Aggressive Clean LLM Output Section -->
+                                <div id="scenario-aggressive-result-section" style="display: none; margin-top: 1.25rem;">
+                                    <hr class="divider">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                            <span class="badge badge-accent" id="scenario-aggr-badge">Aggressive Mode: Distilled Context</span>
+                                            <span class="badge badge-success" id="scenario-aggr-tes">TES: 0.98 (Hallucination-Free)</span>
+                                        </div>
+                                        <button type="button" class="copy-btn" id="copy-aggr-prompt-btn" onclick="copyAggressivePrompt()">
+                                            📋 Copy for LLM
+                                        </button>
+                                    </div>
+
+                                    <div class="section-label">Clean LLM Prompt Payload (Ready for API / Chat)</div>
+                                    <div class="output-box" id="scenario-aggressive-output" style="font-size: 0.78rem;"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- ── Ask (RAG) Tab ── -->
-            <div class="tab-content" id="tab-ask-content">
-                <div class="tag">Ask My Docs · Grounded Knowledge</div>
-
-                <div class="ask-layout">
-                    <!-- Self-Service User Knowledge Base Sidebar -->
-                    <aside class="rag-sidebar">
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                            <strong style="font-size:13px;color:var(--head-text);">Knowledge Source</strong>
-                        </div>
-                        <div class="rag-source-toggle" role="radiogroup" aria-label="RAG Data Source">
-                            <label class="rag-source-option active" id="rag-opt-cloud">
-                                <input type="radio" name="ask-data-source" value="cloud" checked onchange="RagWorkspace.setDataSource('cloud')">
-                                <span>☁️ Cloud Data</span>
-                            </label>
-                            <label class="rag-source-option" id="rag-opt-own">
-                                <input type="radio" name="ask-data-source" value="own" onchange="RagWorkspace.setDataSource('own')">
-                                <span>💻 Own Data</span>
-                            </label>
-                        </div>
-
-                        <div id="rag-cloud-panel" style="display:flex;flex-direction:column;gap:10px;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                                <strong style="font-size:12px;color:var(--text-muted);">Cloud Knowledge Base</strong>
-                                <input type="file" id="user-rag-file-input" accept=".pdf" style="display:none;">
-                                <button type="button" id="user-rag-upload-btn" class="copy-btn" style="padding:4px 10px;font-size:11.5px;">+ Upload PDF</button>
-                            </div>
-                            <div id="user-rag-docs-list">
-                                <div class="rag-empty-note">Sign in to upload &amp; manage your own PDFs.</div>
-                            </div>
-                        </div>
-
-                        <div id="rag-own-panel" class="rag-local-card" style="display:none;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                                <strong style="font-size:12px;color:var(--head-text);">Local Companion</strong>
-                                <span id="local-rag-status-pill" class="rag-status-pill status-processing">checking</span>
-                            </div>
-                            <div id="local-rag-watch-dir" style="font-size:11px;color:var(--text-muted);word-break:break-all;">Endpoint: 127.0.0.1:49152</div>
-                            <div id="local-rag-counts" style="font-size:11px;color:var(--text-muted);">Waiting for local companion...</div>
-                            <div style="font-size:11px;color:var(--text-muted);line-height:1.4;">Raw <code>.pdf</code> &amp; <code>.docx</code> stay strictly on your machine. Only top-k text chunks are used for prompt assembly.</div>
-                            <button type="button" id="local-rag-refresh-btn" class="btn-ghost" onclick="RagWorkspace.checkLocalHealth()" style="width:100%;font-size:11.5px;padding:5px 8px;">↻ Check Local Status</button>
-                        </div>
-
-                        <button type="button" class="btn-ghost" onclick="RagWorkspace.openVerifyModal()" style="width:100%;font-size:12px;padding:7px 10px;">🛡️ Verify LLM Reply</button>
-                    </aside>
-
-                    <div>
-                
-                <div class="form-row">
-                    <label for="scenario-mode-select" class="section-label">Pipeline Mode</label>
-                    <div class="select-wrap">
-                        <select id="scenario-mode-select" class="tc-select" onchange="handleScenarioModeChange(this.value)">
-                            <option value="Scenario">Scenario Mode</option>
-                            <option value="Regular" selected>Regular Mode</option>
-                        </select>
-                        <div class="select-chevron">▼</div>
-                    </div>
-                    <div class="helper-text" id="mode-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Regular mode queries internal knowledge base with customized output styles & citations.</div>
-                </div>
-
-                <div class="form-row" id="domain-selector-row" style="display: none;">
-                    <label for="scenario-domain-select" class="section-label">Domain Scope</label>
-                    <div class="select-wrap">
-                        <select id="scenario-domain-select" class="tc-select" onchange="handleDomainChange(this.value)">
-                            <option value="" disabled selected>-- Select Mandatory Domain --</option>
-                            <option value="legal">Legal</option>
-                            <option value="business">Business</option>
-                            <option value="finance">Finance</option>
-                        </select>
-                        <div class="select-chevron">▼</div>
-                    </div>
-                    <div class="helper-text" id="domain-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Mandatory domain scope selector for Scenario pipeline.</div>
-                </div>
-
-                <div class="form-row" id="geography-selector-row" style="display: none;">
-                    <label for="scenario-geography-select" class="section-label">Geography</label>
-                    <div class="select-wrap">
-                        <select id="scenario-geography-select" class="tc-select">
-                            <option value="">-- No Region Specific --</option>
-                            <option value="india">India</option>
-                            <option value="us">United States</option>
-                            <option value="uk">United Kingdom</option>
-                        </select>
-                        <div class="select-chevron">▼</div>
-                    </div>
-                    <div class="helper-text" id="geography-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Optional geography filter for regional internal knowledge.</div>
-                </div>
-
-                <div class="form-row" id="style-selector-row">
-                    <label for="scenario-style-select" class="section-label">Output Style</label>
-                    <div class="select-wrap">
-                        <select id="scenario-style-select" class="tc-select">
-                            <option value="balanced" selected>Balanced — Clear, well-structured response maintaining measured tone and context.</option>
-                            <option value="concise">Concise — Direct bulleted output focused strictly on primary findings.</option>
-                            <option value="detailed">Detailed — Comprehensive synthesis including structural breakdowns and contextual nuances.</option>
-                            <option value="aggressive">Aggressive — Assertive, direct stance that states strongest supported position, challenges weak assumptions, and flags risks bluntly.</option>
-                        </select>
-                        <div class="select-chevron">▼</div>
-                    </div>
-                    <div class="helper-text" id="style-helper" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Tone & emphasis style loaded from Scenario_Style_Registry.</div>
-                </div>
-
-                <div class="form-row">
-                    <label for="scenario-query-input" class="section-label">Query / Intake</label>
-                    <textarea id="scenario-query-input" class="tc-textarea" placeholder="Ask a question against internal knowledge base..."></textarea>
-                </div>
-
-                <button class="tc-compress-btn" onclick="executeScenarioAsk()" id="ask-btn">
-                    🔍 Query Internal Knowledge Base
-                </button>
-
-                <div id="scenario-result-section" style="display:none; margin-top: 20px;">
-                    <hr class="divider">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-                        <span class="badge badge-accent" id="scenario-badge-source">Source: internal knowledge base only</span>
-                        <span class="badge badge-success" id="scenario-badge-ns">Namespace: general</span>
-                    </div>
-
-                    <div class="section-label" id="scenario-result-header">Response Output</div>
-                    <div class="output-box" id="scenario-result-output" style="white-space: pre-wrap; font-family: 'Inter', sans-serif; line-height: 1.6;"></div>
-
-                    <div id="scenario-citations-box" style="margin-top: 16px; display: none;">
-                        <div class="section-label">Retrieved Internal Citations</div>
-                        <ul id="scenario-citations-list" style="margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-muted);"></ul>
-                    </div>
-
-                    <!-- ── Aggressive Compression Conversion Action ── -->
-                    <div id="scenario-aggressive-cta" style="margin-top: 24px; padding: 18px; border-radius: 12px; background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2);">
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <!-- ── History Tab ── -->
+                <div class="tab-content" role="tabpanel" aria-labelledby="nav-history" id="tab-history-content">
+                    <div class="history-shell">
+                        <div class="history-toolbar">
                             <div>
-                                <h4 style="margin: 0 0 4px 0; font-size: 15px; color: var(--head-text); display: flex; align-items: center; gap: 6px;">
-                                    <span>⚡</span> Satisfied with Grounded Evidence?
-                                </h4>
-                                <p style="margin: 0; font-size: 13px; color: var(--body-text);">
-                                    Convert to an ultra-clean prompt for LLMs: strips raw chunk wrappers and compresses context with zero hallucination.
-                                </p>
+                                <div class="section-label" style="margin:0;">Prompt Compression Timeline</div>
+                                <div class="insights-subtitle">Inspect side-by-side diffs, copy optimized CRISP prompts, or reload into Workbench.</div>
                             </div>
-                            <button class="tc-compress-btn" id="scenario-compress-aggressive-btn" onclick="executeScenarioAggressiveCompress()" style="width: auto; padding: 10px 20px; font-size: 13px; margin: 0;">
-                                🔥 Compress in Aggressive Mode for LLM
-                            </button>
+                            <span class="bento-badge" id="history-summary-pill">0 runs</span>
                         </div>
-                    </div>
-
-                    <!-- ── Aggressive Clean LLM Output Section ── -->
-                    <div id="scenario-aggressive-result-section" style="display: none; margin-top: 24px;">
-                        <hr class="divider">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <span class="badge badge-accent" id="scenario-aggr-badge">Aggressive Mode: Distilled Context</span>
-                                <span class="badge badge-success" id="scenario-aggr-tes">TES: 0.98 (Hallucination-Free)</span>
+                        <div class="history-controls">
+                            <div class="history-search-wrap">
+                                <span class="history-search-icon" aria-hidden="true">⌕</span>
+                                <label for="history-search" class="visually-hidden">Search history</label>
+                                <input type="text" id="history-search" class="tc-input" placeholder="Search prompts, CRISP outputs, or domains..." oninput="filterHistory(this.value)">
                             </div>
-                            <button class="copy-btn" id="copy-aggr-prompt-btn" onclick="copyAggressivePrompt()" style="margin: 0;">
-                                📋 Copy for LLM
-                            </button>
+                            <div class="bento-model-pills" role="group" aria-label="Filter history by mode">
+                                <button type="button" class="bento-model-pill active" data-history-mode="all" onclick="setHistoryModeFilter('all')">All</button>
+                                <button type="button" class="bento-model-pill" data-history-mode="gentle" onclick="setHistoryModeFilter('gentle')">Light Polish</button>
+                                <button type="button" class="bento-model-pill" data-history-mode="balanced" onclick="setHistoryModeFilter('balanced')">Smart Trim</button>
+                                <button type="button" class="bento-model-pill" data-history-mode="aggressive" onclick="setHistoryModeFilter('aggressive')">Deep Blueprint</button>
+                            </div>
+                            <select id="history-sort" class="tc-select" onchange="setHistorySort(this.value)" aria-label="Sort history" style="width:auto; min-width:9rem; padding:0.45rem 1.8rem 0.45rem 0.75rem; font-size:0.78rem;">
+                                <option value="newest">Newest first</option>
+                                <option value="saved">Most tokens saved</option>
+                                <option value="ratio">Highest % reduction</option>
+                            </select>
                         </div>
-
-                        <div class="section-label">Clean LLM Prompt Payload (Ready for API / Chat)</div>
-                        <div class="output-box" id="scenario-aggressive-output" style="white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;"></div>
+                        <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
+                            <div class="auth-gate-icon" aria-hidden="true">🔒</div>
+                            <div class="auth-gate-title">Save Compression History</div>
+                            <div class="auth-gate-desc">Create a free account or sign in to persist and search past prompt compression history across devices.</div>
+                            <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 0.65rem 1.5rem;">Sign In / Register</button>
+                        </div>
+                        <div id="history-list"></div>
                     </div>
                 </div>
+
+                <!-- ── Stats Tab ── -->
+                <div class="tab-content" role="tabpanel" aria-labelledby="nav-stats" id="tab-stats-content">
+                    <div class="insights-shell">
+                        <div class="insights-header">
+                            <div>
+                                <div class="section-label" style="margin-bottom: 0;">Compression Telemetry &amp; Insights</div>
+                                <div class="insights-subtitle">Cumulative token efficiency, 14-day trajectory, and model cost impact.</div>
+                            </div>
+                            <button type="button" class="insights-refresh-btn" id="insights-refresh-btn" onclick="loadStats()">↻ Refresh</button>
+                        </div>
+                        <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
+                            <div class="auth-gate-icon" aria-hidden="true">📊</div>
+                            <div class="auth-gate-title">Personal Usage Analytics</div>
+                            <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency, and cost reductions over time.</div>
+                            <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 0.65rem 1.5rem;">Sign In / Register</button>
+                        </div>
+                        <div class="insights-bento" id="global-stats"></div>
                     </div>
                 </div>
-            </div>
-
-            <!-- ── History Tab ── -->
-            <div class="tab-content" id="tab-history-content">
-                <div class="history-shell">
-                    <div class="history-toolbar">
-                        <div>
-                            <div class="section-label" style="margin:0;">Prompt Compression Timeline</div>
-                            <div class="insights-subtitle">Inspect side-by-side diffs, copy optimized CRISP prompts, or reload into Workbench.</div>
-                        </div>
-                        <span class="bento-badge" id="history-summary-pill">0 runs</span>
-                    </div>
-                    <div class="history-controls">
-                        <div class="history-search-wrap">
-                            <span class="history-search-icon">⌕</span>
-                            <input type="text" id="history-search" class="tc-input" placeholder="Search prompts, CRISP outputs, or domains..." oninput="filterHistory(this.value)">
-                        </div>
-                        <div class="bento-model-pills" role="group" aria-label="Filter history by mode">
-                            <button type="button" class="bento-model-pill active" data-history-mode="all" onclick="setHistoryModeFilter('all')">All</button>
-                            <button type="button" class="bento-model-pill" data-history-mode="gentle" onclick="setHistoryModeFilter('gentle')">Light Polish</button>
-                            <button type="button" class="bento-model-pill" data-history-mode="balanced" onclick="setHistoryModeFilter('balanced')">Smart Trim</button>
-                            <button type="button" class="bento-model-pill" data-history-mode="aggressive" onclick="setHistoryModeFilter('aggressive')">Deep Blueprint</button>
-                        </div>
-                        <select id="history-sort" class="tc-select" onchange="setHistorySort(this.value)" aria-label="Sort history" style="width:auto; min-width:140px; padding:7px 12px; font-size:12px;">
-                            <option value="newest">Newest first</option>
-                            <option value="saved">Most tokens saved</option>
-                            <option value="ratio">Highest % reduction</option>
-                        </select>
-                    </div>
-                    <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
-                        <div class="auth-gate-icon">🔒</div>
-                        <div class="auth-gate-title">Save Compression History</div>
-                        <div class="auth-gate-desc">Create a free account or sign in to persist and search past prompt compression history across devices.</div>
-                        <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
-                    </div>
-                    <div id="history-list"></div>
-                </div>
-            </div>
-
-            <!-- ── Stats Tab ── -->
-            <div class="tab-content" id="tab-stats-content">
-                <div class="insights-shell">
-                    <div class="insights-header">
-                        <div>
-                            <div class="section-label" style="margin-bottom: 0;">Compression Telemetry &amp; Insights</div>
-                            <div class="insights-subtitle">Cumulative token efficiency, 14-day trajectory, and model cost impact.</div>
-                        </div>
-                        <button type="button" class="insights-refresh-btn" id="insights-refresh-btn" onclick="loadStats()">↻ Refresh</button>
-                    </div>
-                    <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
-                        <div class="auth-gate-icon">📊</div>
-                        <div class="auth-gate-title">Personal Usage Analytics</div>
-                        <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency, and cost reductions over time.</div>
-                        <button type="button" class="tc-compress-btn" onclick="openAuthModal()" style="width: auto; padding: 10px 24px;">Sign In / Register</button>
-                    </div>
-                    <div class="insights-bento" id="global-stats"></div>
-                </div>
-            </div>
-
-        </div> <!-- End Main Section -->
-
+            </div> <!-- End Main Section -->
+        </main>
     </div> <!-- End Glass Card -->
 </div>
 
-<!-- ── Custom Skin Modal ── -->
-<div id="skin-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(6px);">
-    <div class="glass-card" style="max-width: 420px; padding: 28px;">
-        <h2 class="tc-headline" style="font-size: 20px; margin-bottom: 16px;">Customize UI Skin</h2>
+<!-- ── Native <dialog> Modals (Top-Layer, Focus Trap, Esc Dismiss) ── -->
+<dialog id="skin-modal" class="studio-dialog dialog-sm" aria-labelledby="skin-modal-title">
+    <div class="dialog-inner">
+        <div class="dialog-header">
+            <h2 id="skin-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Customize UI Skin</h2>
+            <button type="button" class="btn-ghost" id="skin-modal-close" aria-label="Close Skin Dialog">✕</button>
+        </div>
         <div class="form-row">
-            <label class="section-label">Background Base</label>
+            <label for="skin-bg-type" class="section-label">Background Base</label>
             <div class="select-wrap">
                 <select id="skin-bg-type" class="tc-select">
                     <option value="dark">Dark Obsidian</option>
                     <option value="light">Light Minimal</option>
                 </select>
-                <div class="select-chevron">▼</div>
+                <div class="select-chevron" aria-hidden="true">▼</div>
             </div>
         </div>
         <div class="form-row">
-            <label class="section-label">Primary Color</label>
-            <input type="color" id="skin-primary" value="#00f2fe" style="width: 100%; height: 42px; border: 1px solid var(--inp-border); cursor: pointer; border-radius: 10px; background: transparent;">
+            <label for="skin-primary" class="section-label">Primary Color</label>
+            <input type="color" id="skin-primary" value="#0284c7" style="width: 100%; height: 2.6rem; border: 1px solid var(--inp-border); cursor: pointer; border-radius: 0.625rem; background: transparent;">
         </div>
-        <div style="display: flex; gap: 10px; margin-top: 24px;">
-            <button class="tc-compress-btn" id="skin-modal-apply" style="flex: 1; margin: 0; padding: 10px;">Apply Skin</button>
-            <button class="clear-btn" id="skin-modal-reset" style="flex: 1; margin: 0; padding: 10px;">Reset Default</button>
+        <div style="display: flex; gap: 0.65rem; margin-top: 1.25rem;">
+            <button type="button" class="tc-compress-btn" id="skin-modal-apply" style="flex: 1; margin: 0;">Apply Skin</button>
+            <button type="button" class="clear-btn" id="skin-modal-reset" style="flex: 1; margin: 0;">Reset Default</button>
         </div>
-        <button class="btn-ghost" id="skin-modal-close" style="width: 100%; margin-top: 12px; border: none;">Cancel</button>
     </div>
-</div>
+</dialog>
 
-<!-- ── Grounding Verifier Modal (GAP-42) ── -->
-<div id="verify-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(6px);">
-    <div class="glass-card" style="max-width: 560px; padding: 26px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h2 class="tc-headline" style="font-size: 18px; margin: 0;">Verify LLM Reply</h2>
-            <button type="button" class="btn-ghost" onclick="RagWorkspace.closeVerifyModal()" style="padding:4px 10px;">✕</button>
+<dialog id="verify-modal" class="studio-dialog" aria-labelledby="verify-modal-title">
+    <div class="dialog-inner">
+        <div class="dialog-header">
+            <h2 id="verify-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Verify LLM Reply</h2>
+            <button type="button" class="btn-ghost" onclick="RagWorkspace.closeVerifyModal()" aria-label="Close Verifier Dialog">✕</button>
         </div>
         <div class="form-row">
-            <label class="section-label">Source Facts (one per line)</label>
-            <textarea id="verify-facts-input" class="tc-textarea" style="min-height:80px;" placeholder="Paste key facts from your docs..."></textarea>
+            <label for="verify-facts-input" class="section-label">Source Facts (one per line)</label>
+            <textarea id="verify-facts-input" class="tc-textarea" style="min-height: 5rem;" placeholder="Paste key facts from your docs..."></textarea>
         </div>
         <div class="form-row">
-            <label class="section-label">LLM Reply to Check</label>
-            <textarea id="verify-answer-input" class="tc-textarea" style="min-height:90px;" placeholder="Paste the AI's answer here..."></textarea>
+            <label for="verify-answer-input" class="section-label">LLM Reply to Check</label>
+            <textarea id="verify-answer-input" class="tc-textarea" style="min-height: 5.5rem;" placeholder="Paste the AI's answer here..."></textarea>
         </div>
-        <button type="button" class="tc-compress-btn" onclick="RagWorkspace.runVerify()" style="padding:10px;">Run Grounding Check</button>
-        <pre id="verify-result-box" class="output-box" style="display:none;margin-top:12px;max-height:180px;overflow:auto;font-size:11.5px;"></pre>
+        <button type="button" class="tc-compress-btn" onclick="RagWorkspace.runVerify()">Run Grounding Check</button>
+        <pre id="verify-result-box" class="output-box" style="display:none;margin-top:0.75rem;max-height:11rem;overflow:auto;font-size:0.74rem;"></pre>
     </div>
-</div>
+</dialog>
+
+<dialog id="studio-cmd-modal" class="studio-dialog cmd-palette-dialog" aria-label="Oryx Studio Command Palette">
+    <label for="studio-cmd-input" class="visually-hidden">Search commands</label>
+    <input type="text" id="studio-cmd-input" class="cmd-palette-input" placeholder="Type a command (e.g. preset, dark mode, smart trim, history, sign in)...">
+    <div class="cmd-palette-list" id="studio-cmd-list"></div>
+</dialog>
 
 <script src="mock_api.js?v=6"></script>
-<script src="rag_workspace.js?v=1"></script>
-<script src="app.js?v=13"></script>
-
-    <!-- Legacy Progress Overlay (Suppressed for R5 non-blocking inline skeleton) -->
-    <div id="neuro-progress-overlay" style="display: none !important; pointer-events: none;">
-        <canvas id="neuron-canvas"></canvas>
-        <div class="brain-loader">
-            <svg class="vector-neural-ring" viewBox="0 0 100 100">
-                <circle class="ring-bg" cx="50" cy="50" r="42" />
-                <circle class="ring-pulse" cx="50" cy="50" r="42" />
-            </svg>
-            <div class="brain-center-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="#00f2fe" stroke-width="1.8" />
-                    <circle cx="12" cy="11" r="3.5" fill="#00f2fe" fill-opacity="0.3" stroke="#00f2fe" stroke-width="1.2" />
-                </svg>
-            </div>
-        </div>
-        <div id="progress-status">Initializing CRISP Neuro-Engine...</div>
-        <div class="progress-subtext">Calibrating semantic entropy & token pruning thresholds</div>
-    </div>
+<script src="rag_workspace.js?v=2"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

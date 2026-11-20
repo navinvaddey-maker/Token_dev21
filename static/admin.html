@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>Admin Console | Oryx Studio</title>
-    <link rel="stylesheet" href="styles/tokens.css?v=20261118c">
-    <link rel="stylesheet" href="admin.css?v=20261118c">
+    <link rel="stylesheet" href="styles/tokens.css?v=20261120">
+    <link rel="stylesheet" href="admin.css?v=20261120">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="theme-dark hud-mode">
-    <nav class="sidebar" id="admin-sidebar">
+<body class="theme-dark">
+    <a href="#admin-main" class="skip-link visually-hidden">Skip to main content</a>
+    <nav class="sidebar" id="admin-sidebar" aria-label="Admin navigation">
         <div class="logo">
             <span class="logo-icon">▲</span>
             <span class="logo-text">Oryx Admin</span>
@@ -29,7 +31,7 @@
         </div>
     </nav>
 
-    <main class="content">
+    <main class="content" id="admin-main" tabindex="-1">
         <header class="hud-header-bar">
             <div class="hud-title-group">
                 <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
@@ -37,13 +39,14 @@
             </div>
             <div class="hud-telemetry-strip">
                 <span class="hud-status-pill" id="hud-status-pill">
-                    <span class="hud-pulse-dot"></span>
+                    <span class="hud-pulse-dot" aria-hidden="true"></span>
                     <span>SYSTEM NOMINAL</span>
                 </span>
                 <span class="hud-mono-chip" id="hud-latency">RTT -- ms</span>
                 <span class="hud-mono-chip" id="hud-utc-clock">--:--:-- UTC</span>
                 <button type="button" class="hud-cmd-btn" id="btn-auto-sync" title="Toggle 10s Live Telemetry Auto-Sync">AUTO-SYNC: ON</button>
                 <button type="button" class="hud-cmd-btn" id="btn-cmd-palette" title="Open Command Palette (⌘K)">⌘K Jump</button>
+                <button type="button" class="hud-cmd-btn" id="btn-admin-theme" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">☀️</button>
                 <div class="user-info">
                     <span id="admin-username">Admin</span>
                     <div class="avatar" id="admin-avatar">A</div>
@@ -160,14 +163,15 @@
                     <input type="text" id="user-search" placeholder="Search by ID, username, email...">
                 </div>
                 <table id="users-table">
+                    <caption class="visually-hidden">Registered users and business types</caption>
                     <thead>
                         <tr>
-                            <th>User ID</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Business Type</th>
-                            <th>Created At</th>
-                            <th>Actions</th>
+                            <th scope="col">User ID</th>
+                            <th scope="col">Username</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Business Type</th>
+                            <th scope="col">Created At</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="users-tbody">
@@ -193,15 +197,16 @@
                     </div>
                 </div>
                 <table id="history-table">
+                    <caption class="visually-hidden">Global compression history</caption>
                     <thead>
                         <tr>
-                            <th>User ID</th>
-                            <th>Domain</th>
-                            <th>Original Size</th>
-                            <th>Final Size</th>
-                            <th>Saved</th>
-                            <th>Mode</th>
-                            <th>Created At</th>
+                            <th scope="col">User ID</th>
+                            <th scope="col">Domain</th>
+                            <th scope="col">Original Size</th>
+                            <th scope="col">Final Size</th>
+                            <th scope="col">Saved</th>
+                            <th scope="col">Mode</th>
+                            <th scope="col">Created At</th>
                         </tr>
                     </thead>
                     <tbody id="history-tbody">
@@ -225,11 +230,12 @@
                     <button class="btn-refresh" onclick="loadFeedback()">↻ Refresh</button>
                 </div>
                 <table id="feedback-type-table">
+                    <caption class="visually-hidden">Feedback signals grouped by type</caption>
                     <thead>
                         <tr>
-                            <th>Signal Type</th>
-                            <th>Count</th>
-                            <th>Avg Sentiment / Value</th>
+                            <th scope="col">Signal Type</th>
+                            <th scope="col">Count</th>
+                            <th scope="col">Avg Sentiment / Value</th>
                         </tr>
                     </thead>
                     <tbody id="feedback-type-tbody">
@@ -243,12 +249,13 @@
                     <h2>Feedback By Use Case</h2>
                 </div>
                 <table id="feedback-usecase-table">
+                    <caption class="visually-hidden">Feedback signals grouped by use case</caption>
                     <thead>
                         <tr>
-                            <th>Use Case</th>
-                            <th>Signal Type</th>
-                            <th>Count</th>
-                            <th>Avg Sentiment / Value</th>
+                            <th scope="col">Use Case</th>
+                            <th scope="col">Signal Type</th>
+                            <th scope="col">Count</th>
+                            <th scope="col">Avg Sentiment / Value</th>
                         </tr>
                     </thead>
                     <tbody id="feedback-usecase-tbody">
@@ -319,16 +326,17 @@
                     <button class="btn-refresh" id="rag-refresh-btn">↻ Refresh</button>
                 </div>
                 <table id="rag-docs-table">
+                    <caption class="visually-hidden">All uploaded RAG knowledge base documents</caption>
                     <thead>
                         <tr>
-                            <th>Filename</th>
-                            <th>Owner User ID</th>
-                            <th>Domain</th>
-                            <th>Pages</th>
-                            <th>Chunks</th>
-                            <th>Status</th>
-                            <th>Uploaded</th>
-                            <th>Actions</th>
+                            <th scope="col">Filename</th>
+                            <th scope="col">Owner User ID</th>
+                            <th scope="col">Domain</th>
+                            <th scope="col">Pages</th>
+                            <th scope="col">Chunks</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Uploaded</th>
+                            <th scope="col">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="rag-docs-tbody">
@@ -340,49 +348,51 @@
 
         <!-- ── Ask (RAG) Section ─────────────────────────────── -->
         <section id="ask-section">
-            <div class="table-container glass" style="margin-top: 2rem; padding: 24px;">
-                <h2>Admin Ask (RAG) Query</h2>
-                
-                <div style="margin-bottom: 16px; margin-top: 16px;">
-                    <label for="admin-scenario-mode-select" style="display:block; margin-bottom: 8px;">Pipeline Mode</label>
-                    <select id="admin-scenario-mode-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
-                        <option value="Scenario">Scenario Mode</option>
-                        <option value="Regular" selected>Regular Mode</option>
-                    </select>
+            <div class="table-container glass hud-panel" style="padding: 1.5rem;">
+                <h2 style="margin-bottom: 1rem;">Admin Ask (RAG) Query</h2>
+
+                <div class="admin-ask-grid">
+                    <div class="admin-field">
+                        <label for="admin-scenario-mode-select">Pipeline Mode</label>
+                        <select id="admin-scenario-mode-select" class="admin-select">
+                            <option value="Scenario">Scenario Mode</option>
+                            <option value="Regular" selected>Regular Mode</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-field">
+                        <label for="admin-scenario-domain-select">Domain Scope</label>
+                        <select id="admin-scenario-domain-select" class="admin-select">
+                            <option value="" disabled selected>-- Select Mandatory Domain --</option>
+                            <option value="legal">Legal</option>
+                            <option value="business">Business</option>
+                            <option value="finance">Finance</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-field">
+                        <label for="admin-scenario-style-select">Output Style</label>
+                        <select id="admin-scenario-style-select" class="admin-select">
+                            <option value="balanced" selected>Balanced</option>
+                            <option value="concise">Concise</option>
+                            <option value="detailed">Detailed</option>
+                            <option value="aggressive">Aggressive</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div style="margin-bottom: 16px;">
-                    <label for="admin-scenario-domain-select" style="display:block; margin-bottom: 8px;">Domain Scope</label>
-                    <select id="admin-scenario-domain-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
-                        <option value="" disabled selected>-- Select Mandatory Domain --</option>
-                        <option value="legal">Legal</option>
-                        <option value="business">Business</option>
-                        <option value="finance">Finance</option>
-                    </select>
+                <div class="admin-field">
+                    <label for="admin-scenario-query-input">Query / Intake</label>
+                    <textarea id="admin-scenario-query-input" class="admin-textarea" placeholder="Ask a question against internal knowledge base..."></textarea>
                 </div>
 
-                <div style="margin-bottom: 16px;">
-                    <label for="admin-scenario-style-select" style="display:block; margin-bottom: 8px;">Output Style</label>
-                    <select id="admin-scenario-style-select" style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1);">
-                        <option value="balanced" selected>Balanced</option>
-                        <option value="concise">Concise</option>
-                        <option value="detailed">Detailed</option>
-                        <option value="aggressive">Aggressive</option>
-                    </select>
-                </div>
-
-                <div style="margin-bottom: 16px;">
-                    <label for="admin-scenario-query-input" style="display:block; margin-bottom: 8px;">Query / Intake</label>
-                    <textarea id="admin-scenario-query-input" placeholder="Ask a question against internal knowledge base..." style="width:100%; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); min-height: 80px;"></textarea>
-                </div>
-
-                <button id="admin-ask-btn" class="btn-primary" style="margin-bottom: 24px;">
+                <button type="button" id="admin-ask-btn" class="btn-primary" style="margin-bottom: 1.25rem;">
                     🔍 Query Internal Knowledge Base
                 </button>
 
                 <div id="admin-scenario-result-section" style="display:none;">
-                    <h3>Response Output</h3>
-                    <div id="admin-scenario-result-output" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;"></div>
+                    <h3 style="margin-bottom: 0.5rem;">Response Output</h3>
+                    <div id="admin-scenario-result-output" class="admin-output"></div>
                 </div>
             </div>
         </section>
@@ -418,6 +428,6 @@
         </div>
     </div>
 
-    <script src="admin.js?v=20261118c"></script>
+    <script src="admin.js?v=20261120"></script>
 </body>
 </html>

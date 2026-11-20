@@ -57,10 +57,18 @@ const MODEL_PRICES = {
 // ── Auth ────────────────────────────────────────────────────────────────────
 
 function switchAuthTab(tab) {
-    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
-    document.getElementById('tab-' + tab).classList.add('active');
-    document.getElementById('form-' + tab).classList.add('active');
+    const tabBtn = document.getElementById('tab-' + tab);
+    if (tabBtn) {
+        tabBtn.classList.add('active');
+        tabBtn.setAttribute('aria-selected', 'true');
+    }
+    const formEl = document.getElementById('form-' + tab);
+    if (formEl) formEl.classList.add('active');
 }
 
 async function handleLogin(e) {
@@ -413,10 +421,16 @@ function switchTab(tab) {
         if (typeof openAuthModal === 'function') openAuthModal();
     }
 
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     const navBtn = document.getElementById('nav-' + tab);
-    if (navBtn) navBtn.classList.add('active');
+    if (navBtn) {
+        navBtn.classList.add('active');
+        navBtn.setAttribute('aria-selected', 'true');
+    }
 
     if (tab === 'compress') {
         const compressContent = document.getElementById('tab-compress');
@@ -942,6 +956,56 @@ async function compress(isSilent = false) {
 }
 
 /**
+ * Toggles the quality score breakdown panel and keeps aria-expanded synchronized.
+ */
+function toggleQualityBreakdown() {
+    const panel = document.getElementById('quality-breakdown');
+    const trigger = document.getElementById('tes-score');
+    if (!panel) return;
+    const isNowHidden = panel.classList.toggle('hidden');
+    if (trigger) {
+        trigger.setAttribute('aria-expanded', isNowHidden ? 'false' : 'true');
+    }
+}
+
+/**
+ * Computes a concise list of pruned tokens between the raw input and optimized output.
+ * Falls back to server-provided pruned_summary when inputs are unavailable.
+ */
+function computePrunedTokenSummary(rawInput, optimizedPrompt, savedCount, fallbackSummary) {
+    if (fallbackSummary) return fallbackSummary;
+    const rawWords = (rawInput || '')
+        .replace(/[^\w\s'-]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2);
+    if (rawWords.length === 0) {
+        return `Removed filler: conversational hedging, redundant phrasing (${savedCount} tokens)`;
+    }
+    const optSet = new Set(
+        (optimizedPrompt || '')
+            .toLowerCase()
+            .replace(/[^\w\s'-]/g, ' ')
+            .split(/\s+/)
+            .filter(Boolean)
+    );
+    const seen = new Set();
+    const removed = [];
+    for (const w of rawWords) {
+        const lower = w.toLowerCase();
+        if (!optSet.has(lower) && !seen.has(lower)) {
+            seen.add(lower);
+            removed.push(w);
+            if (removed.length >= 14) break;
+        }
+    }
+    if (removed.length === 0) {
+        return `Removed filler: conversational hedging, redundant phrasing (${savedCount} tokens)`;
+    }
+    const ellipsis = removed.length >= 14 ? '…' : '';
+    return `Pruned (${savedCount} tok): ${removed.join(', ')}${ellipsis}`;
+}
+
+/**
  * Renders compressed result, diff highlight, TES badge, and dollar telemetry (R2, R3).
  */
 function renderResult(result) {
@@ -998,7 +1062,8 @@ function renderResult(result) {
         const showDiff = State.showDiff !== false && (document.getElementById('diff-toggle')?.checked !== false);
 
         if (showDiff && saved > 0) {
-            const diffSummary = result.pruned_summary || `Removed filler: conversational hedging, redundant phrasing (${saved} tokens)`;
+            const rawInput = document.getElementById('prompt-input')?.value || '';
+            const diffSummary = computePrunedTokenSummary(rawInput, promptText, saved, result.pruned_summary);
             const formattedPrompt = escapeHtml(promptText)
                 .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS)\]/g, '<span class="crisp-tag">[$1]</span>');
 
@@ -1279,8 +1344,10 @@ function renderHistoryList(records) {
             <span class="history-item-time">${escapeHtml(timeStr)}</span>
         `;
 
-        const preview = document.createElement('div');
+        const preview = document.createElement('button');
+        preview.type = 'button';
         preview.className = 'history-preview';
+        preview.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
         preview.textContent = r.original_prompt || '';
         preview.title = 'Click to inspect Original vs. Optimized CRISP prompt';
         preview.addEventListener('click', () => toggleHistoryExpand(recId));
@@ -1609,13 +1676,15 @@ async function loadStats() {
 // ── Utils ───────────────────────────────────────────────────────────────────
 
 function showToast(msg, type) {
-    const existing = document.querySelector('.toast');
+    const region = document.getElementById('toast-region') || document.body;
+    const existing = region.querySelector('.toast');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
     toast.className = 'toast toast-' + type;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     toast.textContent = msg;
-    document.body.appendChild(toast);
+    region.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
 
@@ -1664,14 +1733,17 @@ function validatePromptLength() {
     
     if (count >= 8) {
         compressBtn.disabled = false;
+        promptInput.removeAttribute('aria-invalid');
         if (errorDiv) errorDiv.style.display = 'none';
     } else {
         compressBtn.disabled = true;
         if (errorDiv) {
             if (raw.length > 0) {
+                promptInput.setAttribute('aria-invalid', 'true');
                 errorDiv.textContent = `Prompt must be at least 8 words (currently ${count} / 8).`;
                 errorDiv.style.display = 'block';
             } else {
+                promptInput.removeAttribute('aria-invalid');
                 errorDiv.style.display = 'none';
             }
         }
@@ -1680,22 +1752,77 @@ function validatePromptLength() {
 
 // ── Init & Lifecycle ────────────────────────────────────────────────────────
 
-function initTheme() {
-    const saved = localStorage.getItem('oryx_theme') || 'theme-light';
+// ── Native <dialog> Helpers & Theme Lifecycle ───────────────────────────────
+
+function openDialogSafe(dialogEl) {
+    if (!dialogEl) return;
+    if (typeof dialogEl.showModal === 'function') {
+        if (!dialogEl.open) dialogEl.showModal();
+    } else {
+        dialogEl.setAttribute('open', '');
+        dialogEl.style.display = 'flex';
+    }
+}
+
+function closeDialogSafe(dialogEl) {
+    if (!dialogEl) return;
+    if (typeof dialogEl.close === 'function') {
+        if (dialogEl.open) dialogEl.close();
+    } else {
+        dialogEl.removeAttribute('open');
+        dialogEl.style.display = 'none';
+    }
+}
+
+function applyThemeClass(themeClass) {
+    const normalized = (themeClass === 'theme-dark' || themeClass === 'theme-night') ? 'theme-dark' : 'theme-light';
+    const scheme = normalized === 'theme-dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', scheme);
+    document.documentElement.style.colorScheme = scheme;
     document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-morning', 'theme-afternoon');
-    document.body.classList.add(saved);
+    document.body.classList.add(normalized);
     const btn = document.getElementById('btn-theme-toggle');
-    if (btn) btn.textContent = saved === 'theme-dark' ? '☀️' : '🌙';
+    if (btn) {
+        btn.textContent = normalized === 'theme-dark' ? '☀️' : '🌙';
+        btn.setAttribute('aria-label', normalized === 'theme-dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme');
+    }
+}
+
+function clearCustomSkinInlineVars() {
+    const root = document.documentElement;
+    ['--page-bg', '--glass-bg', '--btn-grad', '--btn-text', '--head-text', '--body-text', '--accent-text'].forEach(p => {
+        root.style.removeProperty(p);
+    });
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('oryx_theme');
+    if (saved) {
+        applyThemeClass(saved);
+    } else {
+        const prefersDark = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+            : false;
+        applyThemeClass(prefersDark ? 'theme-dark' : 'theme-light');
+    }
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        if (mq && typeof mq.addEventListener === 'function') {
+            mq.addEventListener('change', (e) => {
+                if (!localStorage.getItem('oryx_theme')) {
+                    applyThemeClass(e.matches ? 'theme-dark' : 'theme-light');
+                }
+            });
+        }
+    }
 }
 
 function toggleTheme() {
     const isDark = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-night');
     const next = isDark ? 'theme-light' : 'theme-dark';
-    document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-morning', 'theme-afternoon');
-    document.body.classList.add(next);
+    clearCustomSkinInlineVars();
     localStorage.setItem('oryx_theme', next);
-    const btn = document.getElementById('btn-theme-toggle');
-    if (btn) btn.textContent = next === 'theme-dark' ? '☀️' : '🌙';
+    applyThemeClass(next);
 }
 
 function initCustomSkinModal() {
@@ -1714,32 +1841,31 @@ function initCustomSkinModal() {
 
     if (!btn || !modal) return;
 
-    btn.addEventListener('click', () => {
-        modal.style.display = 'flex';
-    });
+    btn.addEventListener('click', () => openDialogSafe(modal));
     if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
+        closeBtn.addEventListener('click', () => closeDialogSafe(modal));
     }
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeDialogSafe(modal);
+    });
     if (applyBtn) {
         applyBtn.addEventListener('click', () => {
             const bgType = document.getElementById('skin-bg-type')?.value || 'dark';
-            const primaryColor = document.getElementById('skin-primary')?.value || '#00f2fe';
+            const primaryColor = document.getElementById('skin-primary')?.value || '#0284c7';
             const config = bgType === 'dark'
                 ? {
-                    bg: '#0b1120',
-                    glassBg: 'rgba(17, 24, 39, 0.88)',
-                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #3b82f6)`,
-                    btnText: '#04192b',
+                    bg: '#090d16',
+                    glassBg: 'rgba(16, 22, 36, 0.92)',
+                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #6366f1)`,
+                    btnText: '#061326',
                     headText: '#f8fafc',
                     bodyText: '#cbd5e1',
                     accentText: primaryColor
                 }
                 : {
                     bg: '#f8fafc',
-                    glassBg: 'rgba(255, 255, 255, 0.92)',
-                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #4f46e5)`,
+                    glassBg: 'rgba(255, 255, 255, 0.94)',
+                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #4338ca)`,
                     btnText: '#ffffff',
                     headText: '#0f172a',
                     bodyText: '#334155',
@@ -1747,20 +1873,162 @@ function initCustomSkinModal() {
                 };
             localStorage.setItem('na_ui_custom_skin', JSON.stringify(config));
             applyCustomSkinConfig(config);
-            modal.style.display = 'none';
+            closeDialogSafe(modal);
             showToast('Custom skin applied', 'success');
         });
     }
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
             localStorage.removeItem('na_ui_custom_skin');
-            const root = document.documentElement;
-            ['--page-bg', '--glass-bg', '--btn-grad', '--btn-text', '--head-text', '--body-text', '--accent-text'].forEach(p => {
-                root.style.removeProperty(p);
-            });
+            clearCustomSkinInlineVars();
             initTheme();
-            modal.style.display = 'none';
+            closeDialogSafe(modal);
             showToast('Skin reset to default', 'success');
+        });
+    }
+}
+
+/**
+ * Enables Left/Right arrow keyboard navigation on ARIA tablists.
+ */
+function initTablistKeyboardNav() {
+    document.querySelectorAll('[role="tablist"]').forEach(tablist => {
+        tablist.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+            const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'))
+                .filter(t => !t.disabled && t.style.display !== 'none');
+            if (tabs.length < 2) return;
+            const idx = tabs.indexOf(document.activeElement);
+            if (idx === -1) return;
+            e.preventDefault();
+            const nextIdx = e.key === 'ArrowRight'
+                ? (idx + 1) % tabs.length
+                : (idx - 1 + tabs.length) % tabs.length;
+            tabs[nextIdx].focus();
+            tabs[nextIdx].click();
+        });
+    });
+}
+
+/**
+ * Studio ⌘K / Ctrl+K Command Palette for fast keyboard-first navigation & actions.
+ */
+function openStudioCommandPalette() {
+    const modal = document.getElementById('studio-cmd-modal');
+    const input = document.getElementById('studio-cmd-input');
+    if (!modal) return;
+    openDialogSafe(modal);
+    if (input) {
+        input.value = '';
+        renderStudioCommandList('');
+        setTimeout(() => input.focus(), 10);
+    }
+}
+
+function getStudioCommands() {
+    const isAuthed = Boolean(State.token);
+    const cmds = [
+        { label: 'Load Preset: Buying a House', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('house'); } },
+        { label: 'Load Preset: Bug Report', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('bug'); } },
+        { label: 'Load Preset: Contract Review', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('legal'); } },
+        { label: 'Mode: Light Polish', hint: 'Mode', action: () => { switchTab('compress'); selectMode('gentle'); } },
+        { label: isAuthed ? 'Mode: Smart Trim' : 'Mode: Smart Trim (Sign in)', hint: 'Mode', action: () => { switchTab('compress'); selectMode('balanced'); } },
+        { label: isAuthed ? 'Mode: Deep Blueprint' : 'Mode: Deep Blueprint (Sign in)', hint: 'Mode', action: () => { switchTab('compress'); selectMode('aggressive'); } },
+        { label: 'Toggle Light / Dark Theme', hint: 'Theme', action: () => toggleTheme() },
+        { label: 'Customize UI Skin', hint: 'Theme', action: () => openDialogSafe(document.getElementById('skin-modal')) },
+        { label: isAuthed ? 'Sign Out' : 'Sign In / Register', hint: 'Account', action: () => toggleAuthSection() },
+    ];
+    if (isAuthed) {
+        cmds.push(
+            { label: 'Go to Optimize Prompt', hint: 'Tab', action: () => switchTab('compress') },
+            { label: 'Go to Ask My Docs (RAG)', hint: 'Tab', action: () => switchTab('ask') },
+            { label: 'Go to History Timeline', hint: 'Tab', action: () => switchTab('history') },
+            { label: 'Go to Insights Dashboard', hint: 'Tab', action: () => switchTab('stats') },
+        );
+    }
+    return cmds;
+}
+
+function renderStudioCommandList(query = '') {
+    const list = document.getElementById('studio-cmd-list');
+    const modal = document.getElementById('studio-cmd-modal');
+    if (!list) return;
+    const q = query.trim().toLowerCase();
+    const matches = getStudioCommands().filter(c =>
+        c.label.toLowerCase().includes(q) || c.hint.toLowerCase().includes(q)
+    );
+    list.innerHTML = '';
+    if (matches.length === 0) {
+        list.innerHTML = '<div style="padding:0.75rem;font-size:0.8rem;color:var(--text-muted);">No matching commands.</div>';
+        return;
+    }
+    matches.forEach((cmd, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cmd-palette-item' + (idx === 0 ? ' selected' : '');
+        btn.innerHTML = `<span>${escapeHtml(cmd.label)}</span><span class="bento-badge">${escapeHtml(cmd.hint)}</span>`;
+        btn.addEventListener('click', () => {
+            closeDialogSafe(modal);
+            cmd.action();
+        });
+        list.appendChild(btn);
+    });
+}
+
+function initStudioCommandPalette() {
+    const modal = document.getElementById('studio-cmd-modal');
+    const input = document.getElementById('studio-cmd-input');
+    const list = document.getElementById('studio-cmd-list');
+    if (!modal || !input || !list) return;
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeDialogSafe(modal);
+    });
+
+    input.addEventListener('input', (e) => renderStudioCommandList(e.target.value));
+    input.addEventListener('keydown', (e) => {
+        const items = Array.from(list.querySelectorAll('.cmd-palette-item'));
+        if (!items.length) return;
+        let idx = items.findIndex(el => el.classList.contains('selected'));
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            items.forEach(el => el.classList.remove('selected'));
+            items[(idx + 1) % items.length].classList.add('selected');
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            items.forEach(el => el.classList.remove('selected'));
+            items[(idx - 1 + items.length) % items.length].classList.add('selected');
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const active = items[idx >= 0 ? idx : 0];
+            if (active) active.click();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            if (modal.open) closeDialogSafe(modal);
+            else openStudioCommandPalette();
+        } else if (e.key === 'Escape') {
+            const authSec = document.getElementById('auth-section');
+            if (authSec && authSec.style.display === 'block') {
+                closeAuthSection();
+            }
+        }
+    });
+
+    // Backdrop click on auth overlay closes it cleanly
+    const authSec = document.getElementById('auth-section');
+    if (authSec) {
+        authSec.addEventListener('click', (e) => {
+            if (e.target === authSec) closeAuthSection();
+        });
+    }
+    const verifyModal = document.getElementById('verify-modal');
+    if (verifyModal) {
+        verifyModal.addEventListener('click', (e) => {
+            if (e.target === verifyModal) closeDialogSafe(verifyModal);
         });
     }
 }
@@ -1779,6 +2047,8 @@ function applyCustomSkinConfig(config) {
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initCustomSkinModal();
+    initTablistKeyboardNav();
+    initStudioCommandPalette();
     loadPresetsFromFile();
     const token = localStorage.getItem('tce_token');
     const userId = localStorage.getItem('tce_user_id');
@@ -2095,6 +2365,10 @@ if (typeof window !== 'undefined') {
     window.copyAggressivePrompt = copyAggressivePrompt;
     window.toggleTheme = toggleTheme;
     window.filterHistory = filterHistory;
+    window.toggleQualityBreakdown = toggleQualityBreakdown;
+    window.openStudioCommandPalette = openStudioCommandPalette;
+    window.openDialogSafe = openDialogSafe;
+    window.closeDialogSafe = closeDialogSafe;
 }
 if (typeof globalThis !== 'undefined') {
     globalThis.State = State;

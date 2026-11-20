@@ -656,6 +656,46 @@ async function runTestSuite() {
         'History: Load in Workbench restores original prompt into #prompt-input'
     );
 
+    // =========================================================================
+    // Suite 8: 2026 UI/UX, Accessibility & Modern Web Standards Verification
+    // =========================================================================
+    console.log('\n--- Suite 8: 2026 UI/UX & Accessibility ---');
+    const adminHtml = fs.readFileSync(path.resolve(__dirname, '../static/admin.html'), 'utf8');
+    const tokensCss = fs.readFileSync(path.resolve(__dirname, '../static/styles/tokens.css'), 'utf8');
+
+    assert(html.includes('<meta name="color-scheme" content="light dark">'), 'A11y/Theme: index.html declares color-scheme meta');
+    assert(adminHtml.includes('<meta name="color-scheme" content="light dark">'), 'A11y/Theme: admin.html declares color-scheme meta');
+    assert(tokensCss.includes('color-scheme: light dark') && tokensCss.includes('light-dark('), 'Theme: tokens.css sets color-scheme on :root with light-dark()');
+    assert(tokensCss.includes('prefers-reduced-motion: reduce') && tokensCss.includes('forced-colors: active'), 'A11y: tokens.css supports reduced-motion and forced-colors');
+
+    assert(doc.querySelector('header.tc-header') !== null, 'A11y: Semantic <header> landmark present');
+    assert(doc.querySelector('nav.nav-bar[role="tablist"]') !== null, 'A11y: Semantic <nav role="tablist"> present');
+    assert(doc.querySelector('main#main-content') !== null, 'A11y: Semantic <main> landmark present');
+    assert(doc.querySelector('a.skip-link[href="#main-content"]') !== null, 'A11y: Skip link targets #main-content');
+    assert(doc.querySelector('#toast-region[aria-live="polite"]') !== null, 'A11y: Toast live region has aria-live="polite"');
+
+    assert(doc.getElementById('skin-modal')?.tagName === 'DIALOG', 'Modern UI: #skin-modal uses native <dialog>');
+    assert(doc.getElementById('verify-modal')?.tagName === 'DIALOG', 'Modern UI: #verify-modal uses native <dialog>');
+    assert(doc.getElementById('studio-cmd-modal')?.tagName === 'DIALOG', 'Modern UI: #studio-cmd-modal (⌘K) uses native <dialog>');
+
+    const tesBtn = doc.getElementById('tes-score');
+    assert(tesBtn && tesBtn.tagName === 'BUTTON', 'A11y: #tes-score quality trigger is a native <button>');
+    win.toggleQualityBreakdown();
+    assert(tesBtn.getAttribute('aria-expanded') === 'true', 'A11y: toggleQualityBreakdown() updates aria-expanded="true"');
+    win.toggleQualityBreakdown();
+    assert(tesBtn.getAttribute('aria-expanded') === 'false', 'A11y: toggleQualityBreakdown() resets aria-expanded="false"');
+
+    win.openStudioCommandPalette();
+    assert(doc.querySelectorAll('#studio-cmd-list .cmd-palette-item').length >= 5, 'Modern UI: Studio ⌘K Command Palette populates quick actions');
+
+    win.toggleTheme();
+    assert(doc.documentElement.getAttribute('data-theme') === 'dark', 'Theme: toggleTheme() syncs data-theme="dark" on <html>');
+    win.toggleTheme();
+    assert(doc.documentElement.getAttribute('data-theme') === 'light', 'Theme: toggleTheme() toggles back to data-theme="light"');
+
+    assert(!adminHtml.includes('hud-mode'), 'Admin P3: CRT scanline hud-mode class retired');
+    assert(adminHtml.includes('id="btn-admin-theme"') && adminHtml.includes('<th scope="col">'), 'Admin P3: Shared theme toggle and accessible <th scope="col"> headers present');
+
     // Final Summary
     console.log('\n======================================================');
     console.log(` Results: ${passed} PASSED | ${failed} FAILED`);
