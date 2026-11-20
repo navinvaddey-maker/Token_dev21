@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-use crate::npae::schema::types::ExecutionPhase;
+use crate::npae::schema::types::{ExecutionPhase, ValidationStep};
 
 /// Top-level unified configuration deserialized from `config/unified.json`.
 ///
@@ -54,6 +54,24 @@ pub struct DomainTaxonomy {
     /// Optional default deliverables keyed by task type (`"creation"`, `"analysis"`, `"planning"`, `"troubleshooting"`, `"default"`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_deliverables: Option<HashMap<String, Vec<String>>>,
+    /// Optional validation checkpoints keyed by `"{perspective}:{intent}"`, `"{perspective}"`, `"{intent}"`, or `"default"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_templates: Option<HashMap<String, Vec<ValidationStep>>>,
+    /// Optional success criteria templates keyed by `"{perspective}:{intent}"`, `"{perspective}"`, `"{intent}"`, or `"default"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub success_criteria_templates: Option<HashMap<String, Vec<String>>>,
+    /// Optional domain assumption templates keyed by `"{perspective}:{intent}"`, `"{perspective}"`, `"{intent}"`, or `"default"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assumption_templates: Option<HashMap<String, Vec<String>>>,
+    /// Optional dynamic execution protocol instructions keyed by `"{perspective}:{intent}"`, `"{perspective}"`, `"{intent}"`, or `"default"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dynamic_instructions: Option<HashMap<String, String>>,
+    /// Optional output blueprint section lists keyed by `"{perspective}:{intent}"`, `"{perspective}"`, `"{intent}"`, or `"default"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_blueprints: Option<HashMap<String, Vec<String>>>,
+    /// Optional persona guardrail keys (e.g. `"production_grade_only"`, `"jurisdiction_aware"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persona_guardrails: Option<Vec<String>>,
 }
 
 impl Default for DomainTaxonomy {
@@ -68,6 +86,12 @@ impl Default for DomainTaxonomy {
             context_fields: None,
             task_templates: None,
             default_deliverables: None,
+            validation_templates: None,
+            success_criteria_templates: None,
+            assumption_templates: None,
+            dynamic_instructions: None,
+            output_blueprints: None,
+            persona_guardrails: None,
         }
     }
 }
@@ -217,24 +241,91 @@ pub struct WeightedWord {
     pub synonyms: Option<Vec<String>>,
 }
 
-/// Thread-safe configuration handle backed by `Arc<RwLock<UnifiedConfig>>`.
+impl UnifiedConfig {
+    /// Looks up a [`DomainTaxonomy`] entry by canonical name or alias (case-insensitive).
+    ///
+    /// // ARCH: ARCHITECTURE.md §6.6 — centralizes canonical alias resolution + taxonomy lookup.
+    ///
+    /// # Panics
+    /// Never panics.
+    #[must_use]
+    pub fn lookup_domain(&self, name: &str) -> Option<&DomainTaxonomy> {
+        let canonical = normalize_domain(name, &self.domain_taxonomy);
+        self.domain_taxonomy.iter().find(|t| {
+            t.domain.eq_ignore_ascii_case(canonical)
+                || t.aliases.iter().any(|a| a.eq_ignore_ascii_case(name))
+        })
+    }
+}
+
+/// Pre-indexed `O(1)` lookup table mapping lowercased canonical domain names and aliases
+/// to their index in `UnifiedConfig::domain_taxonomy`.
+///
+/// // ARCH: ARCHITECTURE.md §6.6 — avoids linear scans across 22+ domains and aliases on hot paths.
+#[derive(Debug, Clone, Default)]
+pub struct DomainIndex {
+    name_to_idx: HashMap<String, usize>,
+}
+
+impl DomainIndex {
+    /// Builds a `DomainIndex` from a slice of `DomainTaxonomy` definitions.
+    ///
+    /// # Panics
+    /// Never panics.
+    #[must_use]
+    pub fn from_taxonomy(taxonomy: &[DomainTaxonomy]) -> Self {
+        let mut name_to_idx = HashMap::with_capacity(taxonomy.len() * 4);
+        for (idx, tax) in taxonomy.iter().enumerate() {
+            name_to_idx.insert(tax.domain.to_lowercase(), idx);
+            for alias in &tax.aliases {
+                name_to_idx.entry(alias.to_lowercase()).or_insert(idx);
+            }
+        }
+        Self { name_to_idx }
+    }
+
+    /// Resolves a domain name or alias (case-insensitive) to its `domain_taxonomy` index in `O(1)`.
+    ///
+    /// # Panics
+    /// Never panics.
+    #[must_use]
+    pub fn get(&self, name: &str) -> Option<usize> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        self.name_to_idx.get(&trimmed.to_lowercase()).copied()
+    }
+}
+
+#[derive(Debug)]
+struct IndexedConfig {
+    config: Arc<UnifiedConfig>,
+    domain_index: DomainIndex,
+}
+
+/// Thread-safe configuration handle backed by `Arc<RwLock<IndexedConfig>>`.
 ///
 /// # Panics
 /// Never panics: recovers gracefully from poisoned `RwLock` states using `into_inner()`.
 #[derive(Debug, Clone)]
 pub struct ConfigHandle {
-    inner: Arc<RwLock<UnifiedConfig>>,
+    inner: Arc<RwLock<IndexedConfig>>,
 }
 
 impl ConfigHandle {
-    /// Creates a new `ConfigHandle` wrapping `initial`.
+    /// Creates a new `ConfigHandle` wrapping `initial` and builds its `O(1)` [`DomainIndex`].
     ///
     /// # Panics
     /// Never panics.
     #[must_use]
     pub fn new(initial: UnifiedConfig) -> Self {
+        let domain_index = DomainIndex::from_taxonomy(&initial.domain_taxonomy);
         Self {
-            inner: Arc::new(RwLock::new(initial)),
+            inner: Arc::new(RwLock::new(IndexedConfig {
+                config: Arc::new(initial),
+                domain_index,
+            })),
         }
     }
 
@@ -248,20 +339,54 @@ impl ConfigHandle {
         self.inner
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .config
+            .as_ref()
             .clone()
     }
 
-    /// Atomically swaps the active `UnifiedConfig` with `new_config`.
+    /// Returns a zero-copy `Arc<UnifiedConfig>` handle to the active configuration snapshot.
+    ///
+    /// // ARCH: ARCHITECTURE.md §6.6 — avoids cloning the full `unified.json` tree on hot paths.
+    ///
+    /// # Panics
+    /// Never panics (recovers from poisoned lock via `into_inner`).
+    #[must_use]
+    pub fn read_arc(&self) -> Arc<UnifiedConfig> {
+        Arc::clone(
+            &self
+                .inner
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .config,
+        )
+    }
+
+    /// Looks up a domain's index in `UnifiedConfig::domain_taxonomy` in `O(1)` time.
+    ///
+    /// # Panics
+    /// Never panics (recovers from poisoned lock via `into_inner`).
+    #[must_use]
+    pub fn lookup_domain_index(&self, name: &str) -> Option<usize> {
+        self.inner
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .domain_index
+            .get(name)
+    }
+
+    /// Atomically swaps the active `UnifiedConfig` with `new_config` and rebuilds the [`DomainIndex`].
     ///
     /// # Panics
     /// Never panics (recovers from poisoned lock via `into_inner`).
     pub fn swap(&self, new_config: UnifiedConfig) {
         // FIX: Recover write guard if RwLock is poisoned instead of panicking via unwrap() (nrule.md §6).
+        let domain_index = DomainIndex::from_taxonomy(&new_config.domain_taxonomy);
         let mut lock = self
             .inner
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        *lock = new_config;
+        lock.config = Arc::new(new_config);
+        lock.domain_index = domain_index;
     }
 }
 
@@ -298,5 +423,56 @@ impl ConfigLoader {
         let content = serde_json::to_string_pretty(config)?;
         std::fs::write(path, content)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_domain_index_and_config_handle_swap() {
+        let initial = UnifiedConfig {
+            domain_taxonomy: vec![DomainTaxonomy {
+                domain: "software".to_string(),
+                aliases: vec!["tech".to_string(), "coding".to_string()],
+                ..DomainTaxonomy::default()
+            }],
+            roles: vec![],
+            constraints: vec![],
+        };
+
+        let handle = ConfigHandle::new(initial);
+        assert_eq!(handle.lookup_domain_index("software"), Some(0));
+        assert_eq!(handle.lookup_domain_index("TECH"), Some(0));
+        assert_eq!(handle.lookup_domain_index("coding"), Some(0));
+        assert_eq!(handle.lookup_domain_index("unknown"), None);
+
+        let arc_cfg = handle.read_arc();
+        assert_eq!(
+            arc_cfg.lookup_domain("Tech").map(|d| d.domain.as_str()),
+            Some("software")
+        );
+
+        let updated = UnifiedConfig {
+            domain_taxonomy: vec![
+                DomainTaxonomy {
+                    domain: "finance".to_string(),
+                    aliases: vec!["wealth-management".to_string()],
+                    ..DomainTaxonomy::default()
+                },
+                DomainTaxonomy {
+                    domain: "legal".to_string(),
+                    aliases: vec!["law".to_string()],
+                    ..DomainTaxonomy::default()
+                },
+            ],
+            roles: vec![],
+            constraints: vec![],
+        };
+        handle.swap(updated);
+        assert_eq!(handle.lookup_domain_index("software"), None);
+        assert_eq!(handle.lookup_domain_index("wealth-management"), Some(0));
+        assert_eq!(handle.lookup_domain_index("LAW"), Some(1));
     }
 }
