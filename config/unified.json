@@ -5834,6 +5834,1910 @@
         "maintain_narrative_voice",
         "accurate_and_thorough"
       ]
+    },
+    {
+      "domain": "aerospace",
+      "aliases": [
+        "spaceflight",
+        "aviation",
+        "avionics",
+        "orbital-mechanics"
+      ],
+      "boost": 3,
+      "keywords": [
+        "aerospace",
+        "spacecraft",
+        "satellite",
+        "orbital",
+        "delta-v",
+        "propulsion",
+        "avionics",
+        "airframe",
+        "aerodynamics",
+        "telemetry",
+        "launch-vehicle",
+        "thruster",
+        "gnss",
+        "attitude-control",
+        "do-178c",
+        "faa-certification"
+      ],
+      "persona_template": "Principal {role} specializing in aerospace systems engineering, flight dynamics, propulsion trade-offs, and mission assurance.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Mission Requirements & ConOps",
+            "description": "Define mission profile, delta-v/link/mass budgets, and environmental envelopes.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Mission Requirements Spec",
+              "Mass & Power Budget"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Subsystem Design & Trade Studies",
+            "description": "Engineer propulsion, avionics, thermal, and structural subsystems with redundancy.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Subsystem Trade Study",
+              "Interface Control Document (ICD)"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Verification, Environmental Testing & Flight Readiness",
+            "description": "Execute HIL simulation, thermal-vacuum/vibration qualification, and flight readiness review.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Verification Matrix (VCRM)",
+              "Flight Readiness Package"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Mission & Envelope Definition",
+            "description": "Define mission requirements, budgets, and safety margins.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "ConOps & Budgets"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Architecture & Subsystem Trade-Offs",
+            "description": "Design redundant subsystems and interface contracts.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "ICD & Trade Study"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Qualification & Readiness",
+            "description": "Verify against flight-environment and certification gates.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "VCRM & Readiness Review"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "mission_regime",
+        "mass_power_budget",
+        "safety_criticality",
+        "certification_standard"
+      ],
+      "task_templates": {
+        "creation": "Design an aerospace or flight system with quantified mass/power/delta-v budgets and verification gates.",
+        "default": "Deliver a mission-grade aerospace engineering analysis with explicit safety margins."
+      },
+      "default_deliverables": {
+        "default": [
+          "Mission & Budget Table",
+          "Subsystem Architecture",
+          "Verification & Safety Plan"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Mass, Power & Margin Closure",
+            "criteria": "Positive margins maintained on mass, power, thermal, and link/delta-v budgets",
+            "validation_method": "Systems budget audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Fault Tolerance & FMECA",
+            "criteria": "Single-point failures eliminated or mitigated per mission criticality class",
+            "validation_method": "FMECA & fault-tree review"
+          },
+          {
+            "step_number": 3,
+            "name": "Qualification & Certification Gate",
+            "criteria": "Aligns with DO-178C / NASA-STD / FAA airworthiness verification criteria",
+            "validation_method": "Verification matrix audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Mass, power, thermal, and performance budgets close with explicit engineering margins",
+          "Failure modes, redundancy, and fault-handling paths are explicitly specified",
+          "Includes concrete HIL/environmental qualification and certification checkpoints"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume flight-safety margins, radiation/thermal derating, and strict interface control apply",
+          "Assume certification and verification evidence must be traceable to requirements"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Engineer the requested aerospace system with closed mass/power/performance budgets, fault-tolerance architecture, and traceable qualification checkpoints."
+      },
+      "output_blueprints": {
+        "build": [
+          "Mission Envelope & Budgets",
+          "Subsystem Architecture",
+          "Fault Tolerance & FMECA",
+          "Qualification & Test Plan"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "automotive",
+      "aliases": [
+        "ev-engineering",
+        "autonomous-vehicles",
+        "mobility",
+        "powertrain"
+      ],
+      "boost": 3,
+      "keywords": [
+        "automotive",
+        "powertrain",
+        "ev-battery",
+        "bms",
+        "adas",
+        "lidar",
+        "can-bus",
+        "autosar",
+        "iso-26262",
+        "asil",
+        "chassis",
+        "regenerative-braking",
+        "charging-infrastructure",
+        "fleet-telematics",
+        "vehicle-dynamics",
+        "homologation"
+      ],
+      "persona_template": "Principal {role} specializing in automotive systems engineering, EV powertrains, ADAS/autonomy, and ISO 26262 functional safety.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Vehicle Requirements & Functional Safety (HARA)",
+            "description": "Define vehicle targets, ASIL safety goals, and thermal/range envelopes.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Vehicle Spec & HARA",
+              "Safety Concept"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Powertrain / E-E Architecture Design",
+            "description": "Design BMS, inverter, CAN/Ethernet topology, and control algorithms.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "E/E & Powertrain Architecture",
+              "Control Spec"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "HIL Validation, Track Testing & Homologation",
+            "description": "Validate fault injection on HIL rigs, durability testing, and regulatory homologation.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "HIL & Track Test Report",
+              "Homologation Checklist"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Requirements & Safety Goals",
+            "description": "Establish vehicle targets and ISO 26262 ASIL classification.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "HARA & Spec"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "System & Control Design",
+            "description": "Design hardware/software interfaces and diagnostic coverage.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Architecture Spec"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Validation & Homologation",
+            "description": "Execute HIL, durability, and regulatory verification.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Validation Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "vehicle_class",
+        "propulsion_type",
+        "asil_level",
+        "target_market_homologation"
+      ],
+      "task_templates": {
+        "creation": "Design an automotive or EV subsystem with functional safety (ISO 26262), thermal/range trade-offs, and validation tests.",
+        "default": "Deliver a production-oriented automotive engineering specification."
+      },
+      "default_deliverables": {
+        "default": [
+          "System Architecture",
+          "Safety & Diagnostic Spec",
+          "HIL & Track Validation Plan"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Functional Safety (ISO 26262 / ASIL)",
+            "criteria": "Hazard analysis, safe states, and diagnostic coverage satisfy target ASIL",
+            "validation_method": "Safety case review"
+          },
+          {
+            "step_number": 2,
+            "name": "Thermal, Range & Durability Margin",
+            "criteria": "Battery/powertrain performance holds across -20C to +50C operating envelope",
+            "validation_method": "Thermal & drive-cycle simulation"
+          },
+          {
+            "step_number": 3,
+            "name": "Cybersecurity & Homologation (UN R155)",
+            "criteria": "Vehicle bus security and regional homologation rules are verified",
+            "validation_method": "Compliance & TARA audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Satisfies vehicle performance, efficiency/range, and thermal management targets",
+          "Addresses ISO 26262 functional safety, safe states, and diagnostic fault handling",
+          "Includes HIL, bench, and vehicle-level verification criteria"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume automotive-grade temperature/vibration envelopes and ISO 26262 safety lifecycle apply",
+          "Assume CAN/Automotive Ethernet diagnostics and OTA/cybersecurity controls are required"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested automotive system with explicit range/thermal trade-offs, ISO 26262 safety mechanisms, bus/interface contracts, and HIL verification tests."
+      },
+      "output_blueprints": {
+        "build": [
+          "Vehicle Requirements & Safety Goals",
+          "Subsystem & E/E Architecture",
+          "Thermal & Fault-Handling Design",
+          "HIL & Homologation Plan"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "production_grade_only",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "agriculture",
+      "aliases": [
+        "agritech",
+        "agronomy",
+        "precision-farming",
+        "horticulture"
+      ],
+      "boost": 2,
+      "keywords": [
+        "agronomy",
+        "crop-yield",
+        "soil-health",
+        "irrigation",
+        "fertilizer",
+        "precision-agriculture",
+        "greenhouse",
+        "hydroponics",
+        "livestock",
+        "pest-management",
+        "ipm",
+        "harvest",
+        "ndvi",
+        "fertigation",
+        "cover-crop"
+      ],
+      "persona_template": "Senior {role} specializing in agronomy, precision agriculture, soil/water resource management, and sustainable crop economics.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Soil, Climate & Water Baseline",
+            "description": "Evaluate soil chemistry, drainage, growing degree days, and irrigation capacity.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Soil & Water Audit",
+              "Crop Suitability Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Agronomic & Input Protocol Design",
+            "description": "Plan crop rotation, seeding density, fertigation schedule, and IPM pest controls.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Seasonal Agronomic Plan",
+              "Input & Cost Budget"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Monitoring, Harvest & Yield Optimization",
+            "description": "Track moisture/NDVI telemetry, adjust inputs in-season, and measure post-harvest yield.",
+            "estimated_duration": "Seasonal",
+            "deliverables": [
+              "In-Season Scouting Protocol",
+              "Yield & Margin Report"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Site & Soil Baseline",
+            "description": "Assess soil, water, and climate constraints.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Site Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Crop & Input Plan",
+            "description": "Specify rotation, irrigation, nutrient, and IPM protocols.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Agronomic Protocol"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Monitoring & Harvest",
+            "description": "Define scouting metrics, harvest timing, and margin tracking.",
+            "estimated_duration": "Seasonal",
+            "deliverables": [
+              "Yield & Margin Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "climate_zone",
+        "acreage_or_scale",
+        "soil_type",
+        "water_availability"
+      ],
+      "task_templates": {
+        "creation": "Design an agronomic or precision-farming plan balancing yield, input cost, and soil/water sustainability.",
+        "default": "Deliver a practical, science-grounded agricultural management strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "Crop & Rotation Plan",
+          "Irrigation & Nutrient Schedule",
+          "IPM & Yield Economics"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Water & Nutrient Balance",
+            "criteria": "Irrigation and N-P-K application rates match crop evapotranspiration and soil tests",
+            "validation_method": "Soil & water balance check"
+          },
+          {
+            "step_number": 2,
+            "name": "IPM & Regulatory Compliance",
+            "criteria": "Pest controls follow integrated pest management thresholds and label/organic rules",
+            "validation_method": "IPM & label compliance review"
+          },
+          {
+            "step_number": 3,
+            "name": "Unit Economics Per Acre",
+            "criteria": "Seed, input, labor, and harvest costs yield positive contribution margin",
+            "validation_method": "Per-acre gross margin audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Tailors crop, irrigation, and nutrient protocols to climate zone and soil profile",
+          "Balances target yield against per-acre input costs and long-term soil health",
+          "Includes scouting triggers, IPM thresholds, and weather-risk contingencies"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume soil lab testing and local climate/frost dates should calibrate exact input rates",
+          "Assume water rights, pesticide label regulations, and seasonal weather variance apply"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested agronomic or farm-operations plan with site-calibrated irrigation/nutrient schedules, IPM thresholds, per-acre economics, and scouting checkpoints."
+      },
+      "output_blueprints": {
+        "build": [
+          "Site & Soil Constraints",
+          "Crop, Irrigation & Nutrient Protocol",
+          "IPM & Risk Mitigation",
+          "Per-Acre Economics & Monitoring"
+        ]
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "architecture-construction",
+      "aliases": [
+        "civil-engineering",
+        "structural-engineering",
+        "urban-planning",
+        "bim"
+      ],
+      "boost": 3,
+      "keywords": [
+        "structural-engineering",
+        "civil-engineering",
+        "bim",
+        "revit",
+        "building-code",
+        "zoning-setback",
+        "foundation-load",
+        "hvac-sizing",
+        "mep",
+        "leed",
+        "construction-schedule",
+        "critical-path",
+        "rfi",
+        "submittal",
+        "concrete-mix",
+        "seismic"
+      ],
+      "persona_template": "Principal {role} specializing in architectural/structural design, MEP coordination, building-code compliance, and construction project delivery.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Site Feasibility, Code & Program",
+            "description": "Verify zoning envelopes, geotechnical conditions, IBC/local code, and space program.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Code & Zoning Summary",
+              "Basis of Design (BOD)"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Schematic, Structural & MEP Coordination",
+            "description": "Coordinate architectural, structural load paths, and MEP/HVAC systems in BIM.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Coordinated Design Package",
+              "Cost Estimate (ROM)"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Permitting, Construction Admin & Commissioning",
+            "description": "Manage permit submittals, critical-path schedule, QA inspections, and commissioning.",
+            "estimated_duration": "Construction",
+            "deliverables": [
+              "Critical-Path Schedule",
+              "QA/QC & Commissioning Plan"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Feasibility & Code Analysis",
+            "description": "Establish zoning, geotechnical, and building-code constraints.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Code & Program Brief"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Technical Design & Coordination",
+            "description": "Integrate structural, architectural, and MEP systems.",
+            "estimated_duration": "4-8 weeks",
+            "deliverables": [
+              "Basis of Design"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Delivery & Commissioning",
+            "description": "Plan permitting, critical path, and site QA inspections.",
+            "estimated_duration": "Construction",
+            "deliverables": [
+              "Delivery & QA Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "building_typology",
+        "jurisdiction_code",
+        "site_constraints",
+        "construction_budget"
+      ],
+      "task_templates": {
+        "creation": "Develop an architectural, structural, or construction delivery plan aligned with building codes and budget.",
+        "default": "Deliver a code-aware architecture and construction engineering specification."
+      },
+      "default_deliverables": {
+        "default": [
+          "Basis of Design",
+          "Code & Structural/MEP Coordination Notes",
+          "Schedule & Cost Risk Register"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Building Code & Life-Safety Check",
+            "criteria": "Egress, fire ratings, accessibility (ADA), and zoning setbacks satisfy local code",
+            "validation_method": "Code compliance audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Structural & MEP Clash Check",
+            "criteria": "Load paths, seismic/wind criteria, and MEP clearances are coordinated",
+            "validation_method": "BIM clash & load review"
+          },
+          {
+            "step_number": 3,
+            "name": "Cost & Critical-Path Feasibility",
+            "criteria": "Construction estimate includes contingency and realistic long-lead procurement",
+            "validation_method": "Schedule & cost audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Aligns design program with governing building codes, life-safety, and accessibility rules",
+          "Coordinates structural, architectural, and MEP trade-offs with realistic cost contingencies",
+          "Flags licensed PE/RA stamp requirements and site inspection hold points"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume governing local building codes (IBC/IRC/NFPA) and licensed PE/architect stamping apply",
+          "Assume geotechnical survey and site utility verification precede final structural sizing"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Develop the requested architectural or construction plan with explicit code/life-safety gates, structural/MEP coordination, cost/schedule contingencies, and inspection milestones."
+      },
+      "output_blueprints": {
+        "build": [
+          "Site, Code & Program Basis",
+          "Architectural / Structural / MEP Design",
+          "Cost & Critical-Path Schedule",
+          "Permitting & Inspection Gates"
+        ]
+      },
+      "persona_guardrails": [
+        "jurisdiction_aware",
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "insurance",
+      "aliases": [
+        "actuarial",
+        "underwriting",
+        "claims-ops",
+        "insurtech"
+      ],
+      "boost": 3,
+      "keywords": [
+        "actuarial",
+        "underwriting",
+        "loss-ratio",
+        "combined-ratio",
+        "policyholder",
+        "reinsurance",
+        "deductible",
+        "premium-pricing",
+        "claims-adjudication",
+        "solvency",
+        "mortality-table",
+        "subrogation",
+        "catastrophe-model",
+        "endorsement"
+      ],
+      "persona_template": "Senior {role} specializing in actuarial pricing, underwriting risk selection, claims operations, and insurance regulatory compliance.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Risk Exposure & Loss Data Audit",
+            "description": "Analyze historical frequency/severity, exposure segments, and tail-risk concentration.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Exposure & Loss Triangle Summary",
+              "Risk Segmentation Matrix"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Pricing, Underwriting & Policy Design",
+            "description": "Calibrate rating factors, deductibles, exclusions, and reinsurance treaties.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Rating & Underwriting Guidelines",
+              "Policy Coverage Matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Claims Workflow, Reserving & Compliance",
+            "description": "Define claims triage, fraud/SIU triggers, IBNR reserving, and state filing gates.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "Claims & Reserving Playbook",
+              "Regulatory Filing Checklist"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Exposure & Loss Analysis",
+            "description": "Quantify frequency, severity, and tail risk.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Loss Analysis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Underwriting & Pricing",
+            "description": "Define rating factors, coverage limits, and exclusions.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Underwriting Guidelines"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Claims & Solvency Controls",
+            "description": "Set claims adjudication, reserving, and compliance controls.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "Claims & Compliance Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "line_of_business",
+        "jurisdiction_regulator",
+        "target_combined_ratio",
+        "reinsurance_structure"
+      ],
+      "task_templates": {
+        "creation": "Design an insurance product, underwriting framework, or claims workflow with actuarial discipline.",
+        "default": "Deliver an actuarially sound, compliance-aware insurance analysis."
+      },
+      "default_deliverables": {
+        "default": [
+          "Risk & Pricing Framework",
+          "Underwriting Rules & Exclusions",
+          "Loss-Ratio & Compliance Controls"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Actuarial & Combined-Ratio Reconciliation",
+            "criteria": "Pure premium, expense load, and reinsurance cost target sustainable combined ratio",
+            "validation_method": "Actuarial pricing audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Adverse Selection & Exclusions Check",
+            "criteria": "Policy wording, limits, and waiting periods mitigate moral hazard and ambiguity",
+            "validation_method": "Underwriting & wording review"
+          },
+          {
+            "step_number": 3,
+            "name": "Rate Filing & Regulatory Compliance",
+            "criteria": "Rating variables comply with state/national unfair-discrimination and solvency rules",
+            "validation_method": "Regulatory filing review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Separates frequency, severity, expense load, and reinsurance impact on combined ratio",
+          "Defines unambiguous underwriting eligibility, limits, deductibles, and exclusions",
+          "Flags state/regional rate-filing and unfair-discrimination regulatory gates"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume rating variables and policy endorsements are subject to jurisdictional insurance regulation",
+          "Assume credible historical loss experience and tail-catastrophe loading govern final pricing"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested insurance or actuarial framework with explicit frequency/severity drivers, underwriting rules, combined-ratio math, and regulatory filing gates."
+      },
+      "output_blueprints": {
+        "build": [
+          "Exposure & Risk Profile",
+          "Pricing & Underwriting Rules",
+          "Claims & Reserving Controls",
+          "Regulatory & Solvency Gates"
+        ]
+      },
+      "persona_guardrails": [
+        "jurisdiction_aware",
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "accounting-tax",
+      "aliases": [
+        "bookkeeping",
+        "tax-planning",
+        "audit-assurance",
+        "cpa"
+      ],
+      "boost": 3,
+      "keywords": [
+        "gaap",
+        "ifrs",
+        "general-ledger",
+        "journal-entry",
+        "reconciliation",
+        "depreciation",
+        "amortization",
+        "tax-deduction",
+        "tax-credit",
+        "withholding",
+        "sales-tax",
+        "vat",
+        "audit-trail",
+        "trial-balance",
+        "accrual-accounting",
+        "1099"
+      ],
+      "persona_template": "Senior {role} specializing in GAAP/IFRS financial reporting, tax compliance, internal controls, and audit readiness.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Chart of Accounts & Policy Baseline",
+            "description": "Establish accounting basis (GAAP/IFRS/cash), entity structure, and materiality thresholds.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Accounting Policy Memo",
+              "Chart of Accounts Map"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Close, Reconciliation & Tax Treatment",
+            "description": "Define journal entries, sub-ledger reconciliations, and jurisdictional tax calculations.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Close & Reconciliation Checklist",
+              "Tax Position Schedule"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Internal Controls & Audit Readiness",
+            "description": "Implement segregation of duties, supporting workpapers, and filing calendar.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "SOX/Internal Control Matrix",
+              "Audit Trail & Filing Calendar"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Accounting Basis & Scope",
+            "description": "Confirm entity type, GAAP/IFRS basis, and jurisdiction.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Policy Basis"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Entries, Reconciliations & Tax",
+            "description": "Specify journal treatments, reconciliations, and tax rules.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Workpaper Schedule"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Controls & Filing",
+            "description": "Establish audit documentation and statutory deadlines.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Control & Filing Checklist"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "accounting_standard",
+        "tax_jurisdiction",
+        "entity_type",
+        "fiscal_period"
+      ],
+      "task_templates": {
+        "creation": "Design an accounting close, reconciliation, or tax compliance workflow aligned with GAAP/IFRS and statutory rules.",
+        "default": "Deliver a precise, audit-ready accounting or tax analysis."
+      },
+      "default_deliverables": {
+        "default": [
+          "Accounting / Tax Treatment Summary",
+          "Journal & Reconciliation Schedule",
+          "Controls & Filing Checklist"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Double-Entry & Trial-Balance Tie-Out",
+            "criteria": "All debits equal credits and sub-ledgers tie cleanly to the general ledger",
+            "validation_method": "Trial balance reconciliation"
+          },
+          {
+            "step_number": 2,
+            "name": "GAAP / IFRS & Statutory Alignment",
+            "criteria": "Revenue recognition, accruals, and tax positions cite applicable standards",
+            "validation_method": "Technical accounting review"
+          },
+          {
+            "step_number": 3,
+            "name": "Audit Trail & Segregation of Duties",
+            "criteria": "Every adjustment has supporting evidence and independent preparer/reviewer sign-off",
+            "validation_method": "Internal control audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Reconciles mathematically with balanced debits/credits and explicit accounting basis",
+          "States governing tax jurisdiction and applicable GAAP/IFRS standards clearly",
+          "Includes documentation, segregation of duties, and statutory deadline controls"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume governing tax jurisdiction, entity classification, and GAAP/IFRS basis must be explicitly stated",
+          "Assume informational guidance requires review by a licensed CPA/tax advisor before statutory filing"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Deliver the requested accounting or tax workflow with explicit GAAP/IFRS/jurisdictional rules, balanced entry/reconciliation logic, internal controls, and filing checkpoints."
+      },
+      "output_blueprints": {
+        "build": [
+          "Basis & Jurisdictional Scope",
+          "Accounting / Tax Treatment",
+          "Reconciliation & Controls",
+          "Filing & Audit Readiness"
+        ]
+      },
+      "persona_guardrails": [
+        "jurisdiction_aware",
+        "cite_statutes",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "sales-revops",
+      "aliases": [
+        "b2b-sales",
+        "revenue-operations",
+        "account-management",
+        "enterprise-sales"
+      ],
+      "boost": 2,
+      "keywords": [
+        "sales-pipeline",
+        "meddpicc",
+        "bant",
+        "quota",
+        "territory-planning",
+        "crm-hygiene",
+        "outbound-sequence",
+        "discovery-call",
+        "objection-handling",
+        "win-rate",
+        "sales-cycle",
+        "acv",
+        "arr-expansion",
+        "renewal-playbook",
+        "revops"
+      ],
+      "persona_template": "Senior {role} specializing in B2B sales methodology (MEDDPICC), pipeline architecture, quota/territory design, and Revenue Operations.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "ICP, Segmentation & Funnel Baseline",
+            "description": "Define ideal customer profile, buying committee roles, and stage conversion baselines.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "ICP & Buying Committee Map",
+              "Funnel Conversion Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Playbook, Qualification & CRM Stages",
+            "description": "Build MEDDPICC exit criteria, discovery/objection scripts, and CRM stage hygiene.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Sales Playbook & Objection Matrix",
+              "CRM Stage Exit Criteria"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Enablement, Forecasting & Coaching Cadence",
+            "description": "Roll out rep enablement, weighted forecast governance, and win/loss feedback loops.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Forecasting & Deal-Review Cadence",
+              "Rep Ramp KPIs"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "ICP & Pipeline Baseline",
+            "description": "Define target segments, personas, and conversion metrics.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "ICP & Funnel Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Methodology & Playbook",
+            "description": "Define qualification exit criteria, messaging, and objection handling.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Sales Playbook"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Forecasting & Execution",
+            "description": "Establish CRM governance, coaching cadence, and quota KPIs.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "RevOps Governance Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "sales_motion",
+        "average_contract_value",
+        "sales_cycle_length",
+        "buying_committee"
+      ],
+      "task_templates": {
+        "creation": "Build a B2B sales playbook, qualification framework, or RevOps pipeline model with measurable conversion KPIs.",
+        "default": "Deliver an actionable, pipeline-oriented sales and RevOps strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "ICP & Qualification Matrix",
+          "Playbook & Objection Handling",
+          "Pipeline & Forecast KPIs"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Verifiable Stage Exit Criteria",
+            "criteria": "Every CRM stage requires buyer-verified actions rather than rep optimism",
+            "validation_method": "Pipeline hygiene audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Quota & Capacity Math",
+            "criteria": "Pipeline coverage (3x-4x), win rate, and cycle length reconcile with bookings target",
+            "validation_method": "RevOps capacity model check"
+          },
+          {
+            "step_number": 3,
+            "name": "Objection & Mutual Action Plan Coverage",
+            "criteria": "Addresses economic buyer, security/procurement friction, and renewal risk",
+            "validation_method": "Deal desk review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Aligns sales motion (PLG/SMB/Mid-Market/Enterprise) with ACV and buying committee",
+          "Uses verifiable buyer-action stage exit criteria and concrete objection responses",
+          "Reconciles pipeline coverage, win rate, and cycle time against revenue targets"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume CRM stage progression must be anchored to verifiable buyer commitments",
+          "Assume quota capacity accounts for rep ramp time and historical win-rate variance"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Build the requested sales or RevOps playbook with crisp ICP targeting, buyer-verified stage exit criteria, concrete objection handling, and reconciled pipeline/quota math."
+      },
+      "output_blueprints": {
+        "build": [
+          "ICP & Buying Committee",
+          "Qualification & Stage Exit Criteria",
+          "Messaging & Objection Matrix",
+          "Pipeline Math & Coaching Cadence"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "ux-design",
+      "aliases": [
+        "ui-ux",
+        "product-design",
+        "design-systems",
+        "interaction-design"
+      ],
+      "boost": 3,
+      "keywords": [
+        "wireframe",
+        "figma",
+        "design-system",
+        "usability-testing",
+        "wcag",
+        "accessibility",
+        "information-architecture",
+        "user-journey",
+        "microinteraction",
+        "design-tokens",
+        "heuristic-evaluation",
+        "prototype",
+        "responsive-layout",
+        "a11y"
+      ],
+      "persona_template": "Principal {role} specializing in interaction design, scalable design systems, WCAG accessibility, and user research.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "User Flows & Information Architecture",
+            "description": "Map user tasks, mental models, navigation hierarchy, and edge/empty states.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Task Flows & IA Map",
+              "State Matrix (Empty/Loading/Error)"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Component & Design System Specification",
+            "description": "Define layout grid, design tokens, interactive states, and WCAG 2.2 AA contrast/focus.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Component & Token Spec",
+              "Accessibility Annotation Spec"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Usability Validation & Eng Handoff",
+            "description": "Run moderated usability tasks, refine friction points, and deliver dev-ready specs.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Usability Findings Summary",
+              "Engineering Handoff Spec"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Flows & IA",
+            "description": "Map core user journeys and edge states.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "User Flow & IA"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "UI & Accessibility Spec",
+            "description": "Define components, tokens, and WCAG compliance.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Design & A11y Spec"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Validation & Handoff",
+            "description": "Verify usability and prepare engineering handoff.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Usability & Handoff Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_platform",
+        "accessibility_target",
+        "user_context",
+        "design_system_constraints"
+      ],
+      "task_templates": {
+        "creation": "Design a user flow, interface architecture, or design system with explicit edge states and WCAG accessibility.",
+        "default": "Deliver a user-centered, accessible UX/UI design specification."
+      },
+      "default_deliverables": {
+        "default": [
+          "Information Architecture & Flows",
+          "Component & State Specification",
+          "WCAG & Usability Checklist"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "WCAG 2.2 AA Accessibility",
+            "criteria": "Color contrast (>=4.5:1), keyboard navigation, focus states, and ARIA semantics pass",
+            "validation_method": "Accessibility audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Complete UI State Coverage",
+            "criteria": "Empty, loading, error, partial-data, and responsive breakpoints are explicitly designed",
+            "validation_method": "State-matrix check"
+          },
+          {
+            "step_number": 3,
+            "name": "Task Usability & Cognitive Load",
+            "criteria": "Primary user tasks complete with minimal steps and clear error recovery",
+            "validation_method": "Heuristic & usability test"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Covers happy path plus empty, loading, error, and permission-denied UI states",
+          "Meets WCAG 2.2 AA accessibility (keyboard, focus order, contrast, screen-reader labels)",
+          "Minimizes cognitive load with clear visual hierarchy and engineering-ready token specs"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume WCAG 2.2 AA accessibility and keyboard-first usability are mandatory",
+          "Assume responsive breakpoints and dark/light token consistency where applicable"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested UX/UI solution with clear user flows, full state coverage (empty/loading/error), WCAG 2.2 AA accessibility specs, and usability validation criteria."
+      },
+      "output_blueprints": {
+        "build": [
+          "User Journey & IA",
+          "Interface & Component Spec",
+          "Edge States & WCAG Accessibility",
+          "Usability Validation & Handoff"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "telecommunications",
+      "aliases": [
+        "telecom",
+        "5g-networking",
+        "rf-engineering",
+        "isp"
+      ],
+      "boost": 3,
+      "keywords": [
+        "5g",
+        "lte",
+        "ran",
+        "bgp",
+        "mpls",
+        "fiber-optic",
+        "dwdm",
+        "rf-link-budget",
+        "spectrum",
+        "sip-trunk",
+        "voip",
+        "qos",
+        "peering",
+        "cell-tower",
+        "core-network",
+        "netconf",
+        "slicing"
+      ],
+      "persona_template": "Principal {role} specializing in carrier-grade telecom architecture, RF link budgets, optical transport, and BGP/5G core reliability.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Capacity, Spectrum & Link-Budget Design",
+            "description": "Model traffic demand, RF/optical link budgets, latency targets, and redundancy.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Traffic & Link-Budget Model",
+              "Topology Blueprint"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Core, Transport & Routing Configuration",
+            "description": "Design BGP/MPLS/5G core routing, QoS policies, and failover domains.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Routing & QoS Architecture",
+              "Failover Design"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Commissioning, Drive/RFC-2544 Testing & NOC",
+            "description": "Execute RFC-2544 throughput/jitter tests, failover drills, and NOC alerting.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Acceptance Test Plan",
+              "NOC Runbook"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Capacity & Link Design",
+            "description": "Size bandwidth, RF/optical margins, and redundancy.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Link & Capacity Spec"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Routing & QoS Architecture",
+            "description": "Specify routing, QoS classes, and failover mechanics.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Network Architecture"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Testing & Operations",
+            "description": "Run acceptance tests and configure NOC telemetry.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Acceptance & NOC Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "access_technology",
+        "sla_availability",
+        "bandwidth_latency_target",
+        "regulatory_spectrum"
+      ],
+      "task_templates": {
+        "creation": "Architect a carrier-grade telecom or RF/optical network with closed link budgets and failover guarantees.",
+        "default": "Deliver a resilient telecommunications engineering design."
+      },
+      "default_deliverables": {
+        "default": [
+          "Link Budget & Capacity Model",
+          "Routing / QoS Topology",
+          "Failover & Acceptance Test Plan"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Link Budget & Fade Margin",
+            "criteria": "RF/optical SNR and fade margins meet target availability (e.g. 99.99%/99.999%)",
+            "validation_method": "Link-budget verification"
+          },
+          {
+            "step_number": 2,
+            "name": "Failover & Convergence Time",
+            "criteria": "BGP/IGP/ring protection converges within SLA without routing loops",
+            "validation_method": "Failover & chaos test"
+          },
+          {
+            "step_number": 3,
+            "name": "QoS & Regulatory Spectrum Compliance",
+            "criteria": "Latency/jitter classes and FCC/ETSI power/spectrum limits are satisfied",
+            "validation_method": "RFC-2544 & spectrum audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Closes RF/optical link budgets and capacity planning with explicit availability margins",
+          "Eliminates single points of failure with deterministic failover and QoS prioritization",
+          "Includes RFC-2544 / throughput-jitter acceptance tests and NOC alerting"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume carrier-grade N+1 redundancy, explicit fade margins, and regional spectrum regulations apply",
+          "Assume latency, jitter, and packet-loss SLAs must be enforced via end-to-end QoS"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Architect the requested telecom or network design with closed link/capacity budgets, routing and QoS architecture, deterministic failover, and acceptance tests."
+      },
+      "output_blueprints": {
+        "build": [
+          "Capacity & Link Budget",
+          "Topology, Routing & QoS",
+          "Redundancy & Failover",
+          "Acceptance Testing & NOC"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "production_grade_only",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "hospitality-culinary",
+      "aliases": [
+        "restaurant-ops",
+        "hotel-management",
+        "culinary-arts",
+        "food-service"
+      ],
+      "boost": 2,
+      "keywords": [
+        "restaurant",
+        "hospitality",
+        "menu-engineering",
+        "food-cost",
+        "haccp",
+        "revpar",
+        "adr",
+        "front-desk",
+        "kitchen-brigade",
+        "prep-list",
+        "banquet",
+        "catering",
+        "pos-system",
+        "table-turn",
+        "sommelier"
+      ],
+      "persona_template": "Senior {role} specializing in hospitality operations, menu/food-cost engineering, HACCP food safety, and guest experience.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Concept, Unit Economics & Menu/Rate Mix",
+            "description": "Define guest segment, food/labor cost targets (prime cost < 60%), or RevPAR goals.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Concept & Prime-Cost Model",
+              "Menu / Rate Architecture"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "BOH/FOH Operations & HACCP Safety",
+            "description": "Design kitchen/service workflows, inventory par levels, and HACCP food-safety SOPs.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "SOP & Staffing Schedule",
+              "HACCP & Allergen Protocol"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Soft Opening, Training & Guest KPIs",
+            "description": "Train staff, stress-test peak service turns, and monitor guest reviews and waste.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Soft-Launch Checklist",
+              "Daily P&L & Guest KPI Dashboard"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Concept & Economics",
+            "description": "Set prime-cost, food-cost, or RevPAR targets.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Economics Model"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Operations & Safety SOPs",
+            "description": "Define service workflows, par levels, and HACCP compliance.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "Ops & HACCP Manual"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Launch & KPIs",
+            "description": "Execute staff training and track daily waste, turns, and satisfaction.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Launch & KPI Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "venue_format",
+        "cover_or_room_capacity",
+        "target_food_labor_pct",
+        "local_health_code"
+      ],
+      "task_templates": {
+        "creation": "Design a hospitality, hotel, or restaurant operating plan balancing guest experience, prime cost, and food safety.",
+        "default": "Deliver a practical, margin-aware hospitality operations strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "Prime-Cost / RevPAR Model",
+          "Service & Kitchen SOPs",
+          "HACCP & Guest KPI Checklist"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Prime Cost & Margin Reconciliation",
+            "criteria": "Food/beverage cost + labor cost stay within target prime-cost ceiling",
+            "validation_method": "Recipe & labor P&L audit"
+          },
+          {
+            "step_number": 2,
+            "name": "HACCP & Allergen Safety",
+            "criteria": "Cold-chain temperatures, cross-contamination controls, and allergen labeling pass health code",
+            "validation_method": "Food safety inspection check"
+          },
+          {
+            "step_number": 3,
+            "name": "Peak-Service Throughput",
+            "criteria": "Station capacity, ticket times, and table turns hold under peak demand",
+            "validation_method": "Peak-load service drill"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Reconciles recipe/food cost, labor scheduling, and prime-cost or RevPAR targets",
+          "Enforces strict HACCP food-safety and allergen cross-contact protocols",
+          "Provides actionable FOH/BOH SOPs and peak-service throughput metrics"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume local health-department codes, HACCP temperature logs, and liquor/labor regulations apply",
+          "Assume seasonality and food-waste variance must be tracked weekly"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested hospitality or culinary operations plan with prime-cost/RevPAR math, FOH/BOH SOPs, HACCP/allergen safety controls, and peak-service KPIs."
+      },
+      "output_blueprints": {
+        "build": [
+          "Concept & Unit Economics",
+          "FOH / BOH Workflow & Staffing",
+          "HACCP & Allergen Controls",
+          "Launch & Daily KPIs"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "nonprofit-policy",
+      "aliases": [
+        "public-policy",
+        "grant-writing",
+        "philanthropy",
+        "ngo-ops"
+      ],
+      "boost": 2,
+      "keywords": [
+        "nonprofit",
+        "501c3",
+        "grant-proposal",
+        "theory-of-change",
+        "logic-model",
+        "public-policy",
+        "impact-evaluation",
+        "funder",
+        "donor-retention",
+        "advocacy",
+        "stakeholder-coalition",
+        "legislative-brief",
+        "program-budget",
+        "rfp-grant"
+      ],
+      "persona_template": "Senior {role} specializing in public policy analysis, grant writing, Theory of Change design, and measurable social-impact evaluation.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Needs Assessment & Theory of Change",
+            "description": "Define target population, root causes, evidence base, and causal Theory of Change.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Needs Assessment",
+              "Theory of Change & Logic Model"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Program Design, Budget & Governance",
+            "description": "Detail intervention activities, line-item budget with indirect caps, and equity safeguards.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "Program Narrative",
+              "Line-Item Budget & Justification"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Evaluation Plan & Funder Reporting",
+            "description": "Define output/outcome indicators, data collection ethics, and grant compliance reporting.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "M&E Indicator Matrix",
+              "Grant Compliance Calendar"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Needs & Causal Model",
+            "description": "Establish evidence-based need and Theory of Change.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Logic Model"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Program & Budget",
+            "description": "Specify activities, budget, and stakeholder alignment.",
+            "estimated_duration": "2 weeks",
+            "deliverables": [
+              "Program & Budget Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Impact Evaluation",
+            "description": "Define measurable outcomes and reporting governance.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "M&E Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_population",
+        "funding_mechanism",
+        "policy_jurisdiction",
+        "evaluation_horizon"
+      ],
+      "task_templates": {
+        "creation": "Draft a grant proposal, policy brief, or nonprofit program plan with a clear Logic Model and measurable outcomes.",
+        "default": "Deliver an evidence-grounded public policy or nonprofit strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "Theory of Change / Logic Model",
+          "Program & Budget Narrative",
+          "Monitoring & Evaluation Matrix"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Logic Model Causal Alignment",
+            "criteria": "Inputs, activities, outputs, and long-term outcomes link logically without unsupported leaps",
+            "validation_method": "Logic model audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Budget & Funder Compliance",
+            "criteria": "Line-item costs, matching funds, and indirect-cost caps satisfy RFP/501(c)(3) rules",
+            "validation_method": "Grant compliance check"
+          },
+          {
+            "step_number": 3,
+            "name": "Measurable M&E Indicators",
+            "criteria": "Every outcome has a baseline, target, data source, and ethical collection method",
+            "validation_method": "M&E rubric review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Grounds problem statement in verifiable evidence and a clear Theory of Change",
+          "Distinguishes program outputs from measurable long-term outcomes",
+          "Aligns budget narrative, indirect caps, and reporting with funder/statutory rules"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume funder RFP guidelines, indirect-cost caps, and nonprofit/public-sector ethics rules apply",
+          "Assume claims of impact require baseline comparison and transparent measurement methods"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested policy brief, grant proposal, or program plan with an explicit Theory of Change, reconciled budget narrative, measurable M&E indicators, and compliance gates."
+      },
+      "output_blueprints": {
+        "build": [
+          "Need & Evidence Base",
+          "Theory of Change & Program Design",
+          "Budget & Governance",
+          "Monitoring, Evaluation & Compliance"
+        ]
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "cite_sources_required",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "climate-esg",
+      "aliases": [
+        "sustainability",
+        "carbon-accounting",
+        "esg-reporting",
+        "environmental-compliance"
+      ],
+      "boost": 3,
+      "keywords": [
+        "scope-1",
+        "scope-2",
+        "scope-3",
+        "ghg-protocol",
+        "carbon-footprint",
+        "sbti",
+        "csrd",
+        "esg",
+        "net-zero",
+        "decarbonization-roadmap",
+        "lca",
+        "life-cycle-assessment",
+        "emissions-factor",
+        "double-materiality",
+        "tcfd"
+      ],
+      "persona_template": "Principal {role} specializing in GHG Protocol carbon accounting (Scope 1–3), CSRD/ISSB ESG reporting, LCA, and decarbonization strategy.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Boundary, Materiality & Emissions Baseline",
+            "description": "Define organizational/operational boundaries, double materiality, and Scope 1–3 inventory.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Double Materiality Matrix",
+              "Scope 1–3 GHG Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Abatement Curve & Decarbonization Roadmap",
+            "description": "Model marginal abatement cost curve (MACC), SBTi targets, and supplier engagement.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "MACC & Abatement Portfolio",
+              "SBTi-Aligned Transition Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Assurance, Disclosure & Governance",
+            "description": "Prepare audit-ready CSRD/ISSB disclosures, emission-factor lineage, and board KPIs.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Assurance-Ready Disclosure Pack",
+              "Data Lineage & Controls"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Materiality & GHG Baseline",
+            "description": "Establish boundaries and Scope 1–3 emissions inventory.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "GHG Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Decarbonization Roadmap",
+            "description": "Prioritize abatement levers and SBTi targets.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Transition Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Disclosure & Assurance",
+            "description": "Document emission factors, controls, and CSRD/ISSB reporting.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Disclosure & Assurance Pack"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "reporting_framework",
+        "scope_coverage",
+        "industry_sector",
+        "target_year"
+      ],
+      "task_templates": {
+        "creation": "Build a GHG Protocol carbon accounting or CSRD/ISSB decarbonization plan with auditable emission factors.",
+        "default": "Deliver an assurance-ready climate and ESG strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "Scope 1–3 Inventory Design",
+          "Abatement & SBTi Roadmap",
+          "CSRD/ISSB Assurance Controls"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "GHG Protocol Boundary & Factor Audit",
+            "criteria": "Scope 1/2/3 categories avoid double-counting and cite authoritative emission factors (EPA/DEFRA/ecoinvent)",
+            "validation_method": "GHG inventory audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Science-Based Target & Anti-Greenwashing Check",
+            "criteria": "Separates direct abatement from carbon offsets and meets SBTi/CSRD claim rules",
+            "validation_method": "Transition plan & claim review"
+          },
+          {
+            "step_number": 3,
+            "name": "Limited/Reasonable Assurance Readiness",
+            "criteria": "Activity data, estimation proxies, and uncertainty ranges are documented end-to-end",
+            "validation_method": "ESG assurance readiness check"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Follows GHG Protocol boundaries across Scope 1, 2 (market & location), and material Scope 3 categories",
+          "Clearly separates operational abatement from offsets to prevent greenwashing risk",
+          "Documents emission-factor sources, data quality tiers, and CSRD/ISSB assurance trails"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume GHG Protocol Corporate Standard and ISSB/CSRD disclosure rigor govern reporting",
+          "Assume emission factors and Scope 3 proxy assumptions must be explicitly cited and versioned"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested carbon-accounting or ESG transition plan aligned with the GHG Protocol and CSRD/ISSB, citing emission-factor methodology, separating abatement from offsets, and detailing assurance controls."
+      },
+      "output_blueprints": {
+        "build": [
+          "Boundary & Materiality",
+          "Scope 1–3 Inventory & Data Quality",
+          "Abatement Roadmap & MACC",
+          "Disclosure & Assurance Controls"
+        ]
+      },
+      "persona_guardrails": [
+        "cite_sources_required",
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
     }
   ],
   "roles": [
