@@ -57,15 +57,16 @@ impl AggressiveEngine {
         // 1. Ory Engine + Intent Extraction: run CPU-bound embedding & classification work
         // inside `spawn_blocking` before acquiring the async Ory mutex (Rule §6: no heavy CPU
         // on the Tokio runtime; never hold a lock across blocking compute).
-        let config_guard = config_handle.read();
+        // ARCH: ARCHITECTURE.md §6.6 — use zero-copy `read_arc()` instead of cloning `UnifiedConfig`.
+        let config_guard = config_handle.read_arc();
         let prompt_for_intent = user_prompt.clone();
         let repr_for_intent = repr.clone();
-        let cfg_for_intent = config_guard.clone();
+        let cfg_for_intent = std::sync::Arc::clone(&config_guard);
         let mut profile = tokio::task::spawn_blocking(move || {
             super::intent::extract_with_config(
                 &repr_for_intent,
                 &prompt_for_intent,
-                Some(&cfg_for_intent),
+                Some(cfg_for_intent.as_ref()),
             )
         })
         .await
@@ -73,7 +74,7 @@ impl AggressiveEngine {
 
         let ory_lock = ory_engine.lock().await;
         let ory_result = ory_lock
-            .process(&user_prompt, &config_guard)
+            .process(&user_prompt, config_guard.as_ref())
             .map_err(|e| e.to_string())?;
         // FIX: G-02 — release `ory_engine` mutex immediately after `process()` so StructurerRouter,
         // `build_with_blueprint`, ambiguity scoring, HallucinationGuard, and Stage 6B cycles run
@@ -136,7 +137,7 @@ impl AggressiveEngine {
             &profile,
             &user_prompt,
             &resolved_prompt,
-            Some(&config_guard),
+            Some(config_guard.as_ref()),
             reconstructed,
             derived_rag.as_ref(),
             ory_result.blueprint.as_ref(),
@@ -163,16 +164,37 @@ impl AggressiveEngine {
         let aggressive_ms = t_start.elapsed().as_millis() as u64;
 
         // Render final optimized prompt according to requested RenderStyle (Crisp by default).
-        // ARCH: Grounding Harness (GAP-42) — Harness style fences untrusted facts and binds the
-        // downstream LLM to FOUND / PARTIAL_MATCH / NOT_FOUND; Crisp behavior is unchanged.
+        // ARCH: Grounding Harness (GAP-42) & Phase 3 EvidenceBundle (§6.6) — pack provenance-tagged
+        // evidence once so Harness and RAG-backed Crisp prompts share exact `[F#]` IDs, conflict
+        // warnings, and token-budget truncation notices across rendering, HallucinationGuard,
+        // Stage 6B retries, and `/api/npae/verify`.
         let render_style = cfg.render_style.unwrap_or_default();
         let target_model = cfg.target_model_family.unwrap_or_default();
-        let grounding_facts = if render_style == RenderStyle::Harness {
-            super::structurer::collect_grounding_facts(&structured, raw, derived_rag.as_ref())
+        let has_rag_data = derived_rag
+            .as_ref()
+            .is_some_and(|r| !r.facts.is_empty() || !r.detailed_facts.is_empty());
+        let evidence_bundle =
+            super::structurer::EvidenceBundle::from_inputs(&structured, raw, derived_rag.as_ref());
+        let packed_evidence = evidence_bundle.pack(&super::structurer::PromptBudget::default());
+        let use_evidence_crisp = render_style == RenderStyle::Crisp
+            && target_model == crate::npae::schema::types::TargetModelFamily::StandardMarkdown
+            && has_rag_data
+            && !packed_evidence.items.is_empty();
+
+        let mut grounding_facts = if render_style == RenderStyle::Harness {
+            packed_evidence.to_numbered_facts()
         } else {
             Vec::new()
         };
         let optimized_prompt = match render_style {
+            RenderStyle::Crisp if use_evidence_crisp => {
+                super::structurer::render_crisp_prompt_with_evidence(
+                    &structured,
+                    &questions,
+                    &crisp_raw_input,
+                    &packed_evidence,
+                )
+            }
             RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
                 &structured,
                 &questions,
@@ -180,26 +202,27 @@ impl AggressiveEngine {
                 derived_rag.as_ref(),
                 target_model,
             ),
-            RenderStyle::Harness => super::structurer::render_harness_prompt_with_options(
+            RenderStyle::Harness => super::structurer::render_harness_prompt_with_evidence(
                 &structured,
                 &questions,
                 raw,
                 Some(&user_prompt),
-                derived_rag.as_ref(),
+                &packed_evidence,
                 false,
             ),
         };
 
-        // Post-generation validation using Hallucination Guard (including RAG facts as trusted context)
+        // Post-generation validation using Hallucination Guard (including packed evidence as trusted source context)
         let guard_cfg = &structured.hallucination_guard;
         let mut final_prompt = optimized_prompt;
 
-        let guard_source_text = if let Some(ref rag) = derived_rag {
-            if !rag.facts.is_empty() {
-                format!("{}\nContext Facts: {}", raw, rag.facts.join(". "))
-            } else {
-                raw.to_string()
-            }
+        let guard_source_text = if !packed_evidence.items.is_empty() {
+            let fact_texts: Vec<&str> = packed_evidence
+                .items
+                .iter()
+                .map(|i| i.text.as_str())
+                .collect();
+            format!("{raw}\nContext Facts: {}", fact_texts.join(". "))
         } else {
             raw.to_string()
         };
@@ -246,7 +269,13 @@ impl AggressiveEngine {
             }
         }
 
-        let rag_tokens = derived_rag.as_ref().map(|r| r.tokens_added).unwrap_or(0);
+        let rag_tokens = if has_rag_data {
+            packed_evidence
+                .tokens_used
+                .max(derived_rag.as_ref().map(|r| r.tokens_added).unwrap_or(0))
+        } else {
+            0
+        };
         // Initial scoring calculation for Aggressive mode
         let mut scoring_result = compute_aggressive_scoring(
             raw,
@@ -259,11 +288,12 @@ impl AggressiveEngine {
 
         // Stage 6B: Quality Guardrails & Targeted Correction Loop
         // FIX: G-10 — preserve required clarifying questions when `amb.score > threshold` and
-        // track `(best_prompt, best_scoring, best_guard)` across cycles so correction iterations
-        // never degrade `guard_report.passed` or composite score.
+        // track `(best_prompt, best_scoring, best_guard, best_grounding_facts)` across cycles so
+        // correction iterations never degrade `guard_report.passed`, composite score, or `[F#]` alignment.
         let mut best_prompt = final_prompt.clone();
         let mut best_scoring = scoring_result.clone();
         let mut best_guard = guard_report.clone();
+        let mut best_grounding_facts = grounding_facts.clone();
         let max_correction_cycles = 3;
         let mut cycle_num = 0;
 
@@ -282,8 +312,28 @@ impl AggressiveEngine {
                     crate::types::ScoreAxis::TaskEssential => {
                         // TES low: Strip optional roadmap, keep clarifying questions if ambiguous,
                         // and when Harness is active NEVER strip <rules>, <facts>, <requested_items>,
-                        // or <output_contract> (GAP-42).
+                        // or <output_contract> (GAP-42). Tighten evidence budget only when it exceeds
+                        // 300 tokens so short fact sets stay intact.
+                        let compact_evidence = if packed_evidence.tokens_used > 300 {
+                            evidence_bundle.pack(&super::structurer::PromptBudget {
+                                max_evidence_tokens: 300,
+                                max_items: 12,
+                            })
+                        } else {
+                            packed_evidence.clone()
+                        };
+                        if render_style == RenderStyle::Harness {
+                            grounding_facts = compact_evidence.to_numbered_facts();
+                        }
                         final_prompt = match render_style {
+                            RenderStyle::Crisp if use_evidence_crisp => {
+                                super::structurer::render_crisp_prompt_with_evidence(
+                                    &structured,
+                                    questions_for_tes,
+                                    &crisp_raw_input,
+                                    &compact_evidence,
+                                )
+                            }
                             RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
                                 &structured,
                                 questions_for_tes,
@@ -292,12 +342,12 @@ impl AggressiveEngine {
                                 target_model,
                             ),
                             RenderStyle::Harness => {
-                                super::structurer::render_harness_prompt_with_options(
+                                super::structurer::render_harness_prompt_with_evidence(
                                     &structured,
                                     questions_for_tes,
                                     raw,
                                     Some(&user_prompt),
-                                    derived_rag.as_ref(),
+                                    &compact_evidence,
                                     true,
                                 )
                             }
@@ -311,8 +361,19 @@ impl AggressiveEngine {
                         );
                     }
                     crate::types::ScoreAxis::SemanticCompleteness => {
-                        // SCS low: Ensure questions and constraints are fully rendered
+                        // SCS low: Ensure questions, full packed evidence, and constraints are rendered
+                        if render_style == RenderStyle::Harness {
+                            grounding_facts = packed_evidence.to_numbered_facts();
+                        }
                         final_prompt = match render_style {
+                            RenderStyle::Crisp if use_evidence_crisp => {
+                                super::structurer::render_crisp_prompt_with_evidence(
+                                    &structured,
+                                    &questions,
+                                    &crisp_raw_input,
+                                    &packed_evidence,
+                                )
+                            }
                             RenderStyle::Crisp => super::structurer::render_crisp_prompt_for_model(
                                 &structured,
                                 &questions,
@@ -321,12 +382,12 @@ impl AggressiveEngine {
                                 target_model,
                             ),
                             RenderStyle::Harness => {
-                                super::structurer::render_harness_prompt_with_options(
+                                super::structurer::render_harness_prompt_with_evidence(
                                     &structured,
                                     &questions,
                                     raw,
                                     Some(&user_prompt),
-                                    derived_rag.as_ref(),
+                                    &packed_evidence,
                                     false,
                                 )
                             }
@@ -378,12 +439,14 @@ impl AggressiveEngine {
                 best_prompt.clone_from(&final_prompt);
                 best_scoring = scoring_result.clone();
                 best_guard = guard_report.clone();
+                best_grounding_facts = grounding_facts.clone();
             }
         }
 
         final_prompt = best_prompt;
         scoring_result = best_scoring;
         guard_report = best_guard;
+        grounding_facts = best_grounding_facts;
 
         // Final token accounting for UI
         let token_original = crate::utils::tokens::estimate_tokens(raw);
@@ -622,5 +685,110 @@ fn compute_aggressive_scoring(
         scs: scs_score,
         correction_needed,
         correction_axis,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::npae::aggressive::config::{ConfigHandle, UnifiedConfig};
+    use crate::npae::aggressive::structurer::HttpStructurer;
+    use crate::npae::compression::pipeline::run_parallel_pipeline;
+    use crate::npae::ory::OryEngine;
+    use crate::types::{ChunkMetadata, EnrichmentContext, RagChunk, ReconstructedInput};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_engine_wires_evidence_bundle_provenance_and_conflicts() {
+        let raw = "What was Acme Corp Q3 revenue?";
+        let repr = run_parallel_pipeline(raw).expect("parallel pipeline");
+        let config_handle = Arc::new(ConfigHandle::new(UnifiedConfig::default()));
+        let ory_engine = Arc::new(tokio::sync::Mutex::new(OryEngine::new()));
+        let http = HttpStructurer {
+            route: "/api/compress".to_string(),
+            remote_addr: "127.0.0.1".to_string(),
+            body: raw.to_string(),
+        };
+        let reconstructed = ReconstructedInput::default();
+        let enrichment = EnrichmentContext {
+            cluster_vocab: None,
+            rag_chunks: Some(vec![
+                RagChunk {
+                    content: "Quarterly revenue for Acme Corp reached $4.2M in Q3.".to_string(),
+                    domain_tag: "finance".to_string(),
+                    metadata: Some(ChunkMetadata {
+                        source_file: "q3_report.pdf".to_string(),
+                        page_number: Some(4),
+                    }),
+                },
+                RagChunk {
+                    content: "Quarterly revenue for Acme Corp reached $4.8M in Q3.".to_string(),
+                    domain_tag: "finance".to_string(),
+                    metadata: Some(ChunkMetadata {
+                        source_file: "press_release.pdf".to_string(),
+                        page_number: Some(1),
+                    }),
+                },
+            ]),
+        };
+
+        // 1. Crisp mode with RAG chunks surfaces provenance + [CONFLICT: ...]
+        let crisp_resp = AggressiveEngine::run(
+            raw,
+            &repr,
+            &NpaeConfig::default(),
+            Arc::clone(&config_handle),
+            Arc::clone(&ory_engine),
+            &http,
+            &reconstructed,
+            Some(&enrichment),
+        )
+        .await
+        .expect("crisp run");
+        assert!(
+            crisp_resp
+                .optimized_prompt
+                .contains("(Source: q3_report.pdf, p.4)"),
+            "Crisp prompt should preserve page provenance:\n{}",
+            crisp_resp.optimized_prompt
+        );
+        assert!(
+            crisp_resp.optimized_prompt.contains("[CONFLICT:"),
+            "Crisp prompt should surface numeric conflict:\n{}",
+            crisp_resp.optimized_prompt
+        );
+
+        // 2. Harness mode preserves provenance, surfaces <conflicts>, and aligns grounding_facts
+        let harness_cfg = NpaeConfig {
+            render_style: Some(RenderStyle::Harness),
+            ..NpaeConfig::default()
+        };
+        let harness_resp = AggressiveEngine::run(
+            raw,
+            &repr,
+            &harness_cfg,
+            config_handle,
+            ory_engine,
+            &http,
+            &reconstructed,
+            Some(&enrichment),
+        )
+        .await
+        .expect("harness run");
+        assert!(
+            harness_resp
+                .optimized_prompt
+                .contains("(Source: q3_report.pdf, p.4)"),
+            "Harness prompt should preserve page provenance:\n{}",
+            harness_resp.optimized_prompt
+        );
+        assert!(
+            harness_resp.optimized_prompt.contains("<conflicts>"),
+            "Harness prompt should surface <conflicts>:\n{}",
+            harness_resp.optimized_prompt
+        );
+        assert_eq!(harness_resp.grounding_facts.len(), 2);
+        assert_eq!(harness_resp.grounding_facts[0].id, "F1");
+        assert_eq!(harness_resp.grounding_facts[1].id, "F2");
     }
 }
