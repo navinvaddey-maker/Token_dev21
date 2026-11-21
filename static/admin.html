@@ -5,16 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <title>Admin Console | Oryx Studio</title>
+    <link rel="icon" type="image/png" href="logo.png?v=20261121">
     <link rel="stylesheet" href="styles/tokens.css?v=20261120">
-    <link rel="stylesheet" href="admin.css?v=20261120">
+    <link rel="stylesheet" href="admin.css?v=20261121">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="theme-dark">
     <a href="#admin-main" class="skip-link visually-hidden">Skip to main content</a>
     <nav class="sidebar" id="admin-sidebar" aria-label="Admin navigation">
-        <div class="logo">
-            <span class="logo-icon">▲</span>
+        <div class="logo" id="admin-logo-wrap">
+            <span class="logo-icon" id="admin-logo-3d" aria-hidden="true">
+                <span class="owl-3d-rig">
+                    <span class="owl-3d-slice owl-3d-slab-back"></span>
+                    <span class="owl-3d-slice owl-3d-slab-bevel"></span>
+                    <span class="owl-3d-slice owl-3d-slab-face">
+                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
+                    </span>
+                    <span class="owl-3d-slice owl-3d-relief-wings">
+                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
+                    </span>
+                    <span class="owl-3d-slice owl-3d-relief-core">
+                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
+                    </span>
+                    <span class="owl-3d-slice owl-3d-relief-crown">
+                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
+                    </span>
+                    <span class="owl-3d-slice owl-3d-pbr-layer">
+                        <canvas id="admin-owl-pbr-canvas" width="72" height="72" class="owl-3d-pbr-canvas"></canvas>
+                    </span>
+                    <span class="owl-3d-slice owl-3d-sheen"></span>
+                </span>
+            </span>
             <span class="logo-text">Oryx Admin</span>
         </div>
         <ul class="nav-links">
@@ -428,6 +450,6 @@
         </div>
     </div>
 
-    <script src="admin.js?v=20261120"></script>
+    <script src="admin.js?v=20261121"></script>
 </body>
 </html>

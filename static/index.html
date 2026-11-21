@@ -6,11 +6,12 @@
     <meta name="color-scheme" content="light dark">
     <meta name="description" content="Oryx Intelligence Engine — CRISP framework powered prompt & token optimization">
     <title>Oryx Studio — Prompt &amp; Token Optimization</title>
+    <link rel="icon" type="image/png" href="logo.png?v=20261121" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles/tokens.css?v=20261120" />
-    <link rel="stylesheet" href="styles/studio.css?v=20261120" />
+    <link rel="stylesheet" href="styles/studio.css?v=20261121" />
     <style>
         /* Critical-path desktop container & responsive breakpoints */
         .glass-card { max-width: 1160px; }
@@ -69,15 +70,28 @@
     <div class="glass-card">
         <!-- Header Landmark -->
         <header class="tc-header">
-            <div class="tc-logo">
-                <div class="tc-logo-icon" aria-hidden="true">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2L4 6V12C4 17 8 21 12 22C16 21 20 17 20 12V6L12 2Z" stroke="currentColor" stroke-width="1.8" style="color: var(--accent-text);" />
-                        <path d="M12 2L4 6L12 10L20 6L12 2Z" fill="currentColor" fill-opacity="0.22" style="color: var(--accent-text);" />
-                        <circle cx="8.5" cy="11" r="1.7" fill="currentColor" style="color: var(--accent-text);" />
-                        <circle cx="15.5" cy="11" r="1.7" fill="currentColor" style="color: var(--accent-text);" />
-                        <path d="M12 13L10.5 15.5H13.5L12 13Z" fill="currentColor" style="color: var(--accent-text);" />
-                    </svg>
+            <div class="tc-logo" id="oryx-logo-wrap">
+                <div class="tc-logo-icon" id="oryx-logo-3d" aria-hidden="true">
+                    <div class="owl-3d-rig">
+                        <div class="owl-3d-slice owl-3d-slab-back"></div>
+                        <div class="owl-3d-slice owl-3d-slab-bevel"></div>
+                        <div class="owl-3d-slice owl-3d-slab-face">
+                            <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img" decoding="async" />
+                        </div>
+                        <div class="owl-3d-slice owl-3d-relief-wings">
+                            <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img" decoding="async" />
+                        </div>
+                        <div class="owl-3d-slice owl-3d-relief-core">
+                            <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img" decoding="async" />
+                        </div>
+                        <div class="owl-3d-slice owl-3d-relief-crown">
+                            <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img" decoding="async" />
+                        </div>
+                        <div class="owl-3d-slice owl-3d-pbr-layer">
+                            <canvas id="oryx-owl-pbr-canvas" width="80" height="80" class="owl-3d-pbr-canvas"></canvas>
+                        </div>
+                        <div class="owl-3d-slice owl-3d-sheen"></div>
+                    </div>
                 </div>
                 <div class="tc-logo-text">Oryx<span>Studio</span></div>
             </div>
@@ -618,6 +632,6 @@
 
 <script src="mock_api.js?v=6"></script>
 <script src="rag_workspace.js?v=2"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=20261121"></script>
 </body>
 </html>
