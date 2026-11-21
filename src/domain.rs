@@ -156,6 +156,7 @@ pub async fn compress_new(
             None
         },
         rag_chunks: None,
+        ..Default::default()
     };
 
     if req.rag_enabled.unwrap_or(false) {

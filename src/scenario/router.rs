@@ -221,6 +221,7 @@ impl ScenarioModeRouter {
                         let enrichment = crate::types::EnrichmentContext {
                             cluster_vocab: None,
                             rag_chunks: Some(filtered_chunks.clone()),
+                            ..Default::default()
                         };
                         if let Ok(comp_res) = orch
                             .process(
@@ -500,6 +501,7 @@ impl ScenarioModeRouter {
                         let enrichment = crate::types::EnrichmentContext {
                             cluster_vocab: None,
                             rag_chunks: Some(filtered_chunks.clone()),
+                            ..Default::default()
                         };
                         if let Ok(comp_res) = orch
                             .process(

@@ -181,10 +181,55 @@ pub struct ChunkMetadata {
     pub source_file: String,
 }
 
+/// A structured key-value datum supplied via `EnrichmentContext` (e.g. CRM/DB field, user profile,
+/// or API metric) that enters `EvidenceBundle` with `Provenance::StructuredRecord`.
+///
+/// // ARCH: ARCHITECTURE.md §6.6 — Phase 4 structured data ingestion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StructuredKeyValue {
+    /// Origin system or dataset identifier (e.g. `"crm_db"`, `"user_profile"`).
+    pub source_id: String,
+    /// Stable record identifier within `source_id` (e.g. `"acct_42"`).
+    #[serde(default)]
+    pub record_key: String,
+    /// Field or attribute name.
+    pub key: String,
+    /// Field value.
+    pub value: String,
+    /// Optional relevance score in `[0.0, 1.0]` (defaults to `0.90`).
+    #[serde(default)]
+    pub relevance_score: Option<f32>,
+}
+
+/// A structured table supplied via `EnrichmentContext` (e.g. SQL query result or CSV table)
+/// whose rows enter `EvidenceBundle` as `EvidenceKind::TableRow` with `Provenance::StructuredRecord`.
+///
+/// // ARCH: ARCHITECTURE.md §6.6 — Phase 4 structured table ingestion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StructuredTable {
+    /// Origin system or dataset identifier (e.g. `"analytics_warehouse"`).
+    pub source_id: String,
+    /// Logical table name (e.g. `"quarterly_metrics"`).
+    pub table_name: String,
+    /// Ordered column headers corresponding 1-to-1 with each row's cell values.
+    pub columns: Vec<String>,
+    /// Data rows; each row must match `columns.len()`.
+    pub rows: Vec<Vec<String>>,
+    /// Optional relevance score in `[0.0, 1.0]` (defaults to `0.88`).
+    #[serde(default)]
+    pub relevance_score: Option<f32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EnrichmentContext {
     pub cluster_vocab: Option<String>,
     pub rag_chunks: Option<Vec<RagChunk>>,
+    /// Optional structured key-value records ingested into `EvidenceBundle` with `Provenance::StructuredRecord`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_records: Option<Vec<StructuredKeyValue>>,
+    /// Optional structured tables ingested row-by-row into `EvidenceBundle` with `Provenance::StructuredRecord`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_tables: Option<Vec<StructuredTable>>,
 }
 
 /// Unified response enum for the PipelineOrchestrator

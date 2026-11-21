@@ -173,12 +173,58 @@ impl AggressiveEngine {
         let has_rag_data = derived_rag
             .as_ref()
             .is_some_and(|r| !r.facts.is_empty() || !r.detailed_facts.is_empty());
-        let evidence_bundle =
+        let mut evidence_bundle =
             super::structurer::EvidenceBundle::from_inputs(&structured, raw, derived_rag.as_ref());
+
+        // ARCH: ARCHITECTURE.md §6.6 — Phase 4 structured records & tables ingestion into EvidenceBundle
+        // with `Provenance::StructuredRecord` (automatic injection screening, XML escaping & conflict checks).
+        let mut has_structured_data = false;
+        if let Some(enrich) = enrichment {
+            if let Some(ref records) = enrich.structured_records {
+                for rec in records {
+                    let inserted = evidence_bundle.push_key_value(
+                        &rec.key,
+                        &rec.value,
+                        super::structurer::Provenance::StructuredRecord {
+                            source_id: rec.source_id.clone(),
+                            record_key: rec.record_key.clone(),
+                        },
+                        rec.relevance_score.unwrap_or(0.90),
+                    );
+                    if inserted {
+                        has_structured_data = true;
+                    }
+                }
+            }
+            if let Some(ref tables) = enrich.structured_tables {
+                for table in tables {
+                    let col_refs: Vec<&str> = table.columns.iter().map(String::as_str).collect();
+                    let score = table.relevance_score.unwrap_or(0.88);
+                    for (row_idx, row) in table.rows.iter().enumerate() {
+                        let val_refs: Vec<&str> = row.iter().map(String::as_str).collect();
+                        let inserted = evidence_bundle.push_table_row(
+                            &table.table_name,
+                            &col_refs,
+                            &val_refs,
+                            super::structurer::Provenance::StructuredRecord {
+                                source_id: table.source_id.clone(),
+                                record_key: format!("row_{}", row_idx + 1),
+                            },
+                            score,
+                        );
+                        if inserted {
+                            has_structured_data = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        let has_external_evidence = has_rag_data || has_structured_data;
         let packed_evidence = evidence_bundle.pack(&super::structurer::PromptBudget::default());
         let use_evidence_crisp = render_style == RenderStyle::Crisp
             && target_model == crate::npae::schema::types::TargetModelFamily::StandardMarkdown
-            && has_rag_data
+            && has_external_evidence
             && !packed_evidence.items.is_empty();
 
         let mut grounding_facts = if render_style == RenderStyle::Harness {
@@ -269,7 +315,7 @@ impl AggressiveEngine {
             }
         }
 
-        let rag_tokens = if has_rag_data {
+        let rag_tokens = if has_external_evidence {
             packed_evidence
                 .tokens_used
                 .max(derived_rag.as_ref().map(|r| r.tokens_added).unwrap_or(0))
@@ -695,7 +741,10 @@ mod tests {
     use crate::npae::aggressive::structurer::HttpStructurer;
     use crate::npae::compression::pipeline::run_parallel_pipeline;
     use crate::npae::ory::OryEngine;
-    use crate::types::{ChunkMetadata, EnrichmentContext, RagChunk, ReconstructedInput};
+    use crate::types::{
+        ChunkMetadata, EnrichmentContext, RagChunk, ReconstructedInput, StructuredKeyValue,
+        StructuredTable,
+    };
     use std::sync::Arc;
 
     #[tokio::test]
@@ -730,9 +779,23 @@ mod tests {
                     }),
                 },
             ]),
+            structured_records: Some(vec![StructuredKeyValue {
+                source_id: "crm_db".to_string(),
+                record_key: "acct_42".to_string(),
+                key: "account_tier".to_string(),
+                value: "Enterprise".to_string(),
+                relevance_score: Some(0.95),
+            }]),
+            structured_tables: Some(vec![StructuredTable {
+                source_id: "warehouse".to_string(),
+                table_name: "regional_arr".to_string(),
+                columns: vec!["region".to_string(), "arr".to_string()],
+                rows: vec![vec!["NA".to_string(), "$12.5M".to_string()]],
+                relevance_score: Some(0.90),
+            }]),
         };
 
-        // 1. Crisp mode with RAG chunks surfaces provenance + [CONFLICT: ...]
+        // 1. Crisp mode with RAG + structured records/tables surfaces provenance + [CONFLICT: ...]
         let crisp_resp = AggressiveEngine::run(
             raw,
             &repr,
@@ -753,12 +816,26 @@ mod tests {
             crisp_resp.optimized_prompt
         );
         assert!(
+            crisp_resp
+                .optimized_prompt
+                .contains("(Record: crm_db/acct_42)"),
+            "Crisp prompt should render structured record provenance:\n{}",
+            crisp_resp.optimized_prompt
+        );
+        assert!(
+            crisp_resp
+                .optimized_prompt
+                .contains("regional_arr | region=NA | arr=$12.5M"),
+            "Crisp prompt should render structured table row:\n{}",
+            crisp_resp.optimized_prompt
+        );
+        assert!(
             crisp_resp.optimized_prompt.contains("[CONFLICT:"),
             "Crisp prompt should surface numeric conflict:\n{}",
             crisp_resp.optimized_prompt
         );
 
-        // 2. Harness mode preserves provenance, surfaces <conflicts>, and aligns grounding_facts
+        // 2. Harness mode preserves provenance, structured records/tables, <conflicts>, and aligns grounding_facts
         let harness_cfg = NpaeConfig {
             render_style: Some(RenderStyle::Harness),
             ..NpaeConfig::default()
@@ -783,12 +860,19 @@ mod tests {
             harness_resp.optimized_prompt
         );
         assert!(
+            harness_resp
+                .optimized_prompt
+                .contains("(Record: warehouse/row_1)"),
+            "Harness prompt should preserve table row provenance:\n{}",
+            harness_resp.optimized_prompt
+        );
+        assert!(
             harness_resp.optimized_prompt.contains("<conflicts>"),
             "Harness prompt should surface <conflicts>:\n{}",
             harness_resp.optimized_prompt
         );
-        assert_eq!(harness_resp.grounding_facts.len(), 2);
+        assert_eq!(harness_resp.grounding_facts.len(), 4);
         assert_eq!(harness_resp.grounding_facts[0].id, "F1");
-        assert_eq!(harness_resp.grounding_facts[1].id, "F2");
+        assert_eq!(harness_resp.grounding_facts[3].id, "F4");
     }
 }

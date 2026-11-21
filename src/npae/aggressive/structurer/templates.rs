@@ -1270,20 +1270,22 @@ pub(super) fn infer_success_criteria_with_ctx(
     profile: &IntentProfile,
     ctx: &BuildContext<'_>,
 ) -> Vec<String> {
-    if let Some(tax) = ctx.domain_taxonomy_entry {
-        if let Some(ref templates) = tax.success_criteria_templates {
-            if let Some(items) =
-                resolve_template_key(templates, profile.perspective, &profile.primary_intent)
-            {
-                if !items.is_empty() {
-                    let mut criteria = items.clone();
-                    if profile.has_phases {
-                        criteria.push("All execution phases have clear deliverables".into());
+    if !ctx.is_wealth_query && !ctx.is_enterprise_business {
+        if let Some(tax) = ctx.domain_taxonomy_entry {
+            if let Some(ref templates) = tax.success_criteria_templates {
+                if let Some(items) =
+                    resolve_template_key(templates, profile.perspective, &profile.primary_intent)
+                {
+                    if !items.is_empty() {
+                        let mut criteria = items.clone();
+                        if profile.has_phases {
+                            criteria.push("All execution phases have clear deliverables".into());
+                        }
+                        if profile.has_validation {
+                            criteria.push("All validation checkpoints pass".into());
+                        }
+                        return criteria;
                     }
-                    if profile.has_validation {
-                        criteria.push("All validation checkpoints pass".into());
-                    }
-                    return criteria;
                 }
             }
         }
@@ -1562,13 +1564,15 @@ pub(super) fn infer_assumptions_with_ctx(
     profile: &IntentProfile,
     ctx: &BuildContext<'_>,
 ) -> Vec<String> {
-    if let Some(tax) = ctx.domain_taxonomy_entry {
-        if let Some(ref templates) = tax.assumption_templates {
-            if let Some(items) =
-                resolve_template_key(templates, profile.perspective, &profile.primary_intent)
-            {
-                if !items.is_empty() {
-                    return items.clone();
+    if !ctx.is_wealth_query && !ctx.is_enterprise_business {
+        if let Some(tax) = ctx.domain_taxonomy_entry {
+            if let Some(ref templates) = tax.assumption_templates {
+                if let Some(items) =
+                    resolve_template_key(templates, profile.perspective, &profile.primary_intent)
+                {
+                    if !items.is_empty() {
+                        return items.clone();
+                    }
                 }
             }
         }
@@ -1691,13 +1695,15 @@ pub(super) fn derive_dynamic_instruction_with_ctx(
     profile: &IntentProfile,
     ctx: &BuildContext<'_>,
 ) -> String {
-    if let Some(tax) = ctx.domain_taxonomy_entry {
-        if let Some(ref instructions) = tax.dynamic_instructions {
-            if let Some(instr) =
-                resolve_template_key(instructions, profile.perspective, &profile.primary_intent)
-            {
-                if !instr.is_empty() {
-                    return instr.clone();
+    if !ctx.is_wealth_query && !ctx.is_enterprise_business {
+        if let Some(tax) = ctx.domain_taxonomy_entry {
+            if let Some(ref instructions) = tax.dynamic_instructions {
+                if let Some(instr) =
+                    resolve_template_key(instructions, profile.perspective, &profile.primary_intent)
+                {
+                    if !instr.is_empty() {
+                        return instr.clone();
+                    }
                 }
             }
         }

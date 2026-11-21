@@ -175,7 +175,56 @@
           "System Architecture Specification",
           "Performance & Resource Analysis"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Unit Tests",
+            "criteria": "All unit tests pass",
+            "validation_method": "Automated test suite"
+          },
+          {
+            "step_number": 2,
+            "name": "Integration Test",
+            "criteria": "End-to-end flow verified",
+            "validation_method": "Integration test suite"
+          },
+          {
+            "step_number": 3,
+            "name": "Performance Check",
+            "criteria": "Meets latency/throughput targets",
+            "validation_method": "Load testing"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Functional, bug-free implementation with optimized performance",
+          "Adheres to industry-standard architectural patterns and best practices",
+          "Includes necessary technical documentation and test coverage"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume standard system architecture and memory hierarchy unless specified",
+          "Assume high efficiency, reliability, and correctness requirements"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "State key architectural trade-offs first, then deliver complete, runnable, production-grade code (zero stubs or placeholders), enumerate edge cases and failure modes, and provide concrete verification tests."
+      },
+      "output_blueprints": {
+        "build": [
+          "Architecture & Trade-offs",
+          "Complete Implementation",
+          "Edge Cases & Failure Modes",
+          "Verification & Tests"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "science",
@@ -342,7 +391,38 @@
           "Experimental Protocol",
           "Statistical Validation Report"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Hypothesis Falsifiability & Controls",
+            "criteria": "Null hypothesis, independent variables, and negative controls are defined",
+            "validation_method": "Experimental design review"
+          },
+          {
+            "step_number": 2,
+            "name": "Statistical Power & Significance",
+            "criteria": "Sample size, confidence intervals, and p-value thresholds are justified",
+            "validation_method": "Biostatistics / power analysis"
+          },
+          {
+            "step_number": 3,
+            "name": "Reproducibility & Peer-Review Rigor",
+            "criteria": "Methodology and apparatus parameters allow independent replication",
+            "validation_method": "Protocol reproducibility checklist"
+          }
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume adherence to the scientific method and empirical reproducibility",
+          "Assume peer-reviewed standards for statistical validity"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "health",
@@ -504,7 +584,50 @@
           "Personalized Health Protocol",
           "Safety & Monitoring Guidelines"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Clinical Evidence Verification",
+            "criteria": "Recommendations align with peer-reviewed clinical guidelines",
+            "validation_method": "Clinical literature cross-check"
+          },
+          {
+            "step_number": 2,
+            "name": "Contraindication & Safety Screening",
+            "criteria": "Dosages, interactions, and patient risk factors are screened",
+            "validation_method": "Safety & contraindication audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Regulatory & Ethical Compliance",
+            "criteria": "Includes clinical disclaimer and adheres to FDA/EMA/HIPAA standards",
+            "validation_method": "Regulatory review gate"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Clinically accurate protocols grounded in peer-reviewed evidence",
+          "Strict adherence to regulatory (FDA/EMA) and ethical guidelines",
+          "Risk-benefit analysis is comprehensive and clearly stated"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume evidence-based clinical practices and safety-first protocols",
+          "Assume compliance with relevant healthcare regulations and ethics"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested clinical protocol grounded in peer-reviewed evidence, explicit contraindications, safety monitoring, and regulatory standards."
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "cite_sources_required",
+        "no_medical_advice_disclaimer"
+      ]
     },
     {
       "domain": "finance",
@@ -783,7 +906,32 @@
           "Diversified Asset Allocation Strategy",
           "Risk & Cashflow Breakdown"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Mathematical & CAGR Audit",
+            "criteria": "Compound returns, savings rate, and cashflows reconcile mathematically",
+            "validation_method": "Quantitative spreadsheet verification"
+          },
+          {
+            "step_number": 2,
+            "name": "Downside & Drawdown Stress Test",
+            "criteria": "Portfolio survives conservative market drawdown and liquidity shocks",
+            "validation_method": "Scenario sensitivity modeling"
+          },
+          {
+            "step_number": 3,
+            "name": "Tax & Regulatory Alignment",
+            "criteria": "Asset location and withdrawal assumptions account for tax drag",
+            "validation_method": "Tax efficiency review"
+          }
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "software",
@@ -942,7 +1090,57 @@
           "Working Codebase",
           "Automated Test Suite"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Unit Tests",
+            "criteria": "All unit tests pass",
+            "validation_method": "Automated test suite"
+          },
+          {
+            "step_number": 2,
+            "name": "Integration Test",
+            "criteria": "End-to-end flow verified",
+            "validation_method": "Integration test suite"
+          },
+          {
+            "step_number": 3,
+            "name": "Performance Check",
+            "criteria": "Meets latency/throughput targets",
+            "validation_method": "Load testing"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Functional, bug-free implementation with optimized performance",
+          "Adheres to industry-standard architectural patterns and best practices",
+          "Includes necessary technical documentation and test coverage"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume modern, idiomatic technology stack and best practices",
+          "Assume production-grade requirements (security, logging, error handling)"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "State key architectural trade-offs first, then deliver complete, runnable, production-grade code (zero stubs or placeholders), enumerate edge cases and failure modes, and provide concrete verification tests."
+      },
+      "output_blueprints": {
+        "build": [
+          "Architecture & Trade-offs",
+          "Complete Implementation",
+          "Edge Cases & Failure Modes",
+          "Verification & Tests"
+        ]
+      },
+      "persona_guardrails": [
+        "production_grade_only",
+        "no_placeholder_code"
+      ]
     },
     {
       "domain": "business",
@@ -1098,7 +1296,32 @@
           "Revenue & Pricing Model",
           "Launch Execution Plan"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Market Fit",
+            "criteria": "Target market size validated",
+            "validation_method": "TAM/SAM/SOM analysis"
+          },
+          {
+            "step_number": 2,
+            "name": "Financial Viability",
+            "criteria": "Unit economics positive",
+            "validation_method": "Financial model review"
+          },
+          {
+            "step_number": 3,
+            "name": "Competitive Position",
+            "criteria": "Clear differentiation identified",
+            "validation_method": "Competitor analysis"
+          }
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "nutrition",
@@ -1251,7 +1474,42 @@
           "Daily Macro/Micro Targets",
           "Detailed Meal Protocol"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Caloric & Macronutrient Balance",
+            "criteria": "Daily protein, carbohydrate, fat, and caloric totals match target expenditure",
+            "validation_method": "Macro & energy balance audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Allergen & Restriction Compliance",
+            "criteria": "Zero forbidden ingredients or allergens appear in meal selections",
+            "validation_method": "Strict exclusion checklist"
+          },
+          {
+            "step_number": 3,
+            "name": "Micronutrient & Hydration Sufficiency",
+            "criteria": "Electrolyte, fiber, and vitamin requirements are met sustainably",
+            "validation_method": "Nutritional completeness review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Plan is physiologically sound and tailored to specific goals",
+          "Macros and micronutrients are balanced according to activity level",
+          "Includes clear instructions for tracking and adjustment"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested nutrition protocol with quantified caloric/macronutrient targets, meal structure, and strict adherence to dietary exclusions."
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "pharma",
@@ -1400,7 +1658,50 @@
           "Clinical Trial Protocol Synopsis",
           "FDA/ICH Regulatory Compliance Matrix"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Clinical Evidence Verification",
+            "criteria": "Recommendations align with peer-reviewed clinical guidelines",
+            "validation_method": "Clinical literature cross-check"
+          },
+          {
+            "step_number": 2,
+            "name": "Contraindication & Safety Screening",
+            "criteria": "Dosages, interactions, and patient risk factors are screened",
+            "validation_method": "Safety & contraindication audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Regulatory & Ethical Compliance",
+            "criteria": "Includes clinical disclaimer and adheres to FDA/EMA/HIPAA standards",
+            "validation_method": "Regulatory review gate"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Clinically accurate protocols grounded in peer-reviewed evidence",
+          "Strict adherence to regulatory (FDA/EMA) and ethical guidelines",
+          "Risk-benefit analysis is comprehensive and clearly stated"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume evidence-based clinical practices and safety-first protocols",
+          "Assume compliance with relevant healthcare regulations and ethics"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested clinical protocol grounded in peer-reviewed evidence, explicit contraindications, safety monitoring, and regulatory standards."
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "cite_sources_required",
+        "no_medical_advice_disclaimer"
+      ]
     },
     {
       "domain": "data-science",
@@ -1547,7 +1848,56 @@
           "Feature Engineering Pipeline",
           "Model Evaluation & Validation Matrix"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Data Leakage & Split Integrity",
+            "criteria": "Train/validation/test splits are strictly isolated with zero target leakage",
+            "validation_method": "Pipeline data audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Metric & Baseline Evaluation",
+            "criteria": "Model beats baseline on target evaluation metrics (e.g. F1, ROC-AUC, RMSE)",
+            "validation_method": "Holdout benchmark evaluation"
+          },
+          {
+            "step_number": 3,
+            "name": "Calibration, Drift & Safety Check",
+            "criteria": "Predictions are calibrated and robust against distribution shift or bias",
+            "validation_method": "Robustness & fairness suite"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Model performance meets or exceeds stated benchmarks",
+          "Alignment, safety, and ethical considerations are explicitly addressed",
+          "Data handling and inference pipelines are robust and scalable"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume data is imperfect and requires preprocessing/cleaning",
+          "Assume model scalability and ethical considerations are paramount"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested ML/data pipeline with leak-free validation splits, concrete baseline benchmarks, error analysis, and deployment drift guardrails."
+      },
+      "output_blueprints": {
+        "build": [
+          "Architecture & Trade-offs",
+          "Complete Implementation",
+          "Edge Cases & Failure Modes",
+          "Verification & Tests"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "education",
@@ -1757,7 +2107,43 @@
           "Curriculum & Syllabus Blueprint",
           "Competency Assessment Rubric"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Learning Objective Alignment",
+            "criteria": "Every module maps directly to measurable Bloom's taxonomy outcomes",
+            "validation_method": "Curriculum alignment rubric"
+          },
+          {
+            "step_number": 2,
+            "name": "Cognitive Load & Pacing Check",
+            "criteria": "Concepts progress from foundational to advanced with active recall",
+            "validation_method": "Pedagogical pacing review"
+          },
+          {
+            "step_number": 3,
+            "name": "Assessment & Mastery Verification",
+            "criteria": "Formative and summative assessments accurately test concept retention",
+            "validation_method": "Assessment rubric validation"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "default": [
+          "Learning objectives are clearly defined and measurable",
+          "Techniques used are evidence-based and optimized for retention",
+          "Roadmap addresses both theoretical understanding and practical application",
+          "Progress can be tracked through objective mastery checks"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested curriculum or learning plan with measurable learning objectives, active-recall scaffolding, and mastery assessments."
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "creative",
@@ -1902,7 +2288,11 @@
           "Multi-Act Beat Sheet",
           "Polished Manuscript / Script Draft"
         ]
-      }
+      },
+      "persona_guardrails": [
+        "maintain_narrative_voice",
+        "show_dont_tell"
+      ]
     },
     {
       "domain": "health-fitness",
@@ -2026,7 +2416,17 @@
           "Periodized Training Split & Mesocycle",
           "Warm-Up, Mobility & Recovery Protocol"
         ]
-      }
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Plan is physiologically sound and tailored to specific goals",
+          "Macros and micronutrients are balanced according to activity level",
+          "Includes clear instructions for tracking and adjustment"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "legal",
@@ -2236,7 +2636,43 @@
           "Statutory & Regulatory Compliance Checklist",
           "Liability & Risk Allocation Matrix"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Jurisdictional & Statutory Check",
+            "criteria": "All cited clauses and statutes match the governing jurisdiction",
+            "validation_method": "Statutory cross-reference audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Liability & Indemnification Review",
+            "criteria": "Risk allocation, caps, and remedies are unambiguous and enforceable",
+            "validation_method": "Contractual risk matrix review"
+          },
+          {
+            "step_number": 3,
+            "name": "Regulatory Compliance Gate",
+            "criteria": "Satisfies applicable privacy, IP, or industry regulations (e.g. GDPR/HIPAA)",
+            "validation_method": "Compliance checklist verification"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Legal clauses and analysis strictly conform to governing jurisdiction and statutory precedent",
+          "Liability exposure, indemnification, and compliance obligations are unambiguously specified",
+          "Includes actionable risk-mitigation language and regulatory verification"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Draft the requested legal analysis or instrument with jurisdiction-specific statutory precision, explicit liability and indemnification safeguards, and compliance checkpoints."
+      },
+      "persona_guardrails": [
+        "jurisdiction_aware",
+        "cite_statutes"
+      ]
     },
     {
       "domain": "marketing",
@@ -2383,7 +2819,32 @@
           "Multi-Channel Campaign Blueprint",
           "KPI Attribution Dashboard"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Audience & Positioning Fit",
+            "criteria": "Value proposition and messaging match target segment pain points",
+            "validation_method": "Segment & copy review"
+          },
+          {
+            "step_number": 2,
+            "name": "Funnel & Conversion Economics",
+            "criteria": "CAC, ROAS, and checkout conversion targets are Positive-ROI",
+            "validation_method": "Funnel unit economics audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Attribution & A/B Test Readiness",
+            "criteria": "Tracking pixels, KPIs, and experiment hypotheses are instrumentation-ready",
+            "validation_method": "Analytics & experiment checklist"
+          }
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "devops",
@@ -2532,7 +2993,57 @@
           "Infrastructure-as-Code (Terraform/Helm) Spec",
           "SRE Observability & Alerting Runbook"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Unit Tests",
+            "criteria": "All unit tests pass",
+            "validation_method": "Automated test suite"
+          },
+          {
+            "step_number": 2,
+            "name": "Integration Test",
+            "criteria": "End-to-end flow verified",
+            "validation_method": "Integration test suite"
+          },
+          {
+            "step_number": 3,
+            "name": "Performance Check",
+            "criteria": "Meets latency/throughput targets",
+            "validation_method": "Load testing"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Functional, bug-free implementation with optimized performance",
+          "Adheres to industry-standard architectural patterns and best practices",
+          "Includes necessary technical documentation and test coverage"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume modern, idiomatic technology stack and best practices",
+          "Assume production-grade requirements (security, logging, error handling)"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "State key architectural trade-offs first, then deliver complete, runnable, production-grade code (zero stubs or placeholders), enumerate edge cases and failure modes, and provide concrete verification tests."
+      },
+      "output_blueprints": {
+        "build": [
+          "Architecture & Trade-offs",
+          "Complete Implementation",
+          "Edge Cases & Failure Modes",
+          "Verification & Tests"
+        ]
+      },
+      "persona_guardrails": [
+        "production_grade_only",
+        "no_placeholder_code"
+      ]
     },
     {
       "domain": "ai-ml",
@@ -2681,7 +3192,56 @@
           "AI/LLM System Architecture Spec",
           "Golden Evaluation & Safety Harness"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Data Leakage & Split Integrity",
+            "criteria": "Train/validation/test splits are strictly isolated with zero target leakage",
+            "validation_method": "Pipeline data audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Metric & Baseline Evaluation",
+            "criteria": "Model beats baseline on target evaluation metrics (e.g. F1, ROC-AUC, RMSE)",
+            "validation_method": "Holdout benchmark evaluation"
+          },
+          {
+            "step_number": 3,
+            "name": "Calibration, Drift & Safety Check",
+            "criteria": "Predictions are calibrated and robust against distribution shift or bias",
+            "validation_method": "Robustness & fairness suite"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Model performance meets or exceeds stated benchmarks",
+          "Alignment, safety, and ethical considerations are explicitly addressed",
+          "Data handling and inference pipelines are robust and scalable"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume data is imperfect and requires preprocessing/cleaning",
+          "Assume model scalability and ethical considerations are paramount"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested ML/data pipeline with leak-free validation splits, concrete baseline benchmarks, error analysis, and deployment drift guardrails."
+      },
+      "output_blueprints": {
+        "build": [
+          "Architecture & Trade-offs",
+          "Complete Implementation",
+          "Edge Cases & Failure Modes",
+          "Verification & Tests"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "medical",
@@ -2829,7 +3389,50 @@
           "Differential Diagnosis & Workup Matrix",
           "Evidence-Based Clinical Management Protocol"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Clinical Evidence Verification",
+            "criteria": "Recommendations align with peer-reviewed clinical guidelines",
+            "validation_method": "Clinical literature cross-check"
+          },
+          {
+            "step_number": 2,
+            "name": "Contraindication & Safety Screening",
+            "criteria": "Dosages, interactions, and patient risk factors are screened",
+            "validation_method": "Safety & contraindication audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Regulatory & Ethical Compliance",
+            "criteria": "Includes clinical disclaimer and adheres to FDA/EMA/HIPAA standards",
+            "validation_method": "Regulatory review gate"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Clinically accurate protocols grounded in peer-reviewed evidence",
+          "Strict adherence to regulatory (FDA/EMA) and ethical guidelines",
+          "Risk-benefit analysis is comprehensive and clearly stated"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume evidence-based clinical practices and safety-first protocols",
+          "Assume compliance with relevant healthcare regulations and ethics"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested clinical protocol grounded in peer-reviewed evidence, explicit contraindications, safety monitoring, and regulatory standards."
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "cite_sources_required",
+        "no_medical_advice_disclaimer"
+      ]
     },
     {
       "domain": "scientific-research",
@@ -2941,7 +3544,38 @@
           "Formal Hypothesis & Study Protocol",
           "Statistical Analysis Plan (SAP)"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Hypothesis Falsifiability & Controls",
+            "criteria": "Null hypothesis, independent variables, and negative controls are defined",
+            "validation_method": "Experimental design review"
+          },
+          {
+            "step_number": 2,
+            "name": "Statistical Power & Significance",
+            "criteria": "Sample size, confidence intervals, and p-value thresholds are justified",
+            "validation_method": "Biostatistics / power analysis"
+          },
+          {
+            "step_number": 3,
+            "name": "Reproducibility & Peer-Review Rigor",
+            "criteria": "Methodology and apparatus parameters allow independent replication",
+            "validation_method": "Protocol reproducibility checklist"
+          }
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume adherence to the scientific method and empirical reproducibility",
+          "Assume peer-reviewed standards for statistical validity"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "cybersecurity",
@@ -3089,7 +3723,42 @@
           "Threat Model & Attack Surface Matrix",
           "Defensive Remediation Checklist"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Threat Model & Attack Surface Coverage",
+            "criteria": "All trust boundaries and OWASP/MITRE threat vectors are enumerated",
+            "validation_method": "STRIDE / MITRE ATT&CK review"
+          },
+          {
+            "step_number": 2,
+            "name": "Vulnerability & Control Verification",
+            "criteria": "Authentication, encryption, and network controls block exploit paths",
+            "validation_method": "Penetration test & scanner verification"
+          },
+          {
+            "step_number": 3,
+            "name": "Incident Detection & Audit Logging",
+            "criteria": "SIEM alerts and immutable audit logs capture anomalous activity",
+            "validation_method": "SOC detection rule test"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Threat model enumerates all trust boundaries and attack vectors (OWASP/MITRE ATT&CK)",
+          "Defensive controls, encryption, and authentication mechanisms are verifiable",
+          "Includes incident detection telemetry and response playbooks"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Architect the requested security defense or assessment plan covering threat vectors, control hardening, detection telemetry, and incident response."
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "ecommerce",
@@ -3235,7 +3904,32 @@
           "SKU Assortment & Pricing Matrix",
           "Conversion & Fulfillment Plan"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Audience & Positioning Fit",
+            "criteria": "Value proposition and messaging match target segment pain points",
+            "validation_method": "Segment & copy review"
+          },
+          {
+            "step_number": 2,
+            "name": "Funnel & Conversion Economics",
+            "criteria": "CAC, ROAS, and checkout conversion targets are Positive-ROI",
+            "validation_method": "Funnel unit economics audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Attribution & A/B Test Readiness",
+            "criteria": "Tracking pixels, KPIs, and experiment hypotheses are instrumentation-ready",
+            "validation_method": "Analytics & experiment checklist"
+          }
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "real-estate",
@@ -3482,7 +4176,78 @@
           "Comparative Market Analysis (CMA)",
           "NOI, Cap Rate & ROI Projection"
         ]
-      }
+      },
+      "validation_templates": {
+        "consumer": [
+          {
+            "step_number": 1,
+            "name": "Affordability & DTI Stress Test",
+            "criteria": "Monthly PITI + HOA payment stays within DTI ceiling and budget reserves",
+            "validation_method": "Mortgage affordability & DTI audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Neighborhood Comps & Appraisal Check",
+            "criteria": "Offer price aligns with recent comparable sales (CMA) and appraisal value",
+            "validation_method": "CMA & lender appraisal verification"
+          },
+          {
+            "step_number": 3,
+            "name": "Inspection, Title & Closing Verification",
+            "criteria": "Physical inspection contingencies, title clearance, and closing disclosures are verified",
+            "validation_method": "Inspection & settlement checklist"
+          }
+        ],
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Comparable Market & Valuation Check",
+            "criteria": "Pricing, cap rate, and cash-on-cash return align with local comps",
+            "validation_method": "CMA & underwriting audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Zoning, Title & Licensing Compliance",
+            "criteria": "Property use, disclosures, and brokerage steps satisfy local regulations",
+            "validation_method": "Regulatory & title checklist"
+          },
+          {
+            "step_number": 3,
+            "name": "Financing & Cashflow Stress Test",
+            "criteria": "Debt service coverage survives vacancy and interest rate sensitivity",
+            "validation_method": "Underwriting sensitivity model"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "consumer:build": [
+          "Homebuying budget, DTI ratio, down payment, and closing-cost reserves are verified against mortgage pre-approval limits",
+          "Property evaluation and offer pricing are grounded in neighborhood Comparative Market Analysis (CMA) and appraisal comps",
+          "Includes actionable inspection contingencies, title/escrow due diligence, and closing settlement milestones"
+        ],
+        "build": [
+          "Property valuation and cashflow underwriting are grounded in comparable market data",
+          "Licensing, zoning, and transaction steps adhere to local real estate regulations",
+          "Includes actionable client acquisition, financing, and closing milestones"
+        ]
+      },
+      "assumption_templates": {
+        "consumer": [
+          "Assume baseline buyer variables (target purchase budget, credit score tier, down payment %, and state-specific closing customs: attorney state vs. escrow/title state) must be explicitly stated or parameterized rather than silently defaulting to broad national averages",
+          "Assume full contingency protection (inspection, appraisal, and financing contingencies) and itemized cash-to-close accounting (down payment + 2%–5% closing costs + 3–6 months emergency reserves)"
+        ],
+        "default": [
+          "Assume local MLS rules, state real-estate commission licensing requirements, and fiduciary disclosure laws apply",
+          "Assume transaction underwriting accounts for closing costs, vacancy reserves, and local market comparables"
+        ]
+      },
+      "dynamic_instructions": {
+        "consumer:build": "Construct the requested home-buying and mortgage readiness plan with neighborhood CMA valuation, inspection due diligence, and closing settlement milestones.",
+        "build": "Develop the requested real estate strategy with comparable market underwriting, regulatory compliance, and transaction milestones."
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "workplace-productivity",
@@ -3633,7 +4398,18 @@
           "Async Operating Charter & Workflow Spec",
           "Strategic Optimization Roadmap"
         ]
-      }
+      },
+      "success_criteria_templates": {
+        "default": [
+          "Differentiates between objective output and subjective sentiment",
+          "Identifies hidden bottlenecks in distributed collaboration",
+          "Provides actionable recommendations for burnout prevention and engagement",
+          "Aligns productivity metrics with organizational culture goals"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "gaming",
@@ -3854,7 +4630,43 @@
           "Hour-by-Hour Activity Schedule",
           "Itemized Budget & Expense Allocation"
         ]
-      }
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Route & Transit Feasibility",
+            "criteria": "Daily transit times and geographic sequencing are realistic",
+            "validation_method": "Route & schedule audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Budget & Constraint Reconciliation",
+            "criteria": "Lodging, flights, activities, and dining stay within the stated budget ceiling",
+            "validation_method": "Itemized cost tally"
+          },
+          {
+            "step_number": 3,
+            "name": "Dietary & Group Accommodation Check",
+            "criteria": "All dietary restrictions, accessibility, and traveler group needs are met",
+            "validation_method": "Traveler constraint checklist"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Itinerary schedule is geographically logical and optimizes transit times",
+          "All activities, accommodations, and dining options adhere to specified budget limits",
+          "Dietary preferences and family group constraints are fully satisfied",
+          "Includes actionable booking recommendations and cost-optimization alternatives"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested travel itinerary with geographically optimized daily logistics, itemized budget adherence, and traveler constraint compliance."
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     }
   ],
   "roles": [
