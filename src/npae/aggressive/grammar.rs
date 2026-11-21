@@ -147,6 +147,14 @@ impl GrammarCorrector {
                             | "rpo"
                             | "rto"
                             | "sla"
+                            | "dharma"
+                            | "dhrama"
+                            | "billionaier"
+                            | "billionaiers"
+                            | "farmaceutical"
+                            | "biotak"
+                            | "softwear"
+                            | "makewe"
                     );
                     if has_internal_upper || is_protected_tech_term {
                         continue;

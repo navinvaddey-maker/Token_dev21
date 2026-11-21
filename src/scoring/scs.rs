@@ -260,7 +260,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let (score, penalties) = SemanticCompletenessScorer::score(&output);
+        let (score, _penalties) = SemanticCompletenessScorer::score(&output);
         // ambiguity_ratio = 1/2 = 0.5
         // score = (1.0*0.4 + 1.0*0.4 + 0.5*0.2) * 10 = 9.0
         assert!(

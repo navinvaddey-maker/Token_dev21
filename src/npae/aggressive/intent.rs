@@ -1222,6 +1222,7 @@ fn detect_temporal_scope(lower: &str) -> (String, bool, bool) {
     // Phase-based signals
     let phase_signals = [
         "phase",
+        "phased",
         "phases",
         "stage",
         "stages",

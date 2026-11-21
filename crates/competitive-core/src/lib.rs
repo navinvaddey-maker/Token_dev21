@@ -29,7 +29,7 @@ impl CompetitiveNet {
         }
     }
 
-    /// Accepts the same TokenActivation as HebbianNet — same boundary contract.
+    /// Accepts the same `TokenActivation` as `HebbianNet` — same boundary contract.
     pub fn update(&mut self, activation: &TokenActivation) -> ClusterAssignment {
         if activation.blocked || activation.tokens.is_empty() {
             return self.soft_assign(&activation.tokens);
@@ -59,6 +59,7 @@ impl CompetitiveNet {
     }
 
     /// Top-N vocab for a cluster → prepended to next prompt by the optimizer.
+    #[must_use]
     pub fn cluster_vocabulary(&self, cluster_id: usize, top_n: usize) -> Vec<(String, f32)> {
         let Some(c) = self.centroids.get(cluster_id) else {
             return vec![];
@@ -71,6 +72,7 @@ impl CompetitiveNet {
     }
 
     /// Snapshot all centroids for DB persistence.
+    #[must_use]
     pub fn snapshot(&self) -> Vec<CentroidSnapshot> {
         self.centroids
             .iter()

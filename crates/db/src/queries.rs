@@ -37,17 +37,17 @@ pub async fn save_prompt_scoped(
     let schema_json = serde_json::to_value(schema).unwrap_or_default();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_prompts (id, user_id, tenant_id, raw_text, schema_json, token_count)
         VALUES ($1, $2, $3, $4, $5, $6)
-        "#,
+        ",
     )
     .bind(id.to_string())
     .bind(user_id.to_string())
     .bind(tenant_id)
     .bind(raw)
     .bind(schema_json)
-    .bind(schema.token_count as i32)
+    .bind(i32::try_from(schema.token_count).unwrap_or(i32::MAX))
     .execute(pool)
     .await?;
 
@@ -93,14 +93,14 @@ pub async fn upsert_learned_context_scoped(
     let pairs = serde_json::to_value(deltas).unwrap_or_default();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO learned_context (id, user_id, tenant_id, top_pairs)
         VALUES (lower(hex(randomblob(16))), $1, $2, $3)
         ON CONFLICT (user_id) DO UPDATE SET
             top_pairs  = EXCLUDED.top_pairs,
             tenant_id  = EXCLUDED.tenant_id,
             updated_at = CURRENT_TIMESTAMP
-        "#,
+        ",
     )
     .bind(user_id.to_string())
     .bind(tenant_id)
@@ -121,11 +121,11 @@ pub async fn load_learned_context_scoped(
     user_id: Uuid,
 ) -> Result<Vec<WeightDelta>, sqlx::Error> {
     let row = sqlx::query(
-        r#"
+        r"
         SELECT top_pairs
         FROM   learned_context
         WHERE  user_id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(user_id.to_string())
     .bind(tenant_id)
@@ -195,7 +195,7 @@ pub async fn upsert_domain_profile_scoped(
         let top_tokens = serde_json::to_value(&snap.top_tokens).unwrap_or_default();
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO user_domain_profile
                 (id, user_id, tenant_id, cluster_id, cluster_label, top_tokens, hits)
             VALUES (lower(hex(randomblob(16))), $1, $2, $3, $4, $5, $6)
@@ -205,14 +205,14 @@ pub async fn upsert_domain_profile_scoped(
                 hits          = EXCLUDED.hits,
                 tenant_id     = EXCLUDED.tenant_id,
                 updated_at    = CURRENT_TIMESTAMP
-            "#,
+            ",
         )
         .bind(user_id.to_string())
         .bind(tenant_id)
-        .bind(snap.id as i32)
+        .bind(i32::try_from(snap.id).unwrap_or(i32::MAX))
         .bind(&snap.label)
         .bind(top_tokens)
-        .bind(snap.hits as i32)
+        .bind(snap.hits.cast_signed())
         .execute(&mut *tx)
         .await?;
     }
@@ -244,12 +244,12 @@ pub async fn load_domain_profiles_scoped(
     user_id: Uuid,
 ) -> Result<Vec<CentroidSnapshot>, sqlx::Error> {
     let rows = sqlx::query(
-        r#"
+        r"
         SELECT cluster_id, cluster_label, top_tokens, hits
         FROM   user_domain_profile
         WHERE  user_id = $1 AND tenant_id = $2
         ORDER BY cluster_id ASC
-        "#,
+        ",
     )
     .bind(user_id.to_string())
     .bind(tenant_id)
@@ -267,10 +267,10 @@ pub async fn load_domain_profiles_scoped(
             serde_json::from_value(top_tokens_val).unwrap_or_default();
 
         snapshots.push(CentroidSnapshot {
-            id: cluster_id as usize,
+            id: usize::try_from(cluster_id.max(0)).unwrap_or(0),
             label: cluster_label,
             top_tokens,
-            hits: hits.max(0) as u32,
+            hits: hits.max(0).cast_unsigned(),
         });
     }
 
@@ -314,11 +314,11 @@ pub async fn load_cluster_vocab_scoped(
     cluster_id: i32,
 ) -> Result<Vec<(String, f32)>, sqlx::Error> {
     let row = sqlx::query(
-        r#"
+        r"
         SELECT top_tokens
         FROM   user_domain_profile
         WHERE  user_id = $1 AND cluster_id = $2 AND tenant_id = $3
-        "#,
+        ",
     )
     .bind(user_id.to_string())
     .bind(cluster_id)

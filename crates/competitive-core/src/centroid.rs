@@ -9,6 +9,7 @@ pub struct Centroid {
 }
 
 impl Centroid {
+    #[must_use]
     pub fn new(id: usize) -> Self {
         Self {
             id,
@@ -19,6 +20,8 @@ impl Centroid {
     }
 
     /// Cosine similarity between this centroid and an incoming token bag.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn similarity(&self, tokens: &[String]) -> f32 {
         let dot: f32 = tokens
             .iter()
@@ -32,7 +35,8 @@ impl Centroid {
         (dot / (cn * tn)).clamp(0.0, 1.0)
     }
 
-    /// Winner-takes-all update: Δc_i = η · (x - c_i)
+    /// Winner-takes-all update: `Δc_i = η · (x - c_i)`
+    #[allow(clippy::cast_precision_loss)]
     pub fn update(&mut self, tokens: &[String], learning_rate: f32) -> f32 {
         let mut drift = 0.0_f32;
         let len = tokens.len().max(1) as f32;
@@ -48,7 +52,7 @@ impl Centroid {
             *ci += d;
             drift += d.abs();
         }
-        for (tok, ci) in self.vector.iter_mut() {
+        for (tok, ci) in &mut self.vector {
             if !input.contains_key(tok.as_str()) {
                 let d = learning_rate * (0.0 - *ci);
                 *ci += d;

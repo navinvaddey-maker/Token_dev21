@@ -203,20 +203,25 @@ pub fn condense_task_instruction(user_prompt: &str, has_execution_phases: bool) 
     ];
 
     let clause_replacements = [
-        ("walk me through the entire process of buying a house from the very beginning all the way to getting the keys", "Explain the end-to-end house-buying process"),
+        ("walk me through the entire process of buying a house from the very beginning all the way to getting the keys", "End-to-end house-buying guide"),
         ("getting our finances in order first, like what ", ""),
         (" we should aim for, how much money we actually need saved up for a ", ", "),
         (" versus ", "/"),
-        ("how mortgage pre-approval works compared to pre-qualification, as well as the different types of loans available like ", "pre-approval vs. pre-qualification, and loans ("),
-        ("how to find a good real estate agent, what to look for when touring homes and neighborhoods, how to figure out what a fair offer price is, and what kind of ", "agent selection, home/neighborhood touring, fair offer pricing, and "),
+        ("how mortgage pre-approval works compared to pre-qualification, as well as the different types of loans available like ", "pre-approval/pre-qualification, loans ("),
+        ("how to find a good real estate agent, what to look for when touring homes and neighborhoods, how to figure out what a fair offer price is, and what kind of ", "agent, touring, offer, "),
         (" we should definitely include in our purchase agreement—like ", " ("),
         ("what happens during the ", ""),
         (" period", ""),
-        ("what a home inspector actually checks, how we can negotiate ", "inspection checks, negotiating "),
+        ("what a home inspector actually checks, how we can negotiate ", "inspection, "),
         (" if they find major issues with the roof, foundation, plumbing, or electrical systems, what the lender is doing behind the scenes during ", ", "),
         ("why we need ", ""),
         ("any common ", ""),
         (" first-time homebuyers make so we can avoid them", " to avoid"),
+        ("conventional, FHA, or fixed-rate/adjustable-rate mortgages", "conventional/FHA/fixed-rate/adjustable-rate"),
+        ("inspection contingencies, appraisal contingencies, and financing contingencies", "inspection/appraisal/financing"),
+        ("title insurance and homeowners insurance, and final walkthrough and closing day", "title insurance, homeowners insurance, final walkthrough, closing"),
+        ("closing costs and emergency funds, and ", "closing costs/emergency funds, "),
+        ("escrow and underwriting", "escrow/underwriting"),
     ];
 
     let mut condensed_clauses: Vec<String> = Vec::new();

@@ -15,16 +15,17 @@ pub struct HebbianNet {
 }
 
 impl HebbianNet {
+    #[must_use]
     pub fn new(learning_rate: f32, decay: f32) -> Self {
         Self {
-            weights: Default::default(),
+            weights: HashMap::default(),
             learning_rate,
             decay,
         }
     }
 
-    /// Core rule: Δw_ij = η · x_i · x_j
-    /// Silently skips if activation.blocked == true.
+    /// Core rule: `Δw_ij = η · x_i · x_j`
+    /// Silently skips if `activation.blocked == true`.
     /// Never inspects why it was blocked — that is schema-engine's concern.
     pub fn update(&mut self, activation: &TokenActivation) {
         if activation.blocked {
@@ -45,7 +46,8 @@ impl HebbianNet {
         }
     }
 
-    /// Top co-activating pairs — written to token_patterns by learning-engine.
+    /// Top co-activating pairs — written to `token_patterns` by learning-engine.
+    #[must_use]
     pub fn top_associations(&self, n: usize) -> Vec<WeightDelta> {
         let mut pairs: Vec<_> = self
             .weights

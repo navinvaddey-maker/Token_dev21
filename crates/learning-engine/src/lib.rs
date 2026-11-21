@@ -8,7 +8,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use competitive_core::CompetitiveNet;
-use db::{queries::*, DbPool};
+use db::{
+    queries::{
+        load_domain_profiles_scoped, load_learned_context_scoped, save_prompt_scoped,
+        upsert_domain_profile_scoped, upsert_learned_context_scoped,
+    },
+    DbPool,
+};
 use hebbian_core::HebbianNet;
 use schema_engine::{
     constraints::ConstraintSet,
@@ -31,7 +37,7 @@ impl std::fmt::Debug for LearningEngine {
             .field("constraints", &self.constraints)
             .field("hebbian", &self.hebbian)
             .field("competitive", &self.competitive)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -47,6 +53,7 @@ pub struct ProcessResult {
 
 impl LearningEngine {
     /// Constructs a new `LearningEngine` instance.
+    #[must_use]
     pub fn new(pool: DbPool) -> Self {
         Self {
             extractor: Box::new(RuleBasedExtractor),
@@ -60,6 +67,9 @@ impl LearningEngine {
     }
 
     /// Called on every user prompt, defaulting to 'default' tenant.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure during state persistence.
     pub async fn process(
         &mut self,
         user_id: Uuid,
@@ -105,6 +115,9 @@ impl LearningEngine {
     }
 
     /// Process explicit feedback (thumbs up/down) defaulting to 'default' tenant.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure during state persistence.
     pub async fn apply_feedback(
         &mut self,
         user_id: Uuid,
@@ -159,7 +172,7 @@ struct CachedEngine {
     last_used_ms: std::sync::atomic::AtomicU64,
 }
 
-/// Bounded pool of per-(tenant_id, user_id) `LearningEngine` instances.
+/// Bounded pool of per-(`tenant_id`, `user_id`) `LearningEngine` instances.
 ///
 /// Ensures neural weights (Hebbian co-activations & competitive cluster centroids)
 /// are strictly isolated across tenants and users, preventing cross-tenant leakage
@@ -174,6 +187,7 @@ pub struct TenantLearningPool {
 
 impl TenantLearningPool {
     /// Creates a new `TenantLearningPool` with a maximum capacity.
+    #[must_use]
     pub fn new(pool: DbPool, max_entries: usize) -> Self {
         Self {
             pool,
@@ -184,7 +198,7 @@ impl TenantLearningPool {
     }
 
     fn now_ms(&self) -> u64 {
-        self.created_at.elapsed().as_millis() as u64
+        u64::try_from(self.created_at.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 
     /// Retrieves or instantiates an isolated `LearningEngine` for `(tenant_id, user_id)`.
@@ -304,6 +318,7 @@ impl TenantLearningPool {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
 
