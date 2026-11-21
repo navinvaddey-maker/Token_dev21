@@ -304,6 +304,7 @@ impl ScenarioOutputValidator {
     }
 }
 
+#[derive(Debug)]
 pub struct ScenarioOutputComposer;
 impl ScenarioOutputComposer {
     /// Composes a production-grade, structured prompt contract for an LLM based on
@@ -371,9 +372,16 @@ impl ScenarioOutputComposer {
                 let src = c
                     .metadata
                     .as_ref()
-                    .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
+                    .map(|m| {
+                        let page_str = m
+                            .page_number
+                            .map(|p| p.to_string())
+                            .unwrap_or_else(|| "1".to_string());
+                        format!("{} (Page {})", m.source_file, page_str)
+                    })
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
-                format!("[Ref {}]: {}", i + 1, src)
+                let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                format!("[Ref {}]: {}", i + 1, safe_src)
             })
             .collect();
 
@@ -399,7 +407,10 @@ impl ScenarioOutputComposer {
         };
 
         let geo_suffix = geography
-            .map(|g| format!(" (Jurisdiction / Region: {})", g.to_uppercase()))
+            .map(|g| {
+                let safe_geo = crate::npae::grounding::verifier::sanitize_untrusted_fact(g);
+                format!(" (Jurisdiction / Region: {})", safe_geo.to_uppercase())
+            })
             .unwrap_or_default();
 
         let mut body = String::new();
@@ -416,20 +427,6 @@ impl ScenarioOutputComposer {
         body.push_str("Your directive is to evaluate the user's scenario with absolute precision, grounded strictly in the verified internal documents provided below.\n");
         body.push_str(&format!("{}\n\n", parser_summary));
 
-        // Extract explicit VERIFY markers from retrieved chunks programmatically
-        let mut verify_markers = Vec::new();
-        for chunk in rag_chunks {
-            for line in chunk.content.lines() {
-                let trimmed = line.trim();
-                if let Some(pos) = trimmed.find("VERIFY ") {
-                    let item = trimmed[pos + 7..].trim();
-                    if !item.is_empty() && !verify_markers.contains(&item.to_string()) {
-                        verify_markers.push(item.to_string());
-                    }
-                }
-            }
-        }
-
         // 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS
         body.push_str("# 4. OPERATIONAL CONSTRAINTS & GAP WARNINGS\n");
         body.push_str("- Grounding Constraint: Rely exclusively on the cited internal evidence. Do not extrapolate external unverified facts or assumptions.\n");
@@ -440,13 +437,8 @@ impl ScenarioOutputComposer {
         } else {
             body.push_str("- Identified Completeness Gaps (You must explicitly highlight these missing parameters to the user):\n");
             for issue in gap_issues {
-                body.push_str(&format!("  * [GAP WARNING]: {}\n", issue));
-            }
-        }
-        if !verify_markers.is_empty() {
-            body.push_str("- Flagged Internal Verification Items (Defect 5 Protocol): The retrieved knowledge base contains explicit flags requiring external validation:\n");
-            for item in &verify_markers {
-                body.push_str(&format!("  * [VERIFY ITEM]: {}\n", item));
+                let safe_issue = crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
+                body.push_str(&format!("  * [GAP WARNING]: {}\n", safe_issue));
             }
         }
         body.push('\n');
@@ -528,25 +520,36 @@ impl ScenarioOutputComposer {
 
         // 2. USER SCENARIO OBJECTIVE
         body.push_str("# 2. USER SCENARIO OBJECTIVE\n");
-        body.push_str(question.trim());
+        let safe_question =
+            crate::npae::grounding::verifier::sanitize_untrusted_fact(question.trim());
+        body.push_str(&safe_question);
         body.push_str("\n\n");
 
         // 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)
         body.push_str("# 3. VERIFIED GROUNDING EVIDENCE (INTERNAL KNOWLEDGE BASE)\n");
-        body.push_str("<context>\n");
+        body.push_str("<context trust=\"untrusted\">\n");
         for (i, c) in rag_chunks.iter().enumerate() {
-            let doc_ref = c
+            let doc_ref_raw = c
                 .metadata
                 .as_ref()
-                .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
+                .map(|m| {
+                    let page_str = m
+                        .page_number
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "1".to_string());
+                    format!("{} (Page {})", m.source_file, page_str)
+                })
                 .unwrap_or_else(|| format!("Document-{}", i + 1));
+            let doc_ref = crate::npae::grounding::verifier::sanitize_untrusted_fact(&doc_ref_raw);
+            let safe_content =
+                crate::npae::grounding::verifier::sanitize_untrusted_fact(c.content.trim());
             body.push_str(&format!(
                 "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n### Key Evidence [{}] (from {})\n{}\n    </content>\n  </chunk>\n",
                 i + 1,
                 doc_ref,
                 i + 1,
                 doc_ref,
-                c.content.trim()
+                safe_content
             ));
         }
         body.push_str("</context>\n\n");
@@ -558,7 +561,8 @@ impl ScenarioOutputComposer {
             body.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
         } else {
             for issue in gap_issues {
-                body.push_str(&format!("  [GAP WARNING]: {}\n", issue));
+                let safe_issue = crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
+                body.push_str(&format!("  [GAP WARNING]: {}\n", safe_issue));
             }
         }
         body.push_str("</metadata_gaps>\n\n");
@@ -577,6 +581,7 @@ impl ScenarioOutputComposer {
     }
 }
 
+#[derive(Debug)]
 pub struct ScenarioRegularPipeline;
 impl ScenarioRegularPipeline {
     pub fn run(
@@ -586,6 +591,26 @@ impl ScenarioRegularPipeline {
         rag_chunks: &[RagChunk],
         searched_namespaces: Vec<String>,
         compression_mode: Option<&str>,
+    ) -> ScenarioResponse {
+        Self::run_with_instructions(
+            question,
+            style,
+            prompts_dir,
+            rag_chunks,
+            searched_namespaces,
+            compression_mode,
+            None,
+        )
+    }
+
+    pub fn run_with_instructions(
+        question: &str,
+        style: &ScenarioStyleConfig,
+        prompts_dir: &str,
+        rag_chunks: &[RagChunk],
+        searched_namespaces: Vec<String>,
+        compression_mode: Option<&str>,
+        style_instructions: Option<&str>,
     ) -> ScenarioResponse {
         // Web search query refusal check
         let is_web_request = question.to_lowercase().contains("search the web")
@@ -614,9 +639,14 @@ impl ScenarioRegularPipeline {
             };
         }
 
-        let prompt_path = Path::new(prompts_dir).join(&style.prompt_file);
-        let style_instructions =
-            fs::read_to_string(&prompt_path).unwrap_or_else(|_| format!("Style: {}", style.label));
+        let instructions_resolved = match style_instructions {
+            Some(inst) => inst.to_string(),
+            None => {
+                let prompt_path = Path::new(prompts_dir).join(&style.prompt_file);
+                fs::read_to_string(&prompt_path)
+                    .unwrap_or_else(|_| format!("Style: {}", style.label))
+            }
+        };
 
         let citations: Vec<String> = rag_chunks
             .iter()
@@ -625,9 +655,16 @@ impl ScenarioRegularPipeline {
                 let src = c
                     .metadata
                     .as_ref()
-                    .map(|m| format!("{} (Page {:?})", m.source_file, m.page_number.unwrap_or(1)))
+                    .map(|m| {
+                        let page_str = m
+                            .page_number
+                            .map(|p| p.to_string())
+                            .unwrap_or_else(|| "1".to_string());
+                        format!("{} (Page {})", m.source_file, page_str)
+                    })
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
-                format!("[Ref {}]: {}", i + 1, src)
+                let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                format!("[Ref {}]: {}", i + 1, safe_src)
             })
             .collect();
 
@@ -640,7 +677,7 @@ impl ScenarioRegularPipeline {
 
         // Inject persona and style guidance from prompt template (GAP-S01 fix)
         body.push_str("### Style Persona & Directives\n");
-        body.push_str(style_instructions.trim());
+        body.push_str(instructions_resolved.trim());
         body.push_str("\n\n");
 
         if style.key.eq_ignore_ascii_case("aggressive") {
@@ -648,9 +685,30 @@ impl ScenarioRegularPipeline {
             body.push_str("Based strictly on internal knowledge, here is the strongest supported position:\n\n");
         }
 
+        body.push_str("<context trust=\"untrusted\">\n");
         for (i, c) in rag_chunks.iter().enumerate() {
-            body.push_str(&format!("- [{}] {}\n\n", i + 1, c.content));
+            let safe_content =
+                crate::npae::grounding::verifier::sanitize_untrusted_fact(&c.content);
+            let src = c
+                .metadata
+                .as_ref()
+                .map(|m| {
+                    let page_str = m
+                        .page_number
+                        .map(|p| p.to_string())
+                        .unwrap_or_else(|| "1".to_string());
+                    format!("{} (Page {})", m.source_file, page_str)
+                })
+                .unwrap_or_else(|| format!("Doc-{}", i + 1));
+            let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+            body.push_str(&format!(
+                "  <chunk id=\"ID-{:02}\" source=\"{}\">\n    {}\n  </chunk>\n",
+                i + 1,
+                safe_src,
+                safe_content
+            ));
         }
+        body.push_str("</context>\n\n");
 
         body.push_str("### Citations\n");
         for cit in &citations {

@@ -13,6 +13,7 @@ const State = {
     token: null,
     username: null,
     businessType: null,
+    role: null,
     lastResult: null,
     lastTs: null,
     currentMode: 'gentle',
@@ -78,37 +79,22 @@ async function handleLogin(e) {
     if (!username || !password) return showToast('Username and password required', 'error');
 
     try {
-        console.log('Attempting login for:', username);
         const r = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
         });
-        console.log('Login response status:', r.status);
-        console.log('Login response ok:', r.ok);
-        console.log('Login response headers:', Object.fromEntries(r.headers.entries()));
         
         if (!r.ok) {
             const err = await r.json();
-            console.log('Login error response:', err);
             throw new Error(err.error?.message || 'Login failed');
         }
-        console.log('Response received, parsing JSON...');
         const data = await r.json();
         
         // Validate required fields FIRST before accessing any properties
         if (!data || typeof data !== 'object') {
             throw new Error('Invalid login response: data is not an object');
         }
-        
-        // Now it's safe to log data properties
-        console.log('Login response data:', data);
-        console.log('Login response data type:', typeof data);
-        console.log('Login response data keys:', Object.keys(data || {}));
-        
-        // Additional debugging
-        console.log('data.business_type:', data.business_type);
-        console.log('type of data.business_type:', typeof data.business_type);
         
         // Validate required fields
         if (!data.token) {
@@ -123,16 +109,16 @@ async function handleLogin(e) {
         if (!data.business_type) {
             throw new Error('Invalid login response: missing business_type');
         }
-        console.log('Setting State.businessType to:', `"${data.business_type}"`);
         State.token    = data.token;
         State.userId   = data.user_id;
         State.username = data.username;
+        State.role     = data.role || 'user';
         localStorage.setItem('tce_token', data.token);
         localStorage.setItem('tce_user_id', data.user_id);
         localStorage.setItem('tce_username', data.username);
         localStorage.setItem('tce_business_type', data.business_type);
+        localStorage.setItem('tce_role', State.role);
         State.businessType = data.business_type;
-        console.log('Login response business_type:', `"${data.business_type}"`);
         showMainSection();
         showToast('Welcome back, ' + data.username, 'success');
         const promptInput = document.getElementById('prompt-input');
@@ -141,7 +127,6 @@ async function handleLogin(e) {
         }
     } catch (err) {
         console.error('Login error:', err);
-        console.error('Login error stack:', err.stack);
         showToast(err.message, 'error');
     }
 }
@@ -176,16 +161,24 @@ async function handleRegister(e) {
  * Signs the user out, cleans up authentication storage, and gracefully returns
  * to the zero-auth sandbox workbench without locking out the user (R1).
  */
+function isAdminUser() {
+    const r = (State.role || '').trim().toLowerCase();
+    const b = (State.businessType || '').trim().toLowerCase();
+    return r === 'admin' || b === 'admin';
+}
+
 function logout() {
     // ARCH: §1 Reality Check — Session termination transitions gracefully to zero-auth sandbox
     State.token = null;
     State.userId = null;
     State.username = null;
     State.businessType = null;
+    State.role = null;
     localStorage.removeItem('tce_token');
     localStorage.removeItem('tce_user_id');
     localStorage.removeItem('tce_username');
     localStorage.removeItem('tce_business_type');
+    localStorage.removeItem('tce_role');
 
     const authSec = document.getElementById('auth-section');
     if (authSec) authSec.style.display = 'none';
@@ -207,7 +200,7 @@ function showMainSection() {
     
     updateUserBar();
 
-    if (State.businessType && State.businessType.trim().toLowerCase() === 'admin') {
+    if (isAdminUser()) {
         const adminLink = document.getElementById('admin-link');
         if (adminLink) adminLink.style.display = 'inline-flex';
     } else {
@@ -338,7 +331,7 @@ function updateUserBar() {
             sandboxBadge.classList.add('authenticated');
         }
         if (adminLink) {
-            adminLink.style.display = (State.businessType && State.businessType.trim().toLowerCase() === 'admin') ? 'inline-flex' : 'none';
+            adminLink.style.display = isAdminUser() ? 'inline-flex' : 'none';
         }
     } else {
         const remaining = Math.max(0, GUEST_MAX_USES - getGuestUses());
@@ -399,10 +392,13 @@ function onAuthExpired() {
     State.token = null;
     State.userId = null;
     State.username = null;
+    State.businessType = null;
+    State.role = null;
     localStorage.removeItem('tce_token');
     localStorage.removeItem('tce_user_id');
     localStorage.removeItem('tce_username');
     localStorage.removeItem('tce_business_type');
+    localStorage.removeItem('tce_role');
     updateUserBar();
     showToast('Session expired. Switched to sandbox mode.', 'error');
 }
@@ -717,6 +713,15 @@ function handleFileSelect(e) {
  * Ingests .txt, .md, and .pdf files with instant word & token count updates (R4).
  */
 async function processIngestedFile(file) {
+    if (!file) return;
+
+    // Enforce 10 MB client-side file size check before reading into memory
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+    if (file.size > MAX_FILE_SIZE) {
+        showToast('File size exceeds 10MB limit. Please upload a smaller file.', 'error');
+        return;
+    }
+
     const name = file.name.toLowerCase();
     const promptInput = document.getElementById('prompt-input');
     if (!promptInput) return;
@@ -1690,8 +1695,8 @@ function showToast(msg, type) {
 
 function escapeHtml(text) {
     const d = document.createElement('div');
-    d.textContent = text;
-    return d.innerHTML;
+    d.textContent = text == null ? '' : String(text);
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── Validation & Token Estimation (R4) ─────────────────────────────────────
@@ -2054,12 +2059,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const userId = localStorage.getItem('tce_user_id');
     const username = localStorage.getItem('tce_username');
     const businessType = localStorage.getItem('tce_business_type');
+    const role = localStorage.getItem('tce_role');
 
     if (token && userId && username) {
         State.token = token;
         State.userId = userId;
         State.username = username;
         State.businessType = businessType;
+        State.role = role;
         showMainSection();
         loadScenarioRegistry();
     } else {
@@ -2100,12 +2107,30 @@ async function loadScenarioRegistry() {
         const styleSel  = document.getElementById('scenario-style-select');
 
         if (domainSel && reg.domains) {
-            domainSel.innerHTML = '<option value="" disabled selected>-- Select Mandatory Domain --</option>' +
-                reg.domains.map(d => `<option value="${d.key}">${d.label}</option>`).join('');
+            domainSel.innerHTML = '';
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.disabled = true;
+            defaultOpt.selected = true;
+            defaultOpt.textContent = '-- Select Mandatory Domain --';
+            domainSel.appendChild(defaultOpt);
+
+            for (const d of reg.domains) {
+                const opt = document.createElement('option');
+                opt.value = d.key || '';
+                opt.textContent = d.label || '';
+                domainSel.appendChild(opt);
+            }
         }
 
         if (styleSel && reg.styles) {
-            styleSel.innerHTML = reg.styles.map(s => `<option value="${s.key}">${s.label} — ${s.description}</option>`).join('');
+            styleSel.innerHTML = '';
+            for (const s of reg.styles) {
+                const opt = document.createElement('option');
+                opt.value = s.key || '';
+                opt.textContent = `${s.label || ''} — ${s.description || ''}`;
+                styleSel.appendChild(opt);
+            }
         }
 
         scenarioRegistryLoaded = true;

@@ -86,7 +86,11 @@ impl Stage6a {
                 parts.push(format!("**Semantic Context:** {}", ctx));
             }
             if let Some(rag) = rag_opt {
-                parts.push(format!("**Source Knowledge:**\n{}", rag));
+                let safe_rag = crate::npae::grounding::verifier::sanitize_untrusted_fact(&rag);
+                parts.push(format!(
+                    "**Source Knowledge:**\n<retrieved_context trust=\"untrusted\">\n{}\n</retrieved_context>",
+                    safe_rag
+                ));
             }
 
             if let Some(context) = &schema_filled.resolved_schema.context {
@@ -380,7 +384,11 @@ impl Stage6a {
             }
         }
         if let Some(rag) = rag_opt {
-            lines.push(format!("**Source Knowledge:**\n{}", rag));
+            let safe_rag = crate::npae::grounding::verifier::sanitize_untrusted_fact(&rag);
+            lines.push(format!(
+                "**Source Knowledge:**\n<retrieved_context trust=\"untrusted\">\n{}\n</retrieved_context>",
+                safe_rag
+            ));
         }
         if let Some(rag_block) = Self::format_enrichment_rag(schema_filled, &lines) {
             lines.push(rag_block);
@@ -494,13 +502,17 @@ impl Stage6a {
     }
 
     /// Formats RAG chunks from `schema_filled.enrichment` if not already included in `parts`.
+    ///
+    /// Sanitizes chunk content and source file metadata and wraps retrieved knowledge inside
+    /// `<retrieved_context trust="untrusted">` to defend against indirect prompt injection (ARCHITECTURE.md §7.2 Layer 4, Rules §9).
     fn format_enrichment_rag(schema_filled: &AlgorithmOutput, parts: &[String]) -> Option<String> {
         let enrichment = schema_filled.enrichment.as_ref()?;
         let rag_chunks = enrichment.rag_chunks.as_ref()?;
-        if parts
-            .iter()
-            .any(|p| p.contains("Source Knowledge:") || p.contains("Retrieved Knowledge:"))
-        {
+        if parts.iter().any(|p| {
+            p.contains("Source Knowledge:")
+                || p.contains("Retrieved Knowledge:")
+                || p.contains("<retrieved_context")
+        }) {
             return None;
         }
         let mut text = String::new();
@@ -514,15 +526,24 @@ impl Stage6a {
             let source_str = chunk
                 .metadata
                 .as_ref()
-                .map(|m| format!("[Source: {}{}]\n", m.source_file, page_str))
+                .map(|m| {
+                    let safe_source =
+                        crate::npae::grounding::verifier::sanitize_untrusted_fact(&m.source_file);
+                    format!("[Source: {}{}]\n", safe_source, page_str)
+                })
                 .unwrap_or_default();
-            text.push_str(&format!("{}{}\n\n", source_str, chunk.content));
+            let safe_content =
+                crate::npae::grounding::verifier::sanitize_untrusted_fact(&chunk.content);
+            text.push_str(&format!("{}{}\n\n", source_str, safe_content));
         }
         let trimmed = text.trim();
         if trimmed.is_empty() {
             None
         } else {
-            Some(format!("**Retrieved Knowledge:**\n{}", trimmed))
+            Some(format!(
+                "**Retrieved Knowledge:**\n<retrieved_context trust=\"untrusted\">\n{}\n</retrieved_context>",
+                trimmed
+            ))
         }
     }
 }

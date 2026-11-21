@@ -25,24 +25,56 @@ impl RagStore {
 
     // ── Document CRUD ──────────────────────────────────────────────────────
 
-    /// Insert a new document record (status = "processing").
+    /// Insert a new document record (status = "processing") using the default tenant.
     pub async fn insert_document(&self, doc: &RagDocument) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"INSERT INTO rag_documents (id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
-        )
-        .bind(&doc.id)
-        .bind(&doc.user_id)
-        .bind(&doc.filename)
-        .bind(&doc.domain)
-        .bind(&doc.content_hash)
-        .bind(doc.page_count)
-        .bind(doc.chunk_count)
-        .bind(doc.status.as_str())
-        .bind(doc.created_at)
-        .bind(doc.updated_at)
-        .execute(&self.pool)
-        .await?;
+        self.insert_document_with_tenant(doc, "default").await
+    }
+
+    /// Insert a new document record with an explicit tenant scope.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on insert failure.
+    pub async fn insert_document_with_tenant(
+        &self,
+        doc: &RagDocument,
+        tenant_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        if tenant_id == "default" {
+            sqlx::query(
+                r#"INSERT INTO rag_documents (id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+            )
+            .bind(&doc.id)
+            .bind(&doc.user_id)
+            .bind(&doc.filename)
+            .bind(&doc.domain)
+            .bind(&doc.content_hash)
+            .bind(doc.page_count)
+            .bind(doc.chunk_count)
+            .bind(doc.status.as_str())
+            .bind(doc.created_at)
+            .bind(doc.updated_at)
+            .execute(&self.pool)
+            .await?;
+        } else {
+            sqlx::query(
+                r#"INSERT INTO rag_documents (id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at, tenant_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
+            )
+            .bind(&doc.id)
+            .bind(&doc.user_id)
+            .bind(&doc.filename)
+            .bind(&doc.domain)
+            .bind(&doc.content_hash)
+            .bind(doc.page_count)
+            .bind(doc.chunk_count)
+            .bind(doc.status.as_str())
+            .bind(doc.created_at)
+            .bind(doc.updated_at)
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await?;
+        }
         Ok(())
     }
 
@@ -77,31 +109,61 @@ impl RagStore {
         user_id: &str,
         doc_id: &str,
     ) -> Result<Option<RagDocument>, sqlx::Error> {
+        self.get_document_scoped("default", user_id, doc_id).await
+    }
+
+    /// Get a single document by ID, scoped to tenant and user.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on query failure.
+    pub async fn get_document_scoped(
+        &self,
+        tenant_id: &str,
+        user_id: &str,
+        doc_id: &str,
+    ) -> Result<Option<RagDocument>, sqlx::Error> {
         let row = sqlx::query_as::<_, RagDocumentRow>(
             "SELECT id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at
-             FROM rag_documents WHERE id = $1 AND user_id = $2",
+             FROM rag_documents WHERE id = $1 AND user_id = $2 AND tenant_id = $3",
         )
         .bind(doc_id)
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| r.into()))
     }
 
-    /// List all documents for a user.
+    /// List all documents for a user under default tenant.
     pub async fn list_documents(
         &self,
         user_id: &str,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<RagDocument>, sqlx::Error> {
+        self.list_documents_scoped("default", user_id, limit, offset)
+            .await
+    }
+
+    /// List all documents for a user scoped to a specific tenant.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on query failure.
+    pub async fn list_documents_scoped(
+        &self,
+        tenant_id: &str,
+        user_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<RagDocument>, sqlx::Error> {
         let rows = sqlx::query_as::<_, RagDocumentRow>(
             "SELECT id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at
-             FROM rag_documents WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+             FROM rag_documents WHERE user_id = $1 AND tenant_id = $4 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
         )
         .bind(user_id)
         .bind(limit)
         .bind(offset)
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(|r| r.into()).collect())
@@ -109,11 +171,28 @@ impl RagStore {
 
     /// Delete a document and all its chunks (CASCADE in schema).
     pub async fn delete_document(&self, user_id: &str, doc_id: &str) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM rag_documents WHERE id = $1 AND user_id = $2")
-            .bind(doc_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
+        self.delete_document_scoped("default", user_id, doc_id)
+            .await
+    }
+
+    /// Delete a document scoped to tenant and user.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database execution failure.
+    pub async fn delete_document_scoped(
+        &self,
+        tenant_id: &str,
+        user_id: &str,
+        doc_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM rag_documents WHERE id = $1 AND user_id = $2 AND tenant_id = $3",
+        )
+        .bind(doc_id)
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -124,6 +203,53 @@ impl RagStore {
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Admin: delete a document scoped to tenant regardless of owning user.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database execution failure.
+    ///
+    /// # Panics
+    /// Never.
+    pub async fn admin_delete_document_scoped(
+        &self,
+        tenant_id: &str,
+        doc_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        // ARCH: §3.2 — tenant-scoped document deletion
+        let result = sqlx::query("DELETE FROM rag_documents WHERE id = $1 AND tenant_id = $2")
+            .bind(doc_id)
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Admin: list documents for a specific tenant across all users, newest first.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database query failure.
+    ///
+    /// # Panics
+    /// Never.
+    pub async fn list_documents_by_tenant(
+        &self,
+        tenant_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<RagDocument>, sqlx::Error> {
+        // ARCH: §3.2 — tenant-isolated document listing
+        let rows = sqlx::query_as::<_, RagDocumentRow>(
+            "SELECT id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at
+             FROM rag_documents WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+        )
+        .bind(tenant_id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
     /// Admin: list documents across all users, newest first.
@@ -149,12 +275,27 @@ impl RagStore {
         user_id: &str,
         content_hash: &str,
     ) -> Result<Option<RagDocument>, sqlx::Error> {
+        self.find_by_content_hash_scoped("default", user_id, content_hash)
+            .await
+    }
+
+    /// Check if a document with this content hash already exists for the tenant and user.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on query failure.
+    pub async fn find_by_content_hash_scoped(
+        &self,
+        tenant_id: &str,
+        user_id: &str,
+        content_hash: &str,
+    ) -> Result<Option<RagDocument>, sqlx::Error> {
         let row = sqlx::query_as::<_, RagDocumentRow>(
             "SELECT id, user_id, filename, domain, content_hash, page_count, chunk_count, status, created_at, updated_at
-             FROM rag_documents WHERE user_id = $1 AND content_hash = $2",
+             FROM rag_documents WHERE user_id = $1 AND content_hash = $2 AND tenant_id = $3",
         )
         .bind(user_id)
         .bind(content_hash)
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| r.into()))
@@ -162,8 +303,18 @@ impl RagStore {
 
     // ── Chunk CRUD ─────────────────────────────────────────────────────────
 
-    /// Insert a batch of chunks for a document.
+    /// Insert a batch of chunks for a document inside a single SQLite transaction.
+    ///
+    /// ARCH: §3.2 & Workstream 3 — All chunk inserts are wrapped in a single transaction
+    /// so N chunk inserts perform exactly 1 fsync rather than N fsyncs.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database write failure; transaction is rolled back on error.
     pub async fn insert_chunks(&self, chunks: &[RagChunk]) -> Result<(), sqlx::Error> {
+        if chunks.is_empty() {
+            return Ok(());
+        }
+        let mut tx = self.pool.begin().await?;
         for chunk in chunks {
             let embedding_blob = chunk.embedding.as_ref().map(|e| embedding_to_bytes(e));
             let metadata_json = chunk
@@ -185,9 +336,10 @@ impl RagStore {
             .bind(chunk.created_at)
             .bind(&chunk.embedding_model)
             .bind(&chunk.model_version)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
+        tx.commit().await?;
         Ok(())
     }
 
@@ -203,10 +355,6 @@ impl RagStore {
     // ── Vector Search ──────────────────────────────────────────────────────
 
     /// Retrieve the top-K most similar chunks to the query embedding.
-    ///
-    /// Strategy: load all candidate chunk embeddings into memory and compute
-    /// cosine similarity in Rust. This is optimal for <10K chunks per user.
-    /// For larger scale, introduce an ANN index (usearch, hnsw).
     pub async fn search(
         &self,
         query_embedding: &[f32],
@@ -215,7 +363,32 @@ impl RagStore {
         top_k: usize,
         min_similarity: f32,
     ) -> Result<Vec<SearchResult>, sqlx::Error> {
-        self.search_filtered(
+        self.search_scoped(
+            "default",
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+        )
+        .await
+    }
+
+    /// Retrieve top-K most similar chunks scoped to `tenant_id` and `user_id`.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure.
+    pub async fn search_scoped(
+        &self,
+        tenant_id: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+    ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        self.search_filtered_scoped(
+            tenant_id,
             query_embedding,
             user_id,
             document_ids,
@@ -243,7 +416,35 @@ impl RagStore {
         filter: &F,
     ) -> Result<Vec<SearchResult>, sqlx::Error>
     where
-        // Sync: `&F` is held across `.await`, so it must be Send for Axum's Send futures.
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
+        self.search_filtered_scoped(
+            "default",
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            filter,
+        )
+        .await
+    }
+
+    /// Dense top-K search scoped to a specific tenant ID.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure.
+    pub async fn search_filtered_scoped<F>(
+        &self,
+        tenant_id: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
         F: Fn(&SearchResult) -> bool + Sync,
     {
         // Load candidate chunks with their embeddings + document metadata
@@ -251,19 +452,20 @@ impl RagStore {
             if doc_ids.is_empty() {
                 return Ok(vec![]);
             }
-            // Build dynamic IN clause
             let placeholders: Vec<String> =
-                (0..doc_ids.len()).map(|i| format!("${}", i + 2)).collect();
+                (0..doc_ids.len()).map(|i| format!("${}", i + 3)).collect();
             let in_clause = placeholders.join(", ");
             let query_str = format!(
                 "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
                         d.filename, d.domain, c.embedding_model, c.model_version
                  FROM rag_chunks c
                  JOIN rag_documents d ON c.document_id = d.id
-                 WHERE d.user_id = $1 AND d.id IN ({}) AND d.status = 'ready' AND c.embedding IS NOT NULL",
+                 WHERE d.user_id = $1 AND d.tenant_id = $2 AND d.id IN ({}) AND d.status = 'ready' AND c.embedding IS NOT NULL",
                 in_clause
             );
-            let mut q = sqlx::query_as::<_, ChunkSearchRow>(&query_str).bind(user_id);
+            let mut q = sqlx::query_as::<_, ChunkSearchRow>(&query_str)
+                .bind(user_id)
+                .bind(tenant_id);
             for id in doc_ids {
                 q = q.bind(id);
             }
@@ -274,9 +476,10 @@ impl RagStore {
                         d.filename, d.domain, c.embedding_model, c.model_version
                  FROM rag_chunks c
                  JOIN rag_documents d ON c.document_id = d.id
-                 WHERE d.user_id = $1 AND d.status = 'ready' AND c.embedding IS NOT NULL",
+                 WHERE d.user_id = $1 AND d.tenant_id = $2 AND d.status = 'ready' AND c.embedding IS NOT NULL",
             )
             .bind(user_id)
+            .bind(tenant_id)
             .fetch_all(&self.pool)
             .await?
         };
@@ -330,12 +533,24 @@ impl RagStore {
         Ok(results)
     }
 
-    /// Retrieve chunks matching query using SQLite FTS5 BM25 lexical search.
+    /// Retrieve chunks matching query using SQLite FTS5 BM25 lexical search under default tenant.
+    pub async fn search_fts(
+        &self,
+        query_text: &str,
+        user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        self.search_fts_scoped("default", query_text, user_id, limit)
+            .await
+    }
+
+    /// Retrieve chunks matching query using SQLite FTS5 BM25 lexical search scoped to `tenant_id`.
     ///
     /// # Errors
     /// Returns `sqlx::Error` on database failure.
-    pub async fn search_fts(
+    pub async fn search_fts_scoped(
         &self,
+        tenant_id: &str,
         query_text: &str,
         user_id: &str,
         limit: usize,
@@ -360,14 +575,15 @@ impl RagStore {
                          FROM rag_chunks_fts f
                          JOIN rag_chunks c ON f.chunk_id = c.id
                          JOIN rag_documents d ON c.document_id = d.id
-                         WHERE d.user_id = $1 AND rag_chunks_fts MATCH $2
+                         WHERE d.user_id = $1 AND d.tenant_id = $2 AND rag_chunks_fts MATCH $3
                          ORDER BY bm25(rag_chunks_fts) ASC
-                         LIMIT $3";
+                         LIMIT $4";
 
         let rows = match sqlx::query_as::<_, ChunkSearchRow>(query_str)
             .bind(user_id)
+            .bind(tenant_id)
             .bind(&match_expr)
-            .bind(limit as i64)
+            .bind(limit.clamp(1, 200) as i64)
             .fetch_all(&self.pool)
             .await
         {
@@ -462,24 +678,57 @@ impl RagStore {
     where
         F: Fn(&SearchResult) -> bool + Sync,
     {
-        /// Sparse over-fetch multiplier when a filter is active. UNVERIFIED: not tuned;
-        /// chosen as a bounded cost (50 rows at top_k = 5) pending P4 golden-set evaluation.
-        const SPARSE_FILTER_OVERFETCH: usize = 10;
-        self.hybrid_inner(
+        self.search_hybrid_filtered_scoped(
+            "default",
             query_text,
             query_embedding,
             user_id,
             document_ids,
             top_k,
             min_similarity,
-            top_k * SPARSE_FILTER_OVERFETCH,
+            filter,
+        )
+        .await
+    }
+
+    /// Hybrid search scoped to a specific tenant ID.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on database failure.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn search_hybrid_filtered_scoped<F>(
+        &self,
+        tenant_id: &str,
+        query_text: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
+        /// Sparse over-fetch multiplier when a filter is active. UNVERIFIED: not tuned;
+        /// chosen as a bounded cost (50 rows at top_k = 5) pending P4 golden-set evaluation.
+        const SPARSE_FILTER_OVERFETCH: usize = 10;
+        self.hybrid_inner_scoped(
+            tenant_id,
+            query_text,
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            top_k.saturating_mul(SPARSE_FILTER_OVERFETCH),
             filter,
         )
         .await
     }
 
     /// Shared RRF implementation for filtered and unfiltered hybrid search.
-    #[allow(clippy::too_many_arguments)] // private helper; see search_hybrid_filtered.
+    #[allow(clippy::too_many_arguments)]
     async fn hybrid_inner<F>(
         &self,
         query_text: &str,
@@ -494,12 +743,44 @@ impl RagStore {
     where
         F: Fn(&SearchResult) -> bool + Sync,
     {
+        self.hybrid_inner_scoped(
+            "default",
+            query_text,
+            query_embedding,
+            user_id,
+            document_ids,
+            top_k,
+            min_similarity,
+            sparse_fetch_limit,
+            filter,
+        )
+        .await
+    }
+
+    /// Scoped RRF implementation for tenant-isolated hybrid search.
+    #[allow(clippy::too_many_arguments)]
+    async fn hybrid_inner_scoped<F>(
+        &self,
+        tenant_id: &str,
+        query_text: &str,
+        query_embedding: &[f32],
+        user_id: &str,
+        document_ids: Option<&[String]>,
+        top_k: usize,
+        min_similarity: f32,
+        sparse_fetch_limit: usize,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, sqlx::Error>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
         let dense_results = self
-            .search_filtered(
+            .search_filtered_scoped(
+                tenant_id,
                 query_embedding,
                 user_id,
                 document_ids,
-                top_k * 2,
+                top_k.saturating_mul(2),
                 min_similarity,
                 filter,
             )
@@ -507,12 +788,12 @@ impl RagStore {
         // UNVERIFIED/pre-existing: sparse errors are downgraded to "no sparse hits" here and in
         // search_fts (FTS table may be absent on old DBs). Left unchanged in P0; dense errors propagate.
         let sparse_results: Vec<SearchResult> = self
-            .search_fts(query_text, user_id, sparse_fetch_limit)
+            .search_fts_scoped(tenant_id, query_text, user_id, sparse_fetch_limit)
             .await
             .unwrap_or_default()
             .into_iter()
             .filter(|r| filter(r))
-            .take(top_k * 2)
+            .take(top_k.saturating_mul(2))
             .collect();
 
         if sparse_results.is_empty() {
@@ -556,7 +837,7 @@ impl RagStore {
 
     // ── Retrieval Logging ──────────────────────────────────────────────────
 
-    /// Log a retrieval event for analytics.
+    /// Log a retrieval event for analytics with redacted query text under default tenant.
     pub async fn log_retrieval(
         &self,
         user_id: &str,
@@ -566,22 +847,81 @@ impl RagStore {
         top_similarity: f32,
         retrieval_time_ms: i64,
     ) -> Result<(), sqlx::Error> {
-        let id = Uuid::new_v4().to_string();
-        sqlx::query(
-            r#"INSERT INTO rag_retrieval_logs (id, user_id, history_id, query_text, chunks_retrieved, top_similarity_score, retrieval_time_ms, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+        self.log_retrieval_scoped(
+            "default",
+            user_id,
+            history_id,
+            query_text,
+            chunks_retrieved,
+            top_similarity,
+            retrieval_time_ms,
         )
-        .bind(&id)
-        .bind(user_id)
-        .bind(history_id)
-        .bind(query_text)
-        .bind(chunks_retrieved)
-        .bind(top_similarity)
-        .bind(retrieval_time_ms)
-        .bind(chrono::Utc::now())
-        .execute(&self.pool)
-        .await?;
+        .await
+    }
+
+    /// Log a retrieval event for analytics scoped to a specific tenant ID.
+    ///
+    /// # Errors
+    /// Returns `sqlx::Error` on insert failure.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn log_retrieval_scoped(
+        &self,
+        tenant_id: &str,
+        user_id: &str,
+        history_id: Option<&str>,
+        query_text: &str,
+        chunks_retrieved: i64,
+        top_similarity: f32,
+        retrieval_time_ms: i64,
+    ) -> Result<(), sqlx::Error> {
+        let id = Uuid::new_v4().to_string();
+        let sanitized_query = redact_query_text(query_text);
+        if tenant_id == "default" {
+            sqlx::query(
+                r#"INSERT INTO rag_retrieval_logs (id, user_id, history_id, query_text, chunks_retrieved, top_similarity_score, retrieval_time_ms, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+            )
+            .bind(&id)
+            .bind(user_id)
+            .bind(history_id)
+            .bind(&sanitized_query)
+            .bind(chunks_retrieved)
+            .bind(top_similarity)
+            .bind(retrieval_time_ms)
+            .bind(chrono::Utc::now())
+            .execute(&self.pool)
+            .await?;
+        } else {
+            sqlx::query(
+                r#"INSERT INTO rag_retrieval_logs (id, user_id, history_id, query_text, chunks_retrieved, top_similarity_score, retrieval_time_ms, created_at, tenant_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"#,
+            )
+            .bind(&id)
+            .bind(user_id)
+            .bind(history_id)
+            .bind(&sanitized_query)
+            .bind(chunks_retrieved)
+            .bind(top_similarity)
+            .bind(retrieval_time_ms)
+            .bind(chrono::Utc::now())
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await?;
+        }
         Ok(())
+    }
+}
+
+/// Redacts and bounds query text for analytics logging to at most 256 characters.
+///
+/// Prevents full raw prompts, API keys, or secret tokens from leaking into retrieval logs.
+pub fn redact_query_text(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.chars().count() <= 256 {
+        trimmed.to_string()
+    } else {
+        let truncated: String = trimmed.chars().take(253).collect();
+        format!("{}...", truncated)
     }
 }
 

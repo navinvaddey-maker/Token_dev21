@@ -1,13 +1,40 @@
+use axum::http::{header, HeaderValue, Method};
+use axum::middleware;
 use dashmap::DashMap;
 use dotenvy::dotenv;
-use learning_engine::LearningEngine;
+use learning_engine::TenantLearningPool;
 use std::env;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use token_compress_engine::pipeline::orchestrator::PipelineOrchestrator;
 use token_compress_engine::AppState;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+fn build_cors_layer() -> CorsLayer {
+    let allowed: Vec<HeaderValue> = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:8081,http://127.0.0.1:8081".to_string())
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "*")
+        .filter_map(|s| HeaderValue::from_str(s).ok())
+        .collect();
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(allowed))
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+}
+
+use token_compress_engine::api::security_headers_middleware;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -18,7 +45,11 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer().json())
         .init();
 
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    // ARCH: §0 Security — Fail fast on missing or weak JWT_SECRET before binding any socket.
+    token_compress_engine::domain::validate_security_env().map_err(anyhow::Error::msg)?;
+
+    let db_url = env::var("DATABASE_URL")
+        .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set"))?;
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .min_connections(5)
         .max_connections(20)
@@ -61,19 +92,16 @@ async fn main() -> anyhow::Result<()> {
         tracing::error!("Failed to seed scenario archetypes: {:?}", e);
     }
 
-    let engine = Arc::new(Mutex::new(LearningEngine::new(pool.clone())));
+    let learning_pool = Arc::new(TenantLearningPool::new(pool.clone(), 4096));
 
     // Load NPAE unified config once at startup for high-performance memory access
     let npae_config_data =
         token_compress_engine::npae::aggressive::config::ConfigLoader::load("config/unified.json")
-            .unwrap_or_else(|e| panic!("Failed to load unified config: {}", e));
+            .map_err(|e| anyhow::anyhow!("Failed to load unified config: {e}"))?;
     let npae_config = Arc::new(
         token_compress_engine::npae::aggressive::config::ConfigHandle::new(npae_config_data),
     );
 
-    // Build the 7-stage pipeline orchestrator with shared schema priors.
-    // The DashMap is shared across all requests — enables cross-request schema learning
-    // (prediction error drops 20–35% over 10 turns on familiar topics).
     let schema_priors: Arc<DashMap<String, u32>> = Arc::new(DashMap::new());
     let pipeline = Arc::new(PipelineOrchestrator::build_with_pool(
         schema_priors,
@@ -103,12 +131,9 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Spawn ConfigEnricher background task
+    // Spawn ConfigEnricher background task (HumanGate by default)
     let enricher_config_handle = npae_config.clone();
     tokio::task::spawn_blocking(move || {
-        // ARCH: ARCHITECTURE.md §6.6 & SL-4 — Default to `ReviewMode::HumanGate` so
-        // `config/unified.json` is never silently mutated in production unless `NPAE_AUTO_MERGE` is enabled.
-        // FIX: G-02 / SL-4 — Gate `ReviewMode::AutoMerge` behind `NPAE_AUTO_MERGE=true|1`.
         let auto_merge = std::env::var("NPAE_AUTO_MERGE")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false);
@@ -140,11 +165,11 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Spawn Ory Pattern Memory background persistence task (GAP-N02)
+    // Spawn Ory Pattern Memory background persistence task
     let ory_persistence_engine = ory_engine.clone();
     let ory_persistence_pool = pool.clone();
     tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // every 5 mins
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
         loop {
             interval.tick().await;
             let mut engine = ory_persistence_engine.lock().await;
@@ -167,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
         token_compress_engine::scenario::ScenarioDomainRegistry::load_from_file(
             "config/scenario/domains.json",
         )
-        .unwrap_or_else(|e| panic!("Failed to load Scenario Domain Registry: {}", e)),
+        .map_err(|e| anyhow::anyhow!("Failed to load Scenario Domain Registry: {e}"))?,
     );
 
     let style_registry = Arc::new(
@@ -175,14 +200,14 @@ async fn main() -> anyhow::Result<()> {
             "config/scenario/styles.json",
             "prompts/styles",
         )
-        .unwrap_or_else(|e| panic!("Failed to load Scenario Style Registry: {}", e)),
+        .map_err(|e| anyhow::anyhow!("Failed to load Scenario Style Registry: {e}"))?,
     );
 
     let egress_guard = Arc::new(
         token_compress_engine::scenario::ScenarioEgressGuard::load_from_file(
             "config/scenario/egress.json",
         )
-        .unwrap_or_else(|e| panic!("Failed to load Egress Guard Config: {}", e)),
+        .map_err(|e| anyhow::anyhow!("Failed to load Egress Guard Config: {e}"))?,
     );
 
     let scenario_router = Arc::new(token_compress_engine::scenario::ScenarioModeRouter::new(
@@ -192,9 +217,35 @@ async fn main() -> anyhow::Result<()> {
         "prompts/styles".to_string(),
     ));
 
+    // Optional explicit bootstrap admin provisioning (only when zero admins exist and strong password is provided).
+    if let (Ok(admin_user), Ok(admin_pass)) = (
+        env::var("BOOTSTRAP_ADMIN_USERNAME"),
+        env::var("BOOTSTRAP_ADMIN_PASSWORD"),
+    ) {
+        let admin_count = token_compress_engine::data::Repository::count_admins(&pool).await?;
+        if admin_count == 0 && admin_pass.len() >= 16 && admin_user.trim().len() >= 3 {
+            let pw_hash = bcrypt::hash(&admin_pass, bcrypt::DEFAULT_COST)
+                .map_err(|e| anyhow::anyhow!("Admin bootstrap bcrypt failed: {e}"))?;
+            let id = uuid::Uuid::new_v4().to_string();
+            let email = format!("{}@admin.local", admin_user.trim());
+            token_compress_engine::data::Repository::create_user_scoped(
+                &pool,
+                &id,
+                admin_user.trim(),
+                &pw_hash,
+                &email,
+                "Business",
+                "admin",
+                "default",
+            )
+            .await?;
+            tracing::info!("Bootstrapped initial admin user via explicit env vars");
+        }
+    }
+
     let state = AppState {
         pool: pool.clone(),
-        engine,
+        learning_pool,
         pipeline,
         npae_config,
         ory_engine: ory_engine.clone(),
@@ -202,88 +253,41 @@ async fn main() -> anyhow::Result<()> {
         sessions,
         embedding_engine,
         scenario_router,
+        pdf_ingest_sem: Arc::new(Semaphore::new(8)),
+        aggressive_sem: Arc::new(Semaphore::new(32)),
+        compress_sem: Arc::new(Semaphore::new(64)),
     };
 
     let api_router = token_compress_engine::api::router(state);
 
-    // Seed admin user if not exists, or update business_type to admin if exists
-    match token_compress_engine::data::Repository::find_user_by_username(&pool, "navin").await {
-        Ok(None) => {
-            tracing::info!("Seeding admin user: navin");
-            let admin_password = env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
-                tracing::warn!("⚠️  ADMIN_PASSWORD not set — using generated fallback. Set ADMIN_PASSWORD env var for production!");
-                format!("admin_fallback_{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("0000"))
-            });
-            let req = token_compress_engine::models::user::RegisterRequest {
-                username: "navin".to_string(),
-                password: admin_password,
-                email: "navin@token-optimizer.local".to_string(),
-                business_type: Some("admin".to_string()),
-            };
-            if let Err(e) = token_compress_engine::domain::register_user(&pool, req).await {
-                tracing::error!("Failed to seed admin user: {:?}", e);
-            } else {
-                tracing::info!("Admin user seeded successfully.");
-            }
-        }
-        Ok(Some(user)) => {
-            if let Ok(admin_password) = env::var("ADMIN_PASSWORD") {
-                tracing::info!("ADMIN_PASSWORD is set, updating admin user 'navin' password");
-                let pw_hash = bcrypt::hash(&admin_password, bcrypt::DEFAULT_COST).unwrap();
-                if let Err(e) = token_compress_engine::data::Repository::update_user_password(
-                    &pool, &user.id, &pw_hash,
-                )
-                .await
-                {
-                    tracing::error!("Failed to update password for user 'navin': {:?}", e);
-                } else {
-                    tracing::info!("Updated password for user 'navin'.");
-                }
-            }
-
-            if user.business_type.to_lowercase() != "admin" {
-                tracing::info!("Updating existing user 'navin' to have business_type 'admin'");
-                if let Err(e) = token_compress_engine::data::Repository::update_user_business_type(
-                    &pool, &user.id, "admin",
-                )
-                .await
-                {
-                    tracing::error!("Failed to update business_type for user 'navin': {:?}", e);
-                } else {
-                    tracing::info!("Updated business_type for user 'navin' to admin.");
-                }
-            } else {
-                tracing::info!("Admin user 'navin' already exists with correct business_type.");
-            }
-        }
-        Err(e) => {
-            tracing::error!("Failed to check for admin user: {:?}", e);
-        }
-    }
-
-    // Serve static files from the `static/` directory
-    let app = api_router.nest_service("/", ServeDir::new("static"));
+    let app = api_router
+        .nest_service("/", ServeDir::new("static"))
+        .layer(build_cors_layer())
+        .layer(middleware::from_fn(security_headers_middleware));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8081").await?;
     tracing::info!("TokenCompress Engine listening on 0.0.0.0:8081");
 
-    // Graceful shutdown with Ory memory persistence
     let final_ory_engine = ory_engine.clone();
     let final_ory_pool = pool.clone();
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            tokio::signal::ctrl_c()
-                .await
-                .expect("failed to install CTRL+C handler");
-            tracing::info!("Shutdown signal received. Persisting Ory memory...");
-            let mut engine = final_ory_engine.lock().await;
-            if let Err(e) = engine.save_to_db(&final_ory_pool).await {
-                tracing::error!("Final Ory persistence failed: {:?}", e);
-            } else {
-                tracing::info!("Ory memory safely persisted. Goodbye!");
-            }
-        })
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            tracing::error!("Failed to install CTRL+C handler: {:?}", e);
+            return;
+        }
+        tracing::info!("Shutdown signal received. Persisting Ory memory...");
+        let mut engine = final_ory_engine.lock().await;
+        if let Err(e) = engine.save_to_db(&final_ory_pool).await {
+            tracing::error!("Final Ory persistence failed: {:?}", e);
+        } else {
+            tracing::info!("Ory memory safely persisted. Goodbye!");
+        }
+    })
+    .await?;
     Ok(())
 }

@@ -47,8 +47,13 @@ impl<'a> ScenarioClassifier<'a> {
             });
         }
 
-        // Step 1: Vectorize the raw query.
-        let query_vec = self.engine.embed(raw_query);
+        // Step 1: Vectorize the raw query on a worker thread to avoid blocking Tokio.
+        // ARCH: §6 Rust Rules & Workstream 3 — CPU-bound embedding computation offloaded to spawn_blocking.
+        let engine = *self.engine;
+        let q = raw_query.to_string();
+        let query_vec = tokio::task::spawn_blocking(move || engine.embed(&q))
+            .await
+            .ok()?;
 
         // Step 2: Load all seeded archetypes from the scenario_index table.
         let rows = self

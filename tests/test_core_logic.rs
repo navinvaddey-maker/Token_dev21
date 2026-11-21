@@ -19,6 +19,10 @@ async fn test_password_hashing() {
 
 #[tokio::test]
 async fn test_jwt_token_operations() {
+    std::env::set_var(
+        "JWT_SECRET",
+        "test_jwt_secret_key_with_minimum_32_bytes_entropy",
+    );
     // Test JWT creation and verification
     let user_id = Uuid::new_v4().to_string();
 

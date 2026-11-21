@@ -1,43 +1,185 @@
-use crate::{
-    domain,
-    errors::AppError,
-    models::user::{LoginRequest, RegisterRequest},
-    AppState,
-};
-use axum::error_handling::HandleErrorLayer;
+//! HTTP API Router, Authentication/RBAC Middleware, Rate Limiting & Validation Boundaries.
+//!
+//! ARCH: ARCHITECTURE.md §2 Full Component Map (`User → API (Axum) → Auth+RateLimit → Domain`).
+
+use std::{net::SocketAddr, sync::Arc, time::Instant};
+
 use axum::{
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
+    http::{HeaderMap, StatusCode},
     middleware,
     response::IntoResponse,
-    routing::{get, post, put},
-    Json, Router,
+    routing::{delete, get, post, put},
+    Extension, Json, Router,
 };
-use tower::ServiceBuilder;
+use dashmap::DashMap;
 
+use crate::{
+    domain::{self, AuthContext},
+    errors::AppError,
+    models::user::{LoginRequest, RegisterRequest},
+    npae::schema::types::{AggressiveRequest, HallucinationCheckRequest},
+    AppState,
+};
+
+const MAX_PROMPT_BYTES: usize = 64 * 1024;
+const MAX_PROMPT_WORDS: usize = 8_000;
+const MAX_PDF_UPLOAD_BYTES: usize = 50 * 1024 * 1024;
+const MAX_LOCAL_CHUNKS: usize = 10;
+const MAX_LOCAL_CHUNK_BYTES: usize = 8 * 1024;
+const REQUEST_TIMEOUT_SECS: u64 = 15;
+const MAX_RATE_BUCKETS: usize = 50_000;
+
+/// In-memory per-key token-bucket rate limiter (`DashMap`-backed, bounded capacity).
+#[derive(Clone, Debug)]
+struct TokenBucket {
+    tokens: f64,
+    last_refill: Instant,
+}
+
+#[derive(Clone, Debug)]
+struct RateLimiter {
+    buckets: Arc<DashMap<String, TokenBucket>>,
+    capacity: f64,
+    refill_per_sec: f64,
+}
+
+impl RateLimiter {
+    fn new(capacity: f64, refill_per_sec: f64) -> Self {
+        Self {
+            buckets: Arc::new(DashMap::new()),
+            capacity,
+            refill_per_sec,
+        }
+    }
+
+    fn check(&self, key: &str) -> Result<(), AppError> {
+        let now = Instant::now();
+        if !self.buckets.contains_key(key) && self.buckets.len() >= MAX_RATE_BUCKETS {
+            // Prune oldest/idle buckets first to bound memory at 1M-user scale.
+            self.buckets
+                .retain(|_, b| now.duration_since(b.last_refill).as_secs() < 300);
+            if self.buckets.len() >= MAX_RATE_BUCKETS {
+                let oldest_key = self
+                    .buckets
+                    .iter()
+                    .min_by_key(|entry| entry.value().last_refill)
+                    .map(|entry| entry.key().clone());
+                if let Some(evict_key) = oldest_key {
+                    self.buckets.remove(&evict_key);
+                }
+            }
+        }
+
+        let mut entry = self
+            .buckets
+            .entry(key.to_string())
+            .or_insert_with(|| TokenBucket {
+                tokens: self.capacity,
+                last_refill: now,
+            });
+
+        let elapsed = now.duration_since(entry.last_refill).as_secs_f64();
+        entry.tokens = (entry.tokens + elapsed * self.refill_per_sec).min(self.capacity);
+        entry.last_refill = now;
+
+        if entry.tokens >= 1.0 {
+            entry.tokens -= 1.0;
+            Ok(())
+        } else {
+            Err(AppError::TooManyRequests(
+                "Rate limit exceeded; please retry shortly".into(),
+            ))
+        }
+    }
+}
+
+static TRUSTED_PROXIES: std::sync::OnceLock<Vec<std::net::IpAddr>> = std::sync::OnceLock::new();
+
+fn get_trusted_proxies() -> &'static [std::net::IpAddr] {
+    TRUSTED_PROXIES.get_or_init(|| {
+        std::env::var("TRUSTED_PROXIES")
+            .ok()
+            .map(|s| {
+                s.split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .filter_map(|s| s.parse::<std::net::IpAddr>().ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
+}
+
+fn extract_client_ip(headers: &HeaderMap, req_exts: &axum::http::Extensions) -> String {
+    let peer_ip = req_exts
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ConnectInfo(addr)| addr.ip());
+
+    if let Some(peer_ip) = peer_ip {
+        let trusted = get_trusted_proxies();
+        if trusted.contains(&peer_ip) {
+            if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+                if let Some(first) = xff
+                    .split(',')
+                    .next()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
+                    return first.to_string();
+                }
+            }
+            if let Some(xri) = headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                return xri.to_string();
+            }
+        }
+        return peer_ip.to_string();
+    }
+
+    "unknown".to_string()
+}
+
+fn validate_prompt_bounds(text: &str) -> Result<(), AppError> {
+    if text.trim().is_empty() {
+        return Err(AppError::EmptyInput);
+    }
+    if text.len() > MAX_PROMPT_BYTES || text.split_whitespace().count() > MAX_PROMPT_WORDS {
+        return Err(AppError::InputTooLarge);
+    }
+    Ok(())
+}
+
+/// Builds the Axum HTTP router with per-IP auth limits, per-tenant API limits, body caps, and RBAC.
 pub fn router(state: AppState) -> Router {
+    let auth_limiter = RateLimiter::new(15.0, 0.5);
+    let user_limiter = RateLimiter::new(30.0, 2.0);
+
     let auth = Router::new()
         .route("/api/register", post(register))
         .route("/api/login", post(login))
-        // Limit to 5 requests per second for auth routes to prevent brute force
-        // HandleErrorLayer + Buffer are required to make RateLimit cloneable for Axum
-        .layer(
-            ServiceBuilder::new()
-                .layer(HandleErrorLayer::new(|err: tower::BoxError| async move {
-                    (
-                        StatusCode::TOO_MANY_REQUESTS,
-                        format!("Rate limit exceeded: {}", err),
-                    )
-                }))
-                .buffer(100)
-                .rate_limit(5, std::time::Duration::from_secs(1)),
-        );
+        .layer(middleware::from_fn_with_state(
+            auth_limiter,
+            auth_rate_limit_middleware,
+        ));
 
     let public = Router::new()
         .route("/api/health", get(health_check))
         .route("/api/rag/health", get(rag_health))
         .route("/api/scenario/registry", get(scenario_get_registry))
+        .route("/api/v1/schema", get(npae_schema))
+        .route("/api/v1/health", get(npae_health))
         .merge(auth);
+
+    let rag_upload_route = Router::new()
+        .route("/api/rag/upload", post(rag_upload))
+        .layer(DefaultBodyLimit::max(
+            MAX_PDF_UPLOAD_BYTES + 2 * 1024 * 1024,
+        ));
 
     let protected = Router::new()
         .route("/api/compress", post(compress))
@@ -47,16 +189,33 @@ pub fn router(state: AppState) -> Router {
         .route("/api/dev/config", get(dev_config))
         .route("/api/stats", get(stats))
         .route("/api/scenario/ask", post(scenario_ask))
-        .route("/api/rag/upload", post(rag_upload))
         .route("/api/rag/documents", get(rag_list_documents))
         .route(
             "/api/rag/documents/:id",
             get(rag_get_document).delete(rag_delete_document),
         )
         .route("/api/rag/search", get(rag_search))
+        .route("/api/v1/compress", post(npae_compress))
+        .route("/api/v1/aggressive", post(npae_aggressive))
+        .route("/api/npae/verify", post(npae_verify_grounding))
+        .route(
+            "/api/v1/hallucination-check",
+            post(npae_hallucination_check),
+        )
+        .merge(rag_upload_route)
+        .layer(middleware::from_fn_with_state(
+            user_limiter.clone(),
+            user_rate_limit_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
+        ));
+
+    let admin_rag_upload_route = Router::new()
+        .route("/api/admin/rag/upload", post(admin_rag_upload))
+        .layer(DefaultBodyLimit::max(
+            MAX_PDF_UPLOAD_BYTES + 2 * 1024 * 1024,
         ));
 
     let admin = Router::new()
@@ -88,38 +247,132 @@ pub fn router(state: AppState) -> Router {
             get(admin_get_feedback_analysis),
         )
         .route("/api/admin/error-metrics", get(admin_get_error_metrics))
-        .route("/api/admin/rag/upload", post(admin_rag_upload))
         .route("/api/admin/rag/documents", get(admin_rag_list_documents))
         .route(
             "/api/admin/rag/documents/:id",
-            axum::routing::delete(admin_rag_delete_document),
+            delete(admin_rag_delete_document),
         )
+        .merge(admin_rag_upload_route)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             admin_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            user_limiter,
+            user_rate_limit_middleware,
         ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
         ));
 
-    let npae_routes = Router::new()
-        .route("/api/v1/compress", post(npae_compress))
-        .route("/api/v1/aggressive", post(npae_aggressive))
-        .route("/api/npae/verify", post(npae_verify_grounding))
-        .route(
-            "/api/v1/hallucination-check",
-            post(npae_hallucination_check),
-        )
-        .route("/api/v1/schema", get(npae_schema))
-        .route("/api/v1/health", get(npae_health));
-
     Router::new()
         .merge(public)
         .merge(protected)
         .merge(admin)
-        .merge(npae_routes)
+        .layer(middleware::from_fn(global_timeout_middleware))
+        .layer(DefaultBodyLimit::max(256 * 1024))
         .with_state(state)
+}
+
+async fn global_timeout_middleware(
+    req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> Result<axum::response::Response, AppError> {
+    tokio::time::timeout(std::time::Duration::from_secs(60), next.run(req))
+        .await
+        .map_err(|_| AppError::Timeout("Request timed out".into()))
+}
+
+/// Injects standard defense-in-depth HTTP security headers into all responses.
+pub async fn security_headers_middleware(
+    req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> axum::response::Response {
+    use axum::http::{header, HeaderValue};
+    let mut resp = next.run(req).await;
+    let headers = resp.headers_mut();
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:49152; frame-ancestors 'none'; object-src 'none'",
+        ),
+    );
+    resp
+}
+
+// ── Rate-Limit & Auth Middlewares ──────────────────────────────────────────
+
+async fn auth_rate_limit_middleware(
+    State(limiter): State<RateLimiter>,
+    req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> Result<axum::response::Response, AppError> {
+    let ip = extract_client_ip(req.headers(), req.extensions());
+    limiter.check(&format!("auth:{ip}"))?;
+    Ok(next.run(req).await)
+}
+
+async fn user_rate_limit_middleware(
+    State(limiter): State<RateLimiter>,
+    Extension(auth): Extension<AuthContext>,
+    req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> Result<axum::response::Response, AppError> {
+    limiter.check(&format!("user:{}:{}", auth.tenant_id, auth.user_id))?;
+    Ok(next.run(req).await)
+}
+
+async fn admin_middleware(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+    req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> Result<axum::response::Response, AppError> {
+    if !auth.role.eq_ignore_ascii_case("admin") {
+        return Err(AppError::Unauthorized);
+    }
+    let is_admin = domain::is_admin(&state.pool, &auth.user_id).await?;
+    if !is_admin {
+        return Err(AppError::Unauthorized);
+    }
+    Ok(next.run(req).await)
+}
+
+async fn auth_middleware(
+    State(state): State<AppState>,
+    mut req: axum::http::Request<axum::body::Body>,
+    next: middleware::Next,
+) -> Result<axum::response::Response, AppError> {
+    let token = req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(AppError::Unauthorized)?;
+
+    let mut auth_ctx = domain::verify_jwt_claims(token)?;
+
+    let user = crate::data::Repository::find_user_by_id(&state.pool, &auth_ctx.user_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::Unauthorized)?;
+
+    // Authoritative DB check ensures revoked/demoted accounts or stale claims cannot escalate.
+    auth_ctx.role = user.role;
+    auth_ctx.tenant_id = user.tenant_id;
+
+    req.extensions_mut().insert(auth_ctx);
+    Ok(next.run(req).await)
 }
 
 // ── Auth endpoints ─────────────────────────────────────────────────────────
@@ -128,7 +381,6 @@ async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    // Input validation (GAP-029)
     if req.username.len() < 3 || req.username.len() > 50 {
         return Err(AppError::Validation(
             "Username must be 3-50 characters".into(),
@@ -184,11 +436,9 @@ async fn health_check() -> Result<axum::response::Response, AppError> {
 pub struct CompressRequest {
     pub raw_text: String,
     pub task: Option<String>,
-
     pub use_case: Option<String>,
     pub mode: Option<String>,
     pub max_tokens: Option<usize>,
-    // When enabled, the response will include extra SQLx/engine diagnostics.
     pub verbose: Option<bool>,
     pub rag_enabled: Option<bool>,
     pub rag_document_ids: Option<Vec<String>>,
@@ -202,21 +452,48 @@ pub struct CompressRequest {
 
 async fn compress(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Json(req): Json<CompressRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    // Process universally through domain::compress_new, which uses PipelineOrchestrator
-    // The mode differentiation is now strictly handled by PipelineOrchestrator::process
-    let resp = domain::compress_new(&state, &user_id, req).await?;
+    validate_prompt_bounds(&req.raw_text)?;
+
+    let is_aggressive = req
+        .mode
+        .as_deref()
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"));
+    let _permit = if is_aggressive {
+        Some(
+            state
+                .aggressive_sem
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| {
+                    AppError::TooManyRequests(
+                        "Deep Blueprint capacity reached; please retry shortly".into(),
+                    )
+                })?,
+        )
+    } else {
+        None
+    };
+
+    let resp = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        domain::compress_new_scoped(&state, &auth.user_id, &auth.tenant_id, req),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Compression request timed out".into()))??;
+
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
 
 async fn decompress(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
-    let record = domain::get_history_record(&state.pool, &user_id, &id).await?;
+    let record =
+        domain::get_history_record_scoped(&state.pool, &auth.user_id, &auth.tenant_id, &id).await?;
     Ok((
         StatusCode::OK,
         Json(serde_json::json!({ "original_prompt": record.original_prompt })),
@@ -232,21 +509,23 @@ struct PaginationParams {
 
 async fn history(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
     let limit = params.limit.unwrap_or(50).clamp(1, 100);
     let offset = params.offset.unwrap_or(0).max(0);
-    let records = domain::list_history(&state.pool, &user_id, limit, offset).await?;
+    let records =
+        domain::list_history_scoped(&state.pool, &auth.user_id, &auth.tenant_id, limit, offset)
+            .await?;
     Ok((StatusCode::OK, Json(records)).into_response())
 }
 
 async fn feedback(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Json(req): Json<crate::models::feedback_signal::ExplicitFeedback>,
 ) -> Result<axum::response::Response, AppError> {
-    domain::record_explicit_feedback(&state, &user_id, req).await?;
+    domain::record_explicit_feedback_scoped(&state, &auth.user_id, &auth.tenant_id, req).await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
@@ -257,26 +536,30 @@ async fn dev_config(State(state): State<AppState>) -> Result<axum::response::Res
 
 async fn stats(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let s = domain::get_stats(&state.pool, &user_id).await?;
+    let s = domain::get_stats_scoped(&state.pool, &auth.user_id, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(s)).into_response())
 }
 
 // ── Admin endpoints ────────────────────────────────────────────────────────
 
-async fn admin_stats(State(state): State<AppState>) -> Result<axum::response::Response, AppError> {
-    let s = domain::admin_get_stats(&state.pool).await?;
+async fn admin_stats(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<axum::response::Response, AppError> {
+    let s = domain::admin_get_stats(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(s)).into_response())
 }
 
 async fn admin_users(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
     let limit = params.limit.unwrap_or(50).clamp(1, 100);
     let offset = params.offset.unwrap_or(0).max(0);
-    let users = domain::admin_list_users(&state.pool, limit, offset).await?;
+    let users = domain::admin_list_users(&state.pool, &auth.tenant_id, limit, offset).await?;
     Ok((StatusCode::OK, Json(users)).into_response())
 }
 
@@ -287,44 +570,47 @@ struct AdminUpdateUserRequest {
 
 async fn admin_update_user(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
     Json(req): Json<AdminUpdateUserRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    domain::admin_update_user(&state.pool, &id, &req.business_type).await?;
+    domain::admin_update_user(&state.pool, &auth.tenant_id, &id, &req.business_type).await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 async fn admin_delete_user(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
-    domain::admin_delete_user(&state.pool, &id).await?;
+    domain::admin_delete_user(&state.pool, &auth.tenant_id, &id).await?;
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 async fn admin_history(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
     let limit = params.limit.unwrap_or(50).clamp(1, 100);
     let offset = params.offset.unwrap_or(0).max(0);
-    let records = domain::admin_list_history(&state.pool, limit, offset).await?;
+    let records = domain::admin_list_history(&state.pool, &auth.tenant_id, limit, offset).await?;
     Ok((StatusCode::OK, Json(records)).into_response())
 }
 
-// ── Admin Monitoring Endpoints ────────────────────────────────────────────────
-
 async fn admin_get_system_performance(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_system_performance(&state.pool).await?;
+    let stats = domain::admin_get_system_performance(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
 async fn admin_get_learning_engine_stats(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_learning_engine_stats(&state.pool).await?;
+    let stats = domain::admin_get_learning_engine_stats(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
@@ -335,163 +621,167 @@ struct CompressionAnalyticsParams {
 
 async fn admin_get_compression_analytics(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<CompressionAnalyticsParams>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_compression_analytics(&state.pool, params.time_window).await?;
+    let stats =
+        domain::admin_get_compression_analytics(&state.pool, &auth.tenant_id, params.time_window)
+            .await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
 async fn admin_get_user_engagement_stats(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_user_engagement_stats(&state.pool).await?;
+    let stats = domain::admin_get_user_engagement_stats(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
 async fn admin_get_feedback_analysis(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_feedback_analysis(&state.pool).await?;
+    let stats = domain::admin_get_feedback_analysis(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
 async fn admin_get_error_metrics(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
 ) -> Result<axum::response::Response, AppError> {
-    let stats = domain::admin_get_error_metrics(&state.pool).await?;
+    let stats = domain::admin_get_error_metrics(&state.pool, &auth.tenant_id).await?;
     Ok((StatusCode::OK, Json(stats)).into_response())
 }
 
-// ── JWT and Admin middleware ───────────────────────────────────────────────
-
-async fn admin_middleware(
-    State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
-    req: axum::http::Request<axum::body::Body>,
-    next: middleware::Next,
-) -> Result<axum::response::Response, AppError> {
-    let is_admin = domain::is_admin(&state.pool, &user_id).await?;
-    if !is_admin {
-        return Err(AppError::Unauthorized);
-    }
-    Ok(next.run(req).await)
-}
-
-async fn auth_middleware(
-    State(state): State<AppState>,
-    mut req: axum::http::Request<axum::body::Body>,
-    next: middleware::Next,
-) -> Result<axum::response::Response, AppError> {
-    let token = req
-        .headers()
-        .get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .ok_or(AppError::Unauthorized)?;
-
-    let user_id = crate::domain::verify_jwt(token)?;
-
-    let user_exists = crate::data::Repository::find_user_by_id(&state.pool, &user_id)
-        .await
-        .map_err(|_| AppError::Internal("Database error".into()))?
-        .is_some();
-
-    if !user_exists {
-        return Err(AppError::Unauthorized);
-    }
-
-    req.extensions_mut().insert(user_id);
-    Ok(next.run(req).await)
-}
-
 // ── NPAE Handlers ─────────────────────────────────────────────────────────
-use crate::npae::schema::types::{AggressiveRequest, HallucinationCheckRequest};
 
 async fn npae_compress(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<AggressiveRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    let result = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    validate_prompt_bounds(&req.prompt)?;
+    let _permit = state
+        .compress_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests("Compression capacity reached; please retry shortly".into())
+        })?;
+    let prompt_owned = req.prompt.clone();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        tokio::task::spawn_blocking(move || {
+            crate::npae::compression::pipeline::run_parallel_pipeline(&prompt_owned)
+        }),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("NPAE compression timed out".into()))?
+    .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+    .map_err(AppError::Engine)?;
+
     Ok((StatusCode::OK, Json(result)).into_response())
 }
 
 /// Executes Aggressive Mode compression and structuring via `POST /api/v1/aggressive`.
 ///
 /// # Errors
-/// Returns [`AppError::Internal`] if compression or `AggressiveEngine::run` fails.
-///
-/// # Panics
-/// Never.
+/// Returns [`AppError`] on validation, concurrency limit, timeout, or engine error.
 async fn npae_aggressive(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Json(req): Json<AggressiveRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    let empty_cfg = crate::npae::schema::types::NpaeConfig::default();
-    let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
+    validate_prompt_bounds(&req.prompt)?;
 
-    let mut enrichment = crate::types::EnrichmentContext::default();
-    if req.rag_enabled.unwrap_or(false) {
-        let history_id = uuid::Uuid::new_v4().to_string();
-        // ARCH: ARCHITECTURE.md §7.2 — Raise Aggressive RAG similarity gate to 0.45 to filter low-relevance noise.
-        // FIX: G-04 — Raised `min_similarity` from 0.25 to 0.45 in `/api/v1/aggressive`.
-        let query = crate::rag::types::RetrievalQuery {
-            query_text: req.prompt.clone(),
-            user_id: "default_user".to_string(),
-            document_ids: req.rag_document_ids.clone(),
-            top_k: req.rag_top_k.unwrap_or(5),
-            min_similarity: 0.45,
-        };
-        let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
-        if let Ok(retrieved_chunks) = retriever.retrieve(&query, Some(&history_id)).await {
-            if !retrieved_chunks.is_empty() {
-                let chunks = retrieved_chunks
-                    .into_iter()
-                    .map(|res| crate::types::RagChunk {
-                        domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
-                        content: res.chunk.content,
-                        metadata: Some(crate::types::ChunkMetadata {
-                            page_number: res
-                                .chunk
-                                .metadata
-                                .as_ref()
-                                .and_then(|m| m.page_number)
-                                .map(|p| p as u32),
-                            source_file: res.document_filename,
-                        }),
-                    })
-                    .collect();
-                enrichment.rag_chunks = Some(chunks);
+    let _permit = state
+        .aggressive_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests(
+                "Deep Blueprint capacity reached; please retry shortly".into(),
+            )
+        })?;
+
+    let fut = async {
+        let empty_cfg = crate::npae::schema::types::NpaeConfig::default();
+        let cfg = req.config.as_ref().unwrap_or(&empty_cfg);
+
+        let mut enrichment = crate::types::EnrichmentContext::default();
+        if req.rag_enabled.unwrap_or(false) {
+            let history_id = uuid::Uuid::new_v4().to_string();
+            let query = crate::rag::types::RetrievalQuery {
+                query_text: req.prompt.clone(),
+                user_id: auth.user_id.clone(),
+                document_ids: req.rag_document_ids.clone(),
+                top_k: req.rag_top_k.unwrap_or(5).clamp(1, 20),
+                min_similarity: 0.45,
+            };
+            let retriever =
+                crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
+            if let Ok(retrieved_chunks) = retriever
+                .retrieve_scoped(&auth.tenant_id, &query, Some(&history_id))
+                .await
+            {
+                if !retrieved_chunks.is_empty() {
+                    let chunks = retrieved_chunks
+                        .into_iter()
+                        .map(|res| crate::types::RagChunk {
+                            domain_tag: res
+                                .document_domain
+                                .unwrap_or_else(|| "general".to_string()),
+                            content: res.chunk.content,
+                            metadata: Some(crate::types::ChunkMetadata {
+                                page_number: res
+                                    .chunk
+                                    .metadata
+                                    .as_ref()
+                                    .and_then(|m| m.page_number)
+                                    .map(|p| p as u32),
+                                source_file: res.document_filename,
+                            }),
+                        })
+                        .collect();
+                    enrichment.rag_chunks = Some(chunks);
+                }
             }
         }
-    }
 
-    let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&req.prompt)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+        let prompt_for_repr = req.prompt.clone();
+        let repr = tokio::task::spawn_blocking(move || {
+            crate::npae::compression::pipeline::run_parallel_pipeline(&prompt_for_repr)
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+        .map_err(AppError::Engine)?;
 
-    let structurer = crate::npae::aggressive::structurer::HttpStructurer {
-        route: "/api/v1/aggressive".to_string(),
-        remote_addr: "127.0.0.1".to_string(),
-        body: req.prompt.clone(),
+        let structurer = crate::npae::aggressive::structurer::HttpStructurer {
+            route: "/api/v1/aggressive".to_string(),
+            remote_addr: "authenticated".to_string(),
+            body: req.prompt.clone(),
+        };
+
+        let reconstructed = state.pipeline.reconstruct_input(&req.prompt);
+
+        crate::npae::aggressive::engine::AggressiveEngine::run(
+            &req.prompt,
+            &repr,
+            cfg,
+            state.npae_config.clone(),
+            state.ory_engine.clone(),
+            &structurer,
+            &reconstructed,
+            Some(&enrichment),
+        )
+        .await
+        .map_err(AppError::Engine)
     };
 
-    // ARCH: ARCHITECTURE.md §1.2 — Run Stage -1 `TokenReconstructor` so `constraint_locks` (`[STRICT]`)
-    // are enforced on `/api/v1/aggressive` identically to `/api/compress`.
-    // FIX: G-01 — Pass reconstructed input instead of `ReconstructedInput::default()`.
-    let reconstructed = state.pipeline.reconstruct_input(&req.prompt);
+    let resp = tokio::time::timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS), fut)
+        .await
+        .map_err(|_| AppError::Timeout("Aggressive compression timed out".into()))??;
 
-    let resp = crate::npae::aggressive::engine::AggressiveEngine::run(
-        &req.prompt,
-        &repr,
-        cfg,
-        state.npae_config.clone(),
-        state.ory_engine.clone(),
-        &structurer,
-        &reconstructed,
-        Some(&enrichment),
-    )
-    .await
-    .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
 
@@ -499,6 +789,7 @@ async fn npae_hallucination_check(
     State(_state): State<AppState>,
     Json(req): Json<HallucinationCheckRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    validate_prompt_bounds(&req.original_prompt)?;
     let default_cfg = crate::npae::schema::types::HallucinationGuardConfig {
         self_critique_enabled: true,
         confidence_threshold: 0.75,
@@ -509,14 +800,11 @@ async fn npae_hallucination_check(
     let cfg = req.guard_config.as_ref().unwrap_or(&default_cfg);
     let report =
         crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+            .map_err(AppError::Engine)?;
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 
 /// Verifies a downstream LLM response against numbered `[F#]` grounding facts (`GAP-42`).
-///
-/// # Errors
-/// Returns [`AppError::Validation`] if `llm_answer` is empty.
 async fn npae_verify_grounding(
     State(_state): State<AppState>,
     Json(req): Json<crate::npae::grounding::verifier::VerifyGroundingRequest>,
@@ -526,17 +814,7 @@ async fn npae_verify_grounding(
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 
-/// Returns the canonical NPAE 2.0.0 Draft 2020-12 JSON Schema contract (`GET /api/v1/schema`).
-///
-/// # Errors
-/// Never returns [`Err`].
-///
-/// # Panics
-/// Never.
 async fn npae_schema() -> Result<axum::response::Response, AppError> {
-    // ARCH: ARCHITECTURE.md §7.2 Layer 4 & G-08 — Expose strict Draft 2020-12 JSON Schema
-    // (`additionalProperties: false`) for downstream constrained decoding and verification.
-    // FIX: G-08 — Replaced schema endpoint stub with canonical NPAE 2.0.0 JSON Schema.
     let schema_json = serde_json::json!({
         "version": "2.0.0",
         "schema": {
@@ -551,10 +829,7 @@ async fn npae_schema() -> Result<axum::response::Response, AppError> {
                 "clarification_needed"
             ],
             "properties": {
-                "schema_version": {
-                    "type": "string",
-                    "const": "2.0.0"
-                },
+                "schema_version": { "type": "string", "const": "2.0.0" },
                 "status": {
                     "type": "string",
                     "enum": ["GROUNDED", "PARTIAL", "ABSTAIN", "CLARIFICATION_REQUIRED"]
@@ -574,25 +849,14 @@ async fn npae_schema() -> Result<axum::response::Response, AppError> {
                             "answer": { "type": "string" },
                             "cited_facts": {
                                 "type": "array",
-                                "items": {
-                                    "type": "string",
-                                    "pattern": "^F[0-9]+$"
-                                }
+                                "items": { "type": "string", "pattern": "^F[0-9]+$" }
                             }
                         }
                     }
                 },
-                "clarification_needed": {
-                    "type": "boolean"
-                },
-                "clarifying_questions": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                },
-                "unverified_claims": {
-                    "type": "array",
-                    "items": { "type": "string" }
-                }
+                "clarification_needed": { "type": "boolean" },
+                "clarifying_questions": { "type": "array", "items": { "type": "string" } },
+                "unverified_claims": { "type": "array", "items": { "type": "string" } }
             }
         }
     });
@@ -600,7 +864,6 @@ async fn npae_schema() -> Result<axum::response::Response, AppError> {
 }
 
 async fn npae_health() -> Result<axum::response::Response, AppError> {
-    // Phase 7.5
     let health_json = serde_json::json!({
         "status": "ok",
         "version": "npae-1.0.0",
@@ -610,6 +873,59 @@ async fn npae_health() -> Result<axum::response::Response, AppError> {
 }
 
 // ── RAG Handlers ─────────────────────────────────────────────────────────────
+
+async fn read_bounded_pdf_upload(
+    multipart: &mut axum::extract::Multipart,
+) -> Result<(String, String, Vec<u8>), AppError> {
+    let mut raw_filename = String::new();
+    let mut content_type: Option<String> = None;
+    let mut file_bytes: Vec<u8> = Vec::new();
+    let mut found_file = false;
+
+    while let Some(mut field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?
+    {
+        if field.name() == Some("file") {
+            found_file = true;
+            raw_filename = field.file_name().unwrap_or("document.pdf").to_string();
+            content_type = field.content_type().map(str::to_string);
+
+            // Stream chunks with incremental cap so oversized payloads abort before exhausting RAM.
+            while let Some(chunk) = field
+                .chunk()
+                .await
+                .map_err(|e| AppError::Validation(e.to_string()))?
+            {
+                if file_bytes.len().saturating_add(chunk.len()) > MAX_PDF_UPLOAD_BYTES {
+                    return Err(AppError::Validation(format!(
+                        "File exceeds maximum allowed size of {} bytes",
+                        MAX_PDF_UPLOAD_BYTES
+                    )));
+                }
+                file_bytes.extend_from_slice(&chunk);
+            }
+            break;
+        }
+    }
+
+    if !found_file || file_bytes.is_empty() {
+        return Err(AppError::Validation(
+            "No file uploaded or file is empty".into(),
+        ));
+    }
+
+    let sanitized_filename = crate::rag::ingest::validate_pdf_upload(
+        content_type.as_deref(),
+        &raw_filename,
+        &file_bytes,
+        MAX_PDF_UPLOAD_BYTES,
+    )
+    .map_err(AppError::Validation)?;
+
+    Ok((sanitized_filename, raw_filename, file_bytes))
+}
 
 async fn rag_health(State(state): State<AppState>) -> Result<axum::response::Response, AppError> {
     let db_healthy = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
@@ -626,51 +942,60 @@ async fn rag_health(State(state): State<AppState>) -> Result<axum::response::Res
 
 async fn rag_upload(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<axum::response::Response, AppError> {
-    let mut filename = "unknown.pdf".to_string();
-    let mut file_bytes = Vec::new();
+    let permit = state
+        .pdf_ingest_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests("PDF ingestion queue is busy; please retry shortly".into())
+        })?;
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::Validation(e.to_string()))?
-    {
-        let name = field.name().unwrap_or_default().to_string();
-        if name == "file" {
-            filename = field.file_name().unwrap_or("unknown.pdf").to_string();
-            file_bytes = field
-                .bytes()
-                .await
-                .map_err(|e| AppError::Validation(e.to_string()))?
-                .to_vec();
-            break;
-        }
-    }
+    let (sanitized_filename, _, file_bytes) = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        read_bounded_pdf_upload(&mut multipart),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Upload read timed out".into()))??;
 
-    if file_bytes.is_empty() {
-        return Err(AppError::Validation(
-            "No file uploaded or file is empty".into(),
-        ));
-    }
-
-    let ingester = crate::rag::ingest::DocumentIngester::new(state.pool.clone());
+    let ingester = crate::rag::ingest::DocumentIngester::with_config(
+        state.pool.clone(),
+        state.npae_config.clone(),
+    );
     let config = crate::rag::types::ChunkingConfig::default();
 
-    let user_id_clone = user_id.clone();
-    let filename_clone = filename.clone();
+    let user_id_clone = auth.user_id.clone();
+    let tenant_id_clone = auth.tenant_id.clone();
+    let filename_clone = sanitized_filename.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = ingester
-            .ingest_pdf(&user_id_clone, &filename_clone, &file_bytes, &config)
-            .await
-        {
-            tracing::error!(
-                "Background RAG PDF ingestion failed for user {}: {}",
-                user_id_clone,
-                e
-            );
+        let _permit = permit;
+        let ingest_fut = ingester.ingest_pdf_scoped(
+            &tenant_id_clone,
+            &user_id_clone,
+            &filename_clone,
+            &file_bytes,
+            &config,
+        );
+        match tokio::time::timeout(std::time::Duration::from_secs(65), ingest_fut).await {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
+                tracing::error!(
+                    tenant_id = %tenant_id_clone,
+                    user_id = %user_id_clone,
+                    error = %e,
+                    "Background RAG PDF ingestion failed"
+                );
+            }
+            Err(_) => {
+                tracing::error!(
+                    tenant_id = %tenant_id_clone,
+                    user_id = %user_id_clone,
+                    "Background RAG PDF ingestion timed out"
+                );
+            }
         }
     });
 
@@ -678,7 +1003,7 @@ async fn rag_upload(
         StatusCode::ACCEPTED,
         Json(serde_json::json!({
             "status": "processing",
-            "filename": filename,
+            "filename": sanitized_filename,
             "message": "File upload accepted. Processing started in the background."
         })),
     )
@@ -687,7 +1012,7 @@ async fn rag_upload(
 
 async fn rag_list_documents(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
     let limit = params.limit.unwrap_or(50).clamp(1, 100);
@@ -695,7 +1020,7 @@ async fn rag_list_documents(
 
     let docs = state
         .rag_store
-        .list_documents(&user_id, limit, offset)
+        .list_documents_scoped(&auth.tenant_id, &auth.user_id, limit, offset)
         .await
         .map_err(AppError::Database)?;
 
@@ -704,12 +1029,12 @@ async fn rag_list_documents(
 
 async fn rag_get_document(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
     let doc = state
         .rag_store
-        .get_document(&user_id, &id)
+        .get_document_scoped(&auth.tenant_id, &auth.user_id, &id)
         .await
         .map_err(AppError::Database)?
         .ok_or_else(|| AppError::NotFound("Document not found".into()))?;
@@ -732,12 +1057,12 @@ async fn rag_get_document(
 
 async fn rag_delete_document(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
     let deleted = state
         .rag_store
-        .delete_document(&user_id, &id)
+        .delete_document_scoped(&auth.tenant_id, &auth.user_id, &id)
         .await
         .map_err(AppError::Database)?;
 
@@ -759,9 +1084,11 @@ async fn rag_delete_document(
 
 async fn rag_search(
     State(state): State<AppState>,
-    axum::Extension(user_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<crate::rag::types::RagSearchQuery>,
 ) -> Result<axum::response::Response, AppError> {
+    validate_prompt_bounds(&params.query)?;
+
     let doc_ids: Option<Vec<String>> = params.document_ids.map(|s| {
         s.split(',')
             .map(|id| id.trim().to_string())
@@ -769,91 +1096,97 @@ async fn rag_search(
             .collect()
     });
 
-    let query_vector = crate::rag::embeddings::EmbeddingEngine::new().embed(&params.query);
+    let q_text = params.query.clone();
+    let query_vector = tokio::task::spawn_blocking(move || {
+        crate::rag::embeddings::EmbeddingEngine::new().embed(&q_text)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Embedding worker error: {e}")))?;
 
-    let results = state
-        .rag_store
-        .search(
+    let results = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        state.rag_store.search_scoped(
+            &auth.tenant_id,
             &query_vector,
-            &user_id,
+            &auth.user_id,
             doc_ids.as_deref(),
-            params.top_k.unwrap_or(5),
+            params.top_k.unwrap_or(5).clamp(1, 20),
             0.25,
-        )
-        .await
-        .map_err(AppError::Database)?;
+        ),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("RAG search timed out".into()))?
+    .map_err(AppError::Database)?;
 
     Ok((StatusCode::OK, Json(results)).into_response())
 }
 
 // ── Admin RAG Handlers ─────────────────────────────────────────────────────
 
-/// Query params for admin RAG upload — allows targeting a specific user's doc store.
 #[derive(serde::Deserialize)]
 struct AdminRagUploadParams {
-    /// Optional user_id to scope the document to. Defaults to the admin's own id.
     target_user_id: Option<String>,
 }
 
-/// POST /api/admin/rag/upload
-///
-/// Admin-only multipart upload. Ingests the PDF and associates it with
-/// `target_user_id` (query param) or the admin's own id if omitted.
 async fn admin_rag_upload(
     State(state): State<AppState>,
-    axum::Extension(admin_id): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<AdminRagUploadParams>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<axum::response::Response, AppError> {
-    // Determine which user the document belongs to
-    let owner_id = params.target_user_id.unwrap_or_else(|| admin_id.clone());
-
-    let mut filename = "unknown.pdf".to_string();
-    let mut file_bytes: Vec<u8> = Vec::new();
-
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::Validation(e.to_string()))?
-    {
-        let field_name = field.name().unwrap_or_default().to_string();
-        if field_name == "file" {
-            filename = field.file_name().unwrap_or("unknown.pdf").to_string();
-            file_bytes = field
-                .bytes()
-                .await
-                .map_err(|e| AppError::Validation(e.to_string()))?
-                .to_vec();
-            break;
+    let (owner_id, owner_tenant_id) = if let Some(target_id) = params.target_user_id {
+        let user = crate::data::Repository::find_user_by_id(&state.pool, &target_id)
+            .await
+            .map_err(AppError::Database)?
+            .ok_or_else(|| AppError::NotFound("Target user not found".into()))?;
+        if user.tenant_id != auth.tenant_id {
+            return Err(AppError::NotFound("Target user not found".into()));
         }
-    }
+        (user.id, user.tenant_id)
+    } else {
+        (auth.user_id.clone(), auth.tenant_id.clone())
+    };
 
-    if file_bytes.is_empty() {
-        return Err(AppError::Validation(
-            "No file field found or file is empty".into(),
-        ));
-    }
+    let permit = state
+        .pdf_ingest_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests("PDF ingestion queue is busy; please retry shortly".into())
+        })?;
 
-    if !filename.to_lowercase().ends_with(".pdf") {
-        return Err(AppError::Validation("Only PDF files are supported".into()));
-    }
+    let (sanitized_filename, _, file_bytes) = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        read_bounded_pdf_upload(&mut multipart),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Upload read timed out".into()))??;
 
-    let ingester = crate::rag::ingest::DocumentIngester::new(state.pool.clone());
+    let ingester = crate::rag::ingest::DocumentIngester::with_config(
+        state.pool.clone(),
+        state.npae_config.clone(),
+    );
     let config = crate::rag::types::ChunkingConfig::default();
 
     let owner_id_clone = owner_id.clone();
-    let filename_clone = filename.clone();
-    let admin_id_clone = admin_id.clone();
+    let owner_tenant_clone = owner_tenant_id.clone();
+    let filename_clone = sanitized_filename.clone();
+    let admin_id_clone = auth.user_id.clone();
 
-    // Run ingestion asynchronously — returns 202 immediately
     tokio::spawn(async move {
-        match ingester
-            .ingest_pdf(&owner_id_clone, &filename_clone, &file_bytes, &config)
-            .await
-        {
-            Ok(result) => {
+        let _permit = permit;
+        let ingest_fut = ingester.ingest_pdf_scoped(
+            &owner_tenant_clone,
+            &owner_id_clone,
+            &filename_clone,
+            &file_bytes,
+            &config,
+        );
+        match tokio::time::timeout(std::time::Duration::from_secs(65), ingest_fut).await {
+            Ok(Ok(result)) => {
                 tracing::info!(
                     admin_id = %admin_id_clone,
+                    tenant_id = %owner_tenant_clone,
                     owner_id = %owner_id_clone,
                     document_id = %result.document_id,
                     chunks = result.chunks_created,
@@ -861,12 +1194,21 @@ async fn admin_rag_upload(
                     "Admin RAG upload complete"
                 );
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 tracing::error!(
                     admin_id = %admin_id_clone,
+                    tenant_id = %owner_tenant_clone,
                     owner_id = %owner_id_clone,
                     error = %e,
                     "Admin RAG upload failed"
+                );
+            }
+            Err(_) => {
+                tracing::error!(
+                    admin_id = %admin_id_clone,
+                    tenant_id = %owner_tenant_clone,
+                    owner_id = %owner_id_clone,
+                    "Admin RAG upload timed out"
                 );
             }
         }
@@ -876,20 +1218,18 @@ async fn admin_rag_upload(
         StatusCode::ACCEPTED,
         Json(serde_json::json!({
             "status": "processing",
-            "filename": filename,
+            "filename": sanitized_filename,
             "owner_user_id": owner_id,
-            "uploaded_by": admin_id,
+            "uploaded_by": auth.user_id,
             "message": "PDF accepted. Text extraction and embedding running in the background."
         })),
     )
         .into_response())
 }
 
-/// GET /api/admin/rag/documents?limit=50&offset=0
-///
-/// List ALL documents across ALL users for admin oversight.
 async fn admin_rag_list_documents(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Query(params): Query<PaginationParams>,
 ) -> Result<axum::response::Response, AppError> {
     let limit = params.limit.unwrap_or(50).clamp(1, 200);
@@ -897,23 +1237,21 @@ async fn admin_rag_list_documents(
 
     let docs = state
         .rag_store
-        .list_all_documents(limit, offset)
+        .list_documents_by_tenant(&auth.tenant_id, limit, offset)
         .await
         .map_err(AppError::Database)?;
 
     Ok((StatusCode::OK, Json(docs)).into_response())
 }
 
-/// DELETE /api/admin/rag/documents/:id
-///
-/// Force-delete any document (ignores owner check).
 async fn admin_rag_delete_document(
     State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
     Path(id): Path<String>,
 ) -> Result<axum::response::Response, AppError> {
     let deleted = state
         .rag_store
-        .admin_delete_document(&id)
+        .admin_delete_document_scoped(&auth.tenant_id, &id)
         .await
         .map_err(AppError::Database)?;
 
@@ -948,7 +1286,6 @@ async fn scenario_get_registry(
         .into_response())
 }
 
-/// Request payload for `POST /api/scenario/ask`.
 #[derive(Debug, serde::Deserialize)]
 pub struct ScenarioAskRequest {
     pub app_mode: String,
@@ -957,19 +1294,52 @@ pub struct ScenarioAskRequest {
     pub geography: Option<String>,
     pub question: String,
     pub mode: Option<String>,
-    /// Exclusive Ask RAG data source: `"cloud"` (default) or `"own"` (local companion).
     #[serde(default)]
     pub data_source: Option<String>,
-    /// Pre-retrieved top-$k$ chunks from `127.0.0.1:49152/retrieve` when `data_source == "own"`.
     #[serde(default)]
     pub local_chunks: Option<Vec<crate::rag::local::LocalRetrievedChunk>>,
 }
 
 async fn scenario_ask(
     State(state): State<AppState>,
-    axum::Extension(user_id_str): axum::Extension<String>,
+    Extension(auth): Extension<AuthContext>,
     Json(req): Json<ScenarioAskRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    validate_prompt_bounds(&req.question)?;
+
+    let app_mode_lower = req.app_mode.trim().to_ascii_lowercase();
+    if app_mode_lower != "scenario" && app_mode_lower != "regular" {
+        return Err(AppError::Validation(format!(
+            "Invalid app_mode '{}'; expected 'scenario' or 'regular'",
+            req.app_mode
+        )));
+    }
+
+    if let Some(ref m) = req.mode {
+        let m_lower = m.trim().to_ascii_lowercase();
+        const ALLOWED_MODES: &[&str] = &["gentle", "balanced", "aggressive", "concise", "detailed"];
+        if !ALLOWED_MODES.contains(&m_lower.as_str()) {
+            return Err(AppError::Validation(format!(
+                "Invalid mode '{}'; expected one of: gentle, balanced, aggressive, concise, detailed",
+                m
+            )));
+        }
+    }
+
+    if let Some(ref g) = req.geography {
+        let g_trimmed = g.trim();
+        if g_trimmed.is_empty()
+            || g_trimmed.len() > 32
+            || !g_trimmed
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(AppError::Validation(
+                "Invalid geography identifier: must be non-empty, <= 32 chars, and contain only alphanumeric, '_', or '-'".into(),
+            ));
+        }
+    }
+
     let source_mode = req
         .data_source
         .as_deref()
@@ -987,21 +1357,32 @@ async fn scenario_ask(
             crate::scenario::ScenarioDataSource::Cloud
         }
         "own" => {
-            // ARCH: §2.1 — Own Data mode accepts only pre-retrieved top-k local chunks.
-            let mapped = req
-                .local_chunks
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|c| !c.content.trim().is_empty())
-                .map(|c| crate::types::RagChunk {
+            let raw_chunks = req.local_chunks.unwrap_or_default();
+            if raw_chunks.len() > MAX_LOCAL_CHUNKS {
+                return Err(AppError::Validation(format!(
+                    "local_chunks exceeds maximum of {MAX_LOCAL_CHUNKS} chunks"
+                )));
+            }
+            let mut mapped = Vec::with_capacity(raw_chunks.len());
+            for c in raw_chunks {
+                if c.content.len() > MAX_LOCAL_CHUNK_BYTES {
+                    return Err(AppError::Validation(format!(
+                        "local_chunk content exceeds maximum of {MAX_LOCAL_CHUNK_BYTES} bytes"
+                    )));
+                }
+                let trimmed = c.content.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                mapped.push(crate::types::RagChunk {
                     domain_tag: "local_own_data".to_string(),
-                    content: c.content,
+                    content: trimmed.to_string(),
                     metadata: Some(crate::types::ChunkMetadata {
                         page_number: Some(c.page_number),
-                        source_file: c.source_file,
+                        source_file: c.source_file.trim().to_string(),
                     }),
-                })
-                .collect();
+                });
+            }
             crate::scenario::ScenarioDataSource::Own {
                 local_chunks: mapped,
             }
@@ -1013,7 +1394,27 @@ async fn scenario_ask(
         }
     };
 
-    let user = crate::data::Repository::find_user_by_id(&state.pool, &user_id_str)
+    let _permit = if req
+        .mode
+        .as_deref()
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"))
+    {
+        Some(
+            state
+                .aggressive_sem
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| {
+                    AppError::TooManyRequests(
+                        "Deep Blueprint capacity reached; please retry shortly".into(),
+                    )
+                })?,
+        )
+    } else {
+        None
+    };
+
+    let user = crate::data::Repository::find_user_by_id(&state.pool, &auth.user_id)
         .await
         .map_err(AppError::Database)?;
     let business_type = user
@@ -1022,25 +1423,33 @@ async fn scenario_ask(
 
     let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
 
-    let resp = state
-        .scenario_router
-        .route_and_execute_with_source(
+    let resp = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        state.scenario_router.route_and_execute_with_tenant(
+            &auth.tenant_id,
             &req.app_mode,
             req.domain.as_deref(),
             req.style.as_deref(),
-            req.geography.as_deref(),
+            req.geography.as_deref().map(str::trim),
             &req.question,
-            &user_id_str,
+            &auth.user_id,
             &business_type,
             req.mode.as_deref(),
             &retriever,
             Some(&state.pipeline),
             scenario_source,
-        )
-        .await
-        .map_err(AppError::Engine)?;
+        ),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Scenario query timed out".into()))?
+    .map_err(|err_msg| {
+        if err_msg.starts_with("Validation Error:") {
+            AppError::Validation(err_msg)
+        } else {
+            AppError::Engine(err_msg)
+        }
+    })?;
 
-    // GAP-S05 Fix: Persist scenario execution into token_history for analytics and tracking
     let history_id = uuid::Uuid::new_v4().to_string();
     let original_tokens = crate::utils::tokens::estimate_tokens(&req.question) as i64;
     let final_tokens = crate::utils::tokens::estimate_tokens(&resp.output_text) as i64;
@@ -1049,16 +1458,16 @@ async fn scenario_ask(
         .domain
         .as_deref()
         .unwrap_or_else(|| req.style.as_deref().unwrap_or("scenario"));
-    let mode_str = req.mode.as_deref().unwrap_or_else(|| &req.app_mode);
+    let mode_str = req.mode.as_deref().unwrap_or(&req.app_mode);
     let warnings_json = serde_json::to_string(&resp.warnings).unwrap_or_else(|_| "[]".to_string());
 
-    // FIX: D4 — do not silently swallow DB write failure with `let _ =`; log and return typed database error
     sqlx::query(
-        "INSERT INTO token_history (id, user_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, warnings)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
+        "INSERT INTO token_history (id, user_id, tenant_id, original_prompt, optimized_prompt, tokens_saved, token_original, token_final, use_case, mode, engine_version, warnings)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"
     )
     .bind(&history_id)
-    .bind(&user_id_str)
+    .bind(&auth.user_id)
+    .bind(&auth.tenant_id)
     .bind(&req.question)
     .bind(&resp.output_text)
     .bind(saved_tokens)

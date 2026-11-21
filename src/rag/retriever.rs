@@ -19,26 +19,53 @@ impl DocumentRetriever {
         }
     }
 
-    /// Retrieve the top-K relevant chunks for a user query.
-    ///
-    /// 1. Embeds the user query text using the local EmbeddingEngine
-    /// 2. Performs a cosine-similarity search against candidate document chunks in SQLite
-    /// 3. Logs retrieval metrics (time, count, max score) for analytics
+    /// Retrieve the top-K relevant chunks for a user query under default tenant.
     pub async fn retrieve(
         &self,
         query: &RetrievalQuery,
         history_id: Option<&str>,
     ) -> Result<Vec<SearchResult>, String> {
-        self.retrieve_filtered(query, history_id, &|_: &SearchResult| true)
+        self.retrieve_scoped("default", query, history_id).await
+    }
+
+    /// Retrieve the top-K relevant chunks for a user query scoped to `tenant_id`.
+    ///
+    /// # Errors
+    /// Returns `Err` if embedding generation or database search fails.
+    pub async fn retrieve_scoped(
+        &self,
+        tenant_id: &str,
+        query: &RetrievalQuery,
+        history_id: Option<&str>,
+    ) -> Result<Vec<SearchResult>, String> {
+        self.retrieve_filtered_scoped(tenant_id, query, history_id, &|_: &SearchResult| true)
             .await
     }
 
     /// Retrieve top-K relevant chunks matching query and passing a custom filter predicate.
+    pub async fn retrieve_filtered<F>(
+        &self,
+        query: &RetrievalQuery,
+        history_id: Option<&str>,
+        filter: &F,
+    ) -> Result<Vec<SearchResult>, String>
+    where
+        F: Fn(&SearchResult) -> bool + Sync,
+    {
+        self.retrieve_filtered_scoped("default", query, history_id, filter)
+            .await
+    }
+
+    /// Retrieve top-K relevant chunks scoped to `tenant_id` and matching `filter`.
     ///
     /// The predicate is applied before truncation and sorting, preventing out-of-namespace chunks
     /// from crowding out valid documents.
-    pub async fn retrieve_filtered<F>(
+    ///
+    /// # Errors
+    /// Returns `Err` if query embedding or hybrid database retrieval fails.
+    pub async fn retrieve_filtered_scoped<F>(
         &self,
+        tenant_id: &str,
         query: &RetrievalQuery,
         history_id: Option<&str>,
         filter: &F,
@@ -57,9 +84,10 @@ impl DocumentRetriever {
                 .map_err(|e| format!("Worker thread error generating query embedding: {}", e))?;
 
         // Perform hybrid cosine similarity + BM25 search in database with pre-truncation filtering
-        let results = self
+        let results = match self
             .store
-            .search_hybrid_filtered(
+            .search_hybrid_filtered_scoped(
+                tenant_id,
                 &query.query_text,
                 &query_vector,
                 &query.user_id,
@@ -69,7 +97,13 @@ impl DocumentRetriever {
                 filter,
             )
             .await
-            .map_err(|e| format!("Database error during hybrid search: {}", e))?;
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!(tenant_id = %tenant_id, error = %e, "Hybrid RAG search failed");
+                return Err("Retrieval storage error".to_string());
+            }
+        };
 
         let duration_ms = start.elapsed().as_millis() as i64;
         let chunks_count = results.len() as i64;
@@ -78,7 +112,8 @@ impl DocumentRetriever {
         // Log retrieval event for analysis
         if let Err(e) = self
             .store
-            .log_retrieval(
+            .log_retrieval_scoped(
+                tenant_id,
                 &query.user_id,
                 history_id,
                 &query.query_text,

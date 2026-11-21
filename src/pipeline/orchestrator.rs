@@ -404,8 +404,15 @@ impl PipelineOrchestrator {
                 target_model_family: npae_config.and_then(|c| c.target_model_family),
             };
 
-            let repr = crate::npae::compression::pipeline::run_parallel_pipeline(&normalized)
-                .map_err(|e| e.to_string())?;
+            // ARCH: §6 Rust Rules & Workstream 3 — Offload CPU-bound compression pipeline (rayon::join)
+            // onto tokio::task::spawn_blocking instead of blocking Tokio async worker threads.
+            let normalized_clone = normalized.clone();
+            let repr = tokio::task::spawn_blocking(move || {
+                crate::npae::compression::pipeline::run_parallel_pipeline(&normalized_clone)
+            })
+            .await
+            .map_err(|e| format!("JoinError in run_parallel_pipeline: {}", e))?
+            .map_err(|e| e.to_string())?;
 
             let structurer = crate::npae::aggressive::structurer::HttpStructurer {
                 route: "/api/compress".to_string(),

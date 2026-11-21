@@ -9,6 +9,11 @@ use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashMap;
 
+/// Maximum number of in-memory learned patterns before bounded eviction.
+///
+/// ARCH: Workstream 3 & 1M-user concurrency — prevents unbounded RAM growth by capping pattern count.
+pub const MAX_PATTERNS: usize = 10_000;
+
 pub struct PatternMemory {
     patterns: HashMap<String, LearnedPattern>,
     dirty: bool,
@@ -102,7 +107,15 @@ impl PatternMemory {
         None
     }
 
-    /// Record a blueprint and its outcome into memory
+    /// Record a blueprint and its outcome into memory.
+    ///
+    /// Evicts the lowest-usage / oldest pattern when the in-memory cache reaches `MAX_PATTERNS`.
+    ///
+    /// # Errors
+    /// Returns `Err` if serializing the blueprint JSON fails.
+    ///
+    /// # Panics
+    /// Never.
     pub fn record(
         &mut self,
         intent: &LearnedIntent,
@@ -111,6 +124,26 @@ impl PatternMemory {
     ) -> Result<()> {
         let bp_json = serde_json::to_string(blueprint)?;
         let now = Utc::now();
+
+        // ARCH: Workstream 3 — Bounded capacity enforcement.
+        // If at capacity and this is a novel pattern, evict the entry with the lowest usage_count,
+        // breaking ties by oldest last_used.
+        if self.patterns.len() >= MAX_PATTERNS
+            && !self.patterns.contains_key(&intent.intent_fingerprint)
+        {
+            if let Some(evict_key) = self
+                .patterns
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    a.usage_count
+                        .cmp(&b.usage_count)
+                        .then_with(|| a.last_used.cmp(&b.last_used))
+                })
+                .map(|(k, _)| k.clone())
+            {
+                self.patterns.remove(&evict_key);
+            }
+        }
 
         let entry = self
             .patterns
@@ -167,7 +200,6 @@ mod tests {
         BlueprintPhase, BlueprintStrategy, DynamicBlueprint, LearnedIntent, PatternOutcome,
         PhaseGraph, PhaseType, ResourceEstimate, ScopeClass,
     };
-    use chrono::Utc;
 
     #[tokio::test]
     async fn test_pattern_memory_dirty_and_persistence() -> Result<()> {
@@ -259,6 +291,105 @@ mod tests {
         assert_eq!(loaded.len(), 1);
         let _found = loaded.find_match(&intent);
         assert!(loaded.patterns.contains_key(&intent.intent_fingerprint));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pattern_memory_capacity_bounded_eviction() -> Result<()> {
+        let mut mem = PatternMemory::new();
+
+        let bp = DynamicBlueprint {
+            architecture_id: "ORY-TEST".into(),
+            strategy: BlueprintStrategy::NovelDesign {
+                reasoning: "Test".into(),
+            },
+            rationale: "Rationale".into(),
+            phases: vec![],
+            phase_graph: PhaseGraph {
+                edges: vec![],
+                parallel_groups: vec![],
+            },
+            resource_estimate: ResourceEstimate {
+                complexity_score: 1.0,
+                estimated_token_budget: 10,
+                suggested_phases: 1,
+                scope_class: ScopeClass::Quick,
+            },
+            validation_checklist: vec![],
+            developer_notes: "".into(),
+            reuse_patterns: vec![],
+        };
+
+        let outcome = PatternOutcome {
+            pattern_id: "pat-1".into(),
+            quality_score: 8.5,
+            success: true,
+            improvement_notes: vec![],
+        };
+
+        // Populate mock patterns up to MAX_PATTERNS
+        for i in 0..MAX_PATTERNS {
+            let intent = LearnedIntent {
+                raw_prompt: format!("Prompt {}", i),
+                core_objective: format!("Objective {}", i),
+                inferred_domain: "software".into(),
+                novel_signals: vec![],
+                hidden_dependencies: vec![],
+                confidence_score: 0.9,
+                audience_level: None,
+                temporal_markers: vec![],
+                constraint_phrases: vec![],
+                meta_instructions: vec![],
+                complexity_score: 1.0,
+                intent_fingerprint: format!("fp-{}", i),
+            };
+            mem.record(&intent, &bp, &outcome)?;
+        }
+
+        assert_eq!(mem.len(), MAX_PATTERNS);
+
+        // Boost fp-1 usage count
+        let intent_1 = LearnedIntent {
+            raw_prompt: "Prompt 1".into(),
+            core_objective: "Objective 1".into(),
+            inferred_domain: "software".into(),
+            novel_signals: vec![],
+            hidden_dependencies: vec![],
+            confidence_score: 0.9,
+            audience_level: None,
+            temporal_markers: vec![],
+            constraint_phrases: vec![],
+            meta_instructions: vec![],
+            complexity_score: 1.0,
+            intent_fingerprint: "fp-1".into(),
+        };
+        mem.record(&intent_1, &bp, &outcome)?;
+        assert_eq!(mem.len(), MAX_PATTERNS);
+        assert_eq!(mem.patterns.get("fp-1").unwrap().usage_count, 2);
+
+        // Add pattern exceeding MAX_PATTERNS
+        let intent_overflow = LearnedIntent {
+            raw_prompt: "Overflow".into(),
+            core_objective: "Overflow".into(),
+            inferred_domain: "software".into(),
+            novel_signals: vec![],
+            hidden_dependencies: vec![],
+            confidence_score: 0.9,
+            audience_level: None,
+            temporal_markers: vec![],
+            constraint_phrases: vec![],
+            meta_instructions: vec![],
+            complexity_score: 1.0,
+            intent_fingerprint: "fp-overflow".into(),
+        };
+        mem.record(&intent_overflow, &bp, &outcome)?;
+
+        // Size must still be bounded to MAX_PATTERNS
+        assert_eq!(mem.len(), MAX_PATTERNS);
+        assert!(mem.patterns.contains_key("fp-overflow"));
+        // fp-1 with higher usage count should not have been evicted
+        assert!(mem.patterns.contains_key("fp-1"));
 
         Ok(())
     }

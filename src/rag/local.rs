@@ -24,6 +24,8 @@ use super::types::{DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIM};
 
 /// Maximum supported local document size (50 MiB).
 pub const MAX_LOCAL_FILE_BYTES: u64 = 50 * 1024 * 1024;
+/// Maximum allowed decompressed size for `word/document.xml` (16 MiB) to prevent decompression bombs.
+pub const MAX_DOCX_XML_BYTES: u64 = 16 * 1024 * 1024;
 /// Default sliding-window chunk size in whitespace words (calibrated for all-MiniLM-L6-v2).
 const DEFAULT_CHUNK_WORDS: usize = 200;
 /// Default overlap between adjacent chunks in words.
@@ -647,17 +649,31 @@ pub fn extract_document_pages(
     }
 }
 
+/// RAII drop guard for local temp files ensuring cleanup on return, error, or unwind.
+struct LocalTempFileGuard {
+    path: std::path::PathBuf,
+}
+
+impl Drop for LocalTempFileGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
 /// Extracts per-page text from PDF bytes using `pdf_extract::extract_text_by_pages_from_mem`
 /// (falling back to a workspace temp file if needed).
 fn extract_pdf_pages(bytes: &[u8], display_path: &str) -> Result<Vec<String>, LocalRagError> {
     let tmp_name = format!(".rag_local_tmp_{}.pdf", uuid::Uuid::new_v4());
     let tmp_path = std::env::temp_dir().join(tmp_name);
+    let _guard = LocalTempFileGuard {
+        path: tmp_path.clone(),
+    };
     fs::write(&tmp_path, bytes).map_err(|e| LocalRagError::Extraction {
         path: display_path.to_string(),
         reason: e.to_string(),
     })?;
     let extracted = pdf_extract::extract_text_by_pages(&tmp_path);
-    let _ = fs::remove_file(&tmp_path);
+    drop(_guard);
 
     let pages = extracted.map_err(|e| LocalRagError::Extraction {
         path: display_path.to_string(),
@@ -685,7 +701,7 @@ pub fn extract_docx_pages(bytes: &[u8], display_path: &str) -> Result<Vec<String
 
     let mut xml_bytes = Vec::new();
     {
-        let mut doc_entry =
+        let doc_entry =
             archive
                 .by_name("word/document.xml")
                 .map_err(|e| LocalRagError::Extraction {
@@ -693,11 +709,21 @@ pub fn extract_docx_pages(bytes: &[u8], display_path: &str) -> Result<Vec<String
                     reason: format!("missing word/document.xml: {e}"),
                 })?;
         doc_entry
+            .take(MAX_DOCX_XML_BYTES + 1)
             .read_to_end(&mut xml_bytes)
             .map_err(|e| LocalRagError::Extraction {
                 path: display_path.to_string(),
                 reason: format!("failed reading word/document.xml: {e}"),
             })?;
+        if xml_bytes.len() > MAX_DOCX_XML_BYTES as usize {
+            return Err(LocalRagError::Extraction {
+                path: display_path.to_string(),
+                reason: format!(
+                    "decompressed word/document.xml exceeds maximum allowed size of {} bytes (potential zip bomb)",
+                    MAX_DOCX_XML_BYTES
+                ),
+            });
+        }
     }
 
     let reader = EventReader::new(BufReader::new(Cursor::new(xml_bytes)));
@@ -902,6 +928,38 @@ mod tests {
         assert_eq!(pages.len(), 2);
         assert!(pages[0].contains("Indemnification cap"));
         assert!(pages[1].contains("Termination requires thirty days"));
+    }
+
+    #[test]
+    fn extract_docx_pages_rejects_oversized_xml_zip_bomb() {
+        let mut buf = Cursor::new(Vec::new());
+        {
+            let mut writer = ZipWriter::new(&mut buf);
+            let options =
+                SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+            writer
+                .start_file("word/document.xml", options)
+                .expect("start_file succeeds");
+            let chunk = vec![b'x'; 1024 * 1024]; // 1 MiB chunk of compressible data
+                                                 // Write 17 MiB, exceeding MAX_DOCX_XML_BYTES (16 MiB)
+            for _ in 0..17 {
+                writer.write_all(&chunk).expect("write_all succeeds");
+            }
+            writer.finish().expect("finish succeeds");
+        }
+        let bytes = buf.into_inner();
+        let res = extract_docx_pages(&bytes, "zip_bomb.docx");
+        assert!(res.is_err(), "Oversized docx xml must be rejected");
+        match res {
+            Err(LocalRagError::Extraction { reason, .. }) => {
+                assert!(
+                    reason.contains("potential zip bomb")
+                        || reason.contains("exceeds maximum allowed size"),
+                    "Error reason must flag zip bomb: {reason}"
+                );
+            }
+            _ => panic!("Expected LocalRagError::Extraction"),
+        }
     }
 
     #[test]

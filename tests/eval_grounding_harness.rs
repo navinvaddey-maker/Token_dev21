@@ -20,7 +20,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use dashmap::DashMap;
-use learning_engine::LearningEngine;
+use learning_engine::TenantLearningPool;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::sync::Arc;
 use token_compress_engine::npae::aggressive::config::{ConfigHandle, ConfigLoader};
@@ -33,7 +33,7 @@ use token_compress_engine::pipeline::orchestrator::PipelineOrchestrator;
 use token_compress_engine::session::SessionHistory;
 use token_compress_engine::types::{EnrichmentContext, OrchestratorResponse, RagChunk};
 use token_compress_engine::AppState;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 use tower::ServiceExt;
 
 /// Helper trait for concise request construction in tests.
@@ -586,16 +586,44 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
         "prompts/styles".to_string(),
     ));
 
+    std::env::set_var(
+        "JWT_SECRET",
+        "eval_grounding_harness_test_secret_32_bytes_min",
+    );
+
+    let test_user_id = uuid::Uuid::new_v4().to_string();
+    let pw_hash = bcrypt::hash("harness_test_pw_123", bcrypt::DEFAULT_COST).expect("hash");
+    token_compress_engine::data::Repository::create_user_scoped(
+        &pool,
+        &test_user_id,
+        "harness_tester",
+        &pw_hash,
+        "harness@example.com",
+        "Developer",
+        "user",
+        "default",
+    )
+    .await
+    .expect("seed test user");
+    let jwt = token_compress_engine::domain::create_jwt_for_user(&test_user_id, "default", "user")
+        .expect("issue jwt");
+    let auth_header = format!("Bearer {jwt}");
+
     let state = AppState {
         pool: pool.clone(),
-        engine: Arc::new(Mutex::new(LearningEngine::new(pool.clone()))),
+        learning_pool: Arc::new(TenantLearningPool::new(pool.clone(), 64)),
         pipeline,
         npae_config,
         ory_engine,
-        rag_store: Arc::new(token_compress_engine::rag::store::RagStore::new(pool)),
+        rag_store: Arc::new(token_compress_engine::rag::store::RagStore::new(
+            pool.clone(),
+        )),
         sessions: Arc::new(DashMap::new()),
         embedding_engine,
         scenario_router,
+        pdf_ingest_sem: Arc::new(Semaphore::new(4)),
+        aggressive_sem: Arc::new(Semaphore::new(16)),
+        compress_sem: Arc::new(Semaphore::new(16)),
     };
     let app = token_compress_engine::api::router(state);
 
@@ -613,6 +641,7 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
                 .method("POST")
                 .uri("/api/v1/aggressive")
                 .header("content-type", "application/json")
+                .header("authorization", auth_header.as_str())
                 .body(Body::from(agg_body.to_string()))
                 .expect("build request"),
         )
@@ -638,6 +667,7 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
                 .method("POST")
                 .uri("/api/npae/verify")
                 .header("content-type", "application/json")
+                .header("authorization", auth_header.as_str())
                 .body(Body::from(valid_verify_body.to_string()))
                 .expect("build verify request"),
         )
@@ -665,6 +695,7 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
                 .method("POST")
                 .uri("/api/npae/verify")
                 .header("content-type", "application/json")
+                .header("authorization", auth_header.as_str())
                 .body(Body::from(hallucinated_verify_body.to_string()))
                 .expect("build bad verify request"),
         )
@@ -690,6 +721,7 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
                 .method("POST")
                 .uri("/api/npae/verify")
                 .header("content-type", "application/json")
+                .header("authorization", auth_header.as_str())
                 .body(Body::from(
                     serde_json::json!({ "llm_answer": "   " }).to_string(),
                 ))

@@ -153,15 +153,20 @@ pub struct GroundingReport {
     pub grounding_score: f32,
 }
 
-/// Escapes `<` and `>` inside untrusted fact strings so embedded tags such as `</facts>` or
-/// `<rules>` cannot break out of the `<facts trust="untrusted">` XML fence.
+/// Escapes `&`, `<`, `>`, `"`, and `'` inside untrusted fact strings so embedded tags such as
+/// `</facts>` or attribute breakouts like `source="..."` cannot break out of XML fences or attributes.
 ///
 /// # Panics
 /// Never.
 #[must_use]
 pub fn sanitize_untrusted_fact(raw: &str) -> String {
     let collapsed: String = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    collapsed.replace('<', "&lt;").replace('>', "&gt;")
+    collapsed
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
 }
 
 /// Returns `true` if `text` contains a known prompt-injection override phrase.
@@ -303,7 +308,14 @@ pub fn parse_requested_items_from_harness_prompt(prompt: &str) -> Vec<String> {
         }
         let cleaned = strip_numbered_list_prefix(trimmed);
         if !cleaned.is_empty() {
-            items.push(cleaned.replace("&lt;", "<").replace("&gt;", ">"));
+            items.push(
+                cleaned
+                    .replace("&quot;", "\"")
+                    .replace("&#x27;", "'")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&amp;", "&"),
+            );
         }
     }
     items

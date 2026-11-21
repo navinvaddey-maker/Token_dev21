@@ -3,6 +3,7 @@ const State = {
     userId: localStorage.getItem('tce_user_id'),
     username: localStorage.getItem('tce_username'),
     businessType: localStorage.getItem('tce_business_type'),
+    role: localStorage.getItem('tce_role'),
     currentSection: 'overview',
     users: [],
     history: [],
@@ -13,7 +14,10 @@ const State = {
 // ── Init ────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!State.token || !State.businessType || State.businessType.toLowerCase() !== 'admin') {
+    // Client-side UX guard; server enforces authoritative RBAC on all admin endpoints.
+    const isAdmin = (State.role && State.role.toLowerCase() === 'admin') ||
+        (State.businessType && State.businessType.toLowerCase() === 'admin');
+    if (!State.token || !isAdmin) {
         window.location.href = '/'; // Redirect to login if no token or not admin
         return;
     }
@@ -81,7 +85,37 @@ function initEventListeners() {
         localStorage.removeItem('tce_user_id');
         localStorage.removeItem('tce_username');
         localStorage.removeItem('tce_business_type');
+        localStorage.removeItem('tce_role');
         window.location.href = '/';
+    });
+
+    // Delegated click listeners to prevent inline handler script injection
+    document.addEventListener('click', (e) => {
+        const copyChip = e.target.closest('.copy-hud-chip');
+        if (copyChip) {
+            const val = copyChip.getAttribute('data-copy-val');
+            if (val) copyHudValue(val, copyChip);
+            return;
+        }
+        const editBtn = e.target.closest('.user-edit-btn');
+        if (editBtn) {
+            const uid = editBtn.getAttribute('data-user-id');
+            const bType = editBtn.getAttribute('data-business-type');
+            if (uid) openEditModal(uid, bType);
+            return;
+        }
+        const delBtn = e.target.closest('.user-delete-btn');
+        if (delBtn) {
+            const uid = delBtn.getAttribute('data-user-id');
+            if (uid) deleteUser(uid);
+            return;
+        }
+        const delRagBtn = e.target.closest('.rag-doc-delete-btn');
+        if (delRagBtn) {
+            const docId = delRagBtn.getAttribute('data-doc-id');
+            if (docId) deleteRagDoc(docId);
+            return;
+        }
     });
 
     // Mobile sidebar toggle
@@ -462,12 +496,12 @@ function renderHudLiveFeed(records) {
         return;
     }
     feed.innerHTML = records.slice(0, 6).map(r => {
-        const uid = String(r.user_id || '').slice(0, 8);
+        const uid = escapeHtml(String(r.user_id || '').slice(0, 8));
         const orig = Number(r.token_original) || 0;
         const fin = Number(r.token_final) || 0;
         const saved = Number(r.tokens_saved) || 0;
-        const mode = String(r.mode || 'balanced').toUpperCase();
-        const t = r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--';
+        const mode = escapeHtml(String(r.mode || 'balanced').toUpperCase());
+        const t = escapeHtml(r.created_at ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--');
         return `
             <div class="hud-ops-line">
                 <div class="hud-ops-top">
@@ -615,14 +649,14 @@ function renderUsers(filter = '') {
         const shortId = uid.length > 10 ? `${uid.substring(0, 8)}…` : uid;
         return `
         <tr>
-            <td><span class="hud-mono-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" onclick="copyHudValue('${escapeHtml(uid)}', this)">${escapeHtml(shortId)}</span></td>
+            <td><span class="hud-mono-chip copy-hud-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" data-copy-val="${escapeHtml(uid)}">${escapeHtml(shortId)}</span></td>
             <td>${escapeHtml(u.username || '')}</td>
             <td>${escapeHtml(u.email || '')}</td>
             <td><span class="badge">${escapeHtml(u.business_type || 'Developer')}</span></td>
             <td style="font-family:'JetBrains Mono',monospace; font-size:12px;">${escapeHtml(formatHudDate(u.created_at))}</td>
             <td>
-                <button class="action-btn edit-btn" onclick="openEditModal('${escapeHtml(uid)}', '${escapeHtml(u.business_type || '')}')">Edit</button>
-                <button class="action-btn delete-btn" onclick="deleteUser('${escapeHtml(uid)}')">Delete</button>
+                <button class="action-btn edit-btn user-edit-btn" data-user-id="${escapeHtml(uid)}" data-business-type="${escapeHtml(u.business_type || '')}">Edit</button>
+                <button class="action-btn delete-btn user-delete-btn" data-user-id="${escapeHtml(uid)}">Delete</button>
             </td>
         </tr>`;
     }).join('');
@@ -705,7 +739,7 @@ function renderHistory() {
         const shortUid = uid.length > 10 ? `${uid.substring(0, 8)}…` : uid;
         return `
         <tr>
-            <td><span class="hud-mono-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" onclick="copyHudValue('${escapeHtml(uid)}', this)">${escapeHtml(shortUid)}</span></td>
+            <td><span class="hud-mono-chip copy-hud-chip" title="${escapeHtml(uid)} (click to copy)" style="cursor:pointer;" data-copy-val="${escapeHtml(uid)}">${escapeHtml(shortUid)}</span></td>
             <td><span class="badge">${escapeHtml(h.use_case || 'generic')}</span></td>
             <td style="font-variant-numeric:tabular-nums;">${Number(h.token_original || 0).toLocaleString()}</td>
             <td style="font-variant-numeric:tabular-nums;">${Number(h.token_final || 0).toLocaleString()}</td>
@@ -729,8 +763,8 @@ async function loadFeedback() {
         renderFeedback(data);
     } catch (err) {
         console.error('Failed to load feedback analysis:', err);
-        if (tbodyType) tbodyType.innerHTML = `<tr><td colspan="3" class="empty-row" style="color: #f87171;">Failed: ${err.message}</td></tr>`;
-        if (tbodyUseCase) tbodyUseCase.innerHTML = `<tr><td colspan="4" class="empty-row" style="color: #f87171;">Failed: ${err.message}</td></tr>`;
+        if (tbodyType) tbodyType.innerHTML = `<tr><td colspan="3" class="empty-row" style="color: #f87171;">Failed: ${escapeHtml(err.message)}</td></tr>`;
+        if (tbodyUseCase) tbodyUseCase.innerHTML = `<tr><td colspan="4" class="empty-row" style="color: #f87171;">Failed: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
@@ -980,7 +1014,7 @@ async function loadRag() {
         renderRagDocs();
     } catch (err) {
         console.error('Failed to load RAG documents:', err);
-        tbody.innerHTML = `<tr><td colspan="8" class="empty-row" style="color: #f87171;">Failed to load documents: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-row" style="color: #f87171;">Failed to load documents: ${escapeHtml(err.message)}</td></tr>`;
     }
 }
 
@@ -1009,15 +1043,15 @@ function renderRagDocs() {
 
         return `
             <tr>
-                <td title="${doc.filename}">${doc.filename}</td>
-                <td title="${doc.user_id}">${doc.user_id.substring(0, 8)}...</td>
-                <td><span class="badge" style="background: rgba(129, 140, 248, 0.15); color: #818cf8; border: 1px solid rgba(129, 140, 248, 0.3);">${domainVal}</span></td>
-                <td>${pageCountVal}</td>
-                <td>${chunkCountVal}</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                <td>${uploadedDate}</td>
+                <td title="${escapeHtml(doc.filename || '')}">${escapeHtml(doc.filename || '')}</td>
+                <td title="${escapeHtml(doc.user_id || '')}">${escapeHtml(String(doc.user_id || '').substring(0, 8))}...</td>
+                <td><span class="badge" style="background: rgba(129, 140, 248, 0.15); color: #818cf8; border: 1px solid rgba(129, 140, 248, 0.3);">${escapeHtml(domainVal)}</span></td>
+                <td>${escapeHtml(String(pageCountVal))}</td>
+                <td>${escapeHtml(String(chunkCountVal))}</td>
+                <td><span class="status-badge ${escapeHtml(statusClass)}">${escapeHtml(statusText)}</span></td>
+                <td>${escapeHtml(uploadedDate)}</td>
                 <td>
-                    <button class="action-btn delete-btn" onclick="deleteRagDoc('${doc.id}')">Delete</button>
+                    <button class="action-btn delete-btn rag-doc-delete-btn" data-doc-id="${escapeHtml(doc.id)}">Delete</button>
                 </td>
             </tr>
         `;
@@ -1038,7 +1072,7 @@ async function deleteRagDoc(id) {
 function escapeHtml(str) {
     const d = document.createElement('div');
     d.textContent = str == null ? '' : String(str);
-    return d.innerHTML;
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 async function handleAdminAsk() {

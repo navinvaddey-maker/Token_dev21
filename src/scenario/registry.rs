@@ -59,6 +59,12 @@ pub struct ScenarioStyleConfig {
     pub description: String,
     pub prompt_file: String,
     pub version: String,
+    /// Cached file content of the style prompt loaded at startup.
+    ///
+    /// ARCH: §2.1 & Perf Workstream 3 — cached in-memory so request threads never perform
+    /// synchronous disk I/O when resolving style prompts.
+    #[serde(skip, default)]
+    pub prompt_content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,25 +73,38 @@ pub struct ScenarioStyleRegistry {
 }
 
 impl ScenarioStyleRegistry {
+    /// Loads the scenario style registry and validates/caches all referenced prompt templates.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the styles.json configuration file.
+    /// * `prompts_dir` - Directory containing versioned style prompt template files.
+    ///
+    /// # Errors
+    /// Returns `Err(String)` if reading/parsing the JSON fails, or if any configured
+    /// `prompt_file` does not exist or fails to read into memory.
+    ///
+    /// # Panics
+    /// Never.
     pub fn load_from_file(path: &str, prompts_dir: &str) -> Result<Self, String> {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read style registry file '{}': {}", path, e))?;
-        let registry: ScenarioStyleRegistry = serde_json::from_str(&content)
+        let mut registry: ScenarioStyleRegistry = serde_json::from_str(&content)
             .map_err(|e| format!("Failed to parse style registry JSON: {}", e))?;
 
-        // Validate that each versioned style prompt file exists
-        for style in &registry.styles {
+        // Read and cache each versioned style prompt file into prompt_content once at startup
+        for style in &mut registry.styles {
             let prompt_path = Path::new(prompts_dir).join(&style.prompt_file);
-            if !prompt_path.exists() {
-                return Err(format!(
-                    "Startup validation failed: Style '{}' requires prompt file '{:?}' which does not exist.",
-                    style.key, prompt_path
-                ));
-            }
+            let prompt_str = fs::read_to_string(&prompt_path).map_err(|e| {
+                format!(
+                    "Startup validation failed: Style '{}' requires prompt file '{:?}' which failed to read: {}",
+                    style.key, prompt_path, e
+                )
+            })?;
+            style.prompt_content = prompt_str;
         }
 
         info!(
-            "Loaded and validated {} scenario styles from {}",
+            "Loaded and cached {} scenario styles with prompt templates from {}",
             registry.styles.len(),
             path
         );

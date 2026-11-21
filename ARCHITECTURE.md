@@ -175,7 +175,7 @@ The resulting `ScenarioSignal` and NPAE rule profile inject:
 ## 2. Full Component Map (What Really Exists)
 
 ```
-User → API (Axum) → Auth+RateLimit → Domain
+User → API (Axum + CORS/SecurityHeaders/Timeout/BodyLimit) → Auth+TenantRateLimit → Domain
                                        ├─ RAG Retrieval (when rag_enabled)
                                        ├─ ScenarioClassifier (Intent × Vertical Rule + Hash/Margin)
                                        │    └─ ScenarioSignal (domain, task_type, primary_role, secondary, rule_locked)
@@ -243,7 +243,7 @@ The Ask (RAG) workspace (`static/index.html`, `static/app.js`, `static/rag_works
 | Content deduplication | ✅ | SHA-256 hash on upload prevents duplicate ingestion |
 | Embedding storage | ✅ | L2-normalized f32 BLOB, deserializes correctly for cosine search |
 | Retrieval logging | ✅ | Every query logs time, count, top_similarity to `rag_retrieval_logs` |
-| User-scoping | ✅ | All queries filter by `user_id`; admin sees all |
+| Tenant & User-scoping | ✅ | All queries filter by `(tenant_id, user_id)`; admin `role` separated from `business_type` |
 | Document lifecycle | ✅ | Processing → Ready → Failed state machine with error handling |
 | Security | ✅ | `HttpStructurer::pre_validate()` blocks XSS/SQLi patterns |
 
@@ -317,7 +317,7 @@ User compresses prompt
 | GAP-41 | Role mismatch across vertical boundaries (e.g. venture asks in pharma mapped to dev roles) | ✅ **RESOLVED** | `classifier/intent_rule.rs`, `npae/aggressive/role.rs`, `structurer.rs` |
 | GAP-35 | OryEngine.process() called on Aggressive path but result not used for output routing | ✅ **RESOLVED** | `npae/aggressive/engine.rs` & `structurer.rs` — DynamicBlueprint phases, validation steps, and rationale wired into StructuredPrompt |
 | GAP-36 | HallucinationGuard remediation is hardcoded string replacement, not semantic | 🟠 High | `npae/hallucination/guard.rs:62-78` |
-| GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | 🟡 Medium | `rag/ingest.rs:240` |
+| GAP-37 | `detect_domain()` reads config file on every PDF ingest — no caching | ✅ **RESOLVED** | `rag/ingest.rs` uses shared `Arc<ConfigHandle>` |
 | GAP-38 | PatternMemory lost on restart unless `save_to_db()` explicitly called | ✅ **RESOLVED** | `main.rs` & `npae/ory/memory.rs` — Background periodic flush (every 5 min) + graceful shutdown hook |
 | GAP-39 | No ANN index — full-table cosine scan degrades beyond 10K chunks | 🟡 Medium | `rag/store.rs:212` |
 | GAP-42 | LLM answers not grounded/verified; HallucinationGuard checks only our prompt, not the LLM output | ✅ **RESOLVED** | `npae/aggressive/structurer.rs` (harness renderer), `npae/grounding/verifier.rs`, `POST /api/npae/verify` |
@@ -620,4 +620,12 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Phase 2: Split the 4,500-line `src/npae/aggressive/structurer.rs` monolith into `src/npae/aggressive/structurer/` (`mod.rs`, `ingest.rs`, `prune.rs`, `evidence.rs`, `render.rs`, `builder.rs`, `templates.rs`) with 100% backward-compatible public re-exports.
     - Phase 3: Added provenance-tagged `EvidenceBundle` (`Fact`, `KeyValue`, `TableRow`), deterministic numeric conflict detection (`[CONFLICT: F# vs F#]`), `PromptBudget` token-bounded packing with explicit truncation notices (`omitted_count`), `render_crisp_prompt_with_evidence` / `render_harness_prompt_with_evidence`, and wired single-pass `EvidenceBundle` + `ConfigHandle::read_arc()` directly into `AggressiveEngine::run()` (`src/npae/aggressive/engine.rs`) with aligned `grounding_facts` tracking across Stage 6B retries.
     - Phase 4: Migrated hardcoded domain tables (`validation_templates`, `success_criteria_templates`, `assumption_templates`, `dynamic_instructions`, `output_blueprints`, `persona_guardrails`) into `config/unified.json` across canonical domains and extended `EnrichmentContext` (`src/types.rs`) with `structured_records` (`StructuredKeyValue`) and `structured_tables` (`StructuredTable`) wired directly into `AggressiveEngine::run()` → `EvidenceBundle`.
+
+[2026-11-21] [Antigravity] ARCHITECTURE.md
+  Phase A Security, Multi-Tenancy & Concurrency Hardening (§2, §2.1, §3.2):
+    - Authentication & RBAC: Separated `role` (`'user'` / `'admin'`) and `tenant_id` (`migrations/0016_add_role_and_tenant_id.sql`); removed hardcoded `"navin"` admin seeding (opt-in `BOOTSTRAP_ADMIN_*`); pinned HS256+iss+aud JWTs with fail-fast `>=32B` `JWT_SECRET` (`OnceLock` cache); offloaded `bcrypt` to `spawn_blocking` with constant-time dummy verification on missing users; authoritative DB role/tenant reload per request in `auth_middleware`.
+    - Per-Tenant Admin Boundary (§3.2): Scoped all `/api/admin/*` endpoints (`users`, `history`, `stats`, analytics, `rag/documents`, `rag/upload`) to `auth.tenant_id` with transactional last-admin delete protection.
+    - Rate Limiting, Timeouts & Concurrency: Added trusted-proxy-gated (`TRUSTED_PROXIES`) per-IP auth rate limiter and per-`(tenant_id, user_id)` token-bucket limiter with LRU eviction; added global 60s timeout middleware, `DefaultBodyLimit` (256 KiB JSON / 52 MiB multipart), `pdf_ingest_sem`, `aggressive_sem`, `compress_sem`, bounded `TenantLearningPool` with DB hydration & LRU eviction, SQLite chunk insert transaction, and `spawn_blocking` offloading.
+    - RAG & Prompt Injection Hardening: Enforced magic-byte/MIME/extension PDF checks, `MAX_DOCX_XML_BYTES` (16 MiB) ZIP-bomb cap, `MAX_EXTRACTED_TEXT_BYTES` (20 MiB), `rag_top_k` `1..=20` clamping with `saturating_mul`, `<context trust="untrusted">` XML/attribute escaping (`&<>"'`), validated `app_mode`/`mode`/`geography` allowlists, removed untrusted RAG promotion into `# CONSTRAINTS:` / `=== SYSTEM PROMPT ===`.
+    - Client & Error Hygiene: Escaped `&<>"'` in `admin.js`/`app.js` `escapeHtml`, removed auth token `console.log`, added opaque error responses with correlation `error_id`, `CorsLayer` (`ALLOWED_ORIGINS`), and security headers. (CSP `'unsafe-inline'` retained until Phase B migrates remaining inline `onclick=` handlers in `index.html`/`admin.html`.)
 ```
