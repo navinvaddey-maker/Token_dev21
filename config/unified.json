@@ -4429,7 +4429,57 @@
         "level-design",
         "gamedev"
       ],
-      "boost": 2
+      "boost": 2,
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Frame-Time & Memory Budget",
+            "criteria": "Maintains target FPS (60/120fps) within GPU/VRAM and RAM budgets",
+            "validation_method": "Frame profiler & memory trace"
+          },
+          {
+            "step_number": 2,
+            "name": "Core Loop & Playtest Validation",
+            "criteria": "Controls, progression pacing, and difficulty curve feel responsive",
+            "validation_method": "Structured playtest telemetry"
+          },
+          {
+            "step_number": 3,
+            "name": "Netcode & Crash Stability",
+            "criteria": "Zero desyncs, soft-locks, or crash-to-desktop defects under soak test",
+            "validation_method": "Automated soak & multiplayer stress test"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Core gameplay loop, controls, and progression systems are cohesive and responsive",
+          "Rendering, physics, and audio stay within target platform frame-time and memory budgets",
+          "Includes clear architecture for state management, serialization, and playtest telemetry"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume deterministic game loop timing (fixed timestep for physics) and explicit asset budgets",
+          "Assume target platform hardware constraints and input schemes must be respected"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested game system or architecture with crisp core-loop mechanics, explicit frame-time/memory budgets, edge-case state handling, and playtest verification steps."
+      },
+      "output_blueprints": {
+        "build": [
+          "Core Loop & System Design",
+          "Technical Architecture & Data Flow",
+          "Performance & Memory Budgets",
+          "Playtest & QA Checklist"
+        ]
+      },
+      "persona_guardrails": [
+        "production_grade_only",
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "hardware",
@@ -4448,7 +4498,57 @@
         "iot",
         "sensor"
       ],
-      "boost": 2
+      "boost": 2,
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Electrical & Thermal Margin Check",
+            "criteria": "Power rails, current limits, and thermal dissipation stay within component derating",
+            "validation_method": "SPICE / thermal simulation & bench probe"
+          },
+          {
+            "step_number": 2,
+            "name": "Signal Integrity & EMI Compliance",
+            "criteria": "High-speed traces, impedance matching, and EMC/FCC limits are verified",
+            "validation_method": "Oscilloscope / VNA & pre-compliance scan"
+          },
+          {
+            "step_number": 3,
+            "name": "DFM & BOM Supply Verification",
+            "criteria": "PCB layout meets fab tolerances and BOM components have active lead times",
+            "validation_method": "DRC/DFM & BOM lifecycle audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Schematic, power budget, and mechanical/thermal envelopes are quantified with safety margins",
+          "Component selections balance cost, availability, and lifecycle longevity",
+          "Includes bench bring-up procedure and hardware verification checkpoints"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume standard industrial/commercial temperature derating and ESD protection requirements",
+          "Assume design must be manufacturable (DFM/DFA) with verifiable test points"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Engineer the requested hardware architecture with explicit power/thermal budgets, interface specifications, component trade-offs, and bench bring-up verification steps."
+      },
+      "output_blueprints": {
+        "build": [
+          "Block Diagram & Interface Specs",
+          "Power, Thermal & BOM Trade-offs",
+          "PCB / Mechanical Constraints",
+          "Bring-Up & Compliance Test Plan"
+        ]
+      },
+      "persona_guardrails": [
+        "production_grade_only",
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "supply-chain",
@@ -4465,7 +4565,56 @@
         "fulfillment",
         "lead-time"
       ],
-      "boost": 2
+      "boost": 2,
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Lead-Time & Safety Stock Audit",
+            "criteria": "Reorder points and safety stock cover demand variability and supplier lead-time variance",
+            "validation_method": "Inventory simulation & ABC/XYZ analysis"
+          },
+          {
+            "step_number": 2,
+            "name": "Single-Point-of-Failure & Disruption Test",
+            "criteria": "Dual-sourcing and alternate lanes mitigate port, customs, or vendor outages",
+            "validation_method": "Supply risk stress-test"
+          },
+          {
+            "step_number": 3,
+            "name": "Landed Cost & SLA Reconciliation",
+            "criteria": "Freight, duties, warehousing, and OTIF targets reconcile with margin goals",
+            "validation_method": "Total landed cost model audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Balances service level (OTIF), working capital tied in inventory, and total landed cost",
+          "Identifies bottlenecks, lead-time variance, and supplier concentration risks",
+          "Defines measurable logistics KPIs and contingency playbooks"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume demand is stochastic and supplier lead times exhibit tail-risk variability",
+          "Assume customs, Incoterms, and cold-chain/hazmat compliance where applicable"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested supply-chain or logistics strategy with quantified inventory/lead-time trade-offs, resilience contingencies, landed-cost math, and OTIF KPIs."
+      },
+      "output_blueprints": {
+        "build": [
+          "Network & Flow Architecture",
+          "Inventory & Lead-Time Modeling",
+          "Risk & Dual-Sourcing Contingencies",
+          "KPIs & Execution Rollout"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "customer-support",
@@ -4482,7 +4631,56 @@
         "churn-prevention",
         "resolution"
       ],
-      "boost": 2
+      "boost": 2,
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "SLA & Escalation Path Coverage",
+            "criteria": "Response/resolution SLAs and L1/L2/L3 escalation triggers are unambiguous",
+            "validation_method": "Runbook & SLA audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Tone, Empathy & Policy Accuracy",
+            "criteria": "Templates maintain brand voice while strictly adhering to refund/privacy policies",
+            "validation_method": "QA rubric & policy check"
+          },
+          {
+            "step_number": 3,
+            "name": "Deflection & CSAT Measurement",
+            "criteria": "Self-service knowledge base and macros track CSAT, FCR, and ticket deflection",
+            "validation_method": "Support analytics review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Reduces First Response Time (FRT) and improves First Contact Resolution (FCR)",
+          "Provides clear triage trees, escalation criteria, and empathetic response templates",
+          "Aligns automation/self-service with CSAT and retention targets"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume tiered support structure (L1 triage, L2 technical, L3 engineering/billing escalation)",
+          "Assume customer PII must be protected in ticket logs and macros"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested customer support workflow or playbook with clear triage criteria, SLA targets, empathetic communication templates, and CSAT/FCR metrics."
+      },
+      "output_blueprints": {
+        "build": [
+          "Triage & Routing Matrix",
+          "Resolution Playbooks & Templates",
+          "Escalation & SLA Guardrails",
+          "CSAT & QA Metrics"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
     },
     {
       "domain": "travel",
@@ -4665,6 +4863,975 @@
         "build": "Construct the requested travel itinerary with geographically optimized daily logistics, itemized budget adherence, and traveler constraint compliance."
       },
       "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "energy",
+      "aliases": [
+        "renewable-energy",
+        "clean-energy",
+        "power-grid",
+        "utilities",
+        "solar-wind"
+      ],
+      "boost": 3,
+      "keywords": [
+        "solar",
+        "photovoltaic",
+        "wind-turbine",
+        "battery-storage",
+        "bess",
+        "grid",
+        "microgrid",
+        "inverter",
+        "substation",
+        "megawatt",
+        "kilowatt",
+        "lcoe",
+        "ppa",
+        "interconnection",
+        "decarbonization",
+        "utility",
+        "hydropower",
+        "geothermal"
+      ],
+      "persona_template": "Principal {role} specializing in power systems engineering, renewable energy project economics (LCOE/IRR), grid interconnection, and energy storage.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Resource & Grid Feasibility",
+            "description": "Assess generation profile, interconnection queue, land/permitting, and tariff structures.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Resource Yield Study",
+              "Interconnection Feasibility Brief"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "System Sizing & Financial Modeling",
+            "description": "Size generation/storage assets, model LCOE, CAPEX/OPEX, and PPA cash flows.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Sizing & Dispatch Model",
+              "Project Finance Pro Forma"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Engineering, Permitting & Commissioning",
+            "description": "Finalize EPC specs, safety/grid-code compliance, and commissioning tests.",
+            "estimated_duration": "1-3 months",
+            "deliverables": [
+              "EPC Specification",
+              "Commissioning & Grid-Code Plan"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Resource & Grid Feasibility",
+            "description": "Assess generation profile, interconnection queue, and tariff structures.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Resource Yield Study",
+              "Interconnection Brief"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "System Sizing & Financial Modeling",
+            "description": "Size generation/storage assets and model LCOE and cash flows.",
+            "estimated_duration": "2-3 weeks",
+            "deliverables": [
+              "Sizing Model",
+              "Financial Pro Forma"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Commissioning & Operations",
+            "description": "Define EPC specs, compliance gates, and O&M telemetry.",
+            "estimated_duration": "1-3 months",
+            "deliverables": [
+              "Commissioning Plan",
+              "O&M Monitoring Guide"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_capacity_mw",
+        "grid_region",
+        "storage_duration_hrs",
+        "tariff_or_ppa_structure"
+      ],
+      "task_templates": {
+        "creation": "Design an energy system or project plan with quantified generation, storage sizing, LCOE economics, and grid compliance.",
+        "analysis": "Analyze energy project feasibility, dispatch economics, and interconnection/regulatory risks.",
+        "default": "Deliver a quantified energy engineering and economic strategy."
+      },
+      "default_deliverables": {
+        "default": [
+          "System Sizing & Yield Model",
+          "LCOE / Financial Summary",
+          "Grid Compliance & Risk Register"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Energy Balance & Dispatch Check",
+            "criteria": "Generation, storage round-trip efficiency, and curtailment reconcile hourly",
+            "validation_method": "8760-hour dispatch simulation"
+          },
+          {
+            "step_number": 2,
+            "name": "Grid Code & Safety Compliance",
+            "criteria": "Meets IEEE 1547 / UL 9540 / local utility interconnection standards",
+            "validation_method": "Interconnection compliance audit"
+          },
+          {
+            "step_number": 3,
+            "name": "LCOE & Sensitivity Stress Test",
+            "criteria": "Project IRR survives capex overrun, rate shifts, and degradation scenarios",
+            "validation_method": "Financial sensitivity model"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Generation yield, storage sizing, and degradation assumptions are quantitatively justified",
+          "LCOE, CAPEX/OPEX, and interconnection constraints are modeled transparently",
+          "Addresses grid-code compliance, safety standards, and curtailment risks"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume regional grid-code standards, inverter losses, and battery degradation curves apply",
+          "Assume permitting and interconnection queue timelines must be explicitly factored into schedules"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Engineer the requested energy solution with quantified capacity/yield math, LCOE/financial trade-offs, grid-code compliance gates, and commissioning verification."
+      },
+      "output_blueprints": {
+        "build": [
+          "Site & Load Profile",
+          "System Architecture & Sizing",
+          "Economics & LCOE Sensitivity",
+          "Permitting & Commissioning Plan"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "manufacturing",
+      "aliases": [
+        "industrial-engineering",
+        "factory-ops",
+        "lean-manufacturing",
+        "cnc",
+        "quality-engineering"
+      ],
+      "boost": 3,
+      "keywords": [
+        "manufacturing",
+        "factory",
+        "assembly-line",
+        "oee",
+        "six-sigma",
+        "kaizen",
+        "lean",
+        "cnc",
+        "injection-molding",
+        "bom",
+        "mes",
+        "plc",
+        "scada",
+        "takt-time",
+        "yield",
+        "scrap-rate",
+        "iso-9001",
+        "fmea",
+        "spc"
+      ],
+      "persona_template": "Principal {role} specializing in industrial operations, Lean/Six Sigma process optimization, OEE improvement, and ISO-9001 quality systems.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Process Mapping & Takt Analysis",
+            "description": "Map value stream, measure cycle/takt times, and baseline OEE and scrap rates.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Value Stream Map",
+              "Baseline OEE & Bottleneck Report"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Line Design & Quality Controls",
+            "description": "Design cell layout, poka-yoke fixtures, FMEA risk controls, and SPC checkpoints.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Process FMEA",
+              "SPC Control Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Pilot Run & Ramp-Up",
+            "description": "Execute pilot production, validate Cp/Cpk capability, and train operators.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Process Capability Study (Cpk)",
+              "Standard Work Instructions"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Process Mapping & Baseline",
+            "description": "Map value stream, takt time, and OEE bottlenecks.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Value Stream Map",
+              "OEE Baseline"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Process & Quality Engineering",
+            "description": "Define FMEA mitigations, fixtures, and SPC controls.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Process FMEA",
+              "Control Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Pilot Validation & Ramp",
+            "description": "Validate Cpk capability and operator standard work.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "Capability Study",
+              "Standard Work SOP"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "production_volume",
+        "target_takt_time",
+        "quality_standard",
+        "equipment_constraints"
+      ],
+      "task_templates": {
+        "creation": "Design a manufacturing process, line layout, or quality control plan with quantified throughput and defect controls.",
+        "default": "Deliver an industrial engineering plan grounded in Lean, OEE, and statistical quality control."
+      },
+      "default_deliverables": {
+        "default": [
+          "Value Stream & Takt Model",
+          "PFMEA & SPC Control Plan",
+          "Pilot Ramp Checklist"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Throughput & Takt Balance",
+            "criteria": "Line balance satisfies target takt time with bottleneck utilization < 85%",
+            "validation_method": "Line-balancing time study"
+          },
+          {
+            "step_number": 2,
+            "name": "Process Capability (Cp/Cpk)",
+            "criteria": "Critical-to-quality dimensions achieve Cpk >= 1.33 on pilot run",
+            "validation_method": "SPC capability audit"
+          },
+          {
+            "step_number": 3,
+            "name": "EHS & ISO Compliance",
+            "criteria": "Machine guarding, lockout/tagout, and ISO-9001 traceability are verified",
+            "validation_method": "EHS & quality system audit"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Throughput, takt time, and OEE drivers (Availability, Performance, Quality) are quantified",
+          "Failure modes (PFMEA) and statistical process controls (SPC) are explicitly specified",
+          "Includes operator standard work and pilot validation criteria"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume standard EHS/OSHA machine safety and ISO-9001 lot traceability requirements",
+          "Assume changeover times and preventive maintenance windows affect net available capacity"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Design the requested manufacturing process or improvement plan with quantified takt/OEE math, PFMEA risk controls, SPC checkpoints, and pilot ramp criteria."
+      },
+      "output_blueprints": {
+        "build": [
+          "Baseline & Bottleneck Analysis",
+          "Process & Line Design",
+          "PFMEA & Quality Controls",
+          "Pilot Run & OEE Metrics"
+        ]
+      },
+      "persona_guardrails": [
+        "regulatory_compliance",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "hr-recruiting",
+      "aliases": [
+        "human-resources",
+        "talent-acquisition",
+        "people-ops",
+        "recruiting",
+        "compensation"
+      ],
+      "boost": 2,
+      "keywords": [
+        "hiring",
+        "recruiting",
+        "interview-rubric",
+        "onboarding",
+        "compensation-band",
+        "performance-review",
+        "retention",
+        "attrition",
+        "headcount",
+        "job-description",
+        "candidate-pipeline",
+        "ats",
+        "people-ops",
+        "employee-handbook",
+        "okr"
+      ],
+      "persona_template": "Senior {role} specializing in talent acquisition, structured interviewing, compensation architecture, and scalable people operations.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Role Calibration & Competency Matrix",
+            "description": "Define role scope, leveling criteria, compensation band, and must-have competencies.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Role Scorecard",
+              "Leveling & Comp Band"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Sourcing & Structured Interview Loop",
+            "description": "Design sourcing channels, standardized interview rubrics, and bias-mitigated scoring.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Interview Rubric & Question Bank",
+              "Sourcing Plan"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Offer, Onboarding & 90-Day Ramp",
+            "description": "Define closing strategy, 30/60/90-day onboarding milestones, and retention metrics.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "30/60/90 Onboarding Plan",
+              "Hiring Funnel KPIs"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Role & Policy Calibration",
+            "description": "Define competencies, leveling, and compliance boundaries.",
+            "estimated_duration": "3-5 days",
+            "deliverables": [
+              "Role Scorecard"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Process & Rubric Design",
+            "description": "Build structured evaluation rubrics and candidate/employee workflows.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Structured Rubric"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Rollout & Measurement",
+            "description": "Launch program and track funnel conversion, ramp time, and retention.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Onboarding & KPI Dashboard"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "role_level",
+        "headcount_target",
+        "geography_labor_law",
+        "budget_band"
+      ],
+      "task_templates": {
+        "creation": "Design a structured HR, recruiting, or people-ops program with objective rubrics and compliance safeguards.",
+        "default": "Deliver a structured, legally compliant people-operations framework."
+      },
+      "default_deliverables": {
+        "default": [
+          "Role Scorecard & Rubric",
+          "Process Workflow",
+          "Funnel & Retention KPIs"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Rubric Objectivity & Bias Check",
+            "criteria": "Evaluation criteria map directly to job-relevant competencies with anchored scoring",
+            "validation_method": "Structured rubric audit"
+          },
+          {
+            "step_number": 2,
+            "name": "Employment Law & Pay Equity Check",
+            "criteria": "Job requirements, interview questions, and comp bands comply with local labor laws",
+            "validation_method": "HR compliance review"
+          },
+          {
+            "step_number": 3,
+            "name": "Funnel & Ramp Measurability",
+            "criteria": "Tracks time-to-fill, pass-through rates, offer acceptance, and 90-day ramp",
+            "validation_method": "People analytics check"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Evaluation rubrics use observable, behaviorally anchored scoring criteria",
+          "Respects employment law, pay transparency, and anti-discrimination guardrails",
+          "Includes clear funnel conversion and 30/60/90-day ramp metrics"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume structured, competency-based evaluation to minimize interviewer bias",
+          "Assume local employment law and pay-transparency regulations govern offers and policies"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested HR or recruiting framework with behaviorally anchored rubrics, clear leveling/process stages, compliance guardrails, and measurable funnel/ramp KPIs."
+      },
+      "output_blueprints": {
+        "build": [
+          "Role / Program Scope",
+          "Structured Rubric & Workflow",
+          "Compliance & Equity Guardrails",
+          "30/60/90 Rollout & KPIs"
+        ]
+      },
+      "persona_guardrails": [
+        "jurisdiction_aware",
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "product-management",
+      "aliases": [
+        "product-strategy",
+        "prd",
+        "product-ops",
+        "roadmap-planning"
+      ],
+      "boost": 3,
+      "keywords": [
+        "prd",
+        "product-roadmap",
+        "user-story",
+        "north-star-metric",
+        "activation-rate",
+        "retention-cohort",
+        "prioritization",
+        "rice-score",
+        "jtbd",
+        "discovery",
+        "feature-spec",
+        "product-market-fit",
+        "experimentation",
+        "a-b-test",
+        "backlog"
+      ],
+      "persona_template": "Principal {role} specializing in product discovery, PRDs, outcome-driven roadmaps, and experimentation.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Problem Discovery & User Segmentation",
+            "description": "Validate user pain points, jobs-to-be-done, and opportunity sizing.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Problem Statement & JTBD Brief",
+              "Opportunity Sizing"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "PRD, Scope & Trade-Off Specification",
+            "description": "Define functional requirements, non-goals, UX flows, and edge cases.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Product Requirements Document (PRD)",
+              "Explicit Non-Goals & Risks"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Experimentation, Launch & Telemetry",
+            "description": "Define instrumentation events, A/B test hypotheses, guardrail metrics, and rollout tiers.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Experiment & Instrumentation Plan",
+              "GTM Launch Checklist"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Problem Discovery",
+            "description": "Validate user pain points and opportunity sizing.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Problem Brief"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Specification & Prioritization",
+            "description": "Define requirements, non-goals, and trade-offs.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "PRD & Scope Matrix"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Launch & Measurement",
+            "description": "Define telemetry, guardrail metrics, and phased rollout.",
+            "estimated_duration": "1 week",
+            "deliverables": [
+              "Launch & Experiment Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "target_persona",
+        "north_star_metric",
+        "platform_constraints",
+        "launch_horizon"
+      ],
+      "task_templates": {
+        "creation": "Author an outcome-driven PRD, roadmap, or product strategy with explicit non-goals and success metrics.",
+        "default": "Deliver a rigorous product specification grounded in user value and measurable outcomes."
+      },
+      "default_deliverables": {
+        "default": [
+          "Problem & JTBD Summary",
+          "Scoped PRD & Non-Goals",
+          "Success & Guardrail Metrics"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Problem-Solution Fit & Non-Goals",
+            "criteria": "Every requirement traces to a validated user pain point and explicit non-goals prevent scope creep",
+            "validation_method": "PRD review"
+          },
+          {
+            "step_number": 2,
+            "name": "Metric & Guardrail Completeness",
+            "criteria": "Defines primary success metric, counter-metrics, and minimum detectable effect",
+            "validation_method": "Analytics & experiment review"
+          },
+          {
+            "step_number": 3,
+            "name": "Edge Cases & Rollback Readiness",
+            "criteria": "Covers empty/error states, feature flags, and safe rollback criteria",
+            "validation_method": "Engineering & QA readiness check"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Clearly separates user problem, proposed solution, and explicit non-goals",
+          "Defines measurable primary KPIs, counter/guardrail metrics, and experiment hypotheses",
+          "Covers edge cases, phased rollout, and cross-functional dependencies"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume features ship behind feature flags with event telemetry before full GA rollout",
+          "Assume engineering capacity is finite and requires explicit scope prioritization"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Author the requested product specification or strategy with crisp problem framing, prioritized requirements, explicit non-goals, edge cases, and measurable success/guardrail metrics."
+      },
+      "output_blueprints": {
+        "build": [
+          "Problem & User Context",
+          "Requirements & Explicit Non-Goals",
+          "UX Flows & Edge Cases",
+          "Metrics, Experiment & Rollout"
+        ]
+      },
+      "persona_guardrails": [
+        "accurate_and_thorough"
+      ]
+    },
+    {
+      "domain": "biotech",
+      "aliases": [
+        "bioinformatics",
+        "genomics",
+        "synthetic-biology",
+        "drug-discovery",
+        "bioprocessing"
+      ],
+      "boost": 3,
+      "keywords": [
+        "crispr",
+        "rna-seq",
+        "genomics",
+        "proteomics",
+        "bioinformatics",
+        "assay",
+        "bioreactor",
+        "monoclonal-antibody",
+        "elisa",
+        "pcr",
+        "sequencing",
+        "target-validation",
+        "ind-enabling",
+        "gmp",
+        "cell-culture",
+        "ligand"
+      ],
+      "persona_template": "Principal {role} specializing in computational biology, assay design, translational R&D, and GxP/regulatory rigor.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Target & Experimental Hypothesis",
+            "description": "Define biological mechanism, assay endpoints, positive/negative controls, and sample power.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Experimental Design Protocol",
+              "Control & Power Plan"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Wet-Lab / Computational Pipeline Execution",
+            "description": "Execute assay or bioinformatics workflow with QC thresholds and reproducible versioning.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "QC & Reproducibility Log",
+              "Processed Dataset"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Statistical Validation & Translational Gate",
+            "description": "Perform differential/enrichment analysis, orthogonal validation, and GxP documentation.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Statistical Validation Report",
+              "Go/No-Go Gate Summary"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Hypothesis & Controls",
+            "description": "Define biological endpoints, controls, and statistical power.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Experimental Protocol"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Pipeline Execution & QC",
+            "description": "Run assay or computational pipeline with strict QC gates.",
+            "estimated_duration": "2-4 weeks",
+            "deliverables": [
+              "QC Report"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Validation & Documentation",
+            "description": "Perform orthogonal validation and compliance documentation.",
+            "estimated_duration": "1-2 weeks",
+            "deliverables": [
+              "Validation Summary"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "organism_or_system",
+        "assay_modality",
+        "sample_size",
+        "regulatory_tier"
+      ],
+      "task_templates": {
+        "creation": "Design a reproducible biotech or bioinformatics protocol with explicit controls, QC thresholds, and statistical rigor.",
+        "default": "Deliver an evidence-based biotech protocol with explicit controls and biosafety/regulatory awareness."
+      },
+      "default_deliverables": {
+        "default": [
+          "Experimental / Pipeline Protocol",
+          "Controls & QC Thresholds",
+          "Statistical & Compliance Plan"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Control & Replicate Integrity",
+            "criteria": "Positive, negative, and technical/biological replicates are explicitly defined",
+            "validation_method": "Experimental design review"
+          },
+          {
+            "step_number": 2,
+            "name": "QC & Statistical Rigor",
+            "criteria": "Batch-effect correction, multiple-testing adjustment (FDR), and QC cutoffs are specified",
+            "validation_method": "Biostatistics audit"
+          },
+          {
+            "step_number": 3,
+            "name": "Biosafety & GxP Compliance",
+            "criteria": "Adheres to BSL containment, data integrity (ALCOA+), and regulatory standards",
+            "validation_method": "Biosafety & QA review"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Includes explicit positive/negative controls, replicate structure, and QC acceptance criteria",
+          "Applies appropriate statistical corrections (e.g. FDR, batch-effect modeling) without p-hacking",
+          "Flags biosafety, reproducibility, and GxP/regulatory documentation gates"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume strict experimental reproducibility, version-pinned pipelines, and explicit QC gates",
+          "Assume applicable biosafety (BSL) and regulatory/ethical oversight requirements"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Construct the requested biotech or bioinformatics protocol with explicit biological controls, QC thresholds, statistical methodology, and reproducibility/compliance checkpoints."
+      },
+      "output_blueprints": {
+        "build": [
+          "Biological Objective & Controls",
+          "Protocol / Pipeline Architecture",
+          "QC & Statistical Analysis",
+          "Validation & Compliance Gates"
+        ]
+      },
+      "persona_guardrails": [
+        "evidence_based_only",
+        "cite_sources_required",
+        "regulatory_compliance"
+      ]
+    },
+    {
+      "domain": "media-journalism",
+      "aliases": [
+        "journalism",
+        "editorial",
+        "publishing",
+        "communications",
+        "public-relations"
+      ],
+      "boost": 2,
+      "keywords": [
+        "press-release",
+        "editorial",
+        "fact-check",
+        "journalism",
+        "newsroom",
+        "investigative",
+        "op-ed",
+        "media-kit",
+        "crisis-comms",
+        "headline",
+        "byline",
+        "embargo",
+        "source-attribution",
+        "newsletter",
+        "broadcast"
+      ],
+      "persona_template": "Senior {role} specializing in investigative editorial standards, source verification, strategic communications, and clear narrative craft.",
+      "phase_templates": {
+        "build": [
+          {
+            "phase_number": 1,
+            "name": "Angle, Audience & Source Verification",
+            "description": "Define editorial angle, target readership, primary sources, and fact-check inventory.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Editorial Brief",
+              "Primary Source Log"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Drafting & Structural Edit",
+            "description": "Draft copy with strong lede, attributed quotes/data, and tight narrative pacing.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Structured Draft",
+              "Headline & Subhead Options"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Fact-Check, Legal & Publication",
+            "description": "Verify every claim/quote against primary sources and clear defamation/embargo checks.",
+            "estimated_duration": "1 day",
+            "deliverables": [
+              "Fact-Check Sign-Off",
+              "Publication-Ready Copy"
+            ]
+          }
+        ],
+        "default": [
+          {
+            "phase_number": 1,
+            "name": "Brief & Source Audit",
+            "description": "Define angle, audience, and verified primary sources.",
+            "estimated_duration": "1-2 days",
+            "deliverables": [
+              "Editorial Brief"
+            ]
+          },
+          {
+            "phase_number": 2,
+            "name": "Draft & Narrative Edit",
+            "description": "Craft clear, attributed copy tuned to target publication style.",
+            "estimated_duration": "2-3 days",
+            "deliverables": [
+              "Editorial Draft"
+            ]
+          },
+          {
+            "phase_number": 3,
+            "name": "Fact-Check & Distribution",
+            "description": "Verify claims, clear legal/embargo rules, and prepare distribution.",
+            "estimated_duration": "1 day",
+            "deliverables": [
+              "Fact-Check & Distribution Plan"
+            ]
+          }
+        ]
+      },
+      "context_fields": [
+        "publication_format",
+        "target_readership",
+        "house_style",
+        "embargo_or_legal_constraints"
+      ],
+      "task_templates": {
+        "creation": "Draft publication-ready editorial or communications copy with strict source attribution and zero invented quotes.",
+        "default": "Deliver clear, verified editorial or communications material."
+      },
+      "default_deliverables": {
+        "default": [
+          "Headline & Lede",
+          "Attributed Body Copy",
+          "Fact-Check & Verification Notes"
+        ]
+      },
+      "validation_templates": {
+        "default": [
+          {
+            "step_number": 1,
+            "name": "Primary Source Attribution",
+            "criteria": "Every factual claim, statistic, and quote is attributed to a verifiable source (zero fabricated quotes)",
+            "validation_method": "Line-by-line fact-check"
+          },
+          {
+            "step_number": 2,
+            "name": "Style, Clarity & Neutrality",
+            "criteria": "Adheres to requested house style, active voice, and conflict-of-interest disclosure",
+            "validation_method": "Copy-desk editorial review"
+          },
+          {
+            "step_number": 3,
+            "name": "Legal & Defamation Clearance",
+            "criteria": "Flags right-of-reply, privacy, or embargo sensitivities before publication",
+            "validation_method": "Editorial legal check"
+          }
+        ]
+      },
+      "success_criteria_templates": {
+        "build": [
+          "Opens with a compelling, accurate lede matched to target readership and format",
+          "Zero fabricated quotes, statistics, or unnamed unverified assertions",
+          "Includes clear source attribution and editorial/legal fact-check notes"
+        ]
+      },
+      "assumption_templates": {
+        "default": [
+          "Assume strict journalistic ethics: never fabricate quotes, dates, or attribution",
+          "Assume unverified claims must be explicitly tagged for editorial fact-checking"
+        ]
+      },
+      "dynamic_instructions": {
+        "build": "Draft the requested editorial or communications piece with crisp structure, strict source attribution (zero invented quotes or stats), and an explicit fact-check checklist."
+      },
+      "output_blueprints": {
+        "build": [
+          "Headline & Lede",
+          "Core Narrative & Attribution",
+          "Supporting Context / Quotes",
+          "Fact-Check & Distribution Notes"
+        ]
+      },
+      "persona_guardrails": [
+        "cite_sources_required",
+        "maintain_narrative_voice",
         "accurate_and_thorough"
       ]
     }
