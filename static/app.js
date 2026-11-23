@@ -1211,6 +1211,122 @@ function launchInExternalAi(provider) {
     );
 }
 
+const DOMAIN_PLAYBOOKS = [
+    { domain: 'Real Estate', perspective: 'Consumer', title: 'First-Time Homebuyer Checklist', text: 'Walk me through buying a first home with a $450k budget, 20% down payment, fixed vs ARM mortgage comparison, and inspection contingencies without hidden closing fees.' },
+    { domain: 'Software Engineering', perspective: 'Practitioner', title: 'Auth Cookie 401 Root Cause', text: 'Users on Safari hit 401 unauthorized on /api/stats after clearing cookies while Chrome works. Trace SameSite/Partitioned cookie headers and propose a clean fix.' },
+    { domain: 'Legal & Compliance', perspective: 'Practitioner', title: 'SaaS MSA Risk Audit', text: 'Review this vendor SaaS agreement for uncapped indemnification, auto-renewal traps, and IP ownership clauses before Series A. Do not speculate on missing exhibits.' },
+    { domain: 'Finance & Strategy', perspective: 'Investor', title: 'Series A SaaS Underwriting', text: 'Analyze a B2B SaaS startup with $2.4M ARR, 118% NRR, and 18 months runway. Model burn multiple scenarios and highlight diligence red flags.' },
+    { domain: 'Healthcare', perspective: 'Practitioner', title: 'Clinical Triage Protocol', text: 'Draft an outpatient triage checklist for acute chest pain escalation criteria, contraindications, and EHR handoff fields without inventing dosage thresholds.' },
+    { domain: 'Cybersecurity', perspective: 'Practitioner', title: 'JWT & CORS Hardening', text: 'Audit an Axum REST API using HS256 JWTs in localStorage and CORS allowlists. List concrete OWASP mitigations and rotation steps.' },
+    { domain: 'E-Commerce', perspective: 'Practitioner', title: 'Checkout Drop-Off Diagnosis', text: 'Mobile checkout conversion dropped 14% after adding 3DS2 payment step. Outline instrumentation events, latency budgets, and A/B recovery tests.' },
+    { domain: 'Education', perspective: 'Consumer', title: '12-Week Rust Study Plan', text: 'Create a 12-week Rust systems programming curriculum for a Python developer, capped at 6 hours/week, focused on ownership, async Tokio, and SQLite.' },
+    { domain: 'Data Science', perspective: 'Practitioner', title: 'Hybrid RAG Eval Suite', text: 'Design an evaluation harness for hybrid BM25 + dense vector retrieval measuring Recall@5, MRR, and cross-tenant leak rate under 100ms latency.' },
+    { domain: 'Marketing & Growth', perspective: 'Practitioner', title: 'Developer PLG Funnel', text: 'Diagnose why 60% of guest sandbox visitors bounce before signup on a developer API tool and propose 3 high-ROI onboarding experiments.' },
+    { domain: 'Supply Chain', perspective: 'Practitioner', title: 'Safety Stock Reorder Model', text: 'Calculate reorder points and safety stock buffers for 3 SKUs with 14-day supplier lead time variance without assuming normal demand.' },
+    { domain: 'HR & Recruiting', perspective: 'Practitioner', title: 'Staff Engineer Rubric', text: 'Build a structured 4-dimension interview rubric for a Staff Rust Backend Engineer covering systems reliability, SQLite/Postgres concurrency, and mentorship.' }
+];
+
+function openPlaybookModal() {
+    const modal = document.getElementById('playbook-modal');
+    if (!modal) return;
+    renderPlaybooks('');
+    if (typeof modal.showModal === 'function') {
+        if (!modal.open) modal.showModal();
+    } else {
+        modal.style.display = 'flex';
+    }
+}
+
+function closePlaybookModal() {
+    const modal = document.getElementById('playbook-modal');
+    if (!modal) return;
+    if (typeof modal.close === 'function') {
+        if (modal.open) modal.close();
+    } else {
+        modal.style.display = 'none';
+    }
+}
+
+function renderPlaybooks(query) {
+    const grid = document.getElementById('playbook-grid');
+    if (!grid) return;
+    const q = (query || '').trim().toLowerCase();
+    const items = DOMAIN_PLAYBOOKS.filter(p =>
+        !q || p.domain.toLowerCase().includes(q) || p.title.toLowerCase().includes(q) || p.text.toLowerCase().includes(q)
+    );
+    grid.innerHTML = '';
+    items.forEach(p => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'preset-chip';
+        card.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:0.7rem;border-radius:0.65rem;gap:0.25rem;width:100%;';
+        card.innerHTML = `<span style="font-size:0.7rem;color:var(--accent-text);font-weight:700;">${escapeHtml(p.domain)} · ${escapeHtml(p.perspective)}</span>
+            <strong style="font-size:0.8rem;color:var(--head-text);">${escapeHtml(p.title)}</strong>`;
+        card.addEventListener('click', () => {
+            const input = document.getElementById('prompt-input');
+            if (input) {
+                input.value = p.text;
+                updateDetectedDomain(p.text);
+                if (typeof validatePromptLength === 'function') validatePromptLength();
+            }
+            closePlaybookModal();
+            compress();
+        });
+        grid.appendChild(card);
+    });
+}
+
+function showPrivacyLocalInfo() {
+    if (State.token && typeof switchTab === 'function') {
+        switchTab('ask');
+        if (typeof RagWorkspace !== 'undefined' && typeof RagWorkspace.setDataSource === 'function') {
+            RagWorkspace.setDataSource('own');
+        }
+        showToast('Switched to Own Data (100% Local RAG on 127.0.0.1:49152).', 'success');
+        return;
+    }
+    showToast('Own Data Local Companion indexes .pdf/.docx on 127.0.0.1:49152 — zero bytes uploaded. Sign in to open Ask My Docs.', 'success');
+}
+
+function exportAuditSvg() {
+    if (!State.lastResult) return showToast('Compress a prompt first to save an SVG card.', 'error');
+    const r = State.lastResult;
+    const orig = r.token_original || 0;
+    const fin = r.token_final || 0;
+    const saved = r.token_saved || 0;
+    const pct = orig > 0 ? Math.round((saved / orig) * 100) : 0;
+    const ds = r.dual_score || {};
+    const tes = Number(r.tes_score ?? ds.tes ?? 0).toFixed(2);
+    const sfs = Number(ds.sfs ?? 0).toFixed(2);
+    const scs = Number(ds.scs ?? 0).toFixed(2);
+    const scale = State.currentRoiScale || 1000;
+    const scaleLabel = scale >= 1000000 ? '1M/mo' : (scale >= 100000 ? '100k/mo' : '1k runs');
+    const estSavings = ((saved / 1000) * (State.currentModelRate || 0.005) * scale).toFixed(2);
+    const modeLabel = escapeHtml(String(r.mode || State.currentMode || 'balanced').toUpperCase());
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="680" height="240" viewBox="0 0 680 240">
+  <rect width="680" height="240" rx="16" fill="#0f172a"/>
+  <rect x="1" y="1" width="678" height="238" rx="15" fill="none" stroke="#1e293b" stroke-width="2"/>
+  <text x="32" y="44" fill="#38bdf8" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="700">ORYX STUDIO · TOKEN &amp; GROUNDING AUDIT CARD</text>
+  <text x="648" y="44" text-anchor="end" fill="#94a3b8" font-family="monospace" font-size="12">MODE: ${modeLabel}</text>
+  <text x="32" y="102" fill="#f8fafc" font-family="Inter,system-ui,sans-serif" font-size="34" font-weight="800">${orig} → ${fin} tokens (${saved >= 0 ? `-${pct}%` : `+${Math.abs(pct)}%`})</text>
+  <text x="32" y="142" fill="#10b981" font-family="Inter,system-ui,sans-serif" font-size="18" font-weight="700">Est. Savings (${scaleLabel}): $${estSavings}</text>
+  <rect x="32" y="168" width="616" height="44" rx="10" fill="#1e293b"/>
+  <text x="52" y="195" fill="#e2e8f0" font-family="monospace" font-size="14">TES: ${tes}/10   ·   SFS: ${sfs}/10   ·   SCS: ${scs}/10</text>
+</svg>`;
+
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'oryx-audit-card.svg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Saved oryx-audit-card.svg!', 'success');
+}
+
 async function submitFeedback(rating) {
     if (!State.token) {
         showToast('Sign in to submit feedback.', 'error');

@@ -274,10 +274,89 @@ const RagWorkspace = {
         }
     },
 
+    lastVerifyReport: null,
+
+    renderVerifyReport(report) {
+        const outEl = document.getElementById('verify-result-box');
+        if (!outEl) return;
+        this.lastVerifyReport = report;
+        const esc = typeof escapeHtml === 'function'
+            ? escapeHtml
+            : (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const passed = Boolean(report.passed);
+        const scorePct = Math.round((Number(report.grounding_score || 0)) * 100);
+        const unsupported = Array.isArray(report.unsupported_claims) ? report.unsupported_claims : [];
+        const missing = Array.isArray(report.missing_items) ? report.missing_items : [];
+        const claims = Array.isArray(report.claims) ? report.claims : [];
+
+        const badgeBg = passed ? 'rgba(16,185,129,0.16)' : 'rgba(239,68,68,0.16)';
+        const badgeFg = passed ? '#10b981' : '#ef4444';
+
+        let html = `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.65rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <span style="padding:0.2rem 0.55rem;border-radius:999px;font-weight:700;font-size:0.72rem;background:${badgeBg};color:${badgeFg};">
+                        ${passed ? '✓ GROUNDED' : '✕ ISSUES FOUND'}
+                    </span>
+                    <span style="font-size:0.76rem;color:var(--head-text);font-weight:600;">Score: ${scorePct}%</span>
+                    <span style="font-size:0.72rem;color:var(--text-muted);">Unsupported: ${unsupported.length} · Missing: ${missing.length}</span>
+                </div>
+                <button type="button" class="copy-btn" onclick="RagWorkspace.exportVerifyReport()" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
+            </div>
+        `;
+
+        if (claims.length > 0) {
+            html += '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.5rem;">';
+            claims.forEach(c => {
+                const st = String(c.status || '').toUpperCase();
+                const color = st === 'FOUND' ? '#10b981' : (st === 'PARTIAL_MATCH' ? '#f59e0b' : '#ef4444');
+                const bg = st === 'FOUND' ? 'rgba(16,185,129,0.08)' : (st === 'PARTIAL_MATCH' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)');
+                html += `<div style="padding:0.4rem 0.55rem;border-radius:0.45rem;background:${bg};border-left:3px solid ${color};font-size:0.74rem;">
+                    <strong style="color:${color};">${esc(st)}</strong> · ${esc(c.item || c.claim || JSON.stringify(c))}
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (unsupported.length > 0) {
+            html += '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.5rem;">';
+            unsupported.forEach(u => {
+                html += `<div style="padding:0.4rem 0.55rem;border-radius:0.45rem;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;font-size:0.74rem;">
+                    <strong style="color:#ef4444;">${esc(u.issue || 'UNSUPPORTED')}</strong>: ${esc(u.detail || u.claim || JSON.stringify(u))}
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (missing.length > 0) {
+            html += `<div style="padding:0.4rem 0.55rem;border-radius:0.45rem;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;font-size:0.74rem;">
+                <strong style="color:#f59e0b;">MISSING ITEMS:</strong> ${missing.map(esc).join(', ')}
+            </div>`;
+        }
+
+        outEl.style.display = 'block';
+        outEl.innerHTML = html;
+    },
+
+    exportVerifyReport() {
+        if (!this.lastVerifyReport) return;
+        const r = this.lastVerifyReport;
+        const md = [
+            '### Oryx Studio — Grounding Verification Report',
+            `- **Status:** ${r.passed ? 'PASSED' : 'FAILED'}`,
+            `- **Grounding Score:** ${Math.round((Number(r.grounding_score || 0)) * 100)}%`,
+            `- **Unsupported Claims:** ${(r.unsupported_claims || []).length}`,
+            `- **Missing Items:** ${(r.missing_items || []).length}`
+        ].join('\n');
+        navigator.clipboard.writeText(md).then(() => {
+            showToast('Verification report copied!', 'success');
+        }).catch(err => showToast('Copy failed: ' + err.message, 'error'));
+    },
+
     async runVerify() {
         const factsRaw = document.getElementById('verify-facts-input')?.value.trim() || '';
         const answerRaw = document.getElementById('verify-answer-input')?.value.trim() || '';
-        const outEl = document.getElementById('verify-result-box');
 
         if (!answerRaw) {
             return showToast('Paste the LLM reply to verify.', 'error');
@@ -295,10 +374,7 @@ const RagWorkspace = {
                 numbered_facts,
                 requested_items: []
             });
-            if (outEl) {
-                outEl.style.display = 'block';
-                outEl.textContent = JSON.stringify(report, null, 2);
-            }
+            this.renderVerifyReport(report);
             showToast('Verification complete.', 'success');
         } catch (err) {
             showToast(err.message || 'Verification failed', 'error');

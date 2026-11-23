@@ -233,7 +233,7 @@
                     <div class="tab-content active" role="tabpanel" aria-labelledby="nav-compress" id="tab-compress">
                         <div class="tag">CRISP Optimization · Dual-Column Workbench</div>
 
-                        <!-- 1-Click Sample Presets (R1) -->
+                        <!-- 1-Click Sample Presets & Domain Playbooks (R1) -->
                         <div class="preset-strip">
                             <span class="preset-label">Try sample:</span>
                             <button type="button" class="preset-chip" data-preset="house" id="preset-house"
@@ -242,6 +242,10 @@
                                 onclick="loadPreset('bug')">🐛 Bug Report</button>
                             <button type="button" class="preset-chip" data-preset="legal" id="preset-legal"
                                 onclick="loadPreset('legal')">⚖️ Contract Review</button>
+                            <button type="button" class="preset-chip" id="btn-open-playbooks"
+                                onclick="openPlaybookModal()">📚 Playbooks (12+ Domains)</button>
+                            <button type="button" class="preset-chip" id="btn-private-local-badge"
+                                onclick="showPrivacyLocalInfo()" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Zero-Upload Local Docs</button>
                         </div>
 
                         <div class="workbench-split" data-workbench-split id="workbench-container">
@@ -427,6 +431,8 @@
                                                 onclick="launchInExternalAi('claude')" title="Copy prompt and open in Claude">↗ Claude</button>
                                             <button type="button" class="copy-btn" id="export-audit-btn"
                                                 onclick="exportAuditCard()" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
+                                            <button type="button" class="copy-btn" id="export-svg-btn"
+                                                onclick="exportAuditSvg()" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
                                             <button type="button" class="copy-btn" id="btn-verify-workbench"
                                                 onclick="openWorkbenchVerifyModal()" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
                                         </div>
@@ -797,8 +803,22 @@
             </div>
             <button type="button" class="tc-compress-btn" onclick="RagWorkspace.runVerify()">Run Grounding
                 Check</button>
-            <pre id="verify-result-box" class="output-box"
-                style="display:none;margin-top:0.75rem;max-height:11rem;overflow:auto;font-size:0.74rem;"></pre>
+            <div id="verify-result-box" class="output-box"
+                style="display:none;margin-top:0.75rem;max-height:14rem;overflow:auto;font-family:'Inter',sans-serif;"></div>
+        </div>
+    </dialog>
+
+    <dialog id="playbook-modal" class="studio-dialog" aria-labelledby="playbook-modal-title">
+        <div class="dialog-inner">
+            <div class="dialog-header">
+                <h2 id="playbook-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Domain Playbooks</h2>
+                <button type="button" class="btn-ghost" onclick="closePlaybookModal()" aria-label="Close Playbooks">✕</button>
+            </div>
+            <div class="form-row">
+                <label for="playbook-search" class="visually-hidden">Filter playbooks</label>
+                <input type="text" id="playbook-search" class="tc-input" placeholder="Filter by domain (e.g. Healthcare, Finance, Legal, DevOps)..." oninput="renderPlaybooks(this.value)">
+            </div>
+            <div id="playbook-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.65rem;max-height:22rem;overflow:auto;margin-top:0.5rem;"></div>
         </div>
     </dialog>
 
