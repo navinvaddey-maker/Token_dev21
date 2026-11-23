@@ -277,7 +277,7 @@ impl ScenarioToolRouter {
             .iter()
             .map(|tool| {
                 format!(
-                    "Dispatched tool '{}' [domain: '{}', target_terms: [{}], context_bytes: {}]",
+                    "Declared tool capability (not executed) '{}' [domain: '{}', target_terms: [{}], context_bytes: {}]",
                     tool,
                     domain.key,
                     target_terms,

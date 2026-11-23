@@ -870,28 +870,53 @@ fn extract_domain_terms(text: &str) -> HashSet<String> {
         .collect()
 }
 
+/// Extracts temporal/period/version qualifiers (e.g. `q1`, `q2`, `2025`, `2026`, `fy24`, `v2`)
+/// so metrics from distinct time periods are not falsely flagged as contradictions.
+fn extract_period_qualifiers(text: &str) -> HashSet<String> {
+    text.split(|c: char| !c.is_alphanumeric())
+        .map(str::to_lowercase)
+        .filter(|w| {
+            matches!(w.as_str(), "q1" | "q2" | "q3" | "q4")
+                || (w.len() == 4
+                    && w.chars().all(|c| c.is_ascii_digit())
+                    && (w.starts_with("19") || w.starts_with("20")))
+                || (w.starts_with("fy")
+                    && w.len() >= 4
+                    && w[2..].chars().all(|c| c.is_ascii_digit()))
+                || (w.starts_with('v')
+                    && w.len() >= 2
+                    && w[1..].chars().all(|c| c.is_ascii_digit()))
+        })
+        .collect()
+}
+
 /// Deterministically flags pairs of packed evidence items that share >= 2 domain terms but
 /// report disjoint numeric values (e.g., `"Q3 revenue was $4.2M"` vs `"Q3 revenue was $4.8M"`).
 fn detect_numeric_conflicts(items: &[EvidenceItem]) -> Vec<EvidenceConflict> {
     let mut conflicts = Vec::new();
-    let signatures: Vec<(HashSet<String>, HashSet<String>)> = items
+    let signatures: Vec<(HashSet<String>, HashSet<String>, HashSet<String>)> = items
         .iter()
         .map(|it| {
             (
                 extract_domain_terms(&it.text),
                 extract_numeric_tokens(&it.text),
+                extract_period_qualifiers(&it.text),
             )
         })
         .collect();
 
     for i in 0..items.len() {
-        let (ref terms_i, ref nums_i) = signatures[i];
+        let (ref terms_i, ref nums_i, ref periods_i) = signatures[i];
         if nums_i.is_empty() || terms_i.len() < 2 {
             continue;
         }
         for j in (i + 1)..items.len() {
-            let (ref terms_j, ref nums_j) = signatures[j];
+            let (ref terms_j, ref nums_j, ref periods_j) = signatures[j];
             if nums_j.is_empty() || terms_j.len() < 2 {
+                continue;
+            }
+            // Distinct time periods or versions (e.g. Q1 vs Q2, 2025 vs 2026) are not conflicts.
+            if !periods_i.is_empty() && !periods_j.is_empty() && periods_i.is_disjoint(periods_j) {
                 continue;
             }
             let mut shared: Vec<String> = terms_i.intersection(terms_j).cloned().collect();

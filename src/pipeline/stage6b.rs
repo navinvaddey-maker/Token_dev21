@@ -69,11 +69,11 @@ impl CandidateSnapshot {
         let self_compressed = input_tokens == 0 || self.output_tokens <= input_tokens;
         let other_compressed = input_tokens == 0 || other.output_tokens <= input_tokens;
 
-        if self_compressed != other_compressed {
-            return self_compressed;
-        }
         if self.guard_report.passed != other.guard_report.passed {
             return self.guard_report.passed;
+        }
+        if self_compressed != other_compressed {
+            return self_compressed;
         }
         let self_min = self.min_axis();
         let other_min = other.min_axis();

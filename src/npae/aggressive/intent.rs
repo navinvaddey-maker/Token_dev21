@@ -293,12 +293,16 @@ use once_cell::sync::Lazy;
 /// for static taxonomy keywords across requests (Step 2.2 / GAP-37).
 static EMBED_CACHE: Lazy<dashmap::DashMap<String, Vec<f32>>> = Lazy::new(dashmap::DashMap::new);
 
+const MAX_EMBED_CACHE: usize = 10_000;
+
 fn embed_cached(text: &str) -> Vec<f32> {
     if let Some(entry) = EMBED_CACHE.get(text) {
         return entry.value().clone();
     }
     let vec = embed_text(text);
-    EMBED_CACHE.insert(text.to_string(), vec.clone());
+    if EMBED_CACHE.len() < MAX_EMBED_CACHE {
+        EMBED_CACHE.insert(text.to_string(), vec.clone());
+    }
     vec
 }
 

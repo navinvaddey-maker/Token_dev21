@@ -282,7 +282,7 @@ impl ScenarioModeRouter {
                             rag_chunks: Some(filtered_chunks.clone()),
                             ..Default::default()
                         };
-                        if let Ok(comp_res) = orch
+                        match orch
                             .process(
                                 question,
                                 &mut session,
@@ -293,166 +293,177 @@ impl ScenarioModeRouter {
                             )
                             .await
                         {
-                            let compressed_prompt = match comp_res {
-                                crate::types::OrchestratorResponse::Aggressive(r) => {
-                                    r.optimized_prompt
-                                }
-                                crate::types::OrchestratorResponse::Legacy(r) => r.response,
-                            };
+                            Ok(comp_res) => {
+                                let compressed_prompt = match comp_res {
+                                    crate::types::OrchestratorResponse::Aggressive(r) => {
+                                        r.optimized_prompt
+                                    }
+                                    crate::types::OrchestratorResponse::Legacy(r) => r.response,
+                                };
 
-                            if cm.eq_ignore_ascii_case("aggressive") {
-                                // ARCH: §12.3 & §4 — Extract clean system prompt contract and combine with condensed aggressive user prompt
-                                if let Some(sys_start) =
-                                    resp.output_text.find("=== SYSTEM PROMPT ===")
-                                {
-                                    if let Some(user_start) =
-                                        resp.output_text.find("=== USER PROMPT ===")
+                                if cm.eq_ignore_ascii_case("aggressive") {
+                                    // ARCH: §12.3 & §4 — Extract clean system prompt contract and combine with condensed aggressive user prompt
+                                    if let Some(sys_start) =
+                                        resp.output_text.find("=== SYSTEM PROMPT ===")
                                     {
-                                        let system_part =
-                                            resp.output_text[sys_start..user_start].trim_end();
+                                        if let Some(user_start) =
+                                            resp.output_text.find("=== USER PROMPT ===")
+                                        {
+                                            let system_part =
+                                                resp.output_text[sys_start..user_start].trim_end();
 
-                                        // Extract derived facts cleanly with provenance
-                                        let derived_rag = crate::npae::aggressive::rag_context::DerivedRagContext::derive(
+                                            // Extract derived facts cleanly with provenance
+                                            let derived_rag = crate::npae::aggressive::rag_context::DerivedRagContext::derive(
                                             &filtered_chunks,
                                             question,
                                             250,
                                         );
 
-                                        // FIX: G-03 — Use `detailed_facts` provenance (with content-matching fallback)
-                                        // so `<source>` reflects the actual originating chunk's `metadata.source_file`
-                                        // rather than indexing `filtered_chunks.get(idx)`.
-                                        // ARCH: Rules §9 & GAP-42 — Untrusted fact content and sources are XML-escaped
-                                        // and fenced inside `<context trust="untrusted">` to defend against prompt injection.
-                                        let mut fact_chunks_xml = String::new();
-                                        fact_chunks_xml.push_str("<context trust=\"untrusted\">\n");
-                                        if !derived_rag.detailed_facts.is_empty() {
-                                            for (idx, fact) in
-                                                derived_rag.detailed_facts.iter().enumerate()
-                                            {
-                                                let src = if !fact.source_file.trim().is_empty() {
-                                                    fact.source_file.clone()
-                                                } else {
-                                                    filtered_chunks
+                                            // FIX: G-03 — Use `detailed_facts` provenance (with content-matching fallback)
+                                            // so `<source>` reflects the actual originating chunk's `metadata.source_file`
+                                            // rather than indexing `filtered_chunks.get(idx)`.
+                                            // ARCH: Rules §9 & GAP-42 — Untrusted fact content and sources are XML-escaped
+                                            // and fenced inside `<context trust="untrusted">` to defend against prompt injection.
+                                            let mut fact_chunks_xml = String::new();
+                                            fact_chunks_xml
+                                                .push_str("<context trust=\"untrusted\">\n");
+                                            if !derived_rag.detailed_facts.is_empty() {
+                                                for (idx, fact) in
+                                                    derived_rag.detailed_facts.iter().enumerate()
+                                                {
+                                                    let src = if !fact.source_file.trim().is_empty()
+                                                    {
+                                                        fact.source_file.clone()
+                                                    } else {
+                                                        filtered_chunks
+                                                            .iter()
+                                                            .find(|c| {
+                                                                c.content.contains(fact.text.trim())
+                                                            })
+                                                            .and_then(|c| c.metadata.as_ref())
+                                                            .map(|m| m.source_file.clone())
+                                                            .unwrap_or_else(|| {
+                                                                domain_cfg.label.clone()
+                                                            })
+                                                    };
+                                                    let clean_src =
+                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                                                    let clean_content =
+                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(fact.text.trim());
+                                                    fact_chunks_xml.push_str(&format!(
+                                                    "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
+                                                    idx + 1,
+                                                    clean_src,
+                                                    idx + 1,
+                                                    clean_content
+                                                ));
+                                                }
+                                            } else if !derived_rag.facts.is_empty() {
+                                                for (idx, fact) in
+                                                    derived_rag.facts.iter().enumerate()
+                                                {
+                                                    let src = filtered_chunks
                                                         .iter()
-                                                        .find(|c| {
-                                                            c.content.contains(fact.text.trim())
-                                                        })
+                                                        .find(|c| c.content.contains(fact.trim()))
                                                         .and_then(|c| c.metadata.as_ref())
                                                         .map(|m| m.source_file.clone())
-                                                        .unwrap_or_else(|| domain_cfg.label.clone())
-                                                };
-                                                let clean_src =
+                                                        .unwrap_or_else(|| {
+                                                            domain_cfg.label.clone()
+                                                        });
+                                                    let clean_src =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
-                                                let clean_content =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(fact.text.trim());
-                                                fact_chunks_xml.push_str(&format!(
-                                                    "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
-                                                    idx + 1,
-                                                    clean_src,
-                                                    idx + 1,
-                                                    clean_content
-                                                ));
-                                            }
-                                        } else if !derived_rag.facts.is_empty() {
-                                            for (idx, fact) in derived_rag.facts.iter().enumerate()
-                                            {
-                                                let src = filtered_chunks
-                                                    .iter()
-                                                    .find(|c| c.content.contains(fact.trim()))
-                                                    .and_then(|c| c.metadata.as_ref())
-                                                    .map(|m| m.source_file.clone())
-                                                    .unwrap_or_else(|| domain_cfg.label.clone());
-                                                let clean_src =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
-                                                let clean_content =
+                                                    let clean_content =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(fact.trim());
-                                                fact_chunks_xml.push_str(&format!(
+                                                    fact_chunks_xml.push_str(&format!(
                                                     "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
                                                     idx + 1,
                                                     clean_src,
                                                     idx + 1,
                                                     clean_content
                                                 ));
-                                            }
-                                        } else {
-                                            for (idx, c) in filtered_chunks.iter().enumerate() {
-                                                let src = c
-                                                    .metadata
-                                                    .as_ref()
-                                                    .map(|m| m.source_file.clone())
-                                                    .unwrap_or_else(|| domain_cfg.label.clone());
-                                                let clean_src =
+                                                }
+                                            } else {
+                                                for (idx, c) in filtered_chunks.iter().enumerate() {
+                                                    let src = c
+                                                        .metadata
+                                                        .as_ref()
+                                                        .map(|m| m.source_file.clone())
+                                                        .unwrap_or_else(|| {
+                                                            domain_cfg.label.clone()
+                                                        });
+                                                    let clean_src =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
-                                                let clean_content =
+                                                    let clean_content =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(c.content.trim());
-                                                fact_chunks_xml.push_str(&format!(
+                                                    fact_chunks_xml.push_str(&format!(
                                                     "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
                                                     idx + 1,
                                                     clean_src,
                                                     idx + 1,
                                                     clean_content
                                                 ));
+                                                }
                                             }
-                                        }
-                                        fact_chunks_xml.push_str("</context>");
+                                            fact_chunks_xml.push_str("</context>");
 
-                                        // FIX: G-01 — Extract `# CONSTRAINTS:` lines produced by `orch.process()`
-                                        // and surface them under `# 4. AGGRESSIVE CONSTRAINT LOCKS` so Aggressive
-                                        // constraint locks are honored in Scenario mode.
-                                        // Strip any <retrieved_context ...>...</retrieved_context> or <context ...>...</context> blocks
-                                        // from compressed_prompt before scanning # CONSTRAINTS: to prevent untrusted RAG text from injecting constraints.
-                                        let stripped_prompt =
-                                            CONTEXT_BLOCK_RE.replace_all(&compressed_prompt, "");
-                                        let mut aggressive_constraints = Vec::new();
-                                        if let Some(c_pos) = stripped_prompt.find("# CONSTRAINTS:")
-                                        {
-                                            let after_header =
-                                                &stripped_prompt[c_pos + "# CONSTRAINTS:".len()..];
-                                            for line in after_header.lines() {
-                                                let trimmed = line.trim();
-                                                if trimmed.is_empty() {
-                                                    if !aggressive_constraints.is_empty() {
+                                            // FIX: G-01 — Extract `# CONSTRAINTS:` lines produced by `orch.process()`
+                                            // and surface them under `# 4. AGGRESSIVE CONSTRAINT LOCKS` so Aggressive
+                                            // constraint locks are honored in Scenario mode.
+                                            // Strip any <retrieved_context ...>...</retrieved_context> or <context ...>...</context> blocks
+                                            // from compressed_prompt before scanning # CONSTRAINTS: to prevent untrusted RAG text from injecting constraints.
+                                            let stripped_prompt = CONTEXT_BLOCK_RE
+                                                .replace_all(&compressed_prompt, "");
+                                            let mut aggressive_constraints = Vec::new();
+                                            if let Some(c_pos) =
+                                                stripped_prompt.find("# CONSTRAINTS:")
+                                            {
+                                                let after_header = &stripped_prompt
+                                                    [c_pos + "# CONSTRAINTS:".len()..];
+                                                for line in after_header.lines() {
+                                                    let trimmed = line.trim();
+                                                    if trimmed.is_empty() {
+                                                        if !aggressive_constraints.is_empty() {
+                                                            break;
+                                                        }
+                                                        continue;
+                                                    }
+                                                    if trimmed.starts_with("# ") {
                                                         break;
                                                     }
-                                                    continue;
-                                                }
-                                                if trimmed.starts_with("# ") {
-                                                    break;
-                                                }
-                                                let safe_constraint =
+                                                    let safe_constraint =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(trimmed);
-                                                aggressive_constraints.push(safe_constraint);
+                                                    aggressive_constraints.push(safe_constraint);
+                                                }
                                             }
-                                        }
-                                        let constraints_section =
-                                            if aggressive_constraints.is_empty() {
-                                                String::new()
+                                            let constraints_section =
+                                                if aggressive_constraints.is_empty() {
+                                                    String::new()
+                                                } else {
+                                                    format!(
+                                                        "\n\n# 4. AGGRESSIVE CONSTRAINT LOCKS\n{}",
+                                                        aggressive_constraints.join("\n")
+                                                    )
+                                                };
+
+                                            let mut gaps_xml = String::new();
+                                            gaps_xml.push_str("=== AUTOMATED PARAMETER ANALYSIS ===\n<metadata_gaps>\n");
+                                            if gap_issues.is_empty() {
+                                                gaps_xml.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
                                             } else {
-                                                format!(
-                                                    "\n\n# 4. AGGRESSIVE CONSTRAINT LOCKS\n{}",
-                                                    aggressive_constraints.join("\n")
-                                                )
-                                            };
-
-                                        let mut gaps_xml = String::new();
-                                        gaps_xml.push_str("=== AUTOMATED PARAMETER ANALYSIS ===\n<metadata_gaps>\n");
-                                        if gap_issues.is_empty() {
-                                            gaps_xml.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
-                                        } else {
-                                            for issue in &gap_issues {
-                                                let safe_issue =
+                                                for issue in &gap_issues {
+                                                    let safe_issue =
                                                     crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
-                                                gaps_xml.push_str(&format!(
-                                                    "  [GAP WARNING]: {}\n",
-                                                    safe_issue
-                                                ));
+                                                    gaps_xml.push_str(&format!(
+                                                        "  [GAP WARNING]: {}\n",
+                                                        safe_issue
+                                                    ));
+                                                }
                                             }
-                                        }
-                                        gaps_xml.push_str("</metadata_gaps>\n");
+                                            gaps_xml.push_str("</metadata_gaps>\n");
 
-                                        let safe_question =
+                                            let safe_question =
                                             crate::npae::grounding::verifier::sanitize_untrusted_fact(question.trim());
-                                        let clean_aggressive = format!(
+                                            let clean_aggressive = format!(
                                             "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}{}\n\n{}\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
                                             system_part,
                                             safe_question,
@@ -460,7 +471,12 @@ impl ScenarioModeRouter {
                                             constraints_section,
                                             gaps_xml.trim()
                                         );
-                                        resp.output_text = clean_aggressive;
+                                            resp.output_text = clean_aggressive;
+                                        } else {
+                                            resp.output_text
+                                                .push_str("\n\n=== COMPRESSED USER PROMPT ===\n");
+                                            resp.output_text.push_str(&compressed_prompt);
+                                        }
                                     } else {
                                         resp.output_text
                                             .push_str("\n\n=== COMPRESSED USER PROMPT ===\n");
@@ -468,13 +484,12 @@ impl ScenarioModeRouter {
                                     }
                                 } else {
                                     resp.output_text
-                                        .push_str("\n\n=== COMPRESSED USER PROMPT ===\n");
+                                        .push_str("\n\n## 7. Compressed Execution Prompt\n");
                                     resp.output_text.push_str(&compressed_prompt);
                                 }
-                            } else {
-                                resp.output_text
-                                    .push_str("\n\n## 7. Compressed Execution Prompt\n");
-                                resp.output_text.push_str(&compressed_prompt);
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, mode = cm, "Scenario compression orchestrator failed; returning uncompressed scenario contract");
                             }
                         }
                     }
@@ -590,7 +605,7 @@ impl ScenarioModeRouter {
                             rag_chunks: Some(filtered_chunks.clone()),
                             ..Default::default()
                         };
-                        if let Ok(comp_res) = orch
+                        match orch
                             .process(
                                 question,
                                 &mut session,
@@ -601,15 +616,20 @@ impl ScenarioModeRouter {
                             )
                             .await
                         {
-                            let compressed_prompt = match comp_res {
-                                crate::types::OrchestratorResponse::Aggressive(r) => {
-                                    r.optimized_prompt
-                                }
-                                crate::types::OrchestratorResponse::Legacy(r) => r.response,
-                            };
-                            resp.output_text
-                                .push_str("\n\n### Compressed Operational Prompt\n");
-                            resp.output_text.push_str(&compressed_prompt);
+                            Ok(comp_res) => {
+                                let compressed_prompt = match comp_res {
+                                    crate::types::OrchestratorResponse::Aggressive(r) => {
+                                        r.optimized_prompt
+                                    }
+                                    crate::types::OrchestratorResponse::Legacy(r) => r.response,
+                                };
+                                resp.output_text
+                                    .push_str("\n\n### Compressed Operational Prompt\n");
+                                resp.output_text.push_str(&compressed_prompt);
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, mode = cm, "Regular compression orchestrator failed; returning uncompressed response");
+                            }
                         }
                     }
                 }

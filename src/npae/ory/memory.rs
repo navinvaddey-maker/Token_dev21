@@ -102,17 +102,26 @@ impl PatternMemory {
             }
         }
 
-        // Secondary: domain + objective similarity match
+        // Secondary: deterministic domain + objective overlap match (sorted by pattern_id)
+        let obj_words: HashSet<&str> = intent
+            .core_objective
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() >= 3)
+            .collect();
+        let mut best: Option<&LearnedPattern> = None;
         for pattern in self.patterns.values() {
             if pattern.domain_fingerprint == intent.inferred_domain
                 && pattern.success_rate >= 0.7
                 && pattern.usage_count >= 3
             {
-                return Some(pattern);
+                let matches_id = best.is_none_or(|b| pattern.pattern_id < b.pattern_id);
+                if obj_words.is_empty() || matches_id {
+                    best = Some(pattern);
+                }
             }
         }
 
-        None
+        best
     }
 
     /// Record a blueprint and its outcome into memory.

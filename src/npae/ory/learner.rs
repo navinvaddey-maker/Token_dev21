@@ -7,9 +7,7 @@
 use crate::npae::ory::semantic;
 use crate::npae::ory::types::{LearnedIntent, TokenAnalysis, TokenClass};
 use anyhow::Result;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
 
 /// Ory Learner: Deep semantic and domain learner for raw user prompts.
 #[derive(Debug)]
@@ -883,13 +881,21 @@ fn compute_confidence(analysis: &TokenAnalysis, domain: &str) -> f32 {
     confidence.clamp(0.05, 0.99)
 }
 
-/// Generate a fingerprint hash for pattern memory matching
+/// Generate a deterministic FNV-1a fingerprint hash for pattern memory matching.
 fn generate_fingerprint(objective: &str, domain: &str, signals: &[String]) -> String {
-    let mut hasher = DefaultHasher::new();
-    objective.hash(&mut hasher);
-    domain.hash(&mut hasher);
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut feed = |s: &str| {
+        for b in s.as_bytes() {
+            hash ^= u64::from(*b);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
+        }
+        hash ^= 0xff;
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    };
+    feed(objective);
+    feed(domain);
     for signal in signals {
-        signal.hash(&mut hasher);
+        feed(signal);
     }
-    format!("ory-{:016x}", hasher.finish())
+    format!("ory-{hash:016x}")
 }
