@@ -129,18 +129,18 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
     - **L3 (`l3_constraint.rs`):** Verify all extracted `CONSTRAINT_LOCK` / negation / forbidden-topic constraints are honored in the active output (removing reliance on `"fake_api_call()"` / `"magic_token"` sentinel strings in production logic).
   - **Verify:** Adversarial test suite with dropped negations, invented numeric claims, and format contradictions must fail `run_tri_layer` without containing `"magic_token"` or `"fake_api_call()"`.
 
-- [ ] **[AUD-10] Fix `Stage6b::CandidateSnapshot::is_better_than` ranking order** `P1-High` `Effort: XS` `[Pipeline / Safety]`
+- [x] **[AUD-10] Fix `Stage6b::CandidateSnapshot::is_better_than` ranking order** `P1-High` `Effort: XS` `[Pipeline / Safety]`
   - **Files:** `src/pipeline/stage6b.rs:68-84`
   - **Problem:** `self_compressed != other_compressed` currently beats `self.guard_report.passed != other.guard_report.passed`.
   - **Fix:** Put `guard_report.passed` **first** in the comparison hierarchy, followed by `self_compressed`, then `min_axis()` and `avg_score()`.
 
-- [ ] **[AUD-11] Fix `OryLearner` `DefaultHasher` instability & `PatternMemory::find_match` random domain fallback** `P1-High` `Effort: S` `[AI/ML / Determinism]`
+- [x] **[AUD-11] Fix `OryLearner` `DefaultHasher` instability & `PatternMemory::find_match` random domain fallback** `P1-High` `Effort: S` `[AI/ML / Determinism]`
   - **Files:** `src/npae/ory/learner.rs:10, 887-895`, `src/npae/ory/memory.rs:89-108`
   - **Fix:**
     - Replace `std::collections::hash_map::DefaultHasher` in `generate_fingerprint` with deterministic SHA-256 (first 8 bytes hex) or FNV-1a.
     - Replace `PatternMemory::find_match`'s arbitrary `HashMap` domain-only fallback with deterministic similarity matching on stored objective text/embeddings (cosine `>= 0.85` with deterministic tie-breaking by `pattern_id`).
 
-- [ ] **[AUD-12] Fix `detect_numeric_conflicts` false positives on time-series & multi-entity evidence** `P1-High` `Effort: S` `[Grounding]`
+- [x] **[AUD-12] Fix `detect_numeric_conflicts` false positives on time-series & multi-entity evidence** `P1-High` `Effort: S` `[Grounding]`
   - **Files:** `src/npae/aggressive/structurer/evidence.rs:841-926`
   - **Problem:** `extract_domain_terms` strips non-alphabetic tokens (`Q1`, `Q2`, `2025`, `2026`, `v1`, `v2`), falsely flagging normal quarter-over-quarter metrics as `[CONFLICT]`.
   - **Fix:** Extract temporal/version qualifiers (`Q1..Q4`, 4-digit years, `FY\d{2,4}`, `v\d+`, month names) per item and do **not** flag a conflict when two items carry distinct non-empty period/entity qualifiers.
@@ -149,14 +149,14 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
   - **Files:** `src/npae/aggressive/rag_context.rs:240-256`
   - **Fix:** Only drop a candidate sentence under `overlap_ratio >= 0.80` if the sentence adds **no** numeric, currency, or percentage values absent from (or unconfirmed in) the prompt, and retain provenance for verification queries.
 
-- [ ] **[AUD-14] Decouple `detect_knowledge_level` from `intent_vec` `max_val` & calibrate `estimate_tokens`** `P2-Medium` `Effort: M` `[AI/ML / Scoring]`
+- [x] **[AUD-14] Decouple `detect_knowledge_level` from `intent_vec` `max_val` & calibrate `estimate_tokens`** `P2-Medium` `Effort: M` `[AI/ML / Scoring]`
   - **Files:** `src/npae/aggressive/intent.rs:155-202`, `src/npae/aggressive/engine.rs:553-574`, `src/utils/tokens.rs:1-5`
   - **Fix:**
     - Base `detect_knowledge_level` strictly on domain vocabulary density and technical syntax markers rather than normalized `intent_vec` `max_val`.
     - Upgrade `estimate_tokens` from `words * 1.3` to a BPE-calibrated subword estimator (handling code symbols, camelCase/snake_case, URLs, JSON punctuation, and numbers accurately, or integrating `tiktoken-rs`).
     - Bound `EMBED_CACHE` (`src/npae/aggressive/intent.rs:294`) with a max capacity (e.g., `10_000` entries) as defense-in-depth.
 
-- [ ] **[AUD-15] Clean up Scenario mode & deprecated legacy pipeline artifacts** `P2-Medium` `Effort: S` `[Cleanup / Architecture]`
+- [x] **[AUD-15] Clean up Scenario mode & deprecated legacy pipeline artifacts** `P2-Medium` `Effort: S` `[Cleanup / Architecture]`
   - **Files:** `src/scenario/router.rs:279-294, 587-602`, `src/scenario/pipeline.rs:260-289`, `src/engine/pipeline.rs`, `src/data.rs`
   - **Fix:**
     - In `ScenarioModeRouter`, surface or log `orch.process()` errors instead of silent `if let Ok(...)` and reuse per-user session state from `AppState.sessions` where appropriate.
@@ -167,15 +167,15 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
 
 ## Phase 4 — Growth & Client-Value Features (Week 2+)
 
-- [ ] **[GRW-01] Inline 1-Click "Verify LLM Reply" inside Workbench** `High ROI` `Effort: S` `[Product / UX]`
+- [x] **[GRW-01] Inline 1-Click "Verify LLM Reply" inside Workbench** `High ROI` `Effort: S` `[Product / UX]`
   - **Files:** `static/index.html`, `static/app.js`, `static/rag_workspace.js`
   - Auto-bind `StructuredPromptResponse.grounding_facts` + `optimized_prompt` into a "Verify LLM Output" panel directly on the main Optimize Prompt tab (eliminating manual line-by-line fact copying).
 
-- [ ] **[GRW-02] Interactive Clarifying Question Quick-Fill Pills** `High ROI` `Effort: S` `[Product / UX]`
+- [x] **[GRW-02] Interactive Clarifying Question Quick-Fill Pills** `High ROI` `Effort: S` `[Product / UX]`
   - **Files:** `static/app.js`, `static/index.html`
   - Render `clarifying_questions` returned by `AggressiveEngine` as clickable answer chips that append resolved context and re-run compression in 1 click.
 
-- [ ] **[GRW-03] Real Word-Level Diff + Shareable "Token & Grounding Audit Card"** `Medium ROI` `Effort: M` `[Growth / Viral]`
+- [x] **[GRW-03] Real Word-Level Diff + Shareable "Token & Grounding Audit Card"** `Medium ROI` `Effort: M` `[Growth / Viral]`
   - **Files:** `static/app.js`
   - Replace the single `<del>` summary line with an inline diff + real backend `# ROLE:`/`# CONSTRAINTS:`/`<facts>` highlighting, plus a 1-click Markdown/SVG summary export (`Tokens Saved`, `$ Saved / 1k runs`, `Constraint Recall`, `Grounding Score`).
 

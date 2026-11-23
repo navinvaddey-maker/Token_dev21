@@ -414,8 +414,13 @@
                                             </select>
                                             <button type="button" class="copy-btn" id="copy-result-btn"
                                                 onclick="copyResult()">📋 Copy</button>
+                                            <button type="button" class="copy-btn" id="export-audit-btn"
+                                                onclick="exportAuditCard()" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
+                                            <button type="button" class="copy-btn" id="btn-verify-workbench"
+                                                onclick="openWorkbenchVerifyModal()" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
                                         </div>
                                     </div>
+                                    <div id="clarifying-pills" class="preset-strip" style="display: none; margin-top: 0.5rem;"></div>
 
                                     <div class="feedback-row">
                                         <span id="feedback-status"

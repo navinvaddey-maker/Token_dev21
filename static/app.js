@@ -1068,7 +1068,9 @@ function renderResult(result) {
             const rawInput = document.getElementById('prompt-input')?.value || '';
             const diffSummary = computePrunedTokenSummary(rawInput, promptText, saved, result.pruned_summary);
             const formattedPrompt = escapeHtml(promptText)
-                .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS)\]/g, '<span class="crisp-tag">[$1]</span>');
+                .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS)\]/g, '<span class="crisp-tag">[$1]</span>')
+                .replace(/^(# (?:ROLE|TASK \/ INSTRUCTION|CONTEXT|CONSTRAINTS|OUTPUT BLUEPRINT|SUCCESS CRITERIA|EXECUTION PHASES|CLARIFYING QUESTIONS):)/gm, '<span class="crisp-tag">$1</span>')
+                .replace(/(\*\*(?:Role|Task|Constraints|Deliverables):\*\*)/g, '<span class="crisp-tag">$1</span>');
 
             elOutput.innerHTML = `<del class="diff-removed">- ${escapeHtml(diffSummary)}</del>\n${formattedPrompt}`;
         } else {
@@ -1089,6 +1091,72 @@ function renderResult(result) {
         btn.title = isAuthed ? '' : 'Sign in to submit feedback';
     });
     if (fbStatus) fbStatus.style.display = 'none';
+
+    // GRW-02: Interactive Clarifying Question Quick-Fill Pills
+    const pillsEl = document.getElementById('clarifying-pills');
+    if (pillsEl) {
+        const qs = Array.isArray(result.clarifying_questions) ? result.clarifying_questions : [];
+        if (qs.length > 0) {
+            pillsEl.style.display = 'flex';
+            pillsEl.innerHTML = '<span class="preset-label">Clarify:</span>';
+            qs.slice(0, 3).forEach(q => {
+                const qText = typeof q === 'string' ? q : (q.question || q.slot || '');
+                if (!qText) return;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'preset-chip';
+                btn.textContent = `+ ${qText.length > 48 ? qText.slice(0, 45) + '…' : qText}`;
+                btn.title = qText;
+                btn.addEventListener('click', () => {
+                    const input = document.getElementById('prompt-input');
+                    if (!input) return;
+                    const sep = input.value.trim().endsWith('\n') ? '' : '\n';
+                    input.value = `${input.value.trim()}${sep}Context: [${qText}: ]`;
+                    input.focus();
+                    validatePromptLength();
+                });
+                pillsEl.appendChild(btn);
+            });
+        } else {
+            pillsEl.style.display = 'none';
+            pillsEl.innerHTML = '';
+        }
+    }
+}
+
+function openWorkbenchVerifyModal() {
+    const factsEl = document.getElementById('verify-facts-input');
+    if (factsEl && State.lastResult && Array.isArray(State.lastResult.grounding_facts) && State.lastResult.grounding_facts.length > 0) {
+        factsEl.value = State.lastResult.grounding_facts
+            .map(f => `[${f.id}] ${f.text}`)
+            .join('\n');
+    }
+    if (typeof RagWorkspace !== 'undefined' && typeof RagWorkspace.openVerifyModal === 'function') {
+        RagWorkspace.openVerifyModal();
+    }
+}
+
+function exportAuditCard() {
+    if (!State.lastResult) return showToast('Compress a prompt first to export an audit card.', 'error');
+    const r = State.lastResult;
+    const orig = r.token_original || 0;
+    const fin = r.token_final || 0;
+    const saved = r.token_saved || 0;
+    const pct = orig > 0 ? Math.round((saved / orig) * 100) : 0;
+    const ds = r.dual_score || {};
+    const tes = r.tes_score ?? ds.tes ?? 0;
+    const sfs = ds.sfs ?? 0;
+    const scs = ds.scs ?? 0;
+    const card = [
+        '### Oryx Studio — Token & Grounding Audit Card',
+        `- **Mode:** \`${r.mode || State.currentMode}\``,
+        `- **Tokens:** ${orig} → ${fin} (${saved >= 0 ? `-${pct}%` : `+${Math.abs(pct)}%`})`,
+        `- **Scores (0–10):** TES \`${Number(tes).toFixed(2)}\` · SFS \`${Number(sfs).toFixed(2)}\` · SCS \`${Number(scs).toFixed(2)}\``,
+        `- **Est. Savings / 1k runs:** $${((saved / 1000) * (State.currentModelRate || 0.005) * 1000).toFixed(2)}`
+    ].join('\n');
+    navigator.clipboard.writeText(card).then(() => {
+        showToast('Audit Card copied to clipboard!', 'success');
+    }).catch(err => showToast('Copy failed: ' + err.message, 'error'));
 }
 
 async function submitFeedback(rating) {
