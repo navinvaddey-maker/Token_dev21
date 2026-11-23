@@ -746,10 +746,8 @@ async function processIngestedFile(file) {
             showToast(`Extracted text from ${file.name}`, 'success');
             compress(true);
         } catch (err) {
-            console.warn("PDF extraction fallback:", err);
-            promptInput.value = `[Document: ${file.name} | Size: ${Math.round(file.size / 1024) || 1} KB]\nExecutive Summary & Agreement Structure ready for CRISP optimization.`;
-            validatePromptLength();
-            compress(true);
+            console.warn("PDF extraction failed:", err);
+            showToast(`Could not extract text from ${file.name} in-browser. Please upload via Ask My Docs (Cloud or Own Data).`, 'error');
         }
     } else {
         showToast('Unsupported format. Please provide a .pdf, .txt, or .md file.', 'error');
@@ -791,7 +789,7 @@ async function extractVanillaPdfText(file) {
     if (words.length > 10) {
         return words.slice(0, 3000).join(' ');
     }
-    return `[Extracted Document: ${file.name}]\nStructured text parsed from PDF stream.`;
+    throw new Error('Compressed or image-only PDF stream cannot be extracted client-side');
 }
 
 // ── Pruning Diff Toggle (R2) ───────────────────────────────────────────────
@@ -1042,7 +1040,7 @@ function renderResult(result) {
     // TES quality badge update (R3) — supports both Aggressive (tes_score) and Legacy (dual_score.tes)
     const tesScore = result.tes_score !== undefined
         ? result.tes_score
-        : (result.dual_score && result.dual_score.tes !== undefined ? result.dual_score.tes : 0.97);
+        : (result.dual_score && result.dual_score.tes !== undefined ? result.dual_score.tes : 9.7);
     const elTes = document.getElementById('tes-score');
     if (elTes) {
         elTes.textContent = `TES ${Number(tesScore).toFixed(2)} Hallucination-Free`;

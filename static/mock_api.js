@@ -63,7 +63,7 @@ const MockAPI = {
             token_final: outTokens,
             token_saved: savedTokens,
             savings_pct: savedPct,
-            tes_score: 0.97,
+            tes_score: 9.7,
             domain: activeDomain,
             pruned_summary: `Removed filler: conversational hedging, redundant phrasing (${savedTokens} tokens)`,
             warnings: [],
@@ -108,7 +108,7 @@ const API = {
     },
 
     /**
-     * Dispatches compression. Routes to MockAPI when unauthenticated.
+     * Dispatches compression. Routes to MockAPI only when unauthenticated.
      */
     async compress(req) {
         // ARCH: §1 Reality Check — When unauthenticated, execute client-side sandbox compression
@@ -116,16 +116,10 @@ const API = {
             return MockAPI.compress(req);
         }
 
-        try {
-            return await this.call('/api/compress', {
-                method: 'POST',
-                body: JSON.stringify(req),
-            });
-        } catch (err) {
-            // Graceful fallback to sandbox mock compression if backend is offline or unauthorized
-            console.warn('Backend /api/compress failed, falling back to client-side sandbox:', err.message);
-            return MockAPI.compress(req);
-        }
+        return await this.call('/api/compress', {
+            method: 'POST',
+            body: JSON.stringify(req),
+        });
     },
 
     async feedback(req) {

@@ -283,16 +283,16 @@ const RagWorkspace = {
             return showToast('Paste the LLM reply to verify.', 'error');
         }
 
-        const facts = factsRaw
+        const numbered_facts = factsRaw
             .split(/\r?\n/)
             .map(l => l.trim())
             .filter(Boolean)
-            .map((content, idx) => ({ id: `F${idx + 1}`, content }));
+            .map((text, idx) => ({ id: `F${idx + 1}`, text }));
 
         try {
             const report = await API.verifyGrounding({
                 llm_answer: answerRaw,
-                facts,
+                numbered_facts,
                 requested_items: []
             });
             if (outEl) {

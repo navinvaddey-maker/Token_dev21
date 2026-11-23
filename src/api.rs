@@ -1096,27 +1096,22 @@ async fn rag_search(
             .collect()
     });
 
-    let q_text = params.query.clone();
-    let query_vector = tokio::task::spawn_blocking(move || {
-        crate::rag::embeddings::EmbeddingEngine::new().embed(&q_text)
-    })
-    .await
-    .map_err(|e| AppError::Internal(format!("Embedding worker error: {e}")))?;
+    let query = crate::rag::types::RetrievalQuery {
+        query_text: params.query,
+        user_id: auth.user_id.clone(),
+        document_ids: doc_ids,
+        top_k: params.top_k.unwrap_or(5).clamp(1, 20),
+        min_similarity: 0.25,
+    };
 
+    let retriever = crate::rag::retriever::DocumentRetriever::new((*state.rag_store).clone());
     let results = tokio::time::timeout(
         std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
-        state.rag_store.search_scoped(
-            &auth.tenant_id,
-            &query_vector,
-            &auth.user_id,
-            doc_ids.as_deref(),
-            params.top_k.unwrap_or(5).clamp(1, 20),
-            0.25,
-        ),
+        retriever.retrieve_scoped(&auth.tenant_id, &query, None),
     )
     .await
     .map_err(|_| AppError::Timeout("RAG search timed out".into()))?
-    .map_err(AppError::Database)?;
+    .map_err(AppError::Engine)?;
 
     Ok((StatusCode::OK, Json(results)).into_response())
 }

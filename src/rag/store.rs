@@ -540,7 +540,7 @@ impl RagStore {
         user_id: &str,
         limit: usize,
     ) -> Result<Vec<SearchResult>, sqlx::Error> {
-        self.search_fts_scoped("default", query_text, user_id, limit)
+        self.search_fts_scoped("default", query_text, user_id, None, limit)
             .await
     }
 
@@ -553,8 +553,15 @@ impl RagStore {
         tenant_id: &str,
         query_text: &str,
         user_id: &str,
+        document_ids: Option<&[String]>,
         limit: usize,
     ) -> Result<Vec<SearchResult>, sqlx::Error> {
+        if let Some(doc_ids) = document_ids {
+            if doc_ids.is_empty() {
+                return Ok(vec![]);
+            }
+        }
+
         let words: Vec<String> = query_text
             .split_whitespace()
             .map(|w| {
@@ -563,6 +570,7 @@ impl RagStore {
                     .collect::<String>()
             })
             .filter(|w| w.len() >= 3)
+            .map(|w| format!("\"{}\"", w.replace('"', "")))
             .collect();
 
         if words.is_empty() {
@@ -570,27 +578,59 @@ impl RagStore {
         }
 
         let match_expr = words.join(" OR ");
-        let query_str = "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
-                                d.filename, d.domain, c.embedding_model, c.model_version
-                         FROM rag_chunks_fts f
-                         JOIN rag_chunks c ON f.chunk_id = c.id
-                         JOIN rag_documents d ON c.document_id = d.id
-                         WHERE d.user_id = $1 AND d.tenant_id = $2 AND rag_chunks_fts MATCH $3
-                         ORDER BY bm25(rag_chunks_fts) ASC
-                         LIMIT $4";
+        let rows = if let Some(doc_ids) = document_ids {
+            let placeholders: Vec<String> =
+                (0..doc_ids.len()).map(|i| format!("${}", i + 5)).collect();
+            let in_clause = placeholders.join(", ");
+            let query_str = format!(
+                "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
+                        d.filename, d.domain, c.embedding_model, c.model_version
+                 FROM rag_chunks_fts f
+                 JOIN rag_chunks c ON f.chunk_id = c.id
+                 JOIN rag_documents d ON c.document_id = d.id
+                 WHERE d.user_id = $1 AND d.tenant_id = $2 AND d.status = 'ready' AND d.id IN ({}) AND rag_chunks_fts MATCH $3
+                 ORDER BY bm25(rag_chunks_fts) ASC
+                 LIMIT $4",
+                in_clause
+            );
+            let mut q = sqlx::query_as::<_, ChunkSearchRow>(&query_str)
+                .bind(user_id)
+                .bind(tenant_id)
+                .bind(&match_expr)
+                .bind(limit.clamp(1, 200) as i64);
+            for id in doc_ids {
+                q = q.bind(id);
+            }
+            match q.fetch_all(&self.pool).await {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::debug!("FTS5 search skipped or table pending: {}", e);
+                    return Ok(vec![]);
+                }
+            }
+        } else {
+            let query_str = "SELECT c.id, c.document_id, c.chunk_index, c.content, c.embedding, c.metadata, c.token_count, c.created_at,
+                                    d.filename, d.domain, c.embedding_model, c.model_version
+                             FROM rag_chunks_fts f
+                             JOIN rag_chunks c ON f.chunk_id = c.id
+                             JOIN rag_documents d ON c.document_id = d.id
+                             WHERE d.user_id = $1 AND d.tenant_id = $2 AND d.status = 'ready' AND rag_chunks_fts MATCH $3
+                             ORDER BY bm25(rag_chunks_fts) ASC
+                             LIMIT $4";
 
-        let rows = match sqlx::query_as::<_, ChunkSearchRow>(query_str)
-            .bind(user_id)
-            .bind(tenant_id)
-            .bind(&match_expr)
-            .bind(limit.clamp(1, 200) as i64)
-            .fetch_all(&self.pool)
-            .await
-        {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::debug!("FTS5 search skipped or table pending: {}", e);
-                return Ok(vec![]);
+            match sqlx::query_as::<_, ChunkSearchRow>(query_str)
+                .bind(user_id)
+                .bind(tenant_id)
+                .bind(&match_expr)
+                .bind(limit.clamp(1, 200) as i64)
+                .fetch_all(&self.pool)
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::debug!("FTS5 search skipped or table pending: {}", e);
+                    return Ok(vec![]);
+                }
             }
         };
 
@@ -788,7 +828,13 @@ impl RagStore {
         // UNVERIFIED/pre-existing: sparse errors are downgraded to "no sparse hits" here and in
         // search_fts (FTS table may be absent on old DBs). Left unchanged in P0; dense errors propagate.
         let sparse_results: Vec<SearchResult> = self
-            .search_fts_scoped(tenant_id, query_text, user_id, sparse_fetch_limit)
+            .search_fts_scoped(
+                tenant_id,
+                query_text,
+                user_id,
+                document_ids,
+                sparse_fetch_limit,
+            )
             .await
             .unwrap_or_default()
             .into_iter()
@@ -828,8 +874,8 @@ impl RagStore {
         Ok(fused
             .into_iter()
             .map(|(score, mut res)| {
-                // Scale and cap final score
-                res.similarity_score = (res.similarity_score + score * 5.0).min(1.0);
+                // Scale RRF score consistently with local.rs: (vec_rrf + lex_rrf) * (k * 0.5)
+                res.similarity_score = (score * (k * 0.5)).min(1.0);
                 res
             })
             .collect())
