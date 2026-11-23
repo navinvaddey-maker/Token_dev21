@@ -50,12 +50,18 @@ async fn main() -> anyhow::Result<()> {
 
     let db_url = env::var("DATABASE_URL")
         .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set"))?;
+    let connect_opts = db_url
+        .parse::<sqlx::sqlite::SqliteConnectOptions>()?
+        .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+        .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .foreign_keys(true);
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .min_connections(5)
         .max_connections(20)
         .idle_timeout(std::time::Duration::from_secs(300))
         .acquire_timeout(std::time::Duration::from_secs(10))
-        .connect(&db_url)
+        .connect_with(connect_opts)
         .await?;
 
     // Ensure Ory table exists (standardizing on SQLite for Ory memory)
@@ -110,14 +116,21 @@ async fn main() -> anyhow::Result<()> {
         Some(pool.clone()),
     ));
 
+    // Shared lock preventing FileWatcher and ConfigEnricher from racing on config/unified.json.
+    let config_file_lock = Arc::new(std::sync::Mutex::new(()));
+
     // Spawn FileWatcher background task
     let watcher_config_handle = npae_config.clone();
+    let watcher_file_lock = config_file_lock.clone();
     tokio::task::spawn_blocking(move || {
         if let Ok(mut watcher) = token_compress_engine::npae::aggressive::watcher::FileWatcher::new(
             "config/unified.json",
         ) {
             loop {
                 if watcher.wait_for_change(2000).is_ok() {
+                    let _guard = watcher_file_lock
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
                     if let Ok(new_config) =
                         token_compress_engine::npae::aggressive::config::ConfigLoader::load(
                             "config/unified.json",
@@ -133,6 +146,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Spawn ConfigEnricher background task (HumanGate by default)
     let enricher_config_handle = npae_config.clone();
+    let enricher_file_lock = config_file_lock;
     tokio::task::spawn_blocking(move || {
         let auto_merge = std::env::var("NPAE_AUTO_MERGE")
             .map(|v| v == "true" || v == "1")
@@ -151,6 +165,9 @@ async fn main() -> anyhow::Result<()> {
                     "config/feedback.json",
                 )
             {
+                let _guard = enricher_file_lock
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 let mut current_config = enricher_config_handle.read();
                 if let Ok(true) = enricher.process(&mut current_config, &mut store, 5) {
                     enricher_config_handle.swap(current_config.clone());

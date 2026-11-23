@@ -12,6 +12,12 @@ use similarity::{
 };
 use sqlx::SqlitePool;
 
+use once_cell::sync::Lazy;
+use std::sync::RwLock;
+
+/// In-memory cache of seeded `scenario_index` archetypes to avoid querying SQLite on every request.
+static ARCHETYPE_CACHE: Lazy<RwLock<Option<Vec<ScenarioRow>>>> = Lazy::new(|| RwLock::new(None));
+
 /// Number of archetypes to rank during top-k selection.
 const ARCHETYPE_TOP_K: usize = 3;
 
@@ -159,10 +165,20 @@ impl<'a> ScenarioClassifier<'a> {
                 count
             );
         }
+        // Invalidate cache so next lookup loads fresh vectors
+        if let Ok(mut guard) = ARCHETYPE_CACHE.write() {
+            *guard = None;
+        }
         Ok(())
     }
 
     async fn load_seeded_archetype_rows(&self) -> Result<Vec<ScenarioRow>, sqlx::Error> {
+        if let Ok(guard) = ARCHETYPE_CACHE.read() {
+            if let Some(ref cached) = *guard {
+                return Ok(cached.clone());
+            }
+        }
+
         let rows = sqlx::query_as::<_, (String, String, String, String, String, Vec<u8>)>(
             "SELECT label, domain, task_type, expertise, intent_class, vector_blob
              FROM scenario_index
@@ -172,7 +188,7 @@ impl<'a> ScenarioClassifier<'a> {
         .fetch_all(self.pool)
         .await?;
 
-        Ok(rows
+        let mapped: Vec<ScenarioRow> = rows
             .into_iter()
             .map(
                 |(label, domain, task_type, expertise, intent_class, vector_blob)| ScenarioRow {
@@ -184,6 +200,12 @@ impl<'a> ScenarioClassifier<'a> {
                     vector_blob,
                 },
             )
-            .collect())
+            .collect();
+
+        if let Ok(mut guard) = ARCHETYPE_CACHE.write() {
+            *guard = Some(mapped.clone());
+        }
+
+        Ok(mapped)
     }
 }

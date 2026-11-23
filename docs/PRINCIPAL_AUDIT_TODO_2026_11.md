@@ -88,14 +88,14 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
 
 ## Phase 2 — Concurrency, Locking, State Races & Local Companion Security (Days 2–4)
 
-- [ ] **[AUD-05] Enable SQLite WAL mode + `busy_timeout` and batch `PatternMemory::persist`** `P1-High` `Effort: S` `[DB / Infra]`
+- [x] **[AUD-05] Enable SQLite WAL mode + `busy_timeout` and batch `PatternMemory::persist`** `P1-High` `Effort: S` `[DB / Infra]`
   - **Files:** `src/main.rs:53-59`, `src/npae/ory/memory.rs:49-81`
   - **Fix:**
     - Build `SqliteConnectOptions::from_str(&db_url)?` with `.journal_mode(SqliteJournalMode::Wal)`, `.busy_timeout(Duration::from_secs(5))`, `.synchronous(SqliteSynchronous::Normal)`, and `.foreign_keys(true)`.
     - Track `dirty_keys: HashSet<String>` in `PatternMemory` and wrap `PatternMemory::persist` in a single `pool.begin()` transaction writing only dirty patterns.
   - **Verify:** Concurrency integration test spawning 32 parallel `/api/compress` + `OryEngine::save_to_db` + `rag_upload` calls against a temp file-backed SQLite DB with zero `SQLITE_BUSY` errors.
 
-- [ ] **[AUD-06] Fix ONNX embedding contention, batch PDF chunk embedding, and add cancellation on timeout** `P1-High` `Effort: M` `[RAG / Perf]`
+- [x] **[AUD-06] Fix ONNX embedding contention, batch PDF chunk embedding, and add cancellation on timeout** `P1-High` `Effort: M` `[RAG / Perf]`
   - **Files:** `src/rag/embeddings.rs:47-71, 108-157`, `src/rag/ingest.rs:273-356`, `src/classifier/mod.rs:59-85, 165-173`
   - **Fix:**
     - In `DocumentIngester::ingest_pdf_scoped` (`ingest.rs:335-340`), replace per-chunk `embeddings_engine.embed(&chunk.content)` loop with `embeddings_engine.embed_batch(&texts)`.
@@ -103,13 +103,13 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
     - Replace the single global `Mutex<TextEmbedding>` in `embeddings.rs` with a small bounded pool (e.g. `2–4` initialized `TextEmbedding` instances or configurable `FASTEMBED_POOL_SIZE`).
     - Cache `scenario_index` archetype rows + deserialized vectors in memory after `seed_archetype_vectors_on_startup()` instead of querying SQLite on every `/api/compress`.
 
-- [ ] **[AUD-07] Eliminate `ConfigEnricher` vs `FileWatcher` race & make `ConfigLoader::save` atomic** `P1-High` `Effort: S` `[Config / Runtime]`
+- [x] **[AUD-07] Eliminate `ConfigEnricher` vs `FileWatcher` race & make `ConfigLoader::save` atomic** `P1-High` `Effort: S` `[Config / Runtime]`
   - **Files:** `src/main.rs:115-166`, `src/npae/aggressive/config.rs:422-426`, `src/npae/aggressive/watcher.rs`
   - **Fix:**
     - Update `ConfigLoader::save` to write to a temp file in the same directory and `std::fs::rename` atomically.
     - Coordinate `FileWatcher` and `ConfigEnricher` via a shared `Arc<Mutex<()>>` (or unify into one background config task) so enricher saves update the watcher's `last_mtime` and never clobber concurrent manual edits.
 
-- [ ] **[AUD-08] Harden endpoint bounds, semaphore coverage, and `rag` local companion CORS/auth** `P1-High` `Effort: S` `[Security / API]`
+- [x] **[AUD-08] Harden endpoint bounds, semaphore coverage, and `rag` local companion CORS/auth** `P1-High` `Effort: S` `[Security / API]`
   - **Files:** `src/api.rs:335-349, 453-488, 788-815`, `src/bin/rag.rs:130-139`
   - **Fix:**
     - Remove `|| s == "null"` from `is_local_origin` in `src/bin/rag.rs:138` to block sandboxed-iframe / `data:` origin probing of `127.0.0.1:49152`. Add optional per-launch `RAG_AUTH_TOKEN` (`X-Local-Rag-Token`) support for `/retrieve` and `/reindex`.

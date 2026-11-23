@@ -7,7 +7,7 @@
 use crate::npae::ory::types::{DynamicBlueprint, LearnedIntent, LearnedPattern, PatternOutcome};
 use anyhow::Result;
 use chrono::Utc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Maximum number of in-memory learned patterns before bounded eviction.
 ///
@@ -16,6 +16,7 @@ pub const MAX_PATTERNS: usize = 10_000;
 
 pub struct PatternMemory {
     patterns: HashMap<String, LearnedPattern>,
+    dirty_keys: HashSet<String>,
     dirty: bool,
 }
 
@@ -24,6 +25,7 @@ impl PatternMemory {
     pub fn new() -> Self {
         Self {
             patterns: HashMap::new(),
+            dirty_keys: HashSet::new(),
             dirty: false,
         }
     }
@@ -41,41 +43,47 @@ impl PatternMemory {
 
         Ok(Self {
             patterns,
+            dirty_keys: HashSet::new(),
             dirty: false,
         })
     }
 
-    /// Persist patterns to SQLite if dirty
+    /// Persist dirty patterns to SQLite inside a single transaction.
     pub async fn persist(&mut self, pool: &sqlx::SqlitePool) -> Result<()> {
         if !self.dirty {
             return Ok(());
         }
 
-        for pattern in self.patterns.values() {
-            sqlx::query(
-                r#"
-                INSERT INTO learned_patterns 
-                (pattern_id, domain_fingerprint, intent_fingerprint, blueprint_json, usage_count, success_rate, last_used, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                ON CONFLICT(pattern_id) DO UPDATE SET
-                    usage_count = EXCLUDED.usage_count,
-                    success_rate = EXCLUDED.success_rate,
-                    last_used = EXCLUDED.last_used,
-                    blueprint_json = EXCLUDED.blueprint_json
-                "#
-            )
-            .bind(&pattern.pattern_id)
-            .bind(&pattern.domain_fingerprint)
-            .bind(&pattern.intent_fingerprint)
-            .bind(&pattern.blueprint_json)
-            .bind(pattern.usage_count as i64)
-            .bind(pattern.success_rate as f64)
-            .bind(pattern.last_used)
-            .bind(pattern.created_at)
-            .execute(pool)
-            .await?;
+        let mut tx = pool.begin().await?;
+        for key in &self.dirty_keys {
+            if let Some(pattern) = self.patterns.get(key) {
+                sqlx::query(
+                    r#"
+                    INSERT INTO learned_patterns 
+                    (pattern_id, domain_fingerprint, intent_fingerprint, blueprint_json, usage_count, success_rate, last_used, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT(pattern_id) DO UPDATE SET
+                        usage_count = EXCLUDED.usage_count,
+                        success_rate = EXCLUDED.success_rate,
+                        last_used = EXCLUDED.last_used,
+                        blueprint_json = EXCLUDED.blueprint_json
+                    "#
+                )
+                .bind(&pattern.pattern_id)
+                .bind(&pattern.domain_fingerprint)
+                .bind(&pattern.intent_fingerprint)
+                .bind(&pattern.blueprint_json)
+                .bind(pattern.usage_count as i64)
+                .bind(pattern.success_rate as f64)
+                .bind(pattern.last_used)
+                .bind(pattern.created_at)
+                .execute(&mut *tx)
+                .await?;
+            }
         }
+        tx.commit().await?;
 
+        self.dirty_keys.clear();
         self.dirty = false;
         Ok(())
     }
@@ -168,6 +176,7 @@ impl PatternMemory {
         let success_val = if outcome.success { 1.0 } else { 0.0 };
         entry.success_rate = ((entry.success_rate * (n - 1.0)) + success_val) / n;
 
+        self.dirty_keys.insert(intent.intent_fingerprint.clone());
         self.dirty = true;
         Ok(())
     }

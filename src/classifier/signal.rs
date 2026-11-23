@@ -63,7 +63,7 @@ impl ScenarioSignal {
 
 /// A raw row fetched from the `scenario_index` SQLite table.
 /// Used internally by ScenarioClassifier during top-k lookup.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScenarioRow {
     /// Composite key: "{domain}::{intent_class}::{expertise}"
     pub label: String,

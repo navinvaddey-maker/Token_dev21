@@ -419,9 +419,19 @@ impl ConfigLoader {
     ///
     /// # Panics
     /// Never panics.
+    /// Atomically serializes and writes `UnifiedConfig` as pretty-printed JSON to `path`.
+    ///
+    /// # Errors
+    /// Returns an error if JSON serialization, temp file write, or atomic rename fails.
+    ///
+    /// # Panics
+    /// Never.
     pub fn save<P: AsRef<Path>>(path: P, config: &UnifiedConfig) -> Result<()> {
+        let target = path.as_ref();
         let content = serde_json::to_string_pretty(config)?;
-        std::fs::write(path, content)?;
+        let tmp_path = target.with_extension("json.tmp");
+        std::fs::write(&tmp_path, content)?;
+        std::fs::rename(&tmp_path, target)?;
         Ok(())
     }
 }

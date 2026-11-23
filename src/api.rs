@@ -333,16 +333,12 @@ async fn user_rate_limit_middleware(
 }
 
 async fn admin_middleware(
-    State(state): State<AppState>,
     Extension(auth): Extension<AuthContext>,
     req: axum::http::Request<axum::body::Body>,
     next: middleware::Next,
 ) -> Result<axum::response::Response, AppError> {
+    // auth_middleware already reloaded authoritative `role` and `tenant_id` from SQLite.
     if !auth.role.eq_ignore_ascii_case("admin") {
-        return Err(AppError::Unauthorized);
-    }
-    let is_admin = domain::is_admin(&state.pool, &auth.user_id).await?;
-    if !is_admin {
         return Err(AppError::Unauthorized);
     }
     Ok(next.run(req).await)
@@ -462,19 +458,25 @@ async fn compress(
         .as_deref()
         .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"));
     let _permit = if is_aggressive {
-        Some(
-            state
-                .aggressive_sem
-                .clone()
-                .try_acquire_owned()
-                .map_err(|_| {
-                    AppError::TooManyRequests(
-                        "Deep Blueprint capacity reached; please retry shortly".into(),
-                    )
-                })?,
-        )
+        state
+            .aggressive_sem
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                AppError::TooManyRequests(
+                    "Deep Blueprint capacity reached; please retry shortly".into(),
+                )
+            })?
     } else {
-        None
+        state
+            .compress_sem
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                AppError::TooManyRequests(
+                    "Compression capacity reached; please retry shortly".into(),
+                )
+            })?
     };
 
     let resp = tokio::time::timeout(
@@ -790,6 +792,7 @@ async fn npae_hallucination_check(
     Json(req): Json<HallucinationCheckRequest>,
 ) -> Result<axum::response::Response, AppError> {
     validate_prompt_bounds(&req.original_prompt)?;
+    validate_prompt_bounds(&req.output)?;
     let default_cfg = crate::npae::schema::types::HallucinationGuardConfig {
         self_critique_enabled: true,
         confidence_threshold: 0.75,
@@ -806,11 +809,27 @@ async fn npae_hallucination_check(
 
 /// Verifies a downstream LLM response against numbered `[F#]` grounding facts (`GAP-42`).
 async fn npae_verify_grounding(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<crate::npae::grounding::verifier::VerifyGroundingRequest>,
 ) -> Result<axum::response::Response, AppError> {
-    let report = crate::npae::grounding::verifier::verify_grounding(&req)
-        .map_err(|e| AppError::Validation(e.to_string()))?;
+    validate_prompt_bounds(&req.llm_answer)?;
+    let _permit = state
+        .compress_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests("Verification capacity reached; please retry shortly".into())
+        })?;
+    let report = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        tokio::task::spawn_blocking(move || {
+            crate::npae::grounding::verifier::verify_grounding(&req)
+        }),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Grounding verification timed out".into()))?
+    .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+    .map_err(|e| AppError::Validation(e.to_string()))?;
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 

@@ -269,6 +269,8 @@ impl DocumentIngester {
         let config_clone = config.clone();
         let embeddings_engine = self.embeddings;
         let unified_cfg_opt = self.config_handle.as_ref().map(|h| h.read_arc());
+        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let cancelled_worker = Arc::clone(&cancelled);
 
         let timeout_result = tokio::time::timeout(
             std::time::Duration::from_secs(55),
@@ -330,13 +332,19 @@ impl DocumentIngester {
                 let detected_domain =
                     detect_domain(&first_two_pages_text, unified_cfg_opt.as_deref());
 
-                // Chunk the text
+                // Chunk the text and embed in bounded batches with cooperative cancellation
                 let mut chunks = chunk_text(&pages, &config_clone);
-                for chunk in &mut chunks {
-                    chunk.document_id = doc_id_clone.clone();
-                    // Generate embeddings for chunk content
-                    let vector = embeddings_engine.embed(&chunk.content);
-                    chunk.embedding = Some(vector);
+                const EMBED_BATCH_SIZE: usize = 32;
+                for batch in chunks.chunks_mut(EMBED_BATCH_SIZE) {
+                    if cancelled_worker.load(std::sync::atomic::Ordering::Relaxed) {
+                        return Err("PDF ingestion cancelled due to timeout".to_string());
+                    }
+                    let texts: Vec<String> = batch.iter().map(|c| c.content.clone()).collect();
+                    let vectors = embeddings_engine.embed_batch(&texts);
+                    for (chunk, vector) in batch.iter_mut().zip(vectors.into_iter()) {
+                        chunk.document_id = doc_id_clone.clone();
+                        chunk.embedding = Some(vector);
+                    }
                 }
 
                 Ok((pages.len(), chunks, detected_domain))
@@ -347,6 +355,7 @@ impl DocumentIngester {
         let result = match timeout_result {
             Ok(join_res) => join_res,
             Err(_) => {
+                cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
                 let _ = self
                     .store
                     .update_document_status(&doc_id, DocumentStatus::Failed, 0, 0, None)

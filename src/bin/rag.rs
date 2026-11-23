@@ -135,7 +135,6 @@ fn is_local_origin(origin: &HeaderValue) -> bool {
         || s.starts_with("http://localhost")
         || s.starts_with("https://127.0.0.1")
         || s.starts_with("https://localhost")
-        || s == "null"
 }
 
 fn sync_blocking(
