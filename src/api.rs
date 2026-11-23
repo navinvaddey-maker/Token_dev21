@@ -162,6 +162,7 @@ pub fn router(state: AppState) -> Router {
     let auth = Router::new()
         .route("/api/register", post(register))
         .route("/api/login", post(login))
+        .route("/api/demo/compress", post(demo_compress))
         .layer(middleware::from_fn_with_state(
             auth_limiter,
             auth_rate_limit_middleware,
@@ -444,6 +445,62 @@ pub struct CompressRequest {
     pub npae_confidence_threshold: Option<f32>,
     #[serde(default)]
     pub npae_render_style: Option<crate::npae::schema::types::RenderStyle>,
+}
+
+async fn demo_compress(
+    State(state): State<AppState>,
+    Json(mut req): Json<CompressRequest>,
+) -> Result<axum::response::Response, AppError> {
+    const MAX_DEMO_BYTES: usize = 8 * 1024;
+    const MAX_DEMO_WORDS: usize = 500;
+
+    if req.raw_text.trim().is_empty() {
+        return Err(AppError::EmptyInput);
+    }
+    if req.raw_text.len() > MAX_DEMO_BYTES
+        || req.raw_text.split_whitespace().count() > MAX_DEMO_WORDS
+    {
+        return Err(AppError::InputTooLarge);
+    }
+
+    // Never allow unauthenticated demo requests to query server-side RAG.
+    req.rag_enabled = Some(false);
+    req.rag_document_ids = None;
+
+    let is_aggressive = req
+        .mode
+        .as_deref()
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"));
+    let _permit = if is_aggressive {
+        state
+            .aggressive_sem
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                AppError::TooManyRequests(
+                    "Deep Blueprint capacity reached; please retry shortly".into(),
+                )
+            })?
+    } else {
+        state
+            .compress_sem
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| {
+                AppError::TooManyRequests(
+                    "Compression capacity reached; please retry shortly".into(),
+                )
+            })?
+    };
+
+    let resp = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        domain::compress_demo(&state, req),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Demo compression request timed out".into()))??;
+
+    Ok((StatusCode::OK, Json(resp)).into_response())
 }
 
 async fn compress(

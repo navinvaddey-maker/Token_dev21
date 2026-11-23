@@ -16,8 +16,9 @@ const State = {
     role: null,
     lastResult: null,
     lastTs: null,
-    currentMode: 'gentle',
+    currentMode: 'balanced',
     currentModelRate: 0.005, // Default GPT-4o: $0.005 / 1k tokens ($5 / 1M)
+    currentRoiScale: 1000,
     showDiff: true,
     guestUses: 0
 };
@@ -231,25 +232,23 @@ function incrementGuestUses() {
 }
 
 function syncModeAvailability() {
-    const isAuthed = Boolean(State.token);
     const modeConfig = {
         gentle: { label: 'Light Polish', title: 'Light Polish: conservative cleanup preserving structure' },
         balanced: { label: 'Smart Trim', title: 'Smart Trim: balanced pruning with full context fidelity' },
         aggressive: { label: 'Deep Blueprint', title: 'Deep Blueprint: expands your prompt into structured CRISP scaffolding for ~3,000-token comprehensive LLM output' }
     };
 
-    if (!isAuthed) {
-        State.currentMode = 'gentle';
+    if (!State.currentMode) {
+        State.currentMode = 'balanced';
     }
 
     ['gentle', 'balanced', 'aggressive'].forEach(m => {
         const btn = document.getElementById('pm-' + m);
         if (!btn) return;
-        const locked = !isAuthed && m !== 'gentle';
-        btn.disabled = locked;
-        btn.classList.toggle('mode-pill-disabled', locked);
-        btn.textContent = locked ? `${modeConfig[m].label} 🔒` : modeConfig[m].label;
-        btn.title = locked ? `Sign in to unlock ${modeConfig[m].label}` : modeConfig[m].title;
+        btn.disabled = false;
+        btn.classList.remove('mode-pill-disabled');
+        btn.textContent = modeConfig[m].label;
+        btn.title = modeConfig[m].title;
         const isActive = m === State.currentMode;
         btn.classList.toggle('active', isActive);
         btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
@@ -264,7 +263,7 @@ function syncModeAvailability() {
 function syncGuestFeatureAccess() {
     const isAuthed = Boolean(State.token);
 
-    // Restrict Guests strictly to the Optimize Prompt tab.
+    // Restrict Guests from persistent/cloud-only tabs (Ask, History, Insights).
     ['ask', 'history', 'stats'].forEach(tab => {
         const navBtn = document.getElementById('nav-' + tab);
         if (!navBtn) return;
@@ -280,23 +279,27 @@ function syncGuestFeatureAccess() {
         compressNav.setAttribute('aria-disabled', 'false');
     }
 
-    // Disable advanced server-backed options inside Optimize Prompt for Guests.
-    [
-        { inputId: 'opt-rag-enabled', labelId: 'opt-rag-label', hint: 'Sign in to unlock RAG grounding' },
-        { inputId: 'opt-harness-enabled', labelId: 'opt-harness-label', hint: 'Sign in to unlock Grounding Harness' }
-    ].forEach(({ inputId, labelId, hint }) => {
-        const el = document.getElementById(inputId);
-        const lbl = document.getElementById(labelId);
-        if (el) {
-            el.disabled = !isAuthed;
-            if (!isAuthed) el.checked = false;
-        }
-        if (lbl) {
-            lbl.style.opacity = isAuthed ? '1' : '0.5';
-            lbl.style.cursor = isAuthed ? 'pointer' : 'not-allowed';
-            lbl.title = isAuthed ? '' : hint;
-        }
-    });
+    // Keep Cloud RAG gated to Sign In, while allowing guests to try the Grounding Harness.
+    const ragEl = document.getElementById('opt-rag-enabled');
+    const ragLbl = document.getElementById('opt-rag-label');
+    if (ragEl) {
+        ragEl.disabled = !isAuthed;
+        if (!isAuthed) ragEl.checked = false;
+    }
+    if (ragLbl) {
+        ragLbl.style.opacity = isAuthed ? '1' : '0.5';
+        ragLbl.style.cursor = isAuthed ? 'pointer' : 'not-allowed';
+        ragLbl.title = isAuthed ? '' : 'Sign in to unlock RAG grounding';
+    }
+
+    const harnessEl = document.getElementById('opt-harness-enabled');
+    const harnessLbl = document.getElementById('opt-harness-label');
+    if (harnessEl) harnessEl.disabled = false;
+    if (harnessLbl) {
+        harnessLbl.style.opacity = '1';
+        harnessLbl.style.cursor = 'pointer';
+        harnessLbl.title = 'Wrap facts in untrusted XML & enforce citation contract';
+    }
 
     ['btn-feedback-up', 'btn-feedback-down'].forEach(id => {
         const btn = document.getElementById(id);
@@ -335,10 +338,10 @@ function updateUserBar() {
         }
     } else {
         const remaining = Math.max(0, GUEST_MAX_USES - getGuestUses());
-        if (statusText) statusText.innerHTML = `Operating in <strong id="display-username" style="color: #10b981;">Guest Mode (${remaining}/${GUEST_MAX_USES} Light Polish left)</strong>`;
+        if (statusText) statusText.innerHTML = `Operating in <strong id="display-username" style="color: #10b981;">Live Trial (${remaining}/${GUEST_MAX_USES} runs left)</strong>`;
         if (toggleBtn) toggleBtn.textContent = 'Sign In / Register';
         if (sandboxBadge) {
-            sandboxBadge.textContent = `● Guest Mode (${remaining}/${GUEST_MAX_USES} left)`;
+            sandboxBadge.textContent = `● Live Trial (${remaining}/${GUEST_MAX_USES} left)`;
             sandboxBadge.classList.remove('authenticated');
         }
         if (adminLink) adminLink.style.display = 'none';
@@ -578,6 +581,14 @@ function updateModelPricing() {
     updateCostMetrics();
 }
 
+function updateRoiScale() {
+    const scaleSelect = document.getElementById('roi-scale-select');
+    if (scaleSelect) {
+        State.currentRoiScale = parseInt(scaleSelect.value, 10) || 1000;
+    }
+    updateCostMetrics();
+}
+
 /**
  * Extracts phase and validation QA gate counts from an Aggressive Deep Architect prompt.
  */
@@ -619,8 +630,11 @@ function updateCostMetrics() {
     const costSavedEl = document.getElementById('cost-saved');
     if (!costSavedEl) return;
 
+    const scale = State.currentRoiScale || 1000;
+    const scaleLabel = scale >= 1000000 ? '1M/mo' : (scale >= 100000 ? '100k/mo' : '1k runs');
+
     if (!State.lastResult) {
-        costSavedEl.textContent = '$0.00 saved / 1k runs';
+        costSavedEl.textContent = `$0.00 saved / ${scaleLabel}`;
         return;
     }
 
@@ -632,10 +646,8 @@ function updateCostMetrics() {
 
     const savedTokens = State.lastResult.token_saved || 0;
     const rate = State.currentModelRate || 0.005;
-    // FIX: Defect 1 - Negative dollar savings on small inputs.
-    // ARCH: §5 NPAE Grounding & Evaluation — Formatted to $0.00 if savedTokens <= 0, never negative.
-    const savedDollar = savedTokens > 0 ? (savedTokens * rate).toFixed(2) : '0.00';
-    costSavedEl.textContent = `$${savedDollar} saved / 1k runs`;
+    const savedDollar = savedTokens > 0 ? ((savedTokens / 1000) * rate * scale).toFixed(2) : '0.00';
+    costSavedEl.textContent = `$${savedDollar} saved / ${scaleLabel}`;
 }
 
 // ── Domain Detection (R5) ──────────────────────────────────────────────────
@@ -660,11 +672,27 @@ function detectDomain(text) {
     return 'General';
 }
 
+function detectPerspective(text) {
+    const t = text.toLowerCase();
+    if (/\b(underwrite|irr|cap rate|portfolio|roi|capital allocation|yield|invest)\b/.test(t)) {
+        return 'Investor';
+    }
+    if (/\b(client|broker|counsel|audit|deploy|endpoint|architecture|debug|compliance review)\b/.test(t)) {
+        return 'Practitioner';
+    }
+    return 'Consumer';
+}
+
 function updateDetectedDomain(text) {
     const domain = detectDomain(text);
+    const perspective = detectPerspective(text);
     const domainNameEl = document.getElementById('domain-name');
     if (domainNameEl) {
         domainNameEl.textContent = domain;
+    }
+    const perspEl = document.getElementById('perspective-badge');
+    if (perspEl) {
+        perspEl.textContent = perspective;
     }
     return domain;
 }
@@ -856,7 +884,7 @@ async function compress(isSilent = false) {
     const promptInput = document.getElementById('prompt-input');
     const raw = promptInput ? promptInput.value.trim() : '';
     const isGuest = !State.token;
-    const mode = isGuest ? 'gentle' : (State.currentMode || document.getElementById('mode')?.value || 'balanced');
+    const mode = State.currentMode || document.getElementById('mode')?.value || 'balanced';
     const domain = document.getElementById('domain-name')?.textContent || updateDetectedDomain(raw);
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
@@ -867,7 +895,7 @@ async function compress(isSilent = false) {
     }
 
     if (isGuest && getGuestUses() >= GUEST_MAX_USES) {
-        showToast(`Guest limit reached (${GUEST_MAX_USES}/${GUEST_MAX_USES} Light Polish runs). Please sign in for unlimited access.`, 'error');
+        showToast(`Live Trial limit reached (${GUEST_MAX_USES}/${GUEST_MAX_USES} runs). Please sign in for unlimited access.`, 'error');
         if (!isSilent && typeof openAuthModal === 'function') {
             openAuthModal();
         }
@@ -911,7 +939,7 @@ async function compress(isSilent = false) {
     const minDelay = new Promise(r => setTimeout(r, isSilent ? 80 : 250));
 
     const ragEnabled = !isGuest && (document.getElementById('opt-rag-enabled')?.checked || false);
-    const renderStyle = (!isGuest && document.getElementById('opt-harness-enabled')?.checked) ? 'harness' : 'crisp';
+    const renderStyle = document.getElementById('opt-harness-enabled')?.checked ? 'harness' : 'crisp';
     const ragDocIds = (typeof RagWorkspace !== 'undefined' && ragEnabled) ? RagWorkspace.getSelectedDocIds() : [];
 
     try {
@@ -1147,16 +1175,40 @@ function exportAuditCard() {
     const tes = r.tes_score ?? ds.tes ?? 0;
     const sfs = ds.sfs ?? 0;
     const scs = ds.scs ?? 0;
+    const scale = State.currentRoiScale || 1000;
+    const scaleLabel = scale >= 1000000 ? '1M/mo' : (scale >= 100000 ? '100k/mo' : '1k runs');
+    const estSavings = ((saved / 1000) * (State.currentModelRate || 0.005) * scale).toFixed(2);
     const card = [
         '### Oryx Studio — Token & Grounding Audit Card',
         `- **Mode:** \`${r.mode || State.currentMode}\``,
         `- **Tokens:** ${orig} → ${fin} (${saved >= 0 ? `-${pct}%` : `+${Math.abs(pct)}%`})`,
         `- **Scores (0–10):** TES \`${Number(tes).toFixed(2)}\` · SFS \`${Number(sfs).toFixed(2)}\` · SCS \`${Number(scs).toFixed(2)}\``,
-        `- **Est. Savings / 1k runs:** $${((saved / 1000) * (State.currentModelRate || 0.005) * 1000).toFixed(2)}`
+        `- **Est. Savings (${scaleLabel}):** $${estSavings}`
     ].join('\n');
     navigator.clipboard.writeText(card).then(() => {
         showToast('Audit Card copied to clipboard!', 'success');
     }).catch(err => showToast('Copy failed: ' + err.message, 'error'));
+}
+
+function launchInExternalAi(provider) {
+    if (!State.lastResult || !State.lastResult.optimized_prompt) {
+        return showToast('Compress a prompt first before launching.', 'error');
+    }
+    const text = State.lastResult.optimized_prompt;
+    const baseUrl = provider === 'claude' ? 'https://claude.ai/new' : 'https://chatgpt.com/';
+    const encoded = encodeURIComponent(text);
+    const targetUrl = encoded.length <= 1800 ? `${baseUrl}?q=${encoded}` : baseUrl;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+    }
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    showToast(
+        encoded.length <= 1800
+            ? `Opened ${provider === 'claude' ? 'Claude' : 'ChatGPT'}! Bring the reply back to 🛡️ Verify Reply.`
+            : `Prompt copied to clipboard! Paste into ${provider === 'claude' ? 'Claude' : 'ChatGPT'} and verify the reply here.`,
+        'success'
+    );
 }
 
 async function submitFeedback(rating) {

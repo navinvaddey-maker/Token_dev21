@@ -278,6 +278,92 @@ pub async fn compress_new(
 ///
 /// # Errors
 /// Returns `AppError` on execution or persistence failure.
+/// Executes stateless prompt compression for unauthenticated sandbox visitors.
+///
+/// # Arguments
+/// * `state` - Shared application state containing pipeline and classifier handles.
+/// * `req` - Compression request payload (RAG flags are ignored in demo mode).
+///
+/// # Errors
+/// Returns `AppError::Engine` if pipeline execution fails.
+///
+/// # Panics
+/// Never.
+pub async fn compress_demo(
+    state: &AppState,
+    req: crate::api::CompressRequest,
+) -> Result<serde_json::Value, AppError> {
+    // ARCH: §1.3 & §1.5 — Runs the canonical PipelineOrchestrator statelessly (zero DB writes,
+    // zero tenant/RAG access) so guests experience real CRISP/NPAE compression.
+    let scenario = ScenarioClassifier::new(&state.pool, &state.embedding_engine)
+        .classify_query_into_scenario(&req.raw_text)
+        .await;
+
+    let mut session = SessionHistory::new(5);
+    let npae_cfg = crate::npae::schema::types::NpaeConfig {
+        ambiguity_threshold: req.npae_ambiguity_threshold,
+        max_questions: req.npae_max_questions,
+        confidence_threshold: req.npae_confidence_threshold,
+        skip_stage: None,
+        render_style: req.npae_render_style,
+        target_model_family: None,
+    };
+
+    let orchestrator_response = state
+        .pipeline
+        .process(
+            &req.raw_text,
+            &mut session,
+            scenario,
+            req.mode.as_deref(),
+            Some(&npae_cfg),
+            None,
+        )
+        .await
+        .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+
+    let demo_id = format!("demo-{}", Uuid::new_v4());
+    match orchestrator_response {
+        crate::types::OrchestratorResponse::Legacy(resp) => {
+            let mut json_resp = serde_json::to_value(&resp).map_err(|e| {
+                AppError::Internal(format!("Failed to serialize demo response: {e}"))
+            })?;
+            if let Some(obj) = json_resp.as_object_mut() {
+                obj.insert("id".to_string(), serde_json::json!(demo_id));
+                obj.insert("demo".to_string(), serde_json::json!(true));
+            }
+            Ok(json_resp)
+        }
+        crate::types::OrchestratorResponse::Aggressive(resp) => {
+            let tes = resp.scoring_result.tes;
+            let sfs = resp.scoring_result.sfs;
+            let scs = resp.scoring_result.scs;
+            let overall = (tes + sfs + scs) / 3.0;
+            let mut json_resp = serde_json::to_value(&resp).map_err(|e| {
+                AppError::Internal(format!("Failed to serialize aggressive demo response: {e}"))
+            })?;
+            if let Some(obj) = json_resp.as_object_mut() {
+                obj.insert("id".to_string(), serde_json::json!(demo_id));
+                obj.insert("demo".to_string(), serde_json::json!(true));
+                obj.insert("mode".to_string(), serde_json::json!("aggressive"));
+                obj.insert("tes_score".to_string(), serde_json::json!(tes));
+                obj.insert(
+                    "dual_score".to_string(),
+                    serde_json::json!({
+                        "tes": tes,
+                        "sfs": sfs,
+                        "scs": scs,
+                        "overall": overall,
+                    }),
+                );
+                obj.entry("warnings".to_string())
+                    .or_insert_with(|| serde_json::json!([]));
+            }
+            Ok(json_resp)
+        }
+    }
+}
+
 pub async fn compress_new_scoped(
     state: &AppState,
     user_id_str: &str,

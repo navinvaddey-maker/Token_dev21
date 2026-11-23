@@ -108,12 +108,28 @@ const API = {
     },
 
     /**
-     * Dispatches compression. Routes to MockAPI only when unauthenticated.
+     * Dispatches compression. Routes unauthenticated guests to the stateless live demo endpoint
+     * (`/api/demo/compress`), falling back to `MockAPI` only when offline.
      */
     async compress(req) {
-        // ARCH: §1 Reality Check — When unauthenticated, execute client-side sandbox compression
         if (typeof State === 'undefined' || !State.token) {
-            return MockAPI.compress(req);
+            try {
+                const r = await fetch('/api/demo/compress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(req),
+                });
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.error?.message || err.error || 'Demo compression failed');
+                }
+                return await r.json();
+            } catch (err) {
+                if (err instanceof TypeError) {
+                    return MockAPI.compress(req);
+                }
+                throw err;
+            }
         }
 
         return await this.call('/api/compress', {

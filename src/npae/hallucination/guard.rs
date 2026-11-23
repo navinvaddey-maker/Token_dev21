@@ -45,8 +45,8 @@ pub fn run_tri_layer(
     cfg: &HallucinationGuardConfig,
 ) -> Result<HallucinationReport, String> {
     let l1 = l1_critique::check(output, original_prompt, cfg)?;
-    let l2 = l2_confidence::check(output, cfg)?;
-    let l3 = l3_constraint::check(output, cfg)?;
+    let l2 = l2_confidence::check_with_source(output, original_prompt, cfg)?;
+    let l3 = l3_constraint::check_with_source(output, original_prompt, cfg)?;
 
     let passed = l1.passed && l2.passed && l3.passed;
 
@@ -121,18 +121,41 @@ fn strip_braces_outside_task(output: &str) -> String {
 pub fn remediate_hallucination(output: &str, report: &HallucinationReport) -> String {
     let mut corrected = output.to_string();
     if !report.passed {
-        // Apply L1 contradiction correction: prompt forbids JSON, so remove JSON structural braces
-        // outside the user's verbatim task text.
+        // Apply L1 contradiction correction: remove JSON structural braces outside user task text,
+        // and neutralize explicit markdown directives when markdown is forbidden.
         if !report.layers[0].passed {
             corrected = strip_braces_outside_task(&corrected);
+            if report.layers[0]
+                .flags
+                .iter()
+                .any(|f| f.contains("forbids markdown"))
+            {
+                corrected = corrected
+                    .replace("Output Format: markdown", "Output Format: plain text")
+                    .replace("Output Format: Markdown", "Output Format: plain text");
+            }
         }
-        // Apply L2 confidence correction: wrap low confidence claims (e.g. 'magic_token') with [UNCERTAIN]
-        if !report.layers[1].passed {
-            corrected = corrected.replace("magic_token", "[UNCERTAIN]magic_token");
+        // Apply L2 confidence correction: mark unverified quantified/absolute claims with `[UNCERTAIN]`.
+        if !report.layers[1].passed && !corrected.contains("[UNCERTAIN]") {
+            corrected = format!("[UNCERTAIN] {corrected}");
         }
-        // Apply L3 constraint violation correction: remove fake_api_call()
+        // Apply L3 constraint violation correction: strip ungrounded API/URL tokens and restore
+        // any dropped exclusion constraints from flag metadata.
         if !report.layers[2].passed {
-            corrected = corrected.replace("fake_api_call()", "/* REMOVED: fake_api_call */");
+            for flag in &report.layers[2].flags {
+                if let Some(rest) = flag.strip_prefix("Constraint violation: ungrounded API/URL '")
+                {
+                    if let Some((tok, _)) = rest.split_once('\'') {
+                        corrected = corrected.replace(tok, "[REMOVED_UNGROUNDED_REF]");
+                    }
+                } else if let Some(rest) =
+                    flag.strip_prefix("Constraint violation: negation dropped for '")
+                {
+                    if let Some((constraint, _)) = rest.split_once('\'') {
+                        corrected.push_str(&format!("\n# CONSTRAINTS:\n- {constraint}"));
+                    }
+                }
+            }
         }
     }
     corrected
@@ -142,15 +165,19 @@ pub fn remediate_hallucination(output: &str, report: &HallucinationReport) -> St
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_hallucination_guard_all_pass() {
-        let cfg = HallucinationGuardConfig {
+    fn test_cfg() -> HallucinationGuardConfig {
+        HallucinationGuardConfig {
             self_critique_enabled: true,
             confidence_threshold: 0.75,
             contradiction_check: true,
             claim_verification_rules: vec!["no_invented_apis".into()],
             uncertainty_markers: vec!["[UNCERTAIN]".into()],
-        };
+        }
+    }
+
+    #[test]
+    fn test_hallucination_guard_all_pass() {
+        let cfg = test_cfg();
 
         let report = run_tri_layer("This output has no issues.", "no json", &cfg).unwrap();
         assert!(report.passed);
@@ -164,18 +191,12 @@ mod tests {
     }
 
     #[test]
-    fn test_hallucination_guard_fails_and_remediates() {
-        let cfg = HallucinationGuardConfig {
-            self_critique_enabled: true,
-            confidence_threshold: 0.75,
-            contradiction_check: true,
-            claim_verification_rules: vec!["no_invented_apis".into()],
-            uncertainty_markers: vec!["[UNCERTAIN]".into()],
-        };
+    fn test_hallucination_guard_fails_and_remediates_semantically() {
+        let cfg = test_cfg();
 
-        // Trigger L1, L2, L3 failures
-        let output = "{ Here is magic_token and fake_api_call() }";
-        let original_prompt = "no json";
+        // Trigger L1 (JSON contradiction), L2 (invented percentage), and L3 (invented API + dropped negation)
+        let output = "{ Guaranteeing 95% savings via helper_endpoint() and including dairy }";
+        let original_prompt = "Build a meal plan with no json and no dairy";
 
         let report = run_tri_layer(output, original_prompt, &cfg).unwrap();
         assert!(!report.passed);
@@ -185,21 +206,32 @@ mod tests {
         assert!(report.remediation.is_some());
 
         let corrected = remediate_hallucination(output, &report);
-        assert_eq!(
-            corrected,
-            " Here is [UNCERTAIN]magic_token and /* REMOVED: fake_api_call */ "
-        );
+        assert!(corrected.contains("[UNCERTAIN]"));
+        assert!(corrected.contains("[REMOVED_UNGROUNDED_REF]"));
+        assert!(corrected.contains("no dairy"));
 
-        // Re-running on corrected should pass or be much better
         let report_after = run_tri_layer(&corrected, original_prompt, &cfg).unwrap();
         assert!(
             report_after.layers[0].passed,
-            "L1 should pass since braces were stripped"
+            "L1 should pass after brace strip"
         );
-        assert!(!report_after.layers[1].passed, "L2 remains failed because magic_token is still in the text, but now with uncertainty prefix");
+        assert!(
+            report_after.layers[1].passed,
+            "L2 should pass once [UNCERTAIN] marker is applied"
+        );
         assert!(
             report_after.layers[2].passed,
-            "L3 should pass since fake_api_call was removed"
+            "L3 should pass once ungrounded ref is removed and negation restored"
         );
+    }
+
+    #[test]
+    fn test_hallucination_guard_preserves_user_task_braces() {
+        let cfg = test_cfg();
+        let output =
+            "# ROLE: Engineer\n# TASK / INSTRUCTION:\nParse `{key: value}` with no json output\n";
+        let report =
+            run_tri_layer(output, "Parse `{key: value}` with no json output", &cfg).unwrap();
+        assert!(report.layers[0].passed);
     }
 }

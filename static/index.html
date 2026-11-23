@@ -276,7 +276,7 @@
                                             class="visually-hidden" onchange="handleFileSelect(event)">
                                     </label>
                                     <div class="domain-chip" id="domain-chip" data-domain>
-                                        Auto-detected domain: <strong id="domain-name">General</strong>
+                                        Detected lens: <strong id="domain-name">General</strong> · <span id="perspective-badge" style="color: var(--accent-text); font-weight: 600;">Consumer</span>
                                     </div>
                                 </div>
 
@@ -299,19 +299,19 @@
                                 <div class="pane-controls-row">
                                     <div class="segmented-mode-pills" id="mode-pills" role="radiogroup"
                                         aria-label="Compression Mode">
-                                        <button type="button" role="radio" class="mode-pill active" data-mode="gentle"
-                                            id="pm-gentle" aria-checked="true" onclick="selectMode('gentle')">Light
+                                        <button type="button" role="radio" class="mode-pill" data-mode="gentle"
+                                            id="pm-gentle" aria-checked="false" onclick="selectMode('gentle')">Light
                                             Polish</button>
-                                        <button type="button" role="radio" class="mode-pill mode-pill-disabled"
-                                            data-mode="balanced" id="pm-balanced" aria-checked="false" disabled
-                                            title="Sign in to unlock Smart Trim" onclick="selectMode('balanced')">Smart
-                                            Trim 🔒</button>
-                                        <button type="button" role="radio" class="mode-pill mode-pill-disabled"
-                                            data-mode="aggressive" id="pm-aggressive" aria-checked="false" disabled
-                                            title="Sign in to unlock Deep Blueprint"
-                                            onclick="selectMode('aggressive')">Deep Blueprint 🔒</button>
+                                        <button type="button" role="radio" class="mode-pill active"
+                                            data-mode="balanced" id="pm-balanced" aria-checked="true"
+                                            title="Smart Trim: 30-55% token reduction with 100% constraint locks" onclick="selectMode('balanced')">Smart
+                                            Trim</button>
+                                        <button type="button" role="radio" class="mode-pill"
+                                            data-mode="aggressive" id="pm-aggressive" aria-checked="false"
+                                            title="Deep Blueprint: CRISP multi-phase scaffolding"
+                                            onclick="selectMode('aggressive')">Deep Blueprint</button>
                                     </div>
-                                    <input type="hidden" id="mode" value="gentle">
+                                    <input type="hidden" id="mode" value="balanced">
                                 </div>
 
                                 <div class="adv-options-row">
@@ -319,8 +319,8 @@
                                         title="Sign in to unlock RAG grounding"><input type="checkbox"
                                             id="opt-rag-enabled" disabled> Ground with my PDFs</label>
                                     <label id="opt-harness-label" for="opt-harness-enabled"
-                                        title="Sign in to unlock Grounding Harness"><input type="checkbox"
-                                            id="opt-harness-enabled" disabled> Hallucination-Proof Contract</label>
+                                        title="Wrap facts in untrusted XML &amp; enforce citation contract"><input type="checkbox"
+                                            id="opt-harness-enabled"> Hallucination-Proof Contract</label>
                                 </div>
 
                                 <div class="pane-actions-row">
@@ -403,7 +403,7 @@
                                             <span id="output-saving-pct" class="stat-pct">0% saved</span>
                                             <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
                                         </div>
-                                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
                                             <label for="model-select" class="visually-hidden">Target model
                                                 pricing</label>
                                             <select id="model-select" class="tc-select model-select-compact"
@@ -412,8 +412,19 @@
                                                 <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
                                                 <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
                                             </select>
+                                            <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
+                                            <select id="roi-scale-select" class="tc-select model-select-compact"
+                                                onchange="updateRoiScale()" title="Monthly prompt volume for ROI projection">
+                                                <option value="1000" selected>1k runs</option>
+                                                <option value="100000">100k / mo</option>
+                                                <option value="1000000">1M / mo</option>
+                                            </select>
                                             <button type="button" class="copy-btn" id="copy-result-btn"
                                                 onclick="copyResult()">📋 Copy</button>
+                                            <button type="button" class="copy-btn" id="launch-chatgpt-btn"
+                                                onclick="launchInExternalAi('chatgpt')" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
+                                            <button type="button" class="copy-btn" id="launch-claude-btn"
+                                                onclick="launchInExternalAi('claude')" title="Copy prompt and open in Claude">↗ Claude</button>
                                             <button type="button" class="copy-btn" id="export-audit-btn"
                                                 onclick="exportAuditCard()" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
                                             <button type="button" class="copy-btn" id="btn-verify-workbench"

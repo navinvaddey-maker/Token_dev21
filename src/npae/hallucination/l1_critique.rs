@@ -66,11 +66,15 @@ pub fn check(
     }
 
     let mut flags = Vec::new();
-    let prompt_forbids_json = original_prompt.to_lowercase().contains("no json");
+    let prompt_lower = original_prompt.to_lowercase();
+    let prompt_forbids_json =
+        prompt_lower.contains("no json") || prompt_lower.contains("without json");
+    let prompt_forbids_markdown =
+        prompt_lower.contains("no markdown") || prompt_lower.contains("plain text only");
 
     // FIX: G-09 — when `output` is a structured Aggressive prompt (`# TASK / INSTRUCTION:` or
-    // `<task>...</task>`), inspect only the non-task scaffolding (or an explicit `Output Format: json`
-    // directive) so user-quoted JSON snippets inside the task are never falsely flagged.
+    // `<task>...</task>`), inspect only the non-task scaffolding (or an explicit `Output Format:`
+    // directive) so user-quoted snippets inside the task are never falsely flagged.
     if prompt_forbids_json {
         let has_json_contradiction = if let Some(scaffolding) = extract_non_task_scaffolding(output)
         {
@@ -82,6 +86,21 @@ pub fn check(
 
         if has_json_contradiction {
             flags.push("Contradiction: Prompt forbids JSON but output contains JSON syntax".into());
+        }
+    }
+
+    if cfg.contradiction_check && prompt_forbids_markdown {
+        let has_md_contradiction = if let Some(scaffolding) = extract_non_task_scaffolding(output) {
+            let scaffolding_lower = scaffolding.to_lowercase();
+            scaffolding_lower.contains("output format: markdown")
+        } else {
+            output.contains("```")
+        };
+
+        if has_md_contradiction {
+            flags.push(
+                "Contradiction: Prompt forbids markdown but output specifies markdown".into(),
+            );
         }
     }
 

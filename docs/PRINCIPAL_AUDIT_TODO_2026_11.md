@@ -121,7 +121,7 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
 
 ## Phase 3 — Core AI/ML, Guardrails, Scoring & Grounding Correctness (Days 4–8)
 
-- [ ] **[AUD-09] Replace toy `HallucinationGuard` checks (`magic_token`, `fake_api_call()`) with `ARCHITECTURE.md` §7.2 Layer 3** `P0-Critical` `Effort: L` `[AI/ML / Safety]`
+- [x] **[AUD-09] Replace toy `HallucinationGuard` checks (`magic_token`, `fake_api_call()`) with `ARCHITECTURE.md` §7.2 Layer 3** `P0-Critical` `Effort: L` `[AI/ML / Safety]`
   - **Files:** `src/npae/hallucination/guard.rs`, `l1_critique.rs`, `l2_confidence.rs`, `l3_constraint.rs`
   - **Fix:**
     - **L1 (`l1_critique.rs`):** Keep structural format contradiction checks (`"no json"` etc.) AND check sentence-level cosine/lexical alignment between generated scaffolding claims and `original_prompt` + `guard_source_text`.
@@ -145,7 +145,7 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
   - **Problem:** `extract_domain_terms` strips non-alphabetic tokens (`Q1`, `Q2`, `2025`, `2026`, `v1`, `v2`), falsely flagging normal quarter-over-quarter metrics as `[CONFLICT]`.
   - **Fix:** Extract temporal/version qualifiers (`Q1..Q4`, 4-digit years, `FY\d{2,4}`, `v\d+`, month names) per item and do **not** flag a conflict when two items carry distinct non-empty period/entity qualifiers.
 
-- [ ] **[AUD-13] Fix `DerivedRagContext::derive` 80% overlap filter dropping confirming quantitative facts** `P2-Medium` `Effort: XS` `[RAG / Grounding]`
+- [x] **[AUD-13] Fix `DerivedRagContext::derive` 80% overlap filter dropping confirming quantitative facts** `P2-Medium` `Effort: XS` `[RAG / Grounding]`
   - **Files:** `src/npae/aggressive/rag_context.rs:240-256`
   - **Fix:** Only drop a candidate sentence under `overlap_ratio >= 0.80` if the sentence adds **no** numeric, currency, or percentage values absent from (or unconfirmed in) the prompt, and retain provenance for verification queries.
 
@@ -179,7 +179,7 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
   - **Files:** `static/app.js`
   - Replace the single `<del>` summary line with an inline diff + real backend `# ROLE:`/`# CONSTRAINTS:`/`<facts>` highlighting, plus a 1-click Markdown/SVG summary export (`Tokens Saved`, `$ Saved / 1k runs`, `Constraint Recall`, `Grounding Score`).
 
-- [ ] **[GRW-04] Developer CLI (`tce`) / CI Prompt Linter & Local Companion Installer UX** `High ROI` `Effort: M` `[Adoption / B2B]`
+- [x] **[GRW-04] Developer CLI (`tce`) / CI Prompt Linter & Local Companion Installer UX** `High ROI` `Effort: M` `[Adoption / B2B]`
   - **Files:** `src/bin/rag.rs` (extend or add `src/bin/tce.rs`)
   - Package `rag` + `tce` prebuilt binaries / `--stdin` CI mode so teams can gate prompt budgets and grounding verification in CI/CD and local IDE workflows without `cargo run --bin rag`.
 

@@ -250,7 +250,17 @@ impl DerivedRagContext {
                     .filter(|w| prompt_word_set.contains(w.as_str()))
                     .count();
                 let overlap_ratio = overlap_count as f32 / sent_words.len() as f32;
-                if overlap_ratio >= 0.80 {
+                let has_new_quant = sentence_lower.split_whitespace().any(|raw_w| {
+                    let has_digit = raw_w.chars().any(|c| c.is_ascii_digit());
+                    if !has_digit {
+                        return false;
+                    }
+                    let clean = raw_w.trim_matches(|c: char| !c.is_alphanumeric());
+                    !clean.is_empty() && !prompt_word_set.contains(clean)
+                });
+                // AUD-13: Keep high-overlap RAG sentences when they add numeric/currency/percentage
+                // evidence not already present in the prompt.
+                if overlap_ratio >= 0.80 && !has_new_quant {
                     continue;
                 }
             }
