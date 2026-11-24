@@ -446,7 +446,8 @@ async function runTestSuite() {
 
     // 2.7 Tier 2: Boundary & Corner Cases
     console.log('\n--- Suite 3: Boundary & Corner Cases ---');
-    // Prompt < 8 words disables compress button
+    // Start fresh Turn-1 prompt session before testing initial < 8 words boundary
+    win.resetParentSession(true);
     promptInput.value = 'Too short';
     win.validatePromptLength();
     const compressBtn = doc.getElementById('compress-btn');
@@ -820,10 +821,105 @@ async function runTestSuite() {
     win.openStudioCommandPalette();
     assert(doc.querySelectorAll('#studio-cmd-list .cmd-palette-item').length >= 5, 'Modern UI: Studio ⌘K Command Palette populates quick actions');
 
+    // Suite 9: macOS Apple HIG UI & Layout Refinements
+    console.log('\n--- Suite 9: macOS Apple HIG UI & Layout Refinements ---');
+    const studioCss = fs.readFileSync(path.resolve(__dirname, '../static/styles/studio.css'), 'utf8');
+    assert(
+        tokensCss.includes('--bg-canvas') &&
+        tokensCss.includes('--surface-card') &&
+        tokensCss.includes('--surface-control') &&
+        tokensCss.includes('--surface-popover') &&
+        tokensCss.includes('--accent-primary') &&
+        tokensCss.includes('--border-hairline'),
+        'macOS HIG: tokens.css defines core design tokens (--bg-canvas, --surface-card, --surface-control, --surface-popover, --accent-primary, --border-hairline)'
+    );
+    assert(
+        studioCss.includes('.tc-header.macos-toolbar') &&
+        studioCss.includes('.inspector-popover-panel') &&
+        studioCss.includes('.studio-disclosure.inspector-popover-wrap') &&
+        studioCss.includes('.feedback-icon-btn') &&
+        studioCss.includes('.crisp-section-heading') &&
+        studioCss.includes('.clarify-strip'),
+        'macOS HIG: studio.css implements sticky 52px toolbar, floating Inspector popover, quiet feedback icons, syntax tinting, and single-row Clarify strip'
+    );
+
+    assert(doc.querySelector('header.tc-header.macos-toolbar') !== null, 'macOS HIG: Top Toolbar has header.tc-header.macos-toolbar');
+    assert(doc.querySelector('header.tc-header nav.nav-bar[role="tablist"]') !== null, 'macOS HIG: Top Toolbar nav has role="tablist"');
+    assert(doc.getElementById('header-cmd-kbd') !== null, 'macOS HIG: #header-cmd-kbd present');
+
+    win.__ORYX_FORCE_PLATFORM = 'win';
+    win.syncPlatformShortcutBadges();
+    assert(doc.getElementById('header-cmd-kbd').textContent.includes('Ctrl'), 'macOS HIG: Platform-adaptive shortcut badge shows Ctrl on Windows');
+
+    win.__ORYX_FORCE_PLATFORM = 'apple';
+    win.syncPlatformShortcutBadges();
+    assert(doc.getElementById('header-cmd-kbd').textContent.includes('⌘'), 'macOS HIG: Platform-adaptive shortcut badge shows ⌘ on macOS');
+
+    assert(doc.querySelector('#input-pane .pane-header #clear-input-btn') !== null, 'macOS HIG: #clear-input-btn is located inside #input-pane .pane-header');
+    assert(doc.getElementById('compress-btn-kbd') !== null, 'macOS HIG: #compress-btn preserves #compress-btn-kbd');
+
+    assert(doc.getElementById('output-view-toggle') !== null && doc.getElementById('ov-rehydrated') !== null && doc.getElementById('ov-delta') !== null, 'macOS HIG: Right Pane header keeps #output-view-toggle with #ov-rehydrated and #ov-delta');
+    assert(
+        doc.querySelector('#output-pane .pane-header #copy-result-btn') !== null &&
+        doc.querySelector('#output-pane .pane-header #launch-chatgpt-btn') !== null &&
+        doc.querySelector('#output-pane .pane-header #launch-claude-btn') !== null,
+        'macOS HIG: Right Pane header keeps export actions (#copy-result-btn, #launch-chatgpt-btn, #launch-claude-btn) inside pane-header'
+    );
+
+    diffToggle.checked = false;
+    win.State.showDiff = false;
+    win.renderResult({
+        id: 'hig-syntax-1',
+        token_original: 400,
+        token_final: 650,
+        token_saved: 0,
+        savings_pct: 0,
+        tes_score: 0.97,
+        optimized_prompt: '# ROLE: PRINCIPAL ARCHITECT\n<facts trust="untrusted">\n- [F1] Latency <= 50ms\n</facts>\n\n# EXECUTION PHASES:\n1. **Schema Design** (1 week): Model tables\n\n# CONSTRAINTS:\n- [STRICT] Zero downtime [F1]',
+        clarifying_questions: [{ id: 1, gap_addressed: 'missing_slot:real-estate:buyer_credit_tier_and_income', question: 'What is your current credit score tier and approximate debt-to-income (DTI) profile?' }]
+    });
+    assert(
+        outputBox.innerHTML.includes('crisp-section-heading') &&
+        outputBox.innerHTML.includes('crisp-phase-title') &&
+        outputBox.innerHTML.includes('crisp-cite') &&
+        outputBox.innerHTML.includes('crisp-xml-tag'),
+        'macOS HIG: Syntax Highlighting covers # SECTION:, phases, [F#] citations, and attributed <facts trust="untrusted"> XML tags when token_saved === 0'
+    );
+
+    const clarifyChip = doc.querySelector('#clarifying-pills button.clarify-chip');
+    assert(
+        clarifyChip !== null &&
+        clarifyChip.textContent === '+ Add credit & DTI' &&
+        clarifyChip.title.includes('credit score tier'),
+        `macOS HIG: Clarify chip uses concise trigger "+ Add credit & DTI" while keeping full question in .title (got "${clarifyChip ? clarifyChip.textContent : 'null'}")`
+    );
+
+    win.clearInput();
+    const clarifyingPills = doc.getElementById('clarifying-pills');
+    assert(clarifyingPills && clarifyingPills.style.display === 'none' && clarifyingPills.innerHTML === '', 'macOS HIG: win.clearInput() hides and clears #clarifying-pills');
+
+    win.openStudioCommandPalette();
+    const cmdInput = doc.getElementById('studio-cmd-input');
+    const cmdHeaders = Array.from(doc.querySelectorAll('#studio-cmd-list .cmd-group-header')).map(el => el.textContent);
+    assert(
+        cmdHeaders.includes('Actions') &&
+        cmdHeaders.includes('Recent Prompts') &&
+        cmdInput.getAttribute('aria-activedescendant') === 'cmd-opt-0',
+        `macOS HIG: ⌘K Spotlight Command Palette renders grouped Actions & Recent Prompts with ARIA activedescendant (got ${JSON.stringify(cmdHeaders)})`
+    );
+
+    // Security: logout() purges recent prompt cache (oryx_recent_runs) and history state
+    win.logout();
+    assert(
+        win.State.recentRuns.length === 0 &&
+        win.localStorage.getItem('oryx_recent_runs') === null,
+        'Security: logout() purges State.recentRuns and localStorage oryx_recent_runs'
+    );
+
     win.toggleTheme();
-    assert(doc.documentElement.getAttribute('data-theme') === 'dark', 'Theme: toggleTheme() syncs data-theme="dark" on <html>');
+    assert(doc.documentElement.classList.contains('dark') && doc.documentElement.getAttribute('data-theme') === 'dark', 'macOS HIG: .dark class and data-theme="dark" sync on <html>');
     win.toggleTheme();
-    assert(doc.documentElement.getAttribute('data-theme') === 'light', 'Theme: toggleTheme() toggles back to data-theme="light"');
+    assert(!doc.documentElement.classList.contains('dark') && doc.documentElement.getAttribute('data-theme') === 'light', 'macOS HIG: toggleTheme() switches back to light mode');
 
     assert(!adminHtml.includes('hud-mode'), 'Admin P3: CRT scanline hud-mode class retired');
     assert(adminHtml.includes('id="btn-admin-theme"') && adminHtml.includes('<th scope="col">'), 'Admin P3: Shared theme toggle and accessible <th scope="col"> headers present');

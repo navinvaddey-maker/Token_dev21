@@ -1,299 +1,393 @@
-/* Shared Design Tokens for Oryx Studio & Admin Console (2026 Operational System) */
+/* Shared Design Tokens for Token Compress Engine (Apple HIG Design System) */
 /* ARCH: Modern Web Guidance — color-scheme on :root with light-dark() + prefers-color-scheme fallback */
+/* ARCH: macOS Apple HIG Design System Tokens */
 
 :root {
     color-scheme: light dark;
 
-    /* Core Light Palette */
-    --c-page-light: #f8fafc;
-    --c-surface-light: #ffffff;
-    --c-surface-sub-light: #f1f5f9;
-    --c-glass-light: rgba(255, 255, 255, 0.94);
-    --c-border-light: #e2e8f0;
-    --c-border-strong-light: #cbd5e1;
-    --c-head-light: #0f172a;
-    --c-body-light: #334155;
-    --c-muted-light: #52627a;
-    --c-accent-light: #0369a1;
-    --c-accent-strong-light: #0284c7;
-    --c-accent-glow-light: rgba(2, 132, 199, 0.2);
-    --c-btn-grad-light: linear-gradient(135deg, #0284c7 0%, #4338ca 100%);
-    --c-btn-text-light: #ffffff;
-    --c-inp-bg-light: #ffffff;
-    --c-tag-bg-light: rgba(2, 132, 199, 0.1);
-    --c-tag-text-light: #0369a1;
-    --c-pos-light: #047857;
-    --c-danger-light: #b91c1c;
-    --c-warning-light: #b45309;
-    --c-scroll-thumb-light: #94a3b8;
-    --c-scroll-track-light: #f1f5f9;
+    /* Raw Apple HIG Light Tokens */
+    --hig-bg-canvas-light: #F5F5F7;
+    --hig-surface-card-light: #FFFFFF;
+    --hig-surface-sub-light: #FAFAFC;
+    --hig-surface-control-light: #E5E5EA;
+    --hig-surface-popover-light: rgba(255, 255, 255, 0.88);
+    --hig-surface-toolbar-light: rgba(245, 245, 247, 0.80);
+    --hig-segment-thumb-light: #FFFFFF;
+    --hig-text-primary-light: #1D1D1F;
+    --hig-text-secondary-light: #6E6E73;
+    --hig-text-tertiary-light: #8E8E93;
+    --hig-accent-light: #007AFF;
+    --hig-accent-hover-light: #0066D6;
+    --hig-accent-tint-light: rgba(0, 122, 255, 0.10);
+    --hig-accent-border-light: rgba(0, 122, 255, 0.26);
+    --hig-green-light: #248A3D;
+    --hig-red-light: #D70015;
+    --hig-amber-light: #B25000;
+    --hig-syntax-header-light: #3634A3;
+    --hig-scroll-thumb-light: #8E8E93;
+    --hig-scroll-track-light: #F5F5F7;
+    --hig-border-hairline-light: rgba(0, 0, 0, 0.09);
+    --hig-border-strong-light: rgba(0, 0, 0, 0.15);
+    --shadow-card-light: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -8px rgba(0, 0, 0, 0.06);
+    --shadow-segment-light: 0 1px 2.5px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+    --shadow-popover-light: 0 16px 48px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
 
-    /* Core Dark Palette */
-    --c-page-dark: #090d16;
-    --c-surface-dark: #101624;
-    --c-surface-sub-dark: #161f33;
-    --c-glass-dark: rgba(16, 22, 36, 0.92);
-    --c-border-dark: rgba(148, 163, 184, 0.16);
-    --c-border-strong-dark: rgba(148, 163, 184, 0.28);
-    --c-head-dark: #f8fafc;
-    --c-body-dark: #cbd5e1;
-    --c-muted-dark: #94a3b8;
-    --c-accent-dark: #38bdf8;
-    --c-accent-strong-dark: #22d3ee;
-    --c-accent-glow-dark: rgba(56, 189, 248, 0.22);
-    --c-btn-grad-dark: linear-gradient(135deg, #38bdf8 0%, #6366f1 100%);
-    --c-btn-text-dark: #061326;
-    --c-inp-bg-dark: #0c1220;
-    --c-tag-bg-dark: rgba(56, 189, 248, 0.14);
-    --c-tag-text-dark: #7dd3fc;
-    --c-pos-dark: #34d399;
-    --c-danger-dark: #f87171;
-    --c-warning-dark: #fbbf24;
-    --c-scroll-thumb-dark: #475569;
-    --c-scroll-track-dark: #0f172a;
+    /* Raw Apple HIG Dark Tokens */
+    --hig-bg-canvas-dark: #161618;
+    --hig-surface-card-dark: #1E1E20;
+    --hig-surface-sub-dark: #252528;
+    --hig-surface-control-dark: #2C2C2E;
+    --hig-surface-popover-dark: rgba(36, 36, 38, 0.88);
+    --hig-surface-toolbar-dark: rgba(22, 22, 24, 0.80);
+    --hig-segment-thumb-dark: #3A3A3C;
+    --hig-text-primary-dark: #F5F5F7;
+    --hig-text-secondary-dark: #98989D;
+    --hig-text-tertiary-dark: #6E6E73;
+    --hig-accent-dark: #0A84FF;
+    --hig-accent-hover-dark: #409CFF;
+    --hig-accent-tint-dark: rgba(10, 132, 255, 0.16);
+    --hig-accent-border-dark: rgba(10, 132, 255, 0.34);
+    --hig-green-dark: #30D158;
+    --hig-red-dark: #FF453A;
+    --hig-amber-dark: #FF9F0A;
+    --hig-syntax-header-dark: #7D7AFF;
+    --hig-scroll-thumb-dark: #636366;
+    --hig-scroll-track-dark: #161618;
+    --hig-border-hairline-dark: rgba(255, 255, 255, 0.10);
+    --hig-border-strong-dark: rgba(255, 255, 255, 0.18);
+    --shadow-card-dark: 0 1px 2px rgba(0, 0, 0, 0.38), 0 14px 36px -12px rgba(0, 0, 0, 0.55);
+    --shadow-segment-dark: 0 1px 3px rgba(0, 0, 0, 0.48), 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+    --shadow-popover-dark: 0 20px 56px rgba(0, 0, 0, 0.64), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
 
-    /* Semantic Defaults (Light fallback for browsers without light-dark()) */
-    --page-bg: var(--c-page-light);
-    --surface-bg: var(--c-surface-light);
-    --surface-sub: var(--c-surface-sub-light);
-    --glass-bg: var(--c-glass-light);
-    --glass-border: var(--c-border-light);
-    --glass-card-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
-    --btn-grad: var(--c-btn-grad-light);
-    --btn-text: var(--c-btn-text-light);
-    --accent-text: var(--c-accent-light);
-    --accent-glow: var(--c-accent-glow-light);
-    --head-text: var(--c-head-light);
-    --body-text: var(--c-body-light);
-    --text-muted: var(--c-muted-light);
-    --stat-pos: var(--c-pos-light);
-    --inp-bg: var(--c-inp-bg-light);
-    --inp-border: var(--c-border-strong-light);
-    --inp-focus: var(--c-accent-strong-light);
-    --inp-ring: rgba(2, 132, 199, 0.22);
-    --focus-ring: var(--c-accent-strong-light);
-    --prog-fill: linear-gradient(90deg, #0284c7, #10b981);
-    --prog-track: #e2e8f0;
-    --tag-bg: var(--c-tag-bg-light);
-    --tag-text: var(--c-tag-text-light);
-    --divider: #e2e8f0;
-    --copy-bg: rgba(2, 132, 199, 0.08);
-    --copy-border: rgba(2, 132, 199, 0.28);
-    --card-sub-bg: #f1f5f9;
-    --danger: var(--c-danger-light);
-    --success: var(--c-pos-light);
-    --warning: var(--c-warning-light);
-    --scrollbar-thumb: var(--c-scroll-thumb-light);
-    --scrollbar-track: var(--c-scroll-track-light);
+    /* Shared Border & Resolution Tokens */
+    --border-width-hairline: 0.5px;
 
-    accent-color: var(--accent-text);
+    /* Canonical Apple HIG Semantic Tokens & Backward-Compatible Aliases (Light Defaults) */
+    --bg-canvas: var(--hig-bg-canvas-light);
+    --surface-card: var(--hig-surface-card-light);
+    --surface-sub: var(--hig-surface-sub-light);
+    --surface-control: var(--hig-surface-control-light);
+    --surface-popover: var(--hig-surface-popover-light);
+    --surface-toolbar: var(--hig-surface-toolbar-light);
+    --segment-thumb: var(--hig-segment-thumb-light);
+    --text-primary: var(--hig-text-primary-light);
+    --text-secondary: var(--hig-text-secondary-light);
+    --text-tertiary: var(--hig-text-tertiary-light);
+    --accent-primary: var(--hig-accent-light);
+    --accent-hover: var(--hig-accent-hover-light);
+    --accent-tint: var(--hig-accent-tint-light);
+    --accent-border: var(--hig-accent-border-light);
+    --border-hairline: var(--hig-border-hairline-light);
+    --border-strong: var(--hig-border-strong-light);
+    --shadow-card: var(--shadow-card-light);
+    --shadow-segment: var(--shadow-segment-light);
+    --shadow-popover: var(--shadow-popover-light);
+    --syntax-header: var(--hig-syntax-header-light);
+
+    /* Backward-compatible aliases for studio.css and admin.css */
+    --page-bg: var(--hig-bg-canvas-light);
+    --surface-bg: var(--hig-surface-card-light);
+    --glass-bg: var(--hig-surface-toolbar-light);
+    --glass-border: var(--hig-border-hairline-light);
+    --glass-card-shadow: var(--shadow-card-light);
+    --btn-grad: var(--hig-accent-light);
+    --btn-text: #FFFFFF;
+    --accent-text: var(--hig-accent-light);
+    --accent-glow: var(--hig-accent-tint-light);
+    --head-text: var(--hig-text-primary-light);
+    --body-text: var(--hig-text-secondary-light);
+    --text-muted: var(--hig-text-tertiary-light);
+    --stat-pos: var(--hig-green-light);
+    --inp-bg: var(--hig-surface-card-light);
+    --inp-border: var(--hig-border-strong-light);
+    --inp-focus: var(--hig-accent-light);
+    --inp-ring: var(--hig-accent-tint-light);
+    --focus-ring: var(--hig-accent-light);
+    --prog-fill: var(--hig-accent-light);
+    --prog-track: var(--hig-surface-control-light);
+    --tag-bg: var(--hig-accent-tint-light);
+    --tag-text: var(--hig-accent-light);
+    --divider: var(--hig-border-hairline-light);
+    --copy-bg: var(--hig-surface-sub-light);
+    --copy-border: var(--hig-border-hairline-light);
+    --card-sub-bg: var(--hig-surface-sub-light);
+    --danger: var(--hig-red-light);
+    --success: var(--hig-green-light);
+    --warning: var(--hig-amber-light);
+    --scrollbar-thumb: var(--hig-scroll-thumb-light);
+    --scrollbar-track: var(--hig-scroll-track-light);
+
+    accent-color: var(--accent-primary);
     scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-@media (prefers-color-scheme: dark) {
+@media (max-resolution: 1dppx) {
     :root {
-        --page-bg: var(--c-page-dark);
-        --surface-bg: var(--c-surface-dark);
-        --surface-sub: var(--c-surface-sub-dark);
-        --glass-bg: var(--c-glass-dark);
-        --glass-border: var(--c-border-dark);
-        --glass-card-shadow: 0 20px 56px -16px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
-        --btn-grad: var(--c-btn-grad-dark);
-        --btn-text: var(--c-btn-text-dark);
-        --accent-text: var(--c-accent-dark);
-        --accent-glow: var(--c-accent-glow-dark);
-        --head-text: var(--c-head-dark);
-        --body-text: var(--c-body-dark);
-        --text-muted: var(--c-muted-dark);
-        --stat-pos: var(--c-pos-dark);
-        --inp-bg: var(--c-inp-bg-dark);
-        --inp-border: var(--c-border-strong-dark);
-        --inp-focus: var(--c-accent-strong-dark);
-        --inp-ring: rgba(56, 189, 248, 0.24);
-        --focus-ring: var(--c-accent-strong-dark);
-        --prog-fill: linear-gradient(90deg, #38bdf8, #34d399);
-        --prog-track: rgba(255, 255, 255, 0.08);
-        --tag-bg: var(--c-tag-bg-dark);
-        --tag-text: var(--c-tag-text-dark);
-        --divider: rgba(148, 163, 184, 0.14);
-        --copy-bg: rgba(56, 189, 248, 0.1);
-        --copy-border: rgba(56, 189, 248, 0.28);
-        --card-sub-bg: rgba(255, 255, 255, 0.035);
-        --danger: var(--c-danger-dark);
-        --success: var(--c-pos-dark);
-        --warning: var(--c-warning-dark);
-        --scrollbar-thumb: var(--c-scroll-thumb-dark);
-        --scrollbar-track: var(--c-scroll-track-dark);
+        --border-width-hairline: 1px;
     }
 }
 
 @supports (color: light-dark(white, black)) {
     :root {
-        --page-bg: light-dark(var(--c-page-light), var(--c-page-dark));
-        --surface-bg: light-dark(var(--c-surface-light), var(--c-surface-dark));
-        --surface-sub: light-dark(var(--c-surface-sub-light), var(--c-surface-sub-dark));
-        --glass-bg: light-dark(var(--c-glass-light), var(--c-glass-dark));
-        --glass-border: light-dark(var(--c-border-light), var(--c-border-dark));
-        --btn-text: light-dark(var(--c-btn-text-light), var(--c-btn-text-dark));
-        --accent-text: light-dark(var(--c-accent-light), var(--c-accent-dark));
-        --accent-glow: light-dark(var(--c-accent-glow-light), var(--c-accent-glow-dark));
-        --head-text: light-dark(var(--c-head-light), var(--c-head-dark));
-        --body-text: light-dark(var(--c-body-light), var(--c-body-dark));
-        --text-muted: light-dark(var(--c-muted-light), var(--c-muted-dark));
-        --stat-pos: light-dark(var(--c-pos-light), var(--c-pos-dark));
-        --inp-bg: light-dark(var(--c-inp-bg-light), var(--c-inp-bg-dark));
-        --inp-border: light-dark(var(--c-border-strong-light), var(--c-border-strong-dark));
-        --inp-focus: light-dark(var(--c-accent-strong-light), var(--c-accent-strong-dark));
-        --focus-ring: light-dark(var(--c-accent-strong-light), var(--c-accent-strong-dark));
-        --tag-bg: light-dark(var(--c-tag-bg-light), var(--c-tag-bg-dark));
-        --tag-text: light-dark(var(--c-tag-text-light), var(--c-tag-text-dark));
-        --danger: light-dark(var(--c-danger-light), var(--c-danger-dark));
-        --success: light-dark(var(--c-pos-light), var(--c-pos-dark));
-        --warning: light-dark(var(--c-warning-light), var(--c-warning-dark));
-        --scrollbar-thumb: light-dark(var(--c-scroll-thumb-light), var(--c-scroll-thumb-dark));
-        --scrollbar-track: light-dark(var(--c-scroll-track-light), var(--c-scroll-track-dark));
+        --bg-canvas: light-dark(var(--hig-bg-canvas-light), var(--hig-bg-canvas-dark));
+        --surface-card: light-dark(var(--hig-surface-card-light), var(--hig-surface-card-dark));
+        --surface-sub: light-dark(var(--hig-surface-sub-light), var(--hig-surface-sub-dark));
+        --surface-control: light-dark(var(--hig-surface-control-light), var(--hig-surface-control-dark));
+        --surface-popover: light-dark(var(--hig-surface-popover-light), var(--hig-surface-popover-dark));
+        --surface-toolbar: light-dark(var(--hig-surface-toolbar-light), var(--hig-surface-toolbar-dark));
+        --segment-thumb: light-dark(var(--hig-segment-thumb-light), var(--hig-segment-thumb-dark));
+        --text-primary: light-dark(var(--hig-text-primary-light), var(--hig-text-primary-dark));
+        --text-secondary: light-dark(var(--hig-text-secondary-light), var(--hig-text-secondary-dark));
+        --text-tertiary: light-dark(var(--hig-text-tertiary-light), var(--hig-text-tertiary-dark));
+        --accent-primary: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --accent-hover: light-dark(var(--hig-accent-hover-light), var(--hig-accent-hover-dark));
+        --accent-tint: light-dark(var(--hig-accent-tint-light), var(--hig-accent-tint-dark));
+        --accent-border: light-dark(var(--hig-accent-border-light), var(--hig-accent-border-dark));
+        --border-hairline: light-dark(var(--hig-border-hairline-light), var(--hig-border-hairline-dark));
+        --border-strong: light-dark(var(--hig-border-strong-light), var(--hig-border-strong-dark));
+        --shadow-card: light-dark(var(--shadow-card-light), var(--shadow-card-dark));
+        --shadow-segment: light-dark(var(--shadow-segment-light), var(--shadow-segment-dark));
+        --shadow-popover: light-dark(var(--shadow-popover-light), var(--shadow-popover-dark));
+        --syntax-header: light-dark(var(--hig-syntax-header-light), var(--hig-syntax-header-dark));
+
+        --page-bg: light-dark(var(--hig-bg-canvas-light), var(--hig-bg-canvas-dark));
+        --surface-bg: light-dark(var(--hig-surface-card-light), var(--hig-surface-card-dark));
+        --glass-bg: light-dark(var(--hig-surface-toolbar-light), var(--hig-surface-toolbar-dark));
+        --glass-border: light-dark(var(--hig-border-hairline-light), var(--hig-border-hairline-dark));
+        --glass-card-shadow: light-dark(var(--shadow-card-light), var(--shadow-card-dark));
+        --btn-grad: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --btn-text: #FFFFFF;
+        --accent-text: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --accent-glow: light-dark(var(--hig-accent-tint-light), var(--hig-accent-tint-dark));
+        --head-text: light-dark(var(--hig-text-primary-light), var(--hig-text-primary-dark));
+        --body-text: light-dark(var(--hig-text-secondary-light), var(--hig-text-secondary-dark));
+        --text-muted: light-dark(var(--hig-text-tertiary-light), var(--hig-text-tertiary-dark));
+        --stat-pos: light-dark(var(--hig-green-light), var(--hig-green-dark));
+        --inp-bg: light-dark(var(--hig-surface-card-light), var(--hig-surface-card-dark));
+        --inp-border: light-dark(var(--hig-border-strong-light), var(--hig-border-strong-dark));
+        --inp-focus: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --inp-ring: light-dark(var(--hig-accent-tint-light), var(--hig-accent-tint-dark));
+        --focus-ring: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --prog-fill: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --prog-track: light-dark(var(--hig-surface-control-light), var(--hig-surface-control-dark));
+        --tag-bg: light-dark(var(--hig-accent-tint-light), var(--hig-accent-tint-dark));
+        --tag-text: light-dark(var(--hig-accent-light), var(--hig-accent-dark));
+        --divider: light-dark(var(--hig-border-hairline-light), var(--hig-border-hairline-dark));
+        --copy-bg: light-dark(var(--hig-surface-sub-light), var(--hig-surface-sub-dark));
+        --copy-border: light-dark(var(--hig-border-hairline-light), var(--hig-border-hairline-dark));
+        --card-sub-bg: light-dark(var(--hig-surface-sub-light), var(--hig-surface-sub-dark));
+        --danger: light-dark(var(--hig-red-light), var(--hig-red-dark));
+        --success: light-dark(var(--hig-green-light), var(--hig-green-dark));
+        --warning: light-dark(var(--hig-amber-light), var(--hig-amber-dark));
+        --scrollbar-thumb: light-dark(var(--hig-scroll-thumb-light), var(--hig-scroll-thumb-dark));
+        --scrollbar-track: light-dark(var(--hig-scroll-track-light), var(--hig-scroll-track-dark));
     }
 }
 
-/* Explicit Manual Theme Overrides (Synced with html[data-theme] and body.theme-*) */
-html[data-theme="light"],
-body.theme-light {
+@media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"], .light)):where(:not(:has(> body.theme-light))) {
+        --bg-canvas: var(--hig-bg-canvas-dark);
+        --surface-card: var(--hig-surface-card-dark);
+        --surface-sub: var(--hig-surface-sub-dark);
+        --surface-control: var(--hig-surface-control-dark);
+        --surface-popover: var(--hig-surface-popover-dark);
+        --surface-toolbar: var(--hig-surface-toolbar-dark);
+        --segment-thumb: var(--hig-segment-thumb-dark);
+        --text-primary: var(--hig-text-primary-dark);
+        --text-secondary: var(--hig-text-secondary-dark);
+        --text-tertiary: var(--hig-text-tertiary-dark);
+        --accent-primary: var(--hig-accent-dark);
+        --accent-hover: var(--hig-accent-hover-dark);
+        --accent-tint: var(--hig-accent-tint-dark);
+        --accent-border: var(--hig-accent-border-dark);
+        --border-hairline: var(--hig-border-hairline-dark);
+        --border-strong: var(--hig-border-strong-dark);
+        --shadow-card: var(--shadow-card-dark);
+        --shadow-segment: var(--shadow-segment-dark);
+        --shadow-popover: var(--shadow-popover-dark);
+        --syntax-header: var(--hig-syntax-header-dark);
+
+        --page-bg: var(--hig-bg-canvas-dark);
+        --surface-bg: var(--hig-surface-card-dark);
+        --glass-bg: var(--hig-surface-toolbar-dark);
+        --glass-border: var(--hig-border-hairline-dark);
+        --glass-card-shadow: var(--shadow-card-dark);
+        --btn-grad: var(--hig-accent-dark);
+        --btn-text: #FFFFFF;
+        --accent-text: var(--hig-accent-dark);
+        --accent-glow: var(--hig-accent-tint-dark);
+        --head-text: var(--hig-text-primary-dark);
+        --body-text: var(--hig-text-secondary-dark);
+        --text-muted: var(--hig-text-tertiary-dark);
+        --stat-pos: var(--hig-green-dark);
+        --inp-bg: var(--hig-surface-card-dark);
+        --inp-border: var(--hig-border-strong-dark);
+        --inp-focus: var(--hig-accent-dark);
+        --inp-ring: var(--hig-accent-tint-dark);
+        --focus-ring: var(--hig-accent-dark);
+        --prog-fill: var(--hig-accent-dark);
+        --prog-track: var(--hig-surface-control-dark);
+        --tag-bg: var(--hig-accent-tint-dark);
+        --tag-text: var(--hig-accent-dark);
+        --divider: var(--hig-border-hairline-dark);
+        --copy-bg: var(--hig-surface-sub-dark);
+        --copy-border: var(--hig-border-hairline-dark);
+        --card-sub-bg: var(--hig-surface-sub-dark);
+        --danger: var(--hig-red-dark);
+        --success: var(--hig-green-dark);
+        --warning: var(--hig-amber-dark);
+        --scrollbar-thumb: var(--hig-scroll-thumb-dark);
+        --scrollbar-track: var(--hig-scroll-track-dark);
+    }
+}
+
+/* Explicit Manual Theme Overrides */
+html[data-theme="light"], html.light, body.theme-light {
     color-scheme: light;
-    --page-bg: var(--c-page-light);
-    --surface-bg: var(--c-surface-light);
-    --surface-sub: var(--c-surface-sub-light);
-    --glass-bg: var(--c-glass-light);
-    --glass-border: var(--c-border-light);
-    --glass-card-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
-    --btn-grad: var(--c-btn-grad-light);
-    --btn-text: var(--c-btn-text-light);
-    --accent-text: var(--c-accent-light);
-    --accent-glow: var(--c-accent-glow-light);
-    --head-text: var(--c-head-light);
-    --body-text: var(--c-body-light);
-    --text-muted: var(--c-muted-light);
-    --stat-pos: var(--c-pos-light);
-    --inp-bg: var(--c-inp-bg-light);
-    --inp-border: var(--c-border-strong-light);
-    --inp-focus: var(--c-accent-strong-light);
-    --inp-ring: rgba(2, 132, 199, 0.22);
-    --focus-ring: var(--c-accent-strong-light);
-    --prog-fill: linear-gradient(90deg, #0284c7, #10b981);
-    --prog-track: #e2e8f0;
-    --tag-bg: var(--c-tag-bg-light);
-    --tag-text: var(--c-tag-text-light);
-    --divider: #e2e8f0;
-    --copy-bg: rgba(2, 132, 199, 0.08);
-    --copy-border: rgba(2, 132, 199, 0.28);
-    --card-sub-bg: #f1f5f9;
-    --danger: var(--c-danger-light);
-    --success: var(--c-pos-light);
-    --warning: var(--c-warning-light);
-    --scrollbar-thumb: var(--c-scroll-thumb-light);
-    --scrollbar-track: var(--c-scroll-track-light);
+    --bg-canvas: var(--hig-bg-canvas-light);
+    --surface-card: var(--hig-surface-card-light);
+    --surface-sub: var(--hig-surface-sub-light);
+    --surface-control: var(--hig-surface-control-light);
+    --surface-popover: var(--hig-surface-popover-light);
+    --surface-toolbar: var(--hig-surface-toolbar-light);
+    --segment-thumb: var(--hig-segment-thumb-light);
+    --text-primary: var(--hig-text-primary-light);
+    --text-secondary: var(--hig-text-secondary-light);
+    --text-tertiary: var(--hig-text-tertiary-light);
+    --accent-primary: var(--hig-accent-light);
+    --accent-hover: var(--hig-accent-hover-light);
+    --accent-tint: var(--hig-accent-tint-light);
+    --accent-border: var(--hig-accent-border-light);
+    --border-hairline: var(--hig-border-hairline-light);
+    --border-strong: var(--hig-border-strong-light);
+    --shadow-card: var(--shadow-card-light);
+    --shadow-segment: var(--shadow-segment-light);
+    --shadow-popover: var(--shadow-popover-light);
+    --syntax-header: var(--hig-syntax-header-light);
+
+    --page-bg: var(--hig-bg-canvas-light);
+    --surface-bg: var(--hig-surface-card-light);
+    --glass-bg: var(--hig-surface-toolbar-light);
+    --glass-border: var(--hig-border-hairline-light);
+    --glass-card-shadow: var(--shadow-card-light);
+    --btn-grad: var(--hig-accent-light);
+    --btn-text: #FFFFFF;
+    --accent-text: var(--hig-accent-light);
+    --accent-glow: var(--hig-accent-tint-light);
+    --head-text: var(--hig-text-primary-light);
+    --body-text: var(--hig-text-secondary-light);
+    --text-muted: var(--hig-text-tertiary-light);
+    --stat-pos: var(--hig-green-light);
+    --inp-bg: var(--hig-surface-card-light);
+    --inp-border: var(--hig-border-strong-light);
+    --inp-focus: var(--hig-accent-light);
+    --inp-ring: var(--hig-accent-tint-light);
+    --focus-ring: var(--hig-accent-light);
+    --prog-fill: var(--hig-accent-light);
+    --prog-track: var(--hig-surface-control-light);
+    --tag-bg: var(--hig-accent-tint-light);
+    --tag-text: var(--hig-accent-light);
+    --divider: var(--hig-border-hairline-light);
+    --copy-bg: var(--hig-surface-sub-light);
+    --copy-border: var(--hig-border-hairline-light);
+    --card-sub-bg: var(--hig-surface-sub-light);
+    --danger: var(--hig-red-light);
+    --success: var(--hig-green-light);
+    --warning: var(--hig-amber-light);
+    --scrollbar-thumb: var(--hig-scroll-thumb-light);
+    --scrollbar-track: var(--hig-scroll-track-light);
 }
 
-html[data-theme="dark"],
-body.theme-dark,
-body.theme-night {
+html[data-theme="dark"], html.dark, body.dark, body.theme-dark, body.theme-night {
     color-scheme: dark;
-    --page-bg: var(--c-page-dark);
-    --surface-bg: var(--c-surface-dark);
-    --surface-sub: var(--c-surface-sub-dark);
-    --glass-bg: var(--c-glass-dark);
-    --glass-border: var(--c-border-dark);
-    --glass-card-shadow: 0 20px 56px -16px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --btn-grad: var(--c-btn-grad-dark);
-    --btn-text: var(--c-btn-text-dark);
-    --accent-text: var(--c-accent-dark);
-    --accent-glow: var(--c-accent-glow-dark);
-    --head-text: var(--c-head-dark);
-    --body-text: var(--c-body-dark);
-    --text-muted: var(--c-muted-dark);
-    --stat-pos: var(--c-pos-dark);
-    --inp-bg: var(--c-inp-bg-dark);
-    --inp-border: var(--c-border-strong-dark);
-    --inp-focus: var(--c-accent-strong-dark);
-    --inp-ring: rgba(56, 189, 248, 0.24);
-    --focus-ring: var(--c-accent-strong-dark);
-    --prog-fill: linear-gradient(90deg, #38bdf8, #34d399);
-    --prog-track: rgba(255, 255, 255, 0.08);
-    --tag-bg: var(--c-tag-bg-dark);
-    --tag-text: var(--c-tag-text-dark);
-    --divider: rgba(148, 163, 184, 0.14);
-    --copy-bg: rgba(56, 189, 248, 0.1);
-    --copy-border: rgba(56, 189, 248, 0.28);
-    --card-sub-bg: rgba(255, 255, 255, 0.035);
-    --danger: var(--c-danger-dark);
-    --success: var(--c-pos-dark);
-    --warning: var(--c-warning-dark);
-    --scrollbar-thumb: var(--c-scroll-thumb-dark);
-    --scrollbar-track: var(--c-scroll-track-dark);
+    --bg-canvas: var(--hig-bg-canvas-dark);
+    --surface-card: var(--hig-surface-card-dark);
+    --surface-sub: var(--hig-surface-sub-dark);
+    --surface-control: var(--hig-surface-control-dark);
+    --surface-popover: var(--hig-surface-popover-dark);
+    --surface-toolbar: var(--hig-surface-toolbar-dark);
+    --segment-thumb: var(--hig-segment-thumb-dark);
+    --text-primary: var(--hig-text-primary-dark);
+    --text-secondary: var(--hig-text-secondary-dark);
+    --text-tertiary: var(--hig-text-tertiary-dark);
+    --accent-primary: var(--hig-accent-dark);
+    --accent-hover: var(--hig-accent-hover-dark);
+    --accent-tint: var(--hig-accent-tint-dark);
+    --accent-border: var(--hig-accent-border-dark);
+    --border-hairline: var(--hig-border-hairline-dark);
+    --border-strong: var(--hig-border-strong-dark);
+    --shadow-card: var(--shadow-card-dark);
+    --shadow-segment: var(--shadow-segment-dark);
+    --shadow-popover: var(--shadow-popover-dark);
+    --syntax-header: var(--hig-syntax-header-dark);
+
+    --page-bg: var(--hig-bg-canvas-dark);
+    --surface-bg: var(--hig-surface-card-dark);
+    --glass-bg: var(--hig-surface-toolbar-dark);
+    --glass-border: var(--hig-border-hairline-dark);
+    --glass-card-shadow: var(--shadow-card-dark);
+    --btn-grad: var(--hig-accent-dark);
+    --btn-text: #FFFFFF;
+    --accent-text: var(--hig-accent-dark);
+    --accent-glow: var(--hig-accent-tint-dark);
+    --head-text: var(--hig-text-primary-dark);
+    --body-text: var(--hig-text-secondary-dark);
+    --text-muted: var(--hig-text-tertiary-dark);
+    --stat-pos: var(--hig-green-dark);
+    --inp-bg: var(--hig-surface-card-dark);
+    --inp-border: var(--hig-border-strong-dark);
+    --inp-focus: var(--hig-accent-dark);
+    --inp-ring: var(--hig-accent-tint-dark);
+    --focus-ring: var(--hig-accent-dark);
+    --prog-fill: var(--hig-accent-dark);
+    --prog-track: var(--hig-surface-control-dark);
+    --tag-bg: var(--hig-accent-tint-dark);
+    --tag-text: var(--hig-accent-dark);
+    --divider: var(--hig-border-hairline-dark);
+    --copy-bg: var(--hig-surface-sub-dark);
+    --copy-border: var(--hig-border-hairline-dark);
+    --card-sub-bg: var(--hig-surface-sub-dark);
+    --danger: var(--hig-red-dark);
+    --success: var(--hig-green-dark);
+    --warning: var(--hig-amber-dark);
+    --scrollbar-thumb: var(--hig-scroll-thumb-dark);
+    --scrollbar-track: var(--hig-scroll-track-dark);
 }
 
-/* Global Accessible Focus Ring (:focus-visible) */
+/* Accessibility & Focus Rings */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-    outline: 2px solid var(--focus-ring, CanvasText);
+    outline: 2px solid var(--accent-primary);
     outline-offset: 2px;
 }
 
-/* Visually Hidden Utility (keeps skip links & SR context in accessibility tree) */
 .visually-hidden:where(:not(:focus-within, :active)) {
-    position: absolute !important;
-    clip-path: inset(50%) !important;
-    overflow: hidden !important;
-    width: 1px !important;
-    height: 1px !important;
-    margin: -1px !important;
-    padding: 0 !important;
-    border: 0 !important;
-    white-space: nowrap !important;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
 }
 
 .skip-link:focus {
-    position: fixed;
-    top: 0.75rem;
-    left: 0.75rem;
-    z-index: 10001;
-    padding: 0.625rem 1rem;
-    border-radius: 0.5rem;
-    background: var(--surface-bg);
-    color: var(--head-text);
-    border: 2px solid var(--focus-ring);
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-decoration: none;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    clip: auto;
+    clip-path: none;
+    height: auto;
+    overflow: visible;
+    position: static;
+    white-space: normal;
+    width: auto;
 }
 
-/* Windows Forced Colors / High Contrast Mode Resilience */
 @media (forced-colors: active) {
-    .glass-card,
-    .bento-card,
-    .history-item,
-    .rag-sidebar,
-    .telemetry-bar,
-    dialog.studio-dialog {
-        border: 1px solid CanvasText;
-    }
-
     :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-        outline: 2px solid Highlight;
-        outline-offset: 2px;
-    }
-
-    .mode-pill.active,
-    .nav-tab.active,
-    .bento-model-pill.active {
-        border: 2px solid Highlight;
+        outline: 2px solid CanvasText;
     }
 }
 
-/* Global Reduced-Motion Preference */
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *, ::before, ::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;

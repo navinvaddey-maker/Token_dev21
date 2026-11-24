@@ -13,8 +13,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="styles/tokens.css?v=20261120" />
-    <link rel="stylesheet" href="styles/studio.css?v=20261124" />
+    <link rel="stylesheet" href="styles/tokens.css?v=20261124-hig" />
+    <link rel="stylesheet" href="styles/studio.css?v=20261124-hig" />
     <style>
         /* Critical-path desktop container & responsive breakpoints */
         .glass-card {
@@ -80,59 +80,76 @@
         <div class="bubble bubble-1" aria-hidden="true"></div>
         <div class="bubble bubble-2" aria-hidden="true"></div>
 
-        <div class="glass-card">
-            <!-- Header Landmark -->
-            <header class="tc-header">
-                <div class="tc-logo" id="oryx-logo-wrap">
-                    <div class="tc-logo-icon" id="oryx-logo-3d" aria-hidden="true">
-                        <div class="owl-3d-rig">
-                            <div class="owl-3d-slice owl-3d-slab-back"></div>
-                            <div class="owl-3d-slice owl-3d-slab-bevel"></div>
-                            <div class="owl-3d-slice owl-3d-slab-face">
-                                <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img"
-                                    decoding="async" />
+        <header class="tc-header macos-toolbar">
+            <div class="macos-toolbar-inner">
+                <div class="toolbar-left">
+                    <div class="tc-logo" id="oryx-logo-wrap">
+                        <div class="tc-logo-icon" id="oryx-logo-3d" aria-hidden="true">
+                            <div class="owl-3d-rig">
+                                <div class="owl-3d-slice owl-3d-slab-back"></div>
+                                <div class="owl-3d-slice owl-3d-slab-bevel"></div>
+                                <div class="owl-3d-slice owl-3d-slab-face">
+                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
+                                </div>
+                                <div class="owl-3d-slice owl-3d-relief-wings">
+                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
+                                </div>
+                                <div class="owl-3d-slice owl-3d-relief-core">
+                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
+                                </div>
+                                <div class="owl-3d-slice owl-3d-relief-crown">
+                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
+                                </div>
+                                <div class="owl-3d-slice owl-3d-pbr-layer">
+                                    <canvas id="oryx-owl-pbr-canvas" width="60" height="60" class="owl-3d-pbr-canvas"></canvas>
+                                </div>
+                                <div class="owl-3d-slice owl-3d-sheen"></div>
                             </div>
-                            <div class="owl-3d-slice owl-3d-relief-wings">
-                                <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img"
-                                    decoding="async" />
-                            </div>
-                            <div class="owl-3d-slice owl-3d-relief-core">
-                                <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img"
-                                    decoding="async" />
-                            </div>
-                            <div class="owl-3d-slice owl-3d-relief-crown">
-                                <img src="logo.png?v=20261121" alt="" width="40" height="40" class="tc-logo-img"
-                                    decoding="async" />
-                            </div>
-                            <div class="owl-3d-slice owl-3d-pbr-layer">
-                                <canvas id="oryx-owl-pbr-canvas" width="80" height="80"
-                                    class="owl-3d-pbr-canvas"></canvas>
-                            </div>
-                            <div class="owl-3d-slice owl-3d-sheen"></div>
                         </div>
-                    </div>
-                    <div class="tc-logo-text">Oryx<span>Studio</span></div>
-                </div>
-                <div class="header-right-group">
-                    <div class="engine-badge">
-                        <span class="engine-pulse-dot" aria-hidden="true"></span>
-                        <span>Prompt Engine Ready</span>
+                        <div class="tc-logo-text">Oryx<span>Studio</span></div>
                     </div>
                     <span class="sandbox-badge" id="sandbox-badge">● Guest Mode</span>
-                    <button type="button" class="icon-btn-header cmd-trigger-btn" id="btn-studio-cmd"
-                        data-action="openStudioCommandPalette" title="Quick Actions (⌘K)"
-                        aria-label="Open Command Palette">⌘K</button>
+                </div>
+
+                <nav class="nav-bar toolbar-segmented-nav" role="tablist" aria-label="Workspace sections">
+                    <button type="button" class="nav-tab active" role="tab" aria-selected="true"
+                        data-action="switchTab" data-arg="compress" id="nav-compress">Optimize Prompt</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false"
+                        data-action="switchTab" data-arg="ask" id="nav-ask"
+                        style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false"
+                        data-action="switchTab" data-arg="history" id="nav-history"
+                        style="display: none;" disabled aria-disabled="true">History</button>
+                    <button type="button" class="nav-tab" role="tab" aria-selected="false"
+                        data-action="switchTab" data-arg="stats" id="nav-stats"
+                        style="display: none;" disabled aria-disabled="true">Insights</button>
+                </nav>
+
+                <div class="header-right-group toolbar-right">
+                    <button type="button" class="cmd-search-pill cmd-trigger-btn" id="btn-studio-cmd"
+                        data-action="openStudioCommandPalette" title="Quick Actions &amp; Recent Prompts (⌘K)"
+                        aria-label="Open Command Palette">
+                        <span class="cmd-search-icon" aria-hidden="true">⌕</span>
+                        <span class="cmd-search-label">Search</span>
+                        <kbd id="header-cmd-kbd" class="macos-kbd">⌘K</kbd>
+                    </button>
                     <button type="button" class="icon-btn-header" id="btn-theme-toggle" data-action="toggleTheme"
                         title="Toggle Light/Dark Theme" aria-label="Toggle Theme">🌙</button>
                     <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin"
                         aria-label="Customize Skin">🎨</button>
+                    <a href="/admin.html" id="admin-link" class="btn-ghost toolbar-admin-link"
+                        style="display: none; text-decoration: none;">Admin</a>
+                    <div class="toolbar-user-group">
+                        <span class="user-info toolbar-user-status" id="user-status-text"><strong id="display-username">Zero-Auth Sandbox</strong></span>
+                        <button type="button" class="toolbar-account-btn" id="auth-toggle-btn"
+                            data-action="toggleAuthSection">Sign In</button>
+                    </div>
                 </div>
-            </header>
+            </div>
+        </header>
 
+        <div class="glass-card">
             <main id="main-content" tabindex="-1">
-                <h1 class="tc-headline">Oryx Studio</h1>
-                <p class="tc-sub">Make any prompt shorter, clearer, and hallucination-free for ChatGPT, Claude &amp;
-                    Gemini</p>
 
                 <!-- ── Auth Overlay Section (Non-blocking modal overlay, preserves #auth-section) ── -->
                 <div id="auth-section" class="auth-overlay-shell" role="dialog" aria-modal="true"
@@ -203,59 +220,39 @@
 
                 <!-- ── Main Section (R1: Unblocked by Default) ────── -->
                 <div id="main-section" style="display: block;">
-                    <div class="user-bar">
-                        <div class="user-info" id="user-status-text">Operating in <strong id="display-username"
-                                style="color: var(--stat-pos);">Zero-Auth Sandbox</strong></div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <a href="/admin.html" id="admin-link" class="btn-ghost"
-                                style="display: none; text-decoration: none;">🛡️ Admin</a>
-                            <button type="button" class="btn-ghost" id="auth-toggle-btn"
-                                data-action="toggleAuthSection">Sign In / Register</button>
-                        </div>
-                    </div>
-
-                    <nav class="nav-bar" role="tablist" aria-label="Workspace sections">
-                        <button type="button" class="nav-tab active" role="tab" aria-selected="true"
-                            aria-controls="tab-compress" data-action="switchTab" data-arg="compress" id="nav-compress">Optimize
-                            Prompt</button>
-                        <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-ask-content" data-action="switchTab" data-arg="ask" id="nav-ask"
-                            style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
-                        <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-history-content" data-action="switchTab" data-arg="history" id="nav-history"
-                            style="display: none;" disabled aria-disabled="true">History</button>
-                        <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-stats-content" data-action="switchTab" data-arg="stats" id="nav-stats"
-                            style="display: none;" disabled aria-disabled="true">Insights</button>
-                    </nav>
 
                     <!-- ── Compress Tab (2-Column Split Workbench) ── -->
                     <div class="tab-content active" role="tabpanel" aria-labelledby="nav-compress" id="tab-compress">
-                        <div class="tag">CRISP Optimization · Dual-Column Workbench</div>
-
-                        <!-- 1-Click Sample Presets & Domain Playbooks (R1) -->
-                        <div class="preset-strip">
-                            <span class="preset-label">Try sample:</span>
-                            <button type="button" class="preset-chip" data-preset="house" id="preset-house"
-                                data-action="loadPreset" data-arg="house">🏠 Buying a House</button>
-                            <button type="button" class="preset-chip" data-preset="bug" id="preset-bug"
-                                data-action="loadPreset" data-arg="bug">🐛 Bug Report</button>
-                            <button type="button" class="preset-chip" data-preset="legal" id="preset-legal"
-                                data-action="loadPreset" data-arg="legal">⚖️ Contract Review</button>
-                            <button type="button" class="preset-chip" id="btn-open-playbooks"
-                                data-action="openPlaybookModal">📚 Playbooks (12+ Domains)</button>
-                            <button type="button" class="preset-chip" id="btn-private-local-badge"
-                                data-action="showPrivacyLocalInfo" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Zero-Upload Local Docs</button>
+                        <!-- Compact Workbench Title + Preset Bar (.workbench-top-strip) -->
+                        <div class="workbench-top-strip">
+                            <div class="workbench-heading-group">
+                                <h1 class="tc-headline">Oryx Studio</h1>
+                                <p class="tc-sub">Shorter, clearer, hallucination-free prompts for ChatGPT, Claude &amp; Gemini</p>
+                            </div>
+                            <div class="preset-strip">
+                                <span class="preset-label">Try sample:</span>
+                                <button type="button" class="preset-chip" data-preset="house" id="preset-house"
+                                    data-action="loadPreset" data-arg="house">🏠 Buying a House</button>
+                                <button type="button" class="preset-chip" data-preset="bug" id="preset-bug"
+                                    data-action="loadPreset" data-arg="bug">🐛 Bug Report</button>
+                                <button type="button" class="preset-chip" data-preset="legal" id="preset-legal"
+                                    data-action="loadPreset" data-arg="legal">⚖️ Contract Review</button>
+                                <button type="button" class="preset-chip" id="btn-open-playbooks"
+                                    data-action="openPlaybookModal">📚 Playbooks</button>
+                                <button type="button" class="preset-chip" id="btn-private-local-badge"
+                                    data-action="showPrivacyLocalInfo" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Local Docs</button>
+                            </div>
                         </div>
 
                         <div class="workbench-split" data-workbench-split id="workbench-container">
                             <!-- Left Column: Raw Input Pane -->
-                            <div class="pane-column pane-left" id="input-pane">
+                            <div class="pane-column pane-left macos-pane-card" id="input-pane">
                                 <div class="pane-header">
                                     <label for="prompt-input" class="pane-title">Raw Input</label>
-                                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                    <div class="pane-header-meta">
                                         <span id="prompt-word-counter" class="word-counter-pill">0 words (min 8)</span>
                                         <span id="input-token-counter" class="token-pill">0 tokens</span>
+                                        <button type="button" class="clear-btn clear-btn-compact" id="clear-input-btn" data-action="clearInput" title="Clear raw input">Clear</button>
                                     </div>
                                 </div>
 
@@ -315,17 +312,17 @@
                                 </select>
 
                                 <!-- Primary Outcome Presets (Option 3) -->
-                                <div class="segmented-mode-pills outcome-pills" id="outcome-pills" role="radiogroup"
+                                <div class="segmented-mode-pills outcome-pills macos-segmented" id="outcome-pills" role="radiogroup"
                                     aria-label="Outcome Preset">
                                     <button type="button" role="radio" class="mode-pill" data-outcome="factchecked"
                                         id="po-factchecked" aria-checked="false" data-action="selectOutcomePreset"
-                                        data-arg="factchecked" title="Deep Blueprint + Hallucination-Proof Contract">🛡️ Fact-Checked</button>
+                                        data-arg="factchecked" title="Deep Blueprint + Hallucination-Proof Contract">Fact-Checked</button>
                                     <button type="button" role="radio" class="mode-pill active" data-outcome="saver"
                                         id="po-saver" aria-checked="true" data-action="selectOutcomePreset"
-                                        data-arg="saver" title="Smart Trim: 30-55% token reduction with 100% constraint locks">✨ Token Saver</button>
+                                        data-arg="saver" title="Smart Trim: 30-55% token reduction with 100% constraint locks">Token Saver</button>
                                     <button type="button" role="radio" class="mode-pill" data-outcome="blueprint"
                                         id="po-blueprint" aria-checked="false" data-action="selectOutcomePreset"
-                                        data-arg="blueprint" title="Deep Blueprint: CRISP multi-phase scaffolding">📐 Full Blueprint</button>
+                                        data-arg="blueprint" title="Deep Blueprint: CRISP multi-phase scaffolding">Full Blueprint</button>
                                 </div>
 
                                 <!-- Fine-tune & Sources Disclosure (Collapsed by default) -->
@@ -363,40 +360,42 @@
                                 </details>
 
                                 <div class="pane-actions-row">
-                                    <button type="button" class="clear-btn" data-action="clearInput">Clear</button>
                                     <button type="button" class="tc-compress-btn workbench-compress-btn"
                                         data-action="compress" id="compress-btn" disabled>
-                                        ⚡ Compress Prompt
+                                        <span id="compress-btn-label">Update Prompt</span>
+                                        <kbd id="compress-btn-kbd" class="btn-kbd-badge">⌘↩</kbd>
                                     </button>
-                                </div>
-                                <div class="shortcut-hint">
-                                    Press <kbd>⌘</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compress · <kbd>⌘K</kbd>
-                                    for quick actions
                                 </div>
                             </div>
 
                             <!-- Right Column: CRISP Output Pane (R2, R3, R5) -->
-                            <div class="pane-column pane-right" id="output-pane">
-                                <div class="pane-header">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                        <span class="pane-title">AI-Ready Prompt</span>
-                                        <button type="button" class="tes-badge" id="tes-score" data-tes="0.97"
-                                            aria-expanded="false" aria-controls="inspector-drawer"
-                                            data-action="toggleQualityBreakdown"
-                                            title="Inspect quality score breakdown">Quality Ready</button>
-                                        <!-- Phase 4: Output View Switcher (Full Prompt vs Turn Delta) -->
-                                        <div class="segmented-mode-pills output-view-pills" id="output-view-toggle"
-                                            role="radiogroup" aria-label="Output View" style="display: none;">
+                            <div class="pane-column pane-right macos-pane-card" id="output-pane">
+                                <div class="pane-header output-pane-header">
+                                    <div class="output-header-left">
+                                        <div class="segmented-mode-pills output-view-pills macos-segmented-sm" id="output-view-toggle"
+                                            role="radiogroup" aria-label="Output View">
                                             <button type="button" role="radio" class="mode-pill active" id="ov-rehydrated"
                                                 aria-checked="true" data-action="setOutputView" data-arg="rehydrated">Full Prompt</button>
                                             <button type="button" role="radio" class="mode-pill" id="ov-delta"
-                                                aria-checked="false" data-action="setOutputView" data-arg="delta">Turn Delta</button>
+                                                aria-checked="false" disabled aria-disabled="true"
+                                                title="Run a follow-up turn to generate a Turn Delta"
+                                                data-action="setOutputView" data-arg="delta">Turn Delta</button>
                                         </div>
+                                        <label class="diff-toggle-label" for="diff-toggle" title="Highlight pruned filler tokens">
+                                            <input type="checkbox" id="diff-toggle" checked data-change="toggleDiffView">
+                                            <span>Highlight changes</span>
+                                        </label>
                                     </div>
-                                    <label class="diff-toggle-label" for="diff-toggle">
-                                        <input type="checkbox" id="diff-toggle" checked data-change="toggleDiffView">
-                                        <span>Highlight changes</span>
-                                    </label>
+                                    <div class="output-header-exports">
+                                        <button type="button" class="copy-btn toolbar-export-btn" id="copy-result-btn"
+                                            data-action="copyResult" title="Copy prompt to clipboard">Copy</button>
+                                        <button type="button" class="copy-btn toolbar-export-btn" id="launch-chatgpt-btn"
+                                            data-action="launchInExternalAi" data-arg="chatgpt" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
+                                        <button type="button" class="copy-btn toolbar-export-btn" id="launch-claude-btn"
+                                            data-action="launchInExternalAi" data-arg="claude" title="Copy prompt and open in Claude">↗ Claude</button>
+                                        <button type="button" class="copy-btn toolbar-export-btn" id="btn-verify-workbench"
+                                            data-action="openWorkbenchVerifyModal" style="display: none;" title="Verify an LLM reply against this prompt's facts">Verify</button>
+                                    </div>
                                 </div>
 
                                 <!-- Output Box with Non-Blocking Inline Progress (R5) -->
@@ -442,73 +441,83 @@
                                     </div>
                                     <span id="token-saving-pct" style="display: none;">0% saved</span>
 
-                                    <div class="telemetry-bar">
-                                        <div class="telemetry-stats">
+                                    <div id="clarifying-pills" class="preset-strip clarify-strip" style="display: none;"></div>
+                                    <div id="clarify-inline-host" class="clarify-inline-host"></div>
+
+                                    <!-- Unified Footer Status Bar & Floating macOS Inspector Popover (.output-status-bar) -->
+                                    <div class="output-status-bar telemetry-bar">
+                                        <div class="telemetry-stats status-bar-metrics">
                                             <span id="output-summary-pill" class="stat-tok">0 tokens</span>
+                                            <span class="status-sep" aria-hidden="true">·</span>
                                             <span id="output-saving-pct" class="stat-pct">0% saved</span>
+                                            <button type="button" class="tes-badge" id="tes-score" data-tes="0.97"
+                                                aria-expanded="false" aria-controls="inspector-drawer"
+                                                data-action="toggleQualityBreakdown"
+                                                title="Inspect quality score breakdown">Quality Ready</button>
                                         </div>
-                                        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-                                            <button type="button" class="copy-btn" id="copy-result-btn"
-                                                data-action="copyResult">📋 Copy</button>
-                                            <button type="button" class="copy-btn" id="launch-chatgpt-btn"
-                                                data-action="launchInExternalAi" data-arg="chatgpt" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
-                                            <button type="button" class="copy-btn" id="launch-claude-btn"
-                                                data-action="launchInExternalAi" data-arg="claude" title="Copy prompt and open in Claude">↗ Claude</button>
-                                            <button type="button" class="copy-btn" id="btn-verify-workbench"
-                                                data-action="openWorkbenchVerifyModal" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
-                                        </div>
-                                    </div>
 
-                                    <!-- Collapsible Inspector Drawer (Collapsed by default) -->
-                                    <details class="studio-disclosure inspector-drawer" id="inspector-drawer">
-                                        <summary class="studio-disclosure-summary">Inspector · Quality, Cost &amp; Exports</summary>
-                                        <div class="studio-disclosure-body inspector-body">
-                                            <div id="quality-breakdown" class="quality-breakdown">
-                                                <span>Efficiency (TES): <strong>—</strong></span>
-                                                <span>Meaning (SFS): <strong>—</strong></span>
-                                                <span>Rules Kept (SCS): <strong>—</strong></span>
-                                            </div>
-                                            <div class="inspector-metrics-row">
-                                                <div class="telemetry-stats">
-                                                    <span id="output-token-count" class="stat-tok">0 tokens</span>
-                                                    <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                        <div class="status-bar-right">
+                                            <details class="studio-disclosure inspector-drawer inspector-popover-wrap" id="inspector-drawer">
+                                                <summary class="studio-disclosure-summary inspector-trigger-btn">
+                                                    <span>Inspector</span>
+                                                    <span class="inspector-chevron" aria-hidden="true">▾</span>
+                                                </summary>
+                                                <div class="studio-disclosure-body inspector-body inspector-popover-panel">
+                                                    <div class="inspector-popover-header">
+                                                        <span class="inspector-popover-title">Inspector · Quality, Cost &amp; Exports</span>
+                                                    </div>
+                                                    <div id="quality-breakdown" class="quality-breakdown">
+                                                        <span>Efficiency (TES): <strong>—</strong></span>
+                                                        <span>Meaning (SFS): <strong>—</strong></span>
+                                                        <span>Rules Kept (SCS): <strong>—</strong></span>
+                                                    </div>
+                                                    <div class="inspector-metrics-row">
+                                                        <div class="telemetry-stats">
+                                                            <span id="output-token-count" class="stat-tok">0 tokens</span>
+                                                            <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                                        </div>
+                                                        <div class="inspector-controls-row">
+                                                            <label for="model-select" class="visually-hidden">Target model pricing</label>
+                                                            <select id="model-select" class="tc-select model-select-compact"
+                                                                data-change="updateModelPricing">
+                                                                <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
+                                                                <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
+                                                                <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
+                                                            </select>
+                                                            <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
+                                                            <select id="roi-scale-select" class="tc-select model-select-compact"
+                                                                data-change="updateRoiScale" title="Monthly prompt volume for ROI projection">
+                                                                <option value="1000" selected>1k runs</option>
+                                                                <option value="100000">100k / mo</option>
+                                                                <option value="1000000">1M / mo</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="inspector-exports-row">
+                                                            <button type="button" class="copy-btn" id="export-audit-btn"
+                                                                data-action="exportAuditCard" title="Copy Markdown Token &amp; Quality Audit Card">Audit Card</button>
+                                                            <button type="button" class="copy-btn" id="export-svg-btn"
+                                                                data-action="exportAuditSvg" title="Download shareable SVG Audit Card">Save SVG</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div class="inspector-controls-row">
-                                                    <label for="model-select" class="visually-hidden">Target model
-                                                        pricing</label>
-                                                    <select id="model-select" class="tc-select model-select-compact"
-                                                        data-change="updateModelPricing">
-                                                        <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
-                                                        <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
-                                                        <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
-                                                    </select>
-                                                    <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
-                                                    <select id="roi-scale-select" class="tc-select model-select-compact"
-                                                        data-change="updateRoiScale" title="Monthly prompt volume for ROI projection">
-                                                        <option value="1000" selected>1k runs</option>
-                                                        <option value="100000">100k / mo</option>
-                                                        <option value="1000000">1M / mo</option>
-                                                    </select>
-                                                    <button type="button" class="copy-btn" id="export-audit-btn"
-                                                        data-action="exportAuditCard" title="Copy Markdown Token &amp; Quality Audit Card">📊 Audit Card</button>
-                                                    <button type="button" class="copy-btn" id="export-svg-btn"
-                                                        data-action="exportAuditSvg" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
-                                                </div>
+                                            </details>
+
+                                            <span class="status-divider" role="separator" aria-orientation="vertical"></span>
+
+                                            <div class="feedback-row feedback-quiet-group" role="group" aria-label="Prompt output feedback">
+                                                <span id="feedback-status" class="feedback-status-note" style="display: none;">Saved</span>
+                                                <button type="button" class="feedback-icon-btn" id="btn-feedback-up"
+                                                    data-action="submitFeedback" data-arg="thumbs_up" aria-pressed="false" disabled
+                                                    aria-label="Useful" title="Sign in to submit feedback">
+                                                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+                                                </button>
+                                                <button type="button" class="feedback-icon-btn" id="btn-feedback-down"
+                                                    data-action="submitFeedback" data-arg="thumbs_down" aria-pressed="false" disabled
+                                                    aria-label="Not Useful" title="Sign in to submit feedback">
+                                                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+                                                </button>
                                             </div>
                                         </div>
-                                    </details>
-                                    <div id="clarifying-pills" class="preset-strip" style="display: none; margin-top: 0.5rem;"></div>
-
-                                    <div class="feedback-row">
-                                        <span id="feedback-status"
-                                            style="font-size: 0.78rem; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓
-                                            Feedback recorded</span>
-                                        <button type="button" class="btn-success-sm" id="btn-feedback-up"
-                                            data-action="submitFeedback" data-arg="thumbs_up" disabled
-                                            title="Sign in to submit feedback">👍 Useful</button>
-                                        <button type="button" class="btn-danger-sm" id="btn-feedback-down"
-                                            data-action="submitFeedback" data-arg="thumbs_down" disabled
-                                            title="Sign in to submit feedback">👎 Not Useful</button>
                                     </div>
                                 </div>
                             </div>
@@ -806,13 +815,14 @@
                             <div class="insights-bento" id="global-stats"></div>
                         </div>
                     </div>
+
                 </div> <!-- End Main Section -->
             </main>
         </div> <!-- End Glass Card -->
     </div>
 
     <!-- ── Native <dialog> Modals (Top-Layer, Focus Trap, Esc Dismiss) ── -->
-    <dialog id="skin-modal" class="studio-dialog dialog-sm" aria-labelledby="skin-modal-title">
+    <dialog id="skin-modal" class="studio-dialog dialog-sm" closedby="any" aria-labelledby="skin-modal-title">
         <div class="dialog-inner">
             <div class="dialog-header">
                 <h2 id="skin-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Customize UI Skin
@@ -843,7 +853,7 @@
         </div>
     </dialog>
 
-    <dialog id="verify-modal" class="studio-dialog" aria-labelledby="verify-modal-title">
+    <dialog id="verify-modal" class="studio-dialog" closedby="any" aria-labelledby="verify-modal-title">
         <div class="dialog-inner">
             <div class="dialog-header">
                 <h2 id="verify-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Verify LLM Reply
@@ -868,7 +878,7 @@
         </div>
     </dialog>
 
-    <dialog id="playbook-modal" class="studio-dialog" aria-labelledby="playbook-modal-title">
+    <dialog id="playbook-modal" class="studio-dialog" closedby="any" aria-labelledby="playbook-modal-title">
         <div class="dialog-inner">
             <div class="dialog-header">
                 <h2 id="playbook-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Domain Playbooks</h2>
@@ -882,16 +892,26 @@
         </div>
     </dialog>
 
-    <dialog id="studio-cmd-modal" class="studio-dialog cmd-palette-dialog" aria-label="Oryx Studio Command Palette">
-        <label for="studio-cmd-input" class="visually-hidden">Search commands</label>
-        <input type="text" id="studio-cmd-input" class="cmd-palette-input"
-            placeholder="Type a command (e.g. preset, dark mode, smart trim, history, sign in)...">
-        <div class="cmd-palette-list" id="studio-cmd-list"></div>
+    <dialog id="studio-cmd-modal" class="studio-dialog cmd-palette-dialog" closedby="any" aria-label="Oryx Studio Command Palette">
+        <div class="cmd-palette-search-bar">
+            <span class="cmd-palette-search-icon" aria-hidden="true">⌕</span>
+            <label for="studio-cmd-input" class="visually-hidden">Search commands and recent prompts</label>
+            <input type="text" id="studio-cmd-input" class="cmd-palette-input" role="combobox"
+                aria-expanded="true" aria-controls="studio-cmd-list" aria-autocomplete="list"
+                autocomplete="off" autofocus placeholder="Search actions or recent prompts...">
+            <button type="button" class="cmd-esc-btn" data-action="closeStudioCommandPalette" aria-label="Dismiss Command Palette">ESC</button>
+        </div>
+        <div class="cmd-palette-list" id="studio-cmd-list" role="listbox" aria-label="Actions and recent prompts"></div>
+        <div class="cmd-palette-footer">
+            <span><kbd class="macos-kbd">↑</kbd><kbd class="macos-kbd">↓</kbd> Navigate</span>
+            <span><kbd class="macos-kbd">↩</kbd> Select</span>
+            <span><kbd class="macos-kbd">ESC</kbd> Close</span>
+        </div>
     </dialog>
 
     <script src="mock_api.js?v=6"></script>
     <script src="rag_workspace.js?v=2"></script>
-    <script src="app.js?v=20261124"></script>
+    <script src="app.js?v=20261124-hig"></script>
 </body>
 
 </html>

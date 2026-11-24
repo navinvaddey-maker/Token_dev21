@@ -8,6 +8,88 @@
 const GUEST_MAX_USES = 3;
 const GUEST_USES_KEY = 'tce_guest_uses';
 
+const RECENT_RUNS_KEY = 'oryx_recent_runs';
+
+// ARCH: ARCHITECTURE.md §2 Full Component Map (Presentation Layer) — macOS Apple HIG platform
+// shortcut adaptation & Spotlight recent-runs ring buffer (purged on logout/session expiry).
+/**
+ * Detects whether the client OS uses Apple modifier conventions (`⌘` vs `Ctrl`).
+ */
+function isApplePlatform() {
+    if (typeof window !== 'undefined' && window.__ORYX_FORCE_PLATFORM === 'win') return false;
+    if (typeof window !== 'undefined' && window.__ORYX_FORCE_PLATFORM === 'apple') return true;
+    const ua = (typeof navigator !== 'undefined' && ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent)) || '';
+    if (/jsdom/i.test(ua)) return true;
+    return /Mac|iPhone|iPad|iPod/i.test(ua);
+}
+
+function getModKeySymbol() {
+    return isApplePlatform() ? '⌘' : 'Ctrl+';
+}
+
+function getCmdPaletteBadge() {
+    return isApplePlatform() ? '⌘K' : 'Ctrl K';
+}
+
+function getRunShortcutBadge() {
+    return isApplePlatform() ? '⌘↩' : 'Ctrl+↩';
+}
+
+function syncPlatformShortcutBadges() {
+    const kbdCmd = document.getElementById('header-cmd-kbd');
+    if (kbdCmd) kbdCmd.textContent = getCmdPaletteBadge();
+    const btnStudioCmd = document.getElementById('btn-studio-cmd');
+    if (btnStudioCmd) btnStudioCmd.title = `Quick Actions & Recent Prompts (${getCmdPaletteBadge()})`;
+    const kbdRun = document.getElementById('compress-btn-kbd');
+    if (kbdRun) kbdRun.textContent = getRunShortcutBadge();
+}
+
+function setCompressButtonLabel(labelText) {
+    const labelEl = document.getElementById('compress-btn-label');
+    const btn = document.getElementById('compress-btn');
+    if (labelEl) {
+        labelEl.textContent = labelText;
+    } else if (btn) {
+        const kbd = document.getElementById('compress-btn-kbd');
+        const kbdHtml = kbd ? kbd.outerHTML : '<kbd id="compress-btn-kbd">⌘↩</kbd>';
+        btn.innerHTML = escapeHtml(labelText) + ' ' + kbdHtml;
+    }
+}
+
+function loadRecentPromptRuns() {
+    try {
+        const raw = localStorage.getItem(RECENT_RUNS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                State.recentRuns = parsed.slice(0, 5);
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to load recent prompt runs:', err);
+    }
+}
+
+function recordRecentPromptRun({ id, rawText, tokenOriginal, tokenFinal, tokensSaved, mode }) {
+    try {
+        if (!rawText) return;
+        const item = {
+            id: id || ('run_' + Math.random().toString(36).slice(2, 9)),
+            preview: rawText.slice(0, 90),
+            raw_text: rawText.slice(0, 2000),
+            token_original: tokenOriginal || 0,
+            token_final: tokenFinal || 0,
+            tokens_saved: tokensSaved || 0,
+            mode: mode || State.currentMode,
+            created_at: new Date().toISOString()
+        };
+        State.recentRuns = [item, ...(State.recentRuns || []).filter(r => r.id !== item.id && r.raw_text !== item.raw_text)].slice(0, 5);
+        localStorage.setItem(RECENT_RUNS_KEY, JSON.stringify(State.recentRuns));
+    } catch (err) {
+        console.warn('Failed to record recent prompt run:', err);
+    }
+}
+
 const State = {
     userId: null,
     token: null,
@@ -22,6 +104,7 @@ const State = {
     currentRoiScale: 1000,
     showDiff: true,
     guestUses: 0,
+    recentRuns: [],
     // Phase 4: Multi-turn continuation state
     parentId: null,
     parentRawPrompt: '',
@@ -180,8 +263,29 @@ function isAdminUser() {
     return r === 'admin' || b === 'admin';
 }
 
+/**
+ * Purges session-scoped prompt caches and UI state on logout or 401 session expiration
+ * so prompt contents never leak across users on a shared browser.
+ */
+function purgeSensitiveSessionCache() {
+    State.recentRuns = [];
+    State.lastResult = null;
+    State.lastStats = null;
+    cachedHistoryRecords = [];
+    try {
+        localStorage.removeItem('tce_token');
+        localStorage.removeItem('tce_user_id');
+        localStorage.removeItem('tce_username');
+        localStorage.removeItem('tce_business_type');
+        localStorage.removeItem('tce_role');
+        localStorage.removeItem(RECENT_RUNS_KEY);
+    } catch (err) {
+        console.warn('Failed to clear session storage keys:', err);
+    }
+}
+
 function logout() {
-    // ARCH: §1 Reality Check — Session termination clears HttpOnly cookie and returns to sandbox
+    // ARCH: §1 Reality Check — Session termination clears HttpOnly cookie and purges client caches
     fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
         .catch(err => console.warn('Logout request failed:', err));
     State.token = null;
@@ -189,12 +293,9 @@ function logout() {
     State.username = null;
     State.businessType = null;
     State.role = null;
+    purgeSensitiveSessionCache();
     resetParentSession(true);
-    localStorage.removeItem('tce_token');
-    localStorage.removeItem('tce_user_id');
-    localStorage.removeItem('tce_username');
-    localStorage.removeItem('tce_business_type');
-    localStorage.removeItem('tce_role');
+    clearInput();
 
     const authSec = document.getElementById('auth-section');
     if (authSec) authSec.style.display = 'none';
@@ -361,10 +462,10 @@ function updateUserBar() {
         }
     } else {
         const remaining = Math.max(0, GUEST_MAX_USES - getGuestUses());
-        if (statusText) statusText.innerHTML = `Operating in <strong id="display-username" style="color: #10b981;">Live Trial (${remaining}/${GUEST_MAX_USES} runs left)</strong>`;
-        if (toggleBtn) toggleBtn.textContent = 'Sign In / Register';
+        if (statusText) statusText.innerHTML = `<strong id="display-username">Trial (${remaining}/${GUEST_MAX_USES} left)</strong>`;
+        if (toggleBtn) toggleBtn.textContent = 'Sign In';
         if (sandboxBadge) {
-            sandboxBadge.textContent = `● Live Trial (${remaining}/${GUEST_MAX_USES} left)`;
+            sandboxBadge.textContent = `● Trial (${remaining}/${GUEST_MAX_USES})`;
             sandboxBadge.classList.remove('authenticated');
         }
         if (adminLink) adminLink.style.display = 'none';
@@ -420,12 +521,9 @@ function onAuthExpired() {
     State.username = null;
     State.businessType = null;
     State.role = null;
+    purgeSensitiveSessionCache();
     resetParentSession(true);
-    localStorage.removeItem('tce_token');
-    localStorage.removeItem('tce_user_id');
-    localStorage.removeItem('tce_username');
-    localStorage.removeItem('tce_business_type');
-    localStorage.removeItem('tce_role');
+    clearInput();
     updateUserBar();
     showToast('Session expired. Switched to sandbox mode.', 'error');
 }
@@ -843,6 +941,7 @@ async function processIngestedFile(file) {
     if (name.endsWith('.txt') || name.endsWith('.md')) {
         const reader = new FileReader();
         reader.onload = (event) => {
+            resetParentSession(true);
             promptInput.value = event.target.result;
             validatePromptLength();
             showToast(`Loaded ${file.name} (${Math.round(file.size / 1024) || 1} KB)`, 'success');
@@ -855,6 +954,7 @@ async function processIngestedFile(file) {
     } else if (name.endsWith('.pdf')) {
         try {
             const text = await extractVanillaPdfText(file);
+            resetParentSession(true);
             promptInput.value = text;
             validatePromptLength();
             showToast(`Extracted text from ${file.name}`, 'success');
@@ -942,12 +1042,40 @@ function clearInput() {
     const inlineProgress = document.getElementById('inline-progress');
     if (inlineProgress) inlineProgress.style.display = 'none';
     const viewToggle = document.getElementById('output-view-toggle');
-    if (viewToggle) viewToggle.style.display = 'none';
+    if (viewToggle) viewToggle.style.display = 'inline-flex';
+    const rehydratedBtn = document.getElementById('ov-rehydrated');
+    const deltaBtn = document.getElementById('ov-delta');
+    if (rehydratedBtn) {
+        rehydratedBtn.classList.add('active');
+        rehydratedBtn.setAttribute('aria-checked', 'true');
+    }
+    if (deltaBtn) {
+        deltaBtn.classList.remove('active');
+        deltaBtn.setAttribute('aria-checked', 'false');
+        deltaBtn.disabled = true;
+        deltaBtn.setAttribute('aria-disabled', 'true');
+        deltaBtn.title = 'Run a follow-up turn to generate a Turn Delta';
+    }
     const btn = document.getElementById('compress-btn');
     if (btn) {
         btn.disabled = true;
-        btn.textContent = State.parentId ? '⚡ Update Prompt' : '⚡ Compress Prompt';
     }
+    setCompressButtonLabel('Update Prompt');
+    closeClarifyInlineBox();
+    const pillsEl = document.getElementById('clarifying-pills');
+    if (pillsEl) {
+        pillsEl.style.display = 'none';
+        pillsEl.innerHTML = '';
+    }
+    ['btn-feedback-up', 'btn-feedback-down'].forEach(id => {
+        const fbBtn = document.getElementById(id);
+        if (fbBtn) {
+            fbBtn.classList.remove('is-selected', 'is-dimmed');
+            fbBtn.setAttribute('aria-pressed', 'false');
+        }
+    });
+    const fbStatus = document.getElementById('feedback-status');
+    if (fbStatus) fbStatus.style.display = 'none';
     validatePromptLength();
     updateContinuationModePill();
 
@@ -1014,10 +1142,22 @@ function resetParentSession(silent = false) {
     const ledgerStrip = document.getElementById('continuation-ledger-strip');
     if (ledgerStrip) ledgerStrip.style.display = 'none';
     const viewToggle = document.getElementById('output-view-toggle');
-    if (viewToggle) viewToggle.style.display = 'none';
+    if (viewToggle) viewToggle.style.display = 'inline-flex';
+    const rehydratedBtn = document.getElementById('ov-rehydrated');
+    const deltaBtn = document.getElementById('ov-delta');
+    if (rehydratedBtn) {
+        rehydratedBtn.classList.add('active');
+        rehydratedBtn.setAttribute('aria-checked', 'true');
+    }
+    if (deltaBtn) {
+        deltaBtn.classList.remove('active');
+        deltaBtn.setAttribute('aria-checked', 'false');
+        deltaBtn.disabled = true;
+        deltaBtn.setAttribute('aria-disabled', 'true');
+        deltaBtn.title = 'Run a follow-up turn to generate a Turn Delta';
+    }
 
-    const btn = document.getElementById('compress-btn');
-    if (btn) btn.textContent = '⚡ Compress Prompt';
+    setCompressButtonLabel('Update Prompt');
 
     validatePromptLength();
     if (!silent) {
@@ -1063,16 +1203,13 @@ function updateContinuationModePill() {
     const lockBar = document.getElementById('parent-lock-bar');
     const lockBadge = document.getElementById('parent-lock-badge');
     const modePill = document.getElementById('continuation-mode-pill');
-    const btn = document.getElementById('compress-btn');
     const promptInput = document.getElementById('prompt-input');
 
     const hasParent = Boolean(State.parentId);
     if (lockBar) {
         lockBar.style.display = hasParent ? 'flex' : 'none';
     }
-    if (btn) {
-        btn.textContent = hasParent ? '⚡ Update Prompt' : '⚡ Compress Prompt';
-    }
+    setCompressButtonLabel('Update Prompt');
     if (!hasParent) return;
 
     if (lockBadge) {
@@ -1182,9 +1319,12 @@ function selectActivePhase(phaseNum) {
  * Switches right-pane output display between Full Rehydrated Prompt and Turn Delta.
  */
 function setOutputView(view) {
+    const deltaBtn = document.getElementById('ov-delta');
+    if (view === 'delta' && deltaBtn && deltaBtn.disabled) {
+        return;
+    }
     State.outputView = view === 'delta' ? 'delta' : 'rehydrated';
     const rehydratedBtn = document.getElementById('ov-rehydrated');
-    const deltaBtn = document.getElementById('ov-delta');
     if (rehydratedBtn) {
         const active = State.outputView === 'rehydrated';
         rehydratedBtn.classList.toggle('active', active);
@@ -1579,6 +1719,14 @@ async function compress(isSilent = false, opts = {}) {
         validatePromptLength();
 
         State.lastResult = result;
+        recordRecentPromptRun({
+            id: result.id,
+            rawText: raw,
+            tokenOriginal: result.token_original,
+            tokenFinal: result.token_final,
+            tokensSaved: result.token_saved,
+            mode: mode
+        });
         State.lastTs = Date.now();
         if (isGuest) {
             incrementGuestUses();
@@ -1626,6 +1774,96 @@ function toggleQualityBreakdown() {
     if (!drawer) return;
     drawer.open = !drawer.open;
     syncInspectorAriaExpanded();
+}
+
+// ARCH: ARCHITECTURE.md §6.6 CRISP/Harness Renderers — XSS-safe prompt syntax tinting.
+/**
+ * Formats prompt output with robust XSS-safe syntax highlighting for XML tags (including
+ * attributed `<facts trust="untrusted">`), Markdown `# SECTION:` headers, bracketed markers,
+ * and numbered execution phases.
+ */
+function formatPromptSyntaxHtml(promptText) {
+    let html = escapeHtml(promptText || '');
+    html = html.replace(/(&lt;\/?(?:rules|facts|role|task|context|grounding_facts|constraints|execution_phases|clarifying_questions|output_blueprint|output_contract|execution_protocol|requested_items)(?:\s+(?:(?!&gt;)[^\n])*)?&gt;)/g, '<span class="crisp-xml-tag">$1</span>');
+    html = html.replace(/^(\s*#{1,3}\s+[^\n]+)$/gm, '<span class="crisp-tag crisp-section-heading">$1</span>');
+    html = html.replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS|RESOLVED_SLOTS|REPAIR_CONTEXT|CONSTRAINTS_PATCH|PHASE_CURSOR|REPAIR_DIRECTIVE|NEW_FACTS|TASK)\]/g, '<span class="crisp-tag">[$1]</span>');
+    html = html.replace(/(\*\*(?:Role|Task|Constraints|Deliverables):\*\*)/g, '<span class="crisp-tag">$1</span>');
+    html = html.replace(/^(\d+\.\s+)(\*\*[^*\n]+\*\*)(\s*\([^)\n]+\):?)?/gm, (_, num, title, dur) => `${num}<span class="crisp-phase-title">${title}</span>${dur ? `<span class="crisp-phase-meta">${dur}</span>` : ''}`);
+    html = html.replace(/\[(STRICT|AVOID|HIGH|MEDIUM|LOW|ASSUMED:[^\]]+|CONFLICT:[^\]]+)\]/g, '<span class="crisp-meta-badge">[$1]</span>');
+    html = html.replace(/\[(F\d+)\]/g, '<span class="crisp-cite">[$1]</span>');
+    return html;
+}
+
+const CLARIFY_GAP_LABELS = {
+    'missing_slot:real-estate:buyer_state_or_market': 'Add state / market',
+    'missing_slot:real-estate:buyer_budget_and_down_payment': 'Add budget & cash',
+    'missing_slot:real-estate:buyer_credit_tier_and_income': 'Add credit & DTI',
+    'missing_slot:real-estate:location_or_property_type': 'Add market & property',
+    'missing_slot:legal:jurisdiction': 'Add jurisdiction',
+    'missing_slot:legal:contract_or_party_role': 'Add contract & role',
+    'missing_slot:medical:patient_age_or_profile': 'Add patient profile',
+    'missing_slot:medical:duration_or_medications': 'Add duration & meds',
+    'missing_slot:nutrition:calorie_or_goal_target': 'Add calorie & goal',
+    'missing_slot:nutrition:dietary_restrictions_or_allergies': 'Add diet / allergies',
+    'missing_slot:finance:capital_or_time_horizon': 'Add capital & horizon',
+    'missing_slot:finance:risk_tolerance': 'Add risk & tax',
+    'missing_slot:education:learner_level': 'Add learner level',
+    'missing_slot:education:timeline_or_duration': 'Add timeline',
+    'missing_slot:travel:destination': 'Add destination',
+    'missing_slot:travel:dates_or_duration': 'Add dates & length',
+    'missing_slot:travel:budget_or_travelers': 'Add budget & group',
+    'missing_slot:software:stack_or_environment': 'Add tech stack',
+    'missing_slot:business:target_market_or_stage': 'Add market & stage',
+    'missing_slot:data-science:dataset_or_metric': 'Add dataset & metric',
+    'missing_slot:cybersecurity:target_scope_or_environment': 'Add scope & compliance',
+    'output_format_ambiguous': 'Choose output format',
+    'domain_context_missing': 'Add domain context',
+    'intent_unclear': 'Clarify primary goal',
+    'constraint_incomplete': 'Add budget / timeline',
+    'vague_language_detected': 'Specify outcome',
+    'prompt_too_short': 'Add key details'
+};
+
+// ARCH: ARCHITECTURE.md §1.4 (Step 7) — Maps backend gap_addressed keys into concise 2–4 word
+// single-row UI triggers while preserving the full question in tooltips and slot prompts.
+function formatClarifyChipLabel(q) {
+    if (!q) return 'Clarify detail';
+    if (typeof q === 'object') {
+        if (q.chip_label) return q.chip_label;
+        if (q.gap_addressed && CLARIFY_GAP_LABELS[q.gap_addressed]) {
+            return CLARIFY_GAP_LABELS[q.gap_addressed];
+        }
+    }
+    const text = typeof q === 'string' ? q : (q.question || q.slot || '');
+    const lower = text.toLowerCase();
+    if (/credit|dti|score/i.test(lower)) return 'Add credit & DTI';
+    if (/budget|down payment|cash/i.test(lower)) return 'Add budget & cash';
+    if (/state|market|jurisdiction/i.test(lower)) return 'Add jurisdiction';
+    if (/format|output/i.test(lower)) return 'Choose output format';
+    if (/stack|language|environment|tech/i.test(lower)) return 'Add tech stack';
+    if (/timeline|duration|date/i.test(lower)) return 'Add timeline';
+    if (/diet|allergy|allerg/i.test(lower)) return 'Add diet / allergies';
+
+    const words = text.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+    let sliceLen = 0;
+    const picked = [];
+    for (const w of words) {
+        const nextLen = sliceLen + w.length + (picked.length > 0 ? 1 : 0);
+        if (nextLen <= 24) {
+            picked.push(w);
+            sliceLen = nextLen;
+        } else {
+            break;
+        }
+    }
+    if (picked.length > 0) {
+        return picked.join(' ');
+    }
+    return text.length > 24 ? text.slice(0, 21) + '…' : text;
+}
+
+function closeStudioCommandPalette() {
+    closeDialogSafe(document.getElementById('studio-cmd-modal'));
 }
 
 /**
@@ -1747,14 +1985,14 @@ function renderResult(result) {
     // Live dollar cost savings calculation (R3)
     updateCostMetrics();
 
-    // Phase 4: Output view toggle visibility (Full Prompt vs Turn Delta)
+    // Phase 4: Output view toggle state (Full Prompt vs Turn Delta — always accessible in header)
     const viewToggle = document.getElementById('output-view-toggle');
     const hasDelta = Boolean(result.continuation && result.continuation.delta_prompt);
     if (!hasDelta && State.outputView === 'delta') {
         State.outputView = 'rehydrated';
     }
     if (viewToggle) {
-        viewToggle.style.display = hasDelta ? 'inline-flex' : 'none';
+        viewToggle.style.display = 'inline-flex';
         const rehydratedBtn = document.getElementById('ov-rehydrated');
         const deltaBtn = document.getElementById('ov-delta');
         if (rehydratedBtn) {
@@ -1763,37 +2001,34 @@ function renderResult(result) {
             rehydratedBtn.setAttribute('aria-checked', active ? 'true' : 'false');
         }
         if (deltaBtn) {
-            const active = State.outputView === 'delta';
+            deltaBtn.disabled = !hasDelta;
+            deltaBtn.setAttribute('aria-disabled', hasDelta ? 'false' : 'true');
+            deltaBtn.title = hasDelta
+                ? 'View KV-cache-friendly Turn Delta'
+                : 'Run a follow-up turn to generate a Turn Delta';
+            const active = hasDelta && State.outputView === 'delta';
             deltaBtn.classList.toggle('active', active);
             deltaBtn.setAttribute('aria-checked', active ? 'true' : 'false');
         }
     }
 
-    // Render output with optional pruning diff highlighting (R2) or Turn Delta view
+    // Render output with always-on syntax tinting + optional pruning diff highlighting (R2)
     const elOutput = document.getElementById('result-output');
     if (elOutput) {
         const promptText = getActiveOutputText(result);
         const showDiff = State.showDiff !== false && (document.getElementById('diff-toggle')?.checked !== false);
+        const formattedPrompt = formatPromptSyntaxHtml(promptText);
 
-        if (State.outputView === 'delta') {
-            const formattedDelta = escapeHtml(promptText)
-                .replace(/\[(CONSTRAINTS_PATCH|PHASE_CURSOR|RESOLVED_SLOTS|REPAIR_DIRECTIVE|NEW_FACTS|TASK)\]/g, '<span class="crisp-tag">[$1]</span>');
-            elOutput.innerHTML = formattedDelta;
-        } else if (showDiff && saved > 0) {
+        if (State.outputView !== 'delta' && showDiff && saved > 0) {
             const rawInput = document.getElementById('prompt-input')?.value || '';
             const diffSummary = computePrunedTokenSummary(rawInput, promptText, saved, result.pruned_summary);
-            const formattedPrompt = escapeHtml(promptText)
-                .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS|RESOLVED_SLOTS|REPAIR_CONTEXT)\]/g, '<span class="crisp-tag">[$1]</span>')
-                .replace(/^(# (?:ROLE|TASK \/ INSTRUCTION|CONTEXT|CONSTRAINTS|OUTPUT BLUEPRINT|SUCCESS CRITERIA|EXECUTION PHASES|CLARIFYING QUESTIONS):)/gm, '<span class="crisp-tag">$1</span>')
-                .replace(/(\*\*(?:Role|Task|Constraints|Deliverables):\*\*)/g, '<span class="crisp-tag">$1</span>');
-
             elOutput.innerHTML = `<del class="diff-removed">- ${escapeHtml(diffSummary)}</del>\n${formattedPrompt}`;
         } else {
-            elOutput.textContent = promptText;
+            elOutput.innerHTML = formattedPrompt;
         }
     }
 
-    // Reset feedback row (keep disabled in Guest mode)
+    // Reset quiet monochrome feedback controls (keep disabled in Guest mode)
     const isAuthed = Boolean(State.token);
     const btnUp = document.getElementById('btn-feedback-up');
     const btnDown = document.getElementById('btn-feedback-down');
@@ -1801,14 +2036,17 @@ function renderResult(result) {
     [btnUp, btnDown].forEach(btn => {
         if (!btn) return;
         btn.disabled = !isAuthed;
-        btn.style.opacity = isAuthed ? '1' : '0.5';
-        btn.style.outline = 'none';
-        btn.title = isAuthed ? '' : 'Sign in to submit feedback';
+        btn.classList.remove('is-selected', 'is-dimmed');
+        btn.setAttribute('aria-pressed', 'false');
+        btn.style.opacity = '';
+        btn.style.outline = '';
+        btn.title = isAuthed ? btn.getAttribute('aria-label') || '' : 'Sign in to submit feedback';
     });
     if (fbStatus) fbStatus.style.display = 'none';
 
-    // GRW-02 v2: Interactive Clarifying Question Quick-Fill Pills
+    // GRW-02 v2: Single-Row Concise Clarifying Question Quick-Fill Pills
     const pillsEl = document.getElementById('clarifying-pills');
+    const inlineHost = document.getElementById('clarify-inline-host') || pillsEl;
     if (pillsEl) {
         const qs = Array.isArray(result.clarifying_questions) ? result.clarifying_questions : [];
         if (qs.length > 0) {
@@ -1820,12 +2058,12 @@ function renderResult(result) {
                 if (!qText) return;
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'preset-chip';
-                btn.textContent = `+ ${qText.length > 48 ? qText.slice(0, 45) + '…' : qText}`;
+                btn.className = 'preset-chip clarify-chip';
+                btn.textContent = `+ ${formatClarifyChipLabel(q)}`;
                 btn.title = qText;
                 btn.addEventListener('click', () => {
                     if (State.parentId) {
-                        // Phase 4: Inline slot-fill box without polluting #prompt-input
+                        // Phase 4: Inline slot-fill box without polluting #prompt-input or wrapping chip strip
                         State.pendingClarifySlot = qSlot || qText;
                         const existingBox = document.getElementById('clarify-inline-box');
                         if (existingBox) existingBox.remove();
@@ -1839,7 +2077,7 @@ function renderResult(result) {
                             <button type="button" class="clarify-apply-btn" data-action="applyClarifySlot">Apply</button>
                             <button type="button" class="btn-ghost" data-action="closeClarifyInlineBox" aria-label="Cancel clarification">✕</button>
                         `;
-                        pillsEl.appendChild(box);
+                        if (inlineHost) inlineHost.appendChild(box);
                         const inlineInput = document.getElementById('clarify-inline-input');
                         if (inlineInput) {
                             inlineInput.value = State.resolvedSlots[State.pendingClarifySlot] || '';
@@ -2076,16 +2314,15 @@ async function submitFeedback(rating) {
         if (btnUp && btnDown) {
             btnUp.disabled = true;
             btnDown.disabled = true;
-            if (rating === 'thumbs_up') {
-                btnUp.style.outline = '2px solid #fff';
-                btnDown.style.opacity = '0.4';
-            } else {
-                btnDown.style.outline = '2px solid #fff';
-                btnUp.style.opacity = '0.4';
-            }
+            btnUp.classList.toggle('is-selected', rating === 'thumbs_up');
+            btnUp.classList.toggle('is-dimmed', rating !== 'thumbs_up');
+            btnUp.setAttribute('aria-pressed', rating === 'thumbs_up' ? 'true' : 'false');
+            btnDown.classList.toggle('is-selected', rating === 'thumbs_down');
+            btnDown.classList.toggle('is-dimmed', rating !== 'thumbs_down');
+            btnDown.setAttribute('aria-pressed', rating === 'thumbs_down' ? 'true' : 'false');
         }
         if (fbStatus) {
-            fbStatus.textContent = rating === 'thumbs_up' ? '✓ Marked as Useful' : '✓ Marked as Not Useful';
+            fbStatus.textContent = '✓ Saved';
             fbStatus.style.display = 'inline-block';
         }
     } catch (err) {
@@ -2752,6 +2989,8 @@ function applyThemeClass(themeClass) {
     const scheme = normalized === 'theme-dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', scheme);
     document.documentElement.style.colorScheme = scheme;
+    document.documentElement.classList.toggle('dark', scheme === 'dark');
+    document.body.classList.toggle('dark', scheme === 'dark');
     document.body.classList.remove('theme-light', 'theme-dark', 'theme-night', 'theme-morning', 'theme-afternoon');
     document.body.classList.add(normalized);
     const btn = document.getElementById('btn-theme-toggle');
@@ -2768,8 +3007,33 @@ function clearCustomSkinInlineVars() {
     });
 }
 
+function safeGetStorage(key) {
+    try {
+        return localStorage.getItem(key);
+    } catch (err) {
+        console.warn(`Failed to read localStorage key "${key}":`, err);
+        return null;
+    }
+}
+
+function safeSetStorage(key, val) {
+    try {
+        localStorage.setItem(key, val);
+    } catch (err) {
+        console.warn(`Failed to write localStorage key "${key}":`, err);
+    }
+}
+
+function safeRemoveStorage(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (err) {
+        console.warn(`Failed to remove localStorage key "${key}":`, err);
+    }
+}
+
 function initTheme() {
-    const saved = localStorage.getItem('oryx_theme');
+    const saved = safeGetStorage('oryx_theme');
     if (saved) {
         applyThemeClass(saved);
     } else {
@@ -2782,7 +3046,7 @@ function initTheme() {
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         if (mq && typeof mq.addEventListener === 'function') {
             mq.addEventListener('change', (e) => {
-                if (!localStorage.getItem('oryx_theme')) {
+                if (!safeGetStorage('oryx_theme')) {
                     applyThemeClass(e.matches ? 'theme-dark' : 'theme-light');
                 }
             });
@@ -2794,7 +3058,7 @@ function toggleTheme() {
     const isDark = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-night');
     const next = isDark ? 'theme-light' : 'theme-dark';
     clearCustomSkinInlineVars();
-    localStorage.setItem('oryx_theme', next);
+    safeSetStorage('oryx_theme', next);
     applyThemeClass(next);
 }
 
@@ -2805,7 +3069,7 @@ function initCustomSkinModal() {
     const applyBtn = document.getElementById('skin-modal-apply');
     const resetBtn = document.getElementById('skin-modal-reset');
 
-    const savedSkin = localStorage.getItem('na_ui_custom_skin');
+    const savedSkin = safeGetStorage('na_ui_custom_skin');
     if (savedSkin) {
         try {
             applyCustomSkinConfig(JSON.parse(savedSkin));
@@ -2829,24 +3093,24 @@ function initCustomSkinModal() {
             const primaryColor = document.getElementById('skin-primary')?.value || '#0284c7';
             const config = bgType === 'dark'
                 ? {
-                    bg: '#090d16',
-                    glassBg: 'rgba(16, 22, 36, 0.92)',
-                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #6366f1)`,
-                    btnText: '#061326',
-                    headText: '#f8fafc',
-                    bodyText: '#cbd5e1',
+                    bg: '#161618',
+                    glassBg: 'rgba(22, 22, 24, 0.80)',
+                    btnGrad: primaryColor,
+                    btnText: '#ffffff',
+                    headText: '#F5F5F7',
+                    bodyText: '#98989D',
                     accentText: primaryColor
                 }
                 : {
-                    bg: '#f8fafc',
-                    glassBg: 'rgba(255, 255, 255, 0.94)',
-                    btnGrad: `linear-gradient(135deg, ${primaryColor}, #4338ca)`,
+                    bg: '#F5F5F7',
+                    glassBg: 'rgba(245, 245, 247, 0.80)',
+                    btnGrad: primaryColor,
                     btnText: '#ffffff',
-                    headText: '#0f172a',
-                    bodyText: '#334155',
+                    headText: '#1D1D1F',
+                    bodyText: '#6E6E73',
                     accentText: primaryColor
                 };
-            localStorage.setItem('na_ui_custom_skin', JSON.stringify(config));
+            safeSetStorage('na_ui_custom_skin', JSON.stringify(config));
             applyCustomSkinConfig(config);
             closeDialogSafe(modal);
             showToast('Custom skin applied', 'success');
@@ -2854,7 +3118,7 @@ function initCustomSkinModal() {
     }
     if (resetBtn) {
         resetBtn.addEventListener('click', () => {
-            localStorage.removeItem('na_ui_custom_skin');
+            safeRemoveStorage('na_ui_custom_skin');
             clearCustomSkinInlineVars();
             initTheme();
             closeDialogSafe(modal);
@@ -2931,79 +3195,236 @@ function openStudioCommandPalette() {
     }
 }
 
+function formatRelativePaletteTime(isoStr) {
+    if (!isoStr) return 'Recent';
+    const dt = new Date(isoStr);
+    if (Number.isNaN(dt.getTime())) return 'Recent';
+    const diffSec = Math.max(0, Math.round((Date.now() - dt.getTime()) / 1000));
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function getStudioCommands() {
     const isAuthed = Boolean(State.token);
     const cmds = [
-        { label: 'Load Preset: Buying a House', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('house'); } },
-        { label: 'Load Preset: Bug Report', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('bug'); } },
-        { label: 'Load Preset: Contract Review', hint: 'Preset', action: () => { switchTab('compress'); loadPreset('legal'); } },
-        { label: 'Mode: Light Polish', hint: 'Mode', action: () => { switchTab('compress'); selectMode('gentle'); } },
-        { label: isAuthed ? 'Mode: Smart Trim' : 'Mode: Smart Trim (Sign in)', hint: 'Mode', action: () => { switchTab('compress'); selectMode('balanced'); } },
-        { label: isAuthed ? 'Mode: Deep Blueprint' : 'Mode: Deep Blueprint (Sign in)', hint: 'Mode', action: () => { switchTab('compress'); selectMode('aggressive'); } },
+        {
+            label: 'Run Prompt Optimization',
+            hint: getRunShortcutBadge(),
+            action: () => {
+                switchTab('compress');
+                const btn = document.getElementById('compress-btn');
+                if (btn && !btn.disabled) compress();
+                else document.getElementById('prompt-input')?.focus();
+            }
+        },
+        { label: 'Copy Prompt Output', hint: 'Copy', action: () => copyResult() },
+        { label: 'Toggle Inspector Popover', hint: 'Inspector', action: () => { switchTab('compress'); toggleQualityBreakdown(); } },
+        { label: 'Mode: Fact-Checked', hint: 'Preset', action: () => { switchTab('compress'); selectOutcomePreset('factchecked'); } },
+        { label: 'Mode: Token Saver', hint: 'Preset', action: () => { switchTab('compress'); selectOutcomePreset('saver'); } },
+        { label: 'Mode: Full Blueprint', hint: 'Preset', action: () => { switchTab('compress'); selectOutcomePreset('blueprint'); } },
+        { label: 'Load Sample: Buying a House', hint: 'Sample', action: () => { switchTab('compress'); loadPreset('house'); } },
+        { label: 'Load Sample: Bug Report', hint: 'Sample', action: () => { switchTab('compress'); loadPreset('bug'); } },
+        { label: 'Load Sample: Contract Review', hint: 'Sample', action: () => { switchTab('compress'); loadPreset('legal'); } },
         { label: 'Toggle Light / Dark Theme', hint: 'Theme', action: () => toggleTheme() },
         { label: 'Customize UI Skin', hint: 'Theme', action: () => openDialogSafe(document.getElementById('skin-modal')) },
         { label: isAuthed ? 'Sign Out' : 'Sign In / Register', hint: 'Account', action: () => toggleAuthSection() },
     ];
     if (isAuthed) {
         cmds.push(
-            { label: 'Go to Optimize Prompt', hint: 'Tab', action: () => switchTab('compress') },
-            { label: 'Go to Ask My Docs (RAG)', hint: 'Tab', action: () => switchTab('ask') },
-            { label: 'Go to History Timeline', hint: 'Tab', action: () => switchTab('history') },
-            { label: 'Go to Insights Dashboard', hint: 'Tab', action: () => switchTab('stats') },
+            { label: 'Go to Optimize Prompt', hint: 'View', action: () => switchTab('compress') },
+            { label: 'Go to Ask My Docs (RAG)', hint: 'View', action: () => switchTab('ask') },
+            { label: 'Go to History Timeline', hint: 'View', action: () => switchTab('history') },
+            { label: 'Go to Insights Dashboard', hint: 'View', action: () => switchTab('stats') },
         );
     }
     return cmds;
 }
 
+function getRecentPromptsForPalette() {
+    const merged = [];
+    const seen = new Set();
+    const pushEntry = (rawText, preview, orig, fin, createdAt) => {
+        const cleanRaw = String(rawText || preview || '').trim();
+        if (!cleanRaw) return;
+        const key = cleanRaw.slice(0, 120).toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push({
+            rawText: cleanRaw,
+            preview: String(preview || cleanRaw).replace(/\s+/g, ' ').trim().slice(0, 68),
+            tokenOriginal: Number(orig) || 0,
+            tokenFinal: Number(fin) || 0,
+            timeLabel: formatRelativePaletteTime(createdAt),
+        });
+    };
+
+    (State.recentRuns || []).forEach(r => {
+        pushEntry(r.raw_text, r.preview, r.token_original, r.token_final, r.created_at);
+    });
+    (cachedHistoryRecords || []).forEach(r => {
+        pushEntry(r.original_prompt, r.original_prompt, r.token_original, r.token_final, r.created_at);
+    });
+    return merged.slice(0, 5);
+}
+
+// ARCH: ARCHITECTURE.md §2 Full Component Map (Presentation Layer) — Accessible Spotlight ⌘K
+// combobox/listbox command palette with ARIA activedescendant synchronization.
+function syncPaletteActiveOption(items, activeIdx) {
+    const input = document.getElementById('studio-cmd-input');
+    items.forEach((el, i) => {
+        const isSel = i === activeIdx;
+        el.classList.toggle('selected', isSel);
+        el.setAttribute('aria-selected', isSel ? 'true' : 'false');
+    });
+    if (input) {
+        const activeEl = items[activeIdx];
+        if (activeEl && activeEl.id) {
+            input.setAttribute('aria-activedescendant', activeEl.id);
+        } else {
+            input.removeAttribute('aria-activedescendant');
+        }
+    }
+}
+
 function renderStudioCommandList(query = '') {
     const list = document.getElementById('studio-cmd-list');
     const modal = document.getElementById('studio-cmd-modal');
+    const input = document.getElementById('studio-cmd-input');
     if (!list) return;
     const q = query.trim().toLowerCase();
-    const matches = getStudioCommands().filter(c =>
+    const actionMatches = getStudioCommands().filter(c =>
         c.label.toLowerCase().includes(q) || c.hint.toLowerCase().includes(q)
     );
+    const recentMatches = getRecentPromptsForPalette().filter(r =>
+        !q || r.preview.toLowerCase().includes(q) || r.rawText.toLowerCase().includes(q)
+    );
+
     list.innerHTML = '';
-    if (matches.length === 0) {
-        list.innerHTML = '<div style="padding:0.75rem;font-size:0.8rem;color:var(--text-muted);">No matching commands.</div>';
-        return;
-    }
-    matches.forEach((cmd, idx) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'cmd-palette-item' + (idx === 0 ? ' selected' : '');
-        btn.innerHTML = `<span>${escapeHtml(cmd.label)}</span><span class="bento-badge">${escapeHtml(cmd.hint)}</span>`;
-        btn.addEventListener('click', () => {
-            closeDialogSafe(modal);
-            cmd.action();
+    let selectableCount = 0;
+
+    const actionsHeader = document.createElement('div');
+    actionsHeader.className = 'cmd-group-header';
+    actionsHeader.setAttribute('role', 'presentation');
+    actionsHeader.textContent = 'Actions';
+    list.appendChild(actionsHeader);
+
+    if (actionMatches.length === 0) {
+        const emptyAct = document.createElement('div');
+        emptyAct.setAttribute('role', 'presentation');
+        emptyAct.style.cssText = 'padding:0.45rem 0.65rem;font-size:0.76rem;color:var(--text-tertiary);';
+        emptyAct.textContent = 'No matching actions.';
+        list.appendChild(emptyAct);
+    } else {
+        actionMatches.forEach((cmd) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.id = `cmd-opt-${selectableCount}`;
+            btn.setAttribute('role', 'option');
+            const isFirst = selectableCount === 0;
+            btn.setAttribute('aria-selected', isFirst ? 'true' : 'false');
+            btn.className = 'cmd-palette-item' + (isFirst ? ' selected' : '');
+            selectableCount++;
+            btn.innerHTML = `<span>${escapeHtml(cmd.label)}</span><kbd class="macos-kbd">${escapeHtml(cmd.hint)}</kbd>`;
+            btn.addEventListener('click', () => {
+                closeDialogSafe(modal);
+                cmd.action();
+            });
+            list.appendChild(btn);
         });
-        list.appendChild(btn);
-    });
+    }
+
+    const recentHeader = document.createElement('div');
+    recentHeader.className = 'cmd-group-header';
+    recentHeader.setAttribute('role', 'presentation');
+    recentHeader.textContent = 'Recent Prompts';
+    list.appendChild(recentHeader);
+
+    if (recentMatches.length === 0) {
+        const emptyRec = document.createElement('div');
+        emptyRec.setAttribute('role', 'presentation');
+        emptyRec.style.cssText = 'padding:0.45rem 0.65rem 0.65rem;font-size:0.76rem;color:var(--text-tertiary);';
+        emptyRec.textContent = q ? 'No matching recent prompts.' : 'Run a prompt optimization to populate recent history.';
+        list.appendChild(emptyRec);
+    } else {
+        recentMatches.forEach((rec) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.id = `cmd-opt-${selectableCount}`;
+            btn.setAttribute('role', 'option');
+            const isFirst = selectableCount === 0;
+            btn.setAttribute('aria-selected', isFirst ? 'true' : 'false');
+            btn.className = 'cmd-palette-item' + (isFirst ? ' selected' : '');
+            selectableCount++;
+            const metaText = `${rec.tokenOriginal} → ${rec.tokenFinal} tok · ${rec.timeLabel}`;
+            btn.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(rec.preview)}</span><span class="cmd-item-meta bento-row-meta">${escapeHtml(metaText)}</span>`;
+            btn.addEventListener('click', () => {
+                closeDialogSafe(modal);
+                resetParentSession(true);
+                const promptEl = document.getElementById('prompt-input');
+                if (promptEl) promptEl.value = rec.rawText;
+                validatePromptLength();
+                switchTab('compress');
+            });
+            list.appendChild(btn);
+        });
+    }
+
+    if (input) {
+        if (selectableCount > 0) {
+            input.setAttribute('aria-activedescendant', 'cmd-opt-0');
+        } else {
+            input.removeAttribute('aria-activedescendant');
+        }
+    }
 }
 
 function initStudioCommandPalette() {
     const modal = document.getElementById('studio-cmd-modal');
     const input = document.getElementById('studio-cmd-input');
     const list = document.getElementById('studio-cmd-list');
-    if (!modal || !input || !list) return;
 
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeDialogSafe(modal);
+    // Modern Web Guidance: pointer-position light-dismiss fallback where closedBy is absent
+    if (typeof HTMLDialogElement !== 'undefined' && !('closedBy' in HTMLDialogElement.prototype)) {
+        const outside = (e, dialog) => {
+            const r = dialog.getBoundingClientRect();
+            return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+        };
+        document.querySelectorAll('dialog[closedby="any"]').forEach((dlg) => {
+            let pressedOutside = false;
+            dlg.addEventListener('pointerdown', (e) => { pressedOutside = outside(e, dlg); });
+            dlg.addEventListener('pointerup', (e) => { if (pressedOutside && outside(e, dlg)) closeDialogSafe(dlg); });
+        });
+    }
+
+    // Light-dismiss floating Inspector popover on outside click
+    document.addEventListener('click', (e) => {
+        const inspector = document.getElementById('inspector-drawer');
+        const tesBtn = document.getElementById('tes-score');
+        if (!inspector || !inspector.open) return;
+        if (inspector.contains(e.target) || (tesBtn && tesBtn.contains(e.target))) return;
+        inspector.open = false;
+        syncInspectorAriaExpanded();
     });
+
+    if (!modal || !input || !list) return;
 
     input.addEventListener('input', (e) => renderStudioCommandList(e.target.value));
     input.addEventListener('keydown', (e) => {
         const items = Array.from(list.querySelectorAll('.cmd-palette-item'));
         if (!items.length) return;
-        let idx = items.findIndex(el => el.classList.contains('selected'));
+        const idx = items.findIndex(el => el.classList.contains('selected'));
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            items.forEach(el => el.classList.remove('selected'));
-            items[(idx + 1) % items.length].classList.add('selected');
+            const nextIdx = (idx + 1) % items.length;
+            syncPaletteActiveOption(items, nextIdx);
+            if (typeof items[nextIdx].scrollIntoView === 'function') items[nextIdx].scrollIntoView({ block: 'nearest' });
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            items.forEach(el => el.classList.remove('selected'));
-            items[(idx - 1 + items.length) % items.length].classList.add('selected');
+            const prevIdx = (idx - 1 + items.length) % items.length;
+            syncPaletteActiveOption(items, prevIdx);
+            if (typeof items[prevIdx].scrollIntoView === 'function') items[prevIdx].scrollIntoView({ block: 'nearest' });
         } else if (e.key === 'Enter') {
             e.preventDefault();
             const active = items[idx >= 0 ? idx : 0];
@@ -3021,6 +3442,11 @@ function initStudioCommandPalette() {
             if (authSec && authSec.style.display === 'block') {
                 closeAuthSection();
             }
+            const inspector = document.getElementById('inspector-drawer');
+            if (inspector && inspector.open) {
+                inspector.open = false;
+                syncInspectorAriaExpanded();
+            }
         }
     });
 
@@ -3029,12 +3455,6 @@ function initStudioCommandPalette() {
     if (authSec) {
         authSec.addEventListener('click', (e) => {
             if (e.target === authSec) closeAuthSection();
-        });
-    }
-    const verifyModal = document.getElementById('verify-modal');
-    if (verifyModal) {
-        verifyModal.addEventListener('click', (e) => {
-            if (e.target === verifyModal) closeDialogSafe(verifyModal);
         });
     }
 }
@@ -3276,6 +3696,7 @@ function initOryxOwl3dIcon(containerId, canvasId) {
 function initStudioDeclarativeEvents() {
     const clickActions = {
         openStudioCommandPalette: () => openStudioCommandPalette(),
+        closeStudioCommandPalette: () => closeStudioCommandPalette(),
         toggleTheme: () => toggleTheme(),
         closeAuthSection: () => closeAuthSection(),
         switchAuthTab: (arg) => switchAuthTab(arg),
@@ -3367,6 +3788,8 @@ function initStudioDeclarativeEvents() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    loadRecentPromptRuns();
+    syncPlatformShortcutBadges();
     initStudioDeclarativeEvents();
     initTheme();
     initCustomSkinModal();
@@ -3727,6 +4150,11 @@ if (typeof window !== 'undefined') {
     window.filterHistory = filterHistory;
     window.toggleQualityBreakdown = toggleQualityBreakdown;
     window.openStudioCommandPalette = openStudioCommandPalette;
+    window.closeStudioCommandPalette = closeStudioCommandPalette;
+    window.isApplePlatform = isApplePlatform;
+    window.syncPlatformShortcutBadges = syncPlatformShortcutBadges;
+    window.formatClarifyChipLabel = formatClarifyChipLabel;
+    window.formatPromptSyntaxHtml = formatPromptSyntaxHtml;
     window.openDialogSafe = openDialogSafe;
     window.closeDialogSafe = closeDialogSafe;
 }
@@ -3770,5 +4198,10 @@ if (typeof globalThis !== 'undefined') {
     globalThis.submitFeedback = submitFeedback;
     globalThis.executeScenarioAggressiveCompress = executeScenarioAggressiveCompress;
     globalThis.copyAggressivePrompt = copyAggressivePrompt;
+    globalThis.isApplePlatform = isApplePlatform;
+    globalThis.syncPlatformShortcutBadges = syncPlatformShortcutBadges;
+    globalThis.formatClarifyChipLabel = formatClarifyChipLabel;
+    globalThis.formatPromptSyntaxHtml = formatPromptSyntaxHtml;
+    globalThis.closeStudioCommandPalette = closeStudioCommandPalette;
 }
 
