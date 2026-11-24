@@ -288,7 +288,14 @@ const RagWorkspace = {
         const scorePct = Math.round((Number(report.grounding_score || 0)) * 100);
         const unsupported = Array.isArray(report.unsupported_claims) ? report.unsupported_claims : [];
         const missing = Array.isArray(report.missing_items) ? report.missing_items : [];
-        const claims = Array.isArray(report.claims) ? report.claims : [];
+        const grounded = Array.isArray(report.grounded) ? report.grounded : [];
+        const partial = Array.isArray(report.partial) ? report.partial : [];
+        const notFound = Array.isArray(report.not_found) ? report.not_found : [];
+        const verifiedRows = [
+            ...grounded.map(c => ({ ...c, status: c.status || 'FOUND' })),
+            ...partial.map(c => ({ ...c, status: c.status || 'PARTIAL_MATCH' })),
+            ...notFound.map(c => ({ ...c, status: c.status || 'NOT_FOUND' })),
+        ];
 
         const badgeBg = passed ? 'rgba(16,185,129,0.16)' : 'rgba(239,68,68,0.16)';
         const badgeFg = passed ? '#10b981' : '#ef4444';
@@ -300,20 +307,29 @@ const RagWorkspace = {
                         ${passed ? '✓ GROUNDED' : '✕ ISSUES FOUND'}
                     </span>
                     <span style="font-size:0.76rem;color:var(--head-text);font-weight:600;">Score: ${scorePct}%</span>
-                    <span style="font-size:0.72rem;color:var(--text-muted);">Unsupported: ${unsupported.length} · Missing: ${missing.length}</span>
+                    <span style="font-size:0.72rem;color:var(--text-muted);">Grounded: ${grounded.length} · Partial: ${partial.length} · Not Found: ${notFound.length} · Unsupported: ${unsupported.length} · Missing: ${missing.length}</span>
                 </div>
-                <button type="button" class="copy-btn" data-action="exportVerifyReport" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                    ${!passed ? '<button type="button" class="copy-btn repair-trigger-btn" data-action="generateRepairFromVerify" style="padding:0.22rem 0.55rem;font-size:0.72rem;">⚡ Generate Repair Prompt</button>' : ''}
+                    <button type="button" class="copy-btn" data-action="exportVerifyReport" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
+                </div>
             </div>
         `;
 
-        if (claims.length > 0) {
+        if (verifiedRows.length > 0) {
             html += '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.5rem;">';
-            claims.forEach(c => {
+            verifiedRows.forEach(c => {
                 const st = String(c.status || '').toUpperCase();
                 const color = st === 'FOUND' ? '#10b981' : (st === 'PARTIAL_MATCH' ? '#f59e0b' : '#ef4444');
                 const bg = st === 'FOUND' ? 'rgba(16,185,129,0.08)' : (st === 'PARTIAL_MATCH' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)');
+                const label = c.item || c.claim || '';
+                const answerText = c.answer ? ` — ${c.answer}` : '';
+                const cited = Array.isArray(c.cited_facts) && c.cited_facts.length > 0
+                    ? ` [${c.cited_facts.join(', ')}]`
+                    : '';
+                const body = label ? `${label}${answerText}${cited}` : (c.answer || JSON.stringify(c));
                 html += `<div style="padding:0.4rem 0.55rem;border-radius:0.45rem;background:${bg};border-left:3px solid ${color};font-size:0.74rem;">
-                    <strong style="color:${color};">${esc(st)}</strong> · ${esc(c.item || c.claim || JSON.stringify(c))}
+                    <strong style="color:${color};">${esc(st)}</strong> · ${esc(body)}
                 </div>`;
             });
             html += '</div>';
@@ -349,6 +365,10 @@ const RagWorkspace = {
             `- **Unsupported Claims:** ${(r.unsupported_claims || []).length}`,
             `- **Missing Items:** ${(r.missing_items || []).length}`
         ].join('\n');
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            showToast('Clipboard unavailable in this browser context', 'error');
+            return;
+        }
         navigator.clipboard.writeText(md).then(() => {
             showToast('Verification report copied!', 'success');
         }).catch(err => showToast('Copy failed: ' + err.message, 'error'));

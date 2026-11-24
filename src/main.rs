@@ -268,6 +268,7 @@ async fn main() -> anyhow::Result<()> {
         ory_engine: ory_engine.clone(),
         rag_store,
         sessions,
+        prompt_ledgers: Arc::new(dashmap::DashMap::new()),
         embedding_engine,
         scenario_router,
         pdf_ingest_sem: Arc::new(Semaphore::new(8)),

@@ -619,6 +619,7 @@ async fn test_http_aggressive_harness_and_verify_endpoint_roundtrip() {
             pool.clone(),
         )),
         sessions: Arc::new(DashMap::new()),
+        prompt_ledgers: Arc::new(DashMap::new()),
         embedding_engine,
         scenario_router,
         pdf_ingest_sem: Arc::new(Semaphore::new(4)),

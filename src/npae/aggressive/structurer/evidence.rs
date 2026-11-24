@@ -3,7 +3,7 @@
 //! // ARCH: ARCHITECTURE.md §5 GAP-42 & §7.2 Layer 4 — extracts, sanitizes, and numbers
 //! // `[F1]..[Fn]` grounding facts and `<requested_items>` from raw input and `DerivedRagContext`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::ingest::split_raw_input;
 use crate::npae::aggressive::rag_context::DerivedRagContext;
@@ -145,7 +145,7 @@ const HARNESS_TASK_STARTERS: &[&str] = &[
     "will",
 ];
 
-pub(super) fn extract_declarative_user_fact(sentence: &str) -> Option<&str> {
+pub(crate) fn extract_declarative_user_fact(sentence: &str) -> Option<&str> {
     let trimmed = sentence.trim();
     if trimmed.ends_with('?') || trimmed.split_whitespace().count() < 3 {
         return None;
@@ -738,6 +738,15 @@ impl EvidenceBundle {
         true
     }
 
+    /// Returns a slice of raw (unpacked) evidence items in the bundle.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
+    pub fn raw_items(&self) -> &[EvidenceItem] {
+        &self.items
+    }
+
     /// Returns the total number of raw (unpacked) evidence items in the bundle.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -757,6 +766,23 @@ impl EvidenceBundle {
     /// Never.
     #[must_use]
     pub fn pack(&self, budget: &PromptBudget) -> PackedEvidence {
+        self.pack_aligned(budget, &HashMap::new())
+    }
+
+    /// Deduplicates, ranks, and packs within `budget`, resolving `[F#]` IDs from `id_map`
+    /// (keyed by sanitized item text) *before* running [`detect_numeric_conflicts`] so conflict
+    /// citations always match persistent `ledger.facts` IDs across continuation turns.
+    ///
+    /// // ARCH: ARCHITECTURE.md §6.6 & §6.7 (`SL-3`) — ensures conflict labels never collide on Turn 2+.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
+    pub fn pack_aligned(
+        &self,
+        budget: &PromptBudget,
+        id_map: &HashMap<String, String>,
+    ) -> PackedEvidence {
         if self.items.is_empty() || budget.max_items == 0 || budget.max_evidence_tokens == 0 {
             return PackedEvidence {
                 omitted_count: self.items.len(),
@@ -780,6 +806,9 @@ impl EvidenceBundle {
 
         // 2. Deduplicate and greedily pack within token & item budgets.
         let mut seen_keys: HashSet<String> = HashSet::new();
+        // FIX: High #3 — reserve all IDs from `id_map` so fallback IDs never collide with `[F1]..`.
+        let mut used_ids: HashSet<String> = id_map.values().cloned().collect();
+        let mut next_fallback_seq: u32 = 1;
         let mut selected: Vec<EvidenceItem> = Vec::new();
         let mut tokens_used: u32 = 0;
         let mut omitted_count: usize = 0;
@@ -810,9 +839,30 @@ impl EvidenceBundle {
             }
 
             let mut cloned = item.clone();
-            cloned.id = format!("F{}", selected.len() + 1);
+            cloned.id = if let Some(mapped_id) = id_map.get(&item.text) {
+                used_ids.insert(mapped_id.clone());
+                mapped_id.clone()
+            } else {
+                let mut candidate = format!("F{next_fallback_seq}");
+                while used_ids.contains(&candidate) {
+                    next_fallback_seq = next_fallback_seq.saturating_add(1);
+                    candidate = format!("F{next_fallback_seq}");
+                }
+                next_fallback_seq = next_fallback_seq.saturating_add(1);
+                used_ids.insert(candidate.clone());
+                candidate
+            };
             tokens_used = tokens_used.saturating_add(item_tokens);
             selected.push(cloned);
+        }
+
+        if !id_map.is_empty() {
+            selected.sort_by_key(|it| {
+                it.id
+                    .strip_prefix('F')
+                    .and_then(|n| n.parse::<u32>().ok())
+                    .unwrap_or(u32::MAX)
+            });
         }
 
         let conflicts = detect_numeric_conflicts(&selected);

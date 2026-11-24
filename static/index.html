@@ -259,6 +259,15 @@
                                     </div>
                                 </div>
 
+                                <!-- Phase 4: Parent Lock Bar (hidden until Turn 1 succeeds) -->
+                                <div id="parent-lock-bar" class="parent-lock-bar" style="display: none;" aria-live="polite">
+                                    <div class="parent-lock-info">
+                                        <span id="parent-lock-badge" class="parent-lock-badge">🔒 Linked to Parent · Turn 1</span>
+                                        <span id="continuation-mode-pill" class="continuation-mode-pill mode-delta">Delta Follow-Up</span>
+                                    </div>
+                                    <button type="button" class="parent-reset-btn" id="new-prompt-btn" data-action="resetParentSession" title="Clear parent context and start a fresh prompt">New Prompt</button>
+                                </div>
+
                                 <!-- Drag-and-Drop Ingestion Wrapper (R4) -->
                                 <div class="textarea-dropzone-wrap" id="dropzone" data-dropzone>
                                     <textarea id="prompt-input" class="tc-textarea workbench-textarea"
@@ -282,6 +291,12 @@
                                     <div class="domain-chip" id="domain-chip" data-domain>
                                         Detected lens: <strong id="domain-name">General</strong> · <span id="perspective-badge" style="color: var(--accent-text); font-weight: 600;">Consumer</span>
                                     </div>
+                                </div>
+
+                                <!-- Phase 4: Inherited Constraint Chips & Phase Stepper (hidden unless populated) -->
+                                <div id="continuation-ledger-strip" class="ledger-strip" style="display: none;" aria-label="Continuation State">
+                                    <div id="inherited-constraints-row" class="ledger-row" style="display: none;"></div>
+                                    <div id="phase-stepper-row" class="ledger-row" style="display: none;"></div>
                                 </div>
 
                                 <!-- Hidden legacy inputs for compatibility -->
@@ -363,12 +378,20 @@
                             <!-- Right Column: CRISP Output Pane (R2, R3, R5) -->
                             <div class="pane-column pane-right" id="output-pane">
                                 <div class="pane-header">
-                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                         <span class="pane-title">AI-Ready Prompt</span>
                                         <button type="button" class="tes-badge" id="tes-score" data-tes="0.97"
                                             aria-expanded="false" aria-controls="inspector-drawer"
                                             data-action="toggleQualityBreakdown"
                                             title="Inspect quality score breakdown">Quality Ready</button>
+                                        <!-- Phase 4: Output View Switcher (Full Prompt vs Turn Delta) -->
+                                        <div class="segmented-mode-pills output-view-pills" id="output-view-toggle"
+                                            role="radiogroup" aria-label="Output View" style="display: none;">
+                                            <button type="button" role="radio" class="mode-pill active" id="ov-rehydrated"
+                                                aria-checked="true" data-action="setOutputView" data-arg="rehydrated">Full Prompt</button>
+                                            <button type="button" role="radio" class="mode-pill" id="ov-delta"
+                                                aria-checked="false" data-action="setOutputView" data-arg="delta">Turn Delta</button>
+                                        </div>
                                     </div>
                                     <label class="diff-toggle-label" for="diff-toggle">
                                         <input type="checkbox" id="diff-toggle" checked data-change="toggleDiffView">

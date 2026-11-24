@@ -21,7 +21,18 @@ const State = {
     currentModelRate: 0.005, // Default GPT-4o: $0.005 / 1k tokens ($5 / 1M)
     currentRoiScale: 1000,
     showDiff: true,
-    guestUses: 0
+    guestUses: 0,
+    // Phase 4: Multi-turn continuation state
+    parentId: null,
+    parentRawPrompt: '',
+    turnNumber: 0,
+    activeConstraints: [],
+    revokedConstraints: [],
+    phases: [],
+    activePhase: null,
+    resolvedSlots: {},
+    outputView: 'rehydrated',
+    pendingClarifySlot: null
 };
 
 /**
@@ -88,8 +99,8 @@ async function handleLogin(e) {
         });
         
         if (!r.ok) {
-            const err = await r.json();
-            throw new Error(err.error?.message || 'Login failed');
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.error?.message || err.error || `Login failed (HTTP ${r.status})`);
         }
         const data = await r.json();
         
@@ -149,8 +160,8 @@ async function handleRegister(e) {
             body: JSON.stringify({ username, email, password, business_type }),
         });
         if (!r.ok) {
-            const err = await r.json();
-            throw new Error(err.error?.message || 'Registration failed');
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.error?.message || err.error || `Registration failed (HTTP ${r.status})`);
         }
         showToast('Account created! Please sign in.', 'success');
         switchAuthTab('login');
@@ -171,12 +182,14 @@ function isAdminUser() {
 
 function logout() {
     // ARCH: §1 Reality Check — Session termination clears HttpOnly cookie and returns to sandbox
-    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(err => console.warn('Logout request failed:', err));
     State.token = null;
     State.userId = null;
     State.username = null;
     State.businessType = null;
     State.role = null;
+    resetParentSession(true);
     localStorage.removeItem('tce_token');
     localStorage.removeItem('tce_user_id');
     localStorage.removeItem('tce_username');
@@ -220,7 +233,9 @@ function getGuestUses() {
         if (!Number.isNaN(stored) && stored >= 0) {
             State.guestUses = Math.max(State.guestUses || 0, stored);
         }
-    } catch (_) {}
+    } catch (err) {
+        console.warn('Failed to read guest uses from localStorage:', err);
+    }
     return State.guestUses || 0;
 }
 
@@ -229,7 +244,9 @@ function incrementGuestUses() {
     State.guestUses = next;
     try {
         localStorage.setItem(GUEST_USES_KEY, String(next));
-    } catch (_) {}
+    } catch (err) {
+        console.warn('Failed to persist guest uses to localStorage:', err);
+    }
     return next;
 }
 
@@ -403,6 +420,7 @@ function onAuthExpired() {
     State.username = null;
     State.businessType = null;
     State.role = null;
+    resetParentSession(true);
     localStorage.removeItem('tce_token');
     localStorage.removeItem('tce_user_id');
     localStorage.removeItem('tce_username');
@@ -524,6 +542,8 @@ function loadPreset(key) {
     const preset = SAMPLE_PRESETS[key];
     if (!preset) return;
 
+    resetParentSession(true);
+
     const promptInput = document.getElementById('prompt-input');
     if (promptInput) {
         promptInput.value = preset.text;
@@ -625,7 +645,8 @@ function selectMode(mode) {
     syncOutcomePresetFromControls();
 
     const promptInput = document.getElementById('prompt-input');
-    if (promptInput && promptInput.value.trim().split(/\s+/).filter(Boolean).length >= 8) {
+    const minWords = State.parentId ? 2 : 8;
+    if (promptInput && promptInput.value.trim().split(/\s+/).filter(Boolean).length >= minWords) {
         compress(true);
     } else {
         // FIX: Defect 2 - Invalidate any pending compress requests if mode changed below threshold
@@ -899,7 +920,8 @@ function toggleDiffView() {
 }
 
 /**
- * Clears input prompt and resets workbench state.
+ * Clears input prompt and resets output preview WITHOUT wiping active parent continuation state,
+ * so users can easily clear the box and type a Path A Delta Follow-Up.
  */
 function clearInput() {
     // FIX: Defect 3 - Ghost Output Repopulation on clearInput() While In-Flight.
@@ -910,8 +932,8 @@ function clearInput() {
     if (promptInput) {
         promptInput.value = '';
     }
-    validatePromptLength();
     State.lastResult = null;
+    State.outputView = 'rehydrated';
     const resultOutput = document.getElementById('result-output');
     if (resultOutput) {
         resultOutput.innerHTML = '<span class="text-placeholder" style="color: var(--text-muted); opacity: 0.85;">Enter a prompt on the left to preview CRISP compression...</span>';
@@ -919,8 +941,15 @@ function clearInput() {
     }
     const inlineProgress = document.getElementById('inline-progress');
     if (inlineProgress) inlineProgress.style.display = 'none';
+    const viewToggle = document.getElementById('output-view-toggle');
+    if (viewToggle) viewToggle.style.display = 'none';
     const btn = document.getElementById('compress-btn');
-    if (btn) btn.disabled = true;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = State.parentId ? '⚡ Update Prompt' : '⚡ Compress Prompt';
+    }
+    validatePromptLength();
+    updateContinuationModePill();
 
     const tesEl = document.getElementById('tes-score');
     if (tesEl) {
@@ -960,6 +989,339 @@ function clearInput() {
     if (verifyBtn) verifyBtn.style.display = 'none';
 }
 
+// ── Multi-Turn Continuation UI Lifecycle (Phase 4) ─────────────────────────
+
+/**
+ * Resets all parent-linked continuation state and restores Turn 1 UI controls.
+ *
+ * # Arguments
+ * * `silent` - When true, suppresses the confirmation toast.
+ */
+function resetParentSession(silent = false) {
+    State.parentId = null;
+    State.parentRawPrompt = '';
+    State.turnNumber = 0;
+    State.activeConstraints = [];
+    State.revokedConstraints = [];
+    State.phases = [];
+    State.activePhase = null;
+    State.resolvedSlots = {};
+    State.outputView = 'rehydrated';
+    State.pendingClarifySlot = null;
+
+    const lockBar = document.getElementById('parent-lock-bar');
+    if (lockBar) lockBar.style.display = 'none';
+    const ledgerStrip = document.getElementById('continuation-ledger-strip');
+    if (ledgerStrip) ledgerStrip.style.display = 'none';
+    const viewToggle = document.getElementById('output-view-toggle');
+    if (viewToggle) viewToggle.style.display = 'none';
+
+    const btn = document.getElementById('compress-btn');
+    if (btn) btn.textContent = '⚡ Compress Prompt';
+
+    validatePromptLength();
+    if (!silent) {
+        showToast('Started a fresh prompt session', 'success');
+    }
+}
+
+/**
+ * Detects whether the current #prompt-input text is a Path B Edit Continuation
+ * (>= 45% word overlap with parent prompt or matching prefix) or a Path A Delta Follow-Up.
+ */
+function detectContinuationInputMode(raw) {
+    const cur = (raw || '').trim().toLowerCase();
+    const parent = (State.parentRawPrompt || '').trim().toLowerCase();
+    if (!cur || !parent) return 'delta';
+
+    const prefixLen = Math.min(24, parent.length);
+    if (prefixLen >= 12 && cur.length >= 12 && cur.startsWith(parent.slice(0, prefixLen))) {
+        return 'edit';
+    }
+
+    const parentWords = new Set(parent.split(/\s+/).filter(Boolean));
+    const curWords = cur.split(/\s+/).filter(Boolean);
+    if (parentWords.size === 0 || curWords.length === 0) return 'delta';
+
+    let shared = 0;
+    const seenCur = new Set();
+    for (const w of curWords) {
+        if (parentWords.has(w) && !seenCur.has(w)) {
+            seenCur.add(w);
+            shared++;
+        }
+    }
+    const overlapRatio = shared / parentWords.size;
+    return overlapRatio >= 0.45 ? 'edit' : 'delta';
+}
+
+/**
+ * Synchronizes #parent-lock-bar, #continuation-mode-pill, and #compress-btn label
+ * with active continuation state and live textarea input.
+ */
+function updateContinuationModePill() {
+    const lockBar = document.getElementById('parent-lock-bar');
+    const lockBadge = document.getElementById('parent-lock-badge');
+    const modePill = document.getElementById('continuation-mode-pill');
+    const btn = document.getElementById('compress-btn');
+    const promptInput = document.getElementById('prompt-input');
+
+    const hasParent = Boolean(State.parentId);
+    if (lockBar) {
+        lockBar.style.display = hasParent ? 'flex' : 'none';
+    }
+    if (btn) {
+        btn.textContent = hasParent ? '⚡ Update Prompt' : '⚡ Compress Prompt';
+    }
+    if (!hasParent) return;
+
+    if (lockBadge) {
+        lockBadge.textContent = `🔒 Linked to Parent · Turn ${State.turnNumber || 1}`;
+    }
+    if (modePill) {
+        const mode = detectContinuationInputMode(promptInput ? promptInput.value : '');
+        if (mode === 'edit') {
+            modePill.textContent = 'Edit Continuation';
+            modePill.classList.remove('mode-delta');
+            modePill.classList.add('mode-edit');
+        } else {
+            modePill.textContent = 'Delta Follow-Up';
+            modePill.classList.remove('mode-edit');
+            modePill.classList.add('mode-delta');
+        }
+    }
+}
+
+/**
+ * Renders inherited active constraint chips and execution phase stepper pills
+ * inside #continuation-ledger-strip.
+ */
+function renderContinuationStrip() {
+    const strip = document.getElementById('continuation-ledger-strip');
+    const constraintsRow = document.getElementById('inherited-constraints-row');
+    const phasesRow = document.getElementById('phase-stepper-row');
+    if (!strip || !constraintsRow || !phasesRow) return;
+
+    const constraints = Array.isArray(State.activeConstraints) ? State.activeConstraints : [];
+    const phases = Array.isArray(State.phases) ? State.phases : [];
+    const revokedSet = new Set((State.revokedConstraints || []).map(v => String(v).toLowerCase()));
+
+    if (constraints.length > 0) {
+        constraintsRow.style.display = 'flex';
+        let html = '<span class="ledger-label">Constraints:</span>';
+        constraints.forEach(c => {
+            const cId = String(c.id || c.text || '');
+            const cText = String(c.text || '');
+            const isExcl = String(c.kind || '').toLowerCase() === 'exclusion';
+            const isRevoked = revokedSet.has(cId.toLowerCase()) || revokedSet.has(cText.toLowerCase());
+            const icon = isExcl ? '✕' : '✓';
+            const kindClass = isExcl ? 'constraint-chip-exclude' : 'constraint-chip-include';
+            const revClass = isRevoked ? ' constraint-chip-revoked' : '';
+            html += `<span class="constraint-chip ${kindClass}${revClass}" title="${escapeHtml(cText)}">${icon} ${escapeHtml(cText)}<button type="button" class="constraint-revoke-btn" data-action="revokeInheritedConstraint" data-arg="${escapeHtml(cId)}" aria-label="Revoke ${escapeHtml(cText)}" title="Revoke constraint">×</button></span>`;
+        });
+        constraintsRow.innerHTML = html;
+    } else {
+        constraintsRow.style.display = 'none';
+        constraintsRow.innerHTML = '';
+    }
+
+    if (phases.length > 0) {
+        phasesRow.style.display = 'flex';
+        let html = '<span class="ledger-label">Phases:</span>';
+        phases.forEach(p => {
+            const num = Number(p.phase_number);
+            const name = String(p.name || `Phase ${num}`);
+            const isActive = State.activePhase !== null && Number(State.activePhase) === num;
+            const isDone = String(p.status || '').toLowerCase() === 'done';
+            const cls = isActive ? 'phase-pill active' : (isDone ? 'phase-pill done' : 'phase-pill');
+            html += `<button type="button" class="${cls}" data-action="selectActivePhase" data-arg="${num}" aria-pressed="${isActive ? 'true' : 'false'}">${num}. ${escapeHtml(name)}</button>`;
+        });
+        phasesRow.innerHTML = html;
+    } else {
+        phasesRow.style.display = 'none';
+        phasesRow.innerHTML = '';
+    }
+
+    strip.style.display = (State.parentId && (constraints.length > 0 || phases.length > 0)) ? 'flex' : 'none';
+}
+
+/**
+ * Marks an inherited constraint for revocation and updates the ledger chip strip.
+ */
+function revokeInheritedConstraint(idOrText) {
+    if (!idOrText) return;
+    const key = String(idOrText);
+    const exists = State.revokedConstraints.some(v => String(v).toLowerCase() === key.toLowerCase());
+    if (!exists) {
+        State.revokedConstraints.push(key);
+    }
+    renderContinuationStrip();
+    showToast('Constraint marked for removal on next update', 'success');
+}
+
+/**
+ * Selects an active execution phase pill and runs a continuation update.
+ */
+function selectActivePhase(phaseNum) {
+    const num = Number(phaseNum);
+    if (!Number.isFinite(num) || num <= 0) return;
+    State.activePhase = num;
+    renderContinuationStrip();
+
+    const phaseObj = (State.phases || []).find(p => Number(p.phase_number) === num);
+    const label = phaseObj ? `${num}. ${phaseObj.name}` : `Phase ${num}`;
+    const promptInput = document.getElementById('prompt-input');
+    const curWords = promptInput ? promptInput.value.trim().split(/\s+/).filter(Boolean).length : 0;
+
+    if (State.parentId) {
+        compress(true, curWords >= 2 ? {} : { rawTextOverride: `Focus on Phase ${label}` });
+    }
+}
+
+/**
+ * Switches right-pane output display between Full Rehydrated Prompt and Turn Delta.
+ */
+function setOutputView(view) {
+    State.outputView = view === 'delta' ? 'delta' : 'rehydrated';
+    const rehydratedBtn = document.getElementById('ov-rehydrated');
+    const deltaBtn = document.getElementById('ov-delta');
+    if (rehydratedBtn) {
+        const active = State.outputView === 'rehydrated';
+        rehydratedBtn.classList.toggle('active', active);
+        rehydratedBtn.setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+    if (deltaBtn) {
+        const active = State.outputView === 'delta';
+        deltaBtn.classList.toggle('active', active);
+        deltaBtn.setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+    if (State.lastResult) {
+        renderResult(State.lastResult);
+    }
+}
+
+/**
+ * Returns the active output prompt text matching State.outputView ('rehydrated' vs 'delta').
+ */
+function getActiveOutputText(result) {
+    if (!result) return '';
+    if (State.outputView === 'delta' && result.continuation?.delta_prompt) {
+        return result.continuation.delta_prompt;
+    }
+    return result.continuation?.rehydrated_prompt || result.optimized_prompt || '';
+}
+
+/**
+ * Applies the inline clarifying slot input value without polluting #prompt-input.
+ */
+function applyClarifySlot() {
+    const inputEl = document.getElementById('clarify-inline-input');
+    const slot = State.pendingClarifySlot;
+    if (!inputEl || !slot) return;
+    const val = inputEl.value.trim();
+    if (!val) {
+        inputEl.focus();
+        return showToast('Enter a value to apply this clarification.', 'error');
+    }
+    State.resolvedSlots[slot] = val;
+    State.pendingClarifySlot = null;
+    closeClarifyInlineBox();
+    const promptInput = document.getElementById('prompt-input');
+    const curWords = promptInput ? promptInput.value.trim().split(/\s+/).filter(Boolean).length : 0;
+    compress(true, curWords >= 2 ? {} : { rawTextOverride: `Clarify ${slot}: ${val}` });
+}
+
+/**
+ * Closes the inline clarifying slot box if open.
+ */
+function closeClarifyInlineBox() {
+    const box = document.getElementById('clarify-inline-box');
+    if (box) box.remove();
+    State.pendingClarifySlot = null;
+}
+
+/**
+ * Triggers a surgical repair prompt from a failed Verify Grounding report.
+ */
+async function generateRepairFromVerify() {
+    const report = (typeof RagWorkspace !== 'undefined') ? RagWorkspace.lastVerifyReport : null;
+    if (!report) {
+        return showToast('Run a grounding check first before generating a repair prompt.', 'error');
+    }
+    if (typeof RagWorkspace !== 'undefined' && typeof RagWorkspace.closeVerifyModal === 'function') {
+        RagWorkspace.closeVerifyModal();
+    }
+
+    const grounded = Array.isArray(report.grounded) ? report.grounded : [];
+    const partial = Array.isArray(report.partial) ? report.partial : [];
+    const notFound = Array.isArray(report.not_found) ? report.not_found : [];
+    const unsupported = Array.isArray(report.unsupported_claims) ? report.unsupported_claims : [];
+
+    const failed_items = [];
+    partial.forEach(p => {
+        const st = String(p?.status || 'PARTIAL_MATCH').toUpperCase();
+        if (st !== 'FOUND') {
+            const label = String(p?.item || p?.answer || '').trim();
+            if (label) failed_items.push(`${label} (${st})`);
+        }
+    });
+    unsupported.forEach(u => {
+        const itemLabel = String(u?.item || '').trim();
+        const reason = String(u?.detail || u?.claim || u?.issue || '').trim();
+        const text = itemLabel && reason
+            ? `${itemLabel}: ${reason}`
+            : (reason || itemLabel || JSON.stringify(u));
+        if (text) failed_items.push(text);
+    });
+
+    const missing_items = Array.isArray(report.missing_items)
+        ? report.missing_items.map(m => String(m || '').trim()).filter(Boolean)
+        : [];
+
+    // ARCH: src/npae/schema/types.rs RepairContext expects Vec<String> for details (never nested objects).
+    const scorePct = Math.round((Number(report.grounding_score ?? 0)) * 100);
+    const details = [
+        `Grounding score: ${scorePct}% (grounded: ${grounded.length}, partial: ${partial.length}, not_found: ${notFound.length}, unsupported: ${unsupported.length}, missing: ${missing_items.length})`,
+    ];
+    if (report.contract_violated) {
+        details.push('Output contract table was missing or violated.');
+    }
+    partial.forEach(p => {
+        const itemLabel = String(p?.item || 'item').trim();
+        const answer = String(p?.answer || '').trim();
+        details.push(answer ? `Partial match (${itemLabel}): ${answer}` : `Partial match (${itemLabel})`);
+    });
+    notFound.forEach(nf => {
+        const itemLabel = String(nf?.item || 'item').trim();
+        const answer = String(nf?.answer || 'abstained').trim();
+        details.push(`Not found (${itemLabel}): ${answer}`);
+    });
+    unsupported.forEach(u => {
+        const itemLabel = String(u?.item || 'Claim').trim();
+        const issue = String(u?.issue || 'unsupported').trim();
+        const detail = String(u?.detail || u?.claim || 'failed grounding verification').trim();
+        details.push(`${itemLabel} [${issue}]: ${detail}`);
+    });
+
+    const repair_context = { failed_items, missing_items, details };
+
+    const compressTabBtn = document.getElementById('nav-compress');
+    if (compressTabBtn && !compressTabBtn.classList.contains('active') && typeof switchTab === 'function') {
+        switchTab('compress');
+    }
+
+    const summaryItems = [...failed_items.slice(0, 3), ...missing_items.slice(0, 3)].filter(Boolean);
+    const repairDirective = summaryItems.length > 0
+        ? `Repair grounding failures and missing items (${summaryItems.join('; ')}) using only verified source facts.`
+        : 'Repair grounding failures using only verified source facts.';
+
+    await compress(true, {
+        repairContext: repair_context,
+        rawTextOverride: repairDirective,
+        modeOverride: 'aggressive',
+    });
+}
+
 // ── Compression Lifecycle (R1, R2, R3, R5) ─────────────────────────────────
 
 // FIX: Defects 2, 3, 4 - Sequence token tracking latest compression request to prevent async race conditions
@@ -969,21 +1331,26 @@ let currentCompressId = 0;
  * Executes prompt compression. Employs non-blocking inline skeleton progress (R5)
  * and seamless client-side zero-auth execution when unauthenticated (R1).
  */
-async function compress(isSilent = false) {
+async function compress(isSilent = false, opts = {}) {
     // FIX: Defects 2, 3, 4 - Tag request with monotonically increasing sequence ID
     const reqId = ++currentCompressId;
 
     const promptInput = document.getElementById('prompt-input');
-    const raw = promptInput ? promptInput.value.trim() : '';
+    const typedRaw = promptInput ? promptInput.value.trim() : '';
+    const overrideRaw = (opts && typeof opts.rawTextOverride === 'string') ? opts.rawTextOverride.trim() : '';
+    const raw = overrideRaw || typedRaw;
     const isGuest = !State.token;
-    const mode = State.currentMode || document.getElementById('mode')?.value || 'balanced';
-    const domain = document.getElementById('domain-name')?.textContent || updateDetectedDomain(raw);
+    const modeOverride = (opts && typeof opts.modeOverride === 'string') ? opts.modeOverride.trim() : '';
+    const mode = modeOverride || State.currentMode || document.getElementById('mode')?.value || 'balanced';
+    const domain = document.getElementById('domain-name')?.textContent || updateDetectedDomain(raw || State.parentRawPrompt || '');
+    const repairContext = opts.repairContext || null;
 
     if (!raw) return showToast('Raw Prompt is required', 'error');
 
+    const minWords = State.parentId ? 2 : 8;
     const words = raw.split(/\s+/).filter(Boolean);
-    if (words.length < 8) {
-        return showToast('Raw Prompt must be at least 8 words', 'error');
+    if (words.length < minWords) {
+        return showToast(`Raw Prompt must be at least ${minWords} words`, 'error');
     }
 
     if (isGuest && getGuestUses() >= GUEST_MAX_USES) {
@@ -1034,23 +1401,180 @@ async function compress(isSilent = false) {
     const renderStyle = document.getElementById('opt-harness-enabled')?.checked ? 'harness' : 'crisp';
     const ragDocIds = (typeof RagWorkspace !== 'undefined' && ragEnabled) ? RagWorkspace.getSelectedDocIds() : [];
 
+    // Prepare request payload (client-side rehydration in Guest Mode vs native stateful ledger when authed)
+    let requestPayload = {
+        raw_text: raw,
+        task: 'Optimize prompt',
+        use_case: domain,
+        mode: mode,
+        domain: domain,
+        rag_enabled: ragEnabled,
+        rag_document_ids: ragDocIds.length > 0 ? ragDocIds : undefined,
+        npae_render_style: renderStyle
+    };
+
+    if (isGuest && State.parentId && typeof ClientContinuation !== 'undefined' && ClientContinuation.isTopicReset(raw)) {
+        State.parentId = null;
+        State.parentRawPrompt = '';
+        State.turnNumber = 0;
+        State.activeConstraints = [];
+        State.revokedConstraints = [];
+        State.phases = [];
+        State.activePhase = null;
+        State.resolvedSlots = {};
+        State.pendingClarifySlot = null;
+    }
+
+    let guestContinuationPlan = null;
+    if (isGuest && State.parentId && typeof ClientContinuation !== 'undefined') {
+        const isEditMode = !overrideRaw && typedRaw ? detectContinuationInputMode(typedRaw) === 'edit' : false;
+        const { activeConstraints, supersededLabels } = ClientContinuation.reconcileConstraints(
+            State.activeConstraints,
+            raw,
+            State.revokedConstraints
+        );
+        const nextActivePhase = ClientContinuation.detectPhaseSelection(raw, State.activePhase, State.phases);
+        const rehydratedRaw = ClientContinuation.buildGuestRehydratedPrompt({
+            parentRawPrompt: State.parentRawPrompt,
+            followUpText: raw,
+            isEditMode,
+            activeConstraints,
+            revokedLabels: supersededLabels,
+            phases: State.phases,
+            activePhase: nextActivePhase,
+            resolvedSlots: State.resolvedSlots,
+            repairContext,
+        });
+        const deltaPrompt = ClientContinuation.buildDeltaPrompt({
+            activeConstraints,
+            revokedLabels: supersededLabels,
+            phases: State.phases,
+            activePhase: nextActivePhase,
+            resolvedSlots: State.resolvedSlots,
+            followUpText: raw,
+            repairContext,
+        });
+        requestPayload.raw_text = rehydratedRaw;
+        guestContinuationPlan = {
+            isEditMode,
+            activeConstraints,
+            supersededLabels,
+            nextActivePhase,
+            deltaPrompt,
+        };
+    } else if (!isGuest) {
+        if (State.parentId) {
+            requestPayload.parent_id = State.parentId;
+        }
+        if (State.revokedConstraints.length > 0) {
+            requestPayload.revoked_constraints = State.revokedConstraints.slice();
+        }
+        if (State.activePhase !== null && State.activePhase !== undefined) {
+            requestPayload.active_phase = State.activePhase;
+        }
+        if (State.resolvedSlots && Object.keys(State.resolvedSlots).length > 0) {
+            requestPayload.resolved_slots = { ...State.resolvedSlots };
+        }
+        if (repairContext) {
+            requestPayload.repair_context = repairContext;
+        }
+    } else if (isGuest && repairContext) {
+        requestPayload.raw_text = `${raw}\n\nFailed Claims: ${(repairContext.failed_items || []).join('; ') || 'none'}\nMissing Items: ${(repairContext.missing_items || []).join('; ') || 'none'}`;
+    }
+
     try {
         const [result] = await Promise.all([
-            API.compress({
-                raw_text: raw,
-                task: 'Optimize prompt',
-                use_case: domain,
-                mode: mode,
-                domain: domain,
-                rag_enabled: ragEnabled,
-                rag_document_ids: ragDocIds.length > 0 ? ragDocIds : undefined,
-                npae_render_style: renderStyle
-            }),
+            API.compress(requestPayload),
             minDelay
         ]);
 
         // FIX: Defects 2, 3, 4 - If newer request initiated, discard stale response
         if (reqId !== currentCompressId) return;
+
+        // Hydrate multi-turn continuation state from backend or client-side guest ledger
+        if (isGuest && guestContinuationPlan && typeof ClientContinuation !== 'undefined') {
+            const nextTurn = (State.turnNumber || 1) + 1;
+            const extractedPhases = (State.phases && State.phases.length > 0)
+                ? State.phases
+                : ClientContinuation.extractPhases(result, domain);
+            const hydratedPhases = extractedPhases.map(p => ({
+                ...p,
+                status: guestContinuationPlan.nextActivePhase !== null &&
+                    Number(p.phase_number) === Number(guestContinuationPlan.nextActivePhase)
+                    ? 'active'
+                    : p.status,
+            }));
+
+            let rehydratedPromptText = result.optimized_prompt || '';
+            if (repairContext && !/\[REPAIR/i.test(rehydratedPromptText)) {
+                rehydratedPromptText = `[REPAIR_CONTEXT]\nFix Unsupported: ${(repairContext.failed_items || []).join('; ') || 'none'}\nAdd Missing: ${(repairContext.missing_items || []).join('; ') || 'none'}\n\n${rehydratedPromptText}`;
+                result.optimized_prompt = rehydratedPromptText;
+            }
+
+            result.continuation = {
+                ledger_id: State.parentId,
+                turn_number: nextTurn,
+                path: guestContinuationPlan.isEditMode ? 'edit_continuation' : 'delta_follow_up',
+                primary_kind: repairContext ? 'constraint_patch' : 'phase_step',
+                delta_summary: repairContext ? 'Surgical grounding repair' : 'Applied follow-up delta',
+                delta_prompt: guestContinuationPlan.deltaPrompt,
+                rehydrated_prompt: rehydratedPromptText,
+                active_constraints: guestContinuationPlan.activeConstraints,
+                superseded_constraints: guestContinuationPlan.supersededLabels,
+                phases: hydratedPhases,
+                active_phase: guestContinuationPlan.nextActivePhase,
+                open_slots: [],
+            };
+
+            State.turnNumber = nextTurn;
+            State.activeConstraints = guestContinuationPlan.activeConstraints;
+            State.revokedConstraints = [];
+            State.phases = hydratedPhases;
+            State.activePhase = guestContinuationPlan.nextActivePhase;
+            if (guestContinuationPlan.isEditMode && typedRaw) {
+                State.parentRawPrompt = typedRaw;
+            }
+        } else if (result.continuation) {
+            const cont = result.continuation;
+            State.parentId = cont.ledger_id || State.parentId || result.id;
+            if (!State.parentRawPrompt || cont.path === 'edit_continuation' || cont.path === 'topic_reset' || cont.turn_number === 1) {
+                if (typedRaw) State.parentRawPrompt = typedRaw;
+                else if (!State.parentRawPrompt && raw) State.parentRawPrompt = raw;
+            }
+            if (cont.path === 'topic_reset' || cont.turn_number === 1) {
+                State.resolvedSlots = {};
+                State.pendingClarifySlot = null;
+            }
+            State.turnNumber = cont.turn_number || (State.turnNumber ? State.turnNumber + 1 : 1);
+            State.activeConstraints = Array.isArray(cont.active_constraints) ? cont.active_constraints : [];
+            State.revokedConstraints = [];
+            State.phases = Array.isArray(cont.phases) ? cont.phases : [];
+            State.activePhase = (cont.path === 'topic_reset' || cont.turn_number === 1)
+                ? (cont.active_phase ?? null)
+                : (cont.active_phase ?? State.activePhase);
+        } else {
+            // Turn 1 or legacy fallback without continuation metadata
+            const wasLinked = Boolean(State.parentId);
+            if (!wasLinked) {
+                State.parentId = result.id || ('session-' + Date.now());
+                State.parentRawPrompt = raw;
+                State.turnNumber = 1;
+            } else {
+                State.turnNumber = (State.turnNumber || 1) + 1;
+            }
+            if (typeof ClientContinuation !== 'undefined') {
+                if (!wasLinked) {
+                    State.activeConstraints = ClientContinuation.extractConstraints(raw);
+                    State.phases = ClientContinuation.extractPhases(result, domain);
+                    State.activePhase = State.phases.length > 0 ? State.phases[0].phase_number : null;
+                }
+                State.revokedConstraints = [];
+            }
+        }
+
+        updateContinuationModePill();
+        renderContinuationStrip();
+        validatePromptLength();
 
         State.lastResult = result;
         State.lastTs = Date.now();
@@ -1060,7 +1584,7 @@ async function compress(isSilent = false) {
         }
         renderResult(result);
         if (!isSilent) {
-            showToast('Prompt compressed successfully', 'success');
+            showToast(repairContext ? 'Surgical repair prompt generated!' : 'Prompt compressed successfully', 'success');
         }
     } catch (err) {
         if (reqId !== currentCompressId) return;
@@ -1073,7 +1597,10 @@ async function compress(isSilent = false) {
             if (inlineFill) inlineFill.style.width = '100%';
             if (inlineProgress) inlineProgress.style.display = 'none';
             if (resultOutput) resultOutput.style.opacity = '1';
-            if (btn) btn.disabled = false;
+            if (btn) {
+                const curWords = promptInput ? promptInput.value.trim().split(/\s+/).filter(Boolean).length : 0;
+                btn.disabled = curWords < (State.parentId ? 2 : 8);
+            }
         }
     }
 }
@@ -1140,6 +1667,13 @@ function computePrunedTokenSummary(rawInput, optimizedPrompt, savedCount, fallba
  * Renders compressed result, diff highlight, TES badge, and dollar telemetry (R2, R3).
  */
 function renderResult(result) {
+    const cont = result && result.continuation ? result.continuation : null;
+    if (cont && (cont.path === 'topic_reset' || cont.turn_number === 1)) {
+        State.resolvedSlots = {};
+        State.pendingClarifySlot = null;
+        State.activePhase = cont.active_phase ?? null;
+    }
+
     const orig = result.token_original || 0;
     const final = result.token_final || 0;
     const saved = result.token_saved || 0;
@@ -1211,17 +1745,43 @@ function renderResult(result) {
     // Live dollar cost savings calculation (R3)
     updateCostMetrics();
 
-    // Render output with optional pruning diff highlighting (R2)
+    // Phase 4: Output view toggle visibility (Full Prompt vs Turn Delta)
+    const viewToggle = document.getElementById('output-view-toggle');
+    const hasDelta = Boolean(result.continuation && result.continuation.delta_prompt);
+    if (!hasDelta && State.outputView === 'delta') {
+        State.outputView = 'rehydrated';
+    }
+    if (viewToggle) {
+        viewToggle.style.display = hasDelta ? 'inline-flex' : 'none';
+        const rehydratedBtn = document.getElementById('ov-rehydrated');
+        const deltaBtn = document.getElementById('ov-delta');
+        if (rehydratedBtn) {
+            const active = State.outputView !== 'delta';
+            rehydratedBtn.classList.toggle('active', active);
+            rehydratedBtn.setAttribute('aria-checked', active ? 'true' : 'false');
+        }
+        if (deltaBtn) {
+            const active = State.outputView === 'delta';
+            deltaBtn.classList.toggle('active', active);
+            deltaBtn.setAttribute('aria-checked', active ? 'true' : 'false');
+        }
+    }
+
+    // Render output with optional pruning diff highlighting (R2) or Turn Delta view
     const elOutput = document.getElementById('result-output');
     if (elOutput) {
-        const promptText = result.optimized_prompt || '';
+        const promptText = getActiveOutputText(result);
         const showDiff = State.showDiff !== false && (document.getElementById('diff-toggle')?.checked !== false);
 
-        if (showDiff && saved > 0) {
+        if (State.outputView === 'delta') {
+            const formattedDelta = escapeHtml(promptText)
+                .replace(/\[(CONSTRAINTS_PATCH|PHASE_CURSOR|RESOLVED_SLOTS|REPAIR_DIRECTIVE|NEW_FACTS|TASK)\]/g, '<span class="crisp-tag">[$1]</span>');
+            elOutput.innerHTML = formattedDelta;
+        } else if (showDiff && saved > 0) {
             const rawInput = document.getElementById('prompt-input')?.value || '';
             const diffSummary = computePrunedTokenSummary(rawInput, promptText, saved, result.pruned_summary);
             const formattedPrompt = escapeHtml(promptText)
-                .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS)\]/g, '<span class="crisp-tag">[$1]</span>')
+                .replace(/\[(ROLE|CONTEXT|EXECUTION|CONSTRAINTS|RESOLVED_SLOTS|REPAIR_CONTEXT)\]/g, '<span class="crisp-tag">[$1]</span>')
                 .replace(/^(# (?:ROLE|TASK \/ INSTRUCTION|CONTEXT|CONSTRAINTS|OUTPUT BLUEPRINT|SUCCESS CRITERIA|EXECUTION PHASES|CLARIFYING QUESTIONS):)/gm, '<span class="crisp-tag">$1</span>')
                 .replace(/(\*\*(?:Role|Task|Constraints|Deliverables):\*\*)/g, '<span class="crisp-tag">$1</span>');
 
@@ -1245,7 +1805,7 @@ function renderResult(result) {
     });
     if (fbStatus) fbStatus.style.display = 'none';
 
-    // GRW-02: Interactive Clarifying Question Quick-Fill Pills
+    // GRW-02 v2: Interactive Clarifying Question Quick-Fill Pills
     const pillsEl = document.getElementById('clarifying-pills');
     if (pillsEl) {
         const qs = Array.isArray(result.clarifying_questions) ? result.clarifying_questions : [];
@@ -1254,6 +1814,7 @@ function renderResult(result) {
             pillsEl.innerHTML = '<span class="preset-label">Clarify:</span>';
             qs.slice(0, 3).forEach(q => {
                 const qText = typeof q === 'string' ? q : (q.question || q.slot || '');
+                const qSlot = typeof q === 'string' ? q : (q.slot || q.gap_addressed || q.question || '');
                 if (!qText) return;
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -1261,6 +1822,38 @@ function renderResult(result) {
                 btn.textContent = `+ ${qText.length > 48 ? qText.slice(0, 45) + '…' : qText}`;
                 btn.title = qText;
                 btn.addEventListener('click', () => {
+                    if (State.parentId) {
+                        // Phase 4: Inline slot-fill box without polluting #prompt-input
+                        State.pendingClarifySlot = qSlot || qText;
+                        const existingBox = document.getElementById('clarify-inline-box');
+                        if (existingBox) existingBox.remove();
+
+                        const box = document.createElement('div');
+                        box.id = 'clarify-inline-box';
+                        box.className = 'clarify-inline-box';
+                        box.innerHTML = `
+                            <span class="clarify-inline-label">${escapeHtml(qText)}</span>
+                            <input type="text" id="clarify-inline-input" class="clarify-inline-input" placeholder="Type value (e.g. $100/mo)...">
+                            <button type="button" class="clarify-apply-btn" data-action="applyClarifySlot">Apply</button>
+                            <button type="button" class="btn-ghost" data-action="closeClarifyInlineBox" aria-label="Cancel clarification">✕</button>
+                        `;
+                        pillsEl.appendChild(box);
+                        const inlineInput = document.getElementById('clarify-inline-input');
+                        if (inlineInput) {
+                            inlineInput.value = State.resolvedSlots[State.pendingClarifySlot] || '';
+                            inlineInput.addEventListener('keydown', (ev) => {
+                                if (ev.key === 'Enter') {
+                                    ev.preventDefault();
+                                    applyClarifySlot();
+                                } else if (ev.key === 'Escape') {
+                                    ev.preventDefault();
+                                    closeClarifyInlineBox();
+                                }
+                            });
+                            inlineInput.focus();
+                        }
+                        return;
+                    }
                     const input = document.getElementById('prompt-input');
                     if (!input) return;
                     const sep = input.value.trim().endsWith('\n') ? '' : '\n';
@@ -1289,6 +1882,19 @@ function openWorkbenchVerifyModal() {
     }
 }
 
+/**
+ * Safely writes text to the clipboard if available, showing a fallback toast otherwise.
+ */
+function copyToClipboardSafe(text, onSuccess, errorPrefix = 'Copy failed') {
+    if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        showToast('Clipboard unavailable in this browser context', 'error');
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        if (typeof onSuccess === 'function') onSuccess();
+    }).catch(err => showToast(`${errorPrefix}: ${err.message}`, 'error'));
+}
+
 function exportAuditCard() {
     if (!State.lastResult) return showToast('Compress a prompt first to export an audit card.', 'error');
     const r = State.lastResult;
@@ -1310,22 +1916,20 @@ function exportAuditCard() {
         `- **Scores (0–10):** TES \`${Number(tes).toFixed(2)}\` · SFS \`${Number(sfs).toFixed(2)}\` · SCS \`${Number(scs).toFixed(2)}\``,
         `- **Est. Savings (${scaleLabel}):** $${estSavings}`
     ].join('\n');
-    navigator.clipboard.writeText(card).then(() => {
-        showToast('Audit Card copied to clipboard!', 'success');
-    }).catch(err => showToast('Copy failed: ' + err.message, 'error'));
+    copyToClipboardSafe(card, () => showToast('Audit Card copied to clipboard!', 'success'));
 }
 
 function launchInExternalAi(provider) {
-    if (!State.lastResult || !State.lastResult.optimized_prompt) {
+    const text = getActiveOutputText(State.lastResult);
+    if (!text) {
         return showToast('Compress a prompt first before launching.', 'error');
     }
-    const text = State.lastResult.optimized_prompt;
     const baseUrl = provider === 'claude' ? 'https://claude.ai/new' : 'https://chatgpt.com/';
     const encoded = encodeURIComponent(text);
     const targetUrl = encoded.length <= 1800 ? `${baseUrl}?q=${encoded}` : baseUrl;
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).catch(() => {});
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).catch(err => console.warn('Clipboard copy failed:', err));
     }
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
     showToast(
@@ -1488,10 +2092,10 @@ async function submitFeedback(rating) {
 }
 
 function copyResult() {
-    const cleanPrompt = State.lastResult?.optimized_prompt;
+    const cleanPrompt = getActiveOutputText(State.lastResult);
     const text = cleanPrompt || document.getElementById('result-output')?.textContent;
     if (!text) return showToast('No output to copy', 'error');
-    navigator.clipboard.writeText(text).then(() => {
+    copyToClipboardSafe(text, () => {
         showToast('Copied to clipboard!', 'success');
         const btn = document.getElementById('copy-result-btn');
         if (btn) {
@@ -1503,9 +2107,7 @@ function copyResult() {
                 btn.classList.remove('btn-copied');
             }, 2000);
         }
-    }).catch(err => {
-        showToast('Failed to copy: ' + err.message, 'error');
-    });
+    }, 'Failed to copy');
 }
 
 // ── History Timeline ────────────────────────────────────────────────────────
@@ -2072,6 +2674,7 @@ function validatePromptLength() {
         return;
     }
 
+    const minWords = State.parentId ? 2 : 8;
     const raw = promptInput.value.trim();
     const words = raw ? raw.split(/\s+/).filter(Boolean) : [];
     const count = words.length;
@@ -2079,8 +2682,8 @@ function validatePromptLength() {
     const estimatedTokens = Math.round(count * 1.33);
 
     if (wordBadge) {
-        wordBadge.textContent = `${count} word${count === 1 ? '' : 's'}${count < 8 ? ' (min 8)' : ''}`;
-        if (count >= 8) {
+        wordBadge.textContent = `${count} word${count === 1 ? '' : 's'}${count < minWords ? ` (min ${minWords})` : ''}`;
+        if (count >= minWords) {
             wordBadge.classList.add('badge-valid');
         } else {
             wordBadge.classList.remove('badge-valid');
@@ -2091,11 +2694,15 @@ function validatePromptLength() {
         tokenBadge.textContent = `${estimatedTokens} tokens`;
     }
 
-    if (raw.length > 0) {
+    if (raw.length > 0 && !State.parentId) {
         updateDetectedDomain(raw);
     }
-    
-    if (count >= 8) {
+
+    if (State.parentId) {
+        updateContinuationModePill();
+    }
+
+    if (count >= minWords) {
         compressBtn.disabled = false;
         promptInput.removeAttribute('aria-invalid');
         if (errorDiv) errorDiv.style.display = 'none';
@@ -2104,7 +2711,7 @@ function validatePromptLength() {
         if (errorDiv) {
             if (raw.length > 0) {
                 promptInput.setAttribute('aria-invalid', 'true');
-                errorDiv.textContent = `Prompt must be at least 8 words (currently ${count} / 8).`;
+                errorDiv.textContent = `Prompt must be at least ${minWords} words (currently ${count} / ${minWords}).`;
                 errorDiv.style.display = 'block';
             } else {
                 promptInput.removeAttribute('aria-invalid');
@@ -2200,7 +2807,9 @@ function initCustomSkinModal() {
     if (savedSkin) {
         try {
             applyCustomSkinConfig(JSON.parse(savedSkin));
-        } catch (_) {}
+        } catch (err) {
+            console.warn('Failed to parse saved custom skin config:', err);
+        }
     }
 
     if (!btn || !modal) return;
@@ -2677,6 +3286,13 @@ function initStudioDeclarativeEvents() {
         selectOutcomePreset: (arg) => selectOutcomePreset(arg),
         selectMode: (arg) => selectMode(arg),
         clearInput: () => clearInput(),
+        resetParentSession: () => resetParentSession(),
+        revokeInheritedConstraint: (arg) => revokeInheritedConstraint(arg),
+        selectActivePhase: (arg) => selectActivePhase(arg),
+        setOutputView: (arg) => setOutputView(arg),
+        applyClarifySlot: () => applyClarifySlot(),
+        closeClarifyInlineBox: () => closeClarifyInlineBox(),
+        generateRepairFromVerify: () => generateRepairFromVerify(),
         compress: () => compress(),
         toggleQualityBreakdown: () => toggleQualityBreakdown(),
         copyResult: () => copyResult(),
@@ -2774,7 +3390,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadScenarioRegistry();
             hydrated = true;
         }
-    } catch (_) {}
+    } catch (err) {
+        console.warn('Session hydration check failed:', err);
+    }
 
     if (!hydrated) {
         updateUserBar();
@@ -3055,11 +3673,11 @@ function copyAggressivePrompt() {
     if (!lastAggressivePromptText) {
         return showToast('No compressed prompt to copy', 'error');
     }
-    navigator.clipboard.writeText(lastAggressivePromptText).then(() => {
-        showToast('Clean LLM Prompt copied to clipboard!', 'success');
-    }).catch(err => {
-        showToast('Failed to copy: ' + err.message, 'error');
-    });
+    copyToClipboardSafe(
+        lastAggressivePromptText,
+        () => showToast('Clean LLM Prompt copied to clipboard!', 'success'),
+        'Failed to copy'
+    );
 }
 
 // Explicit global attachment for inline onclick handlers and test runners
@@ -3081,6 +3699,13 @@ if (typeof window !== 'undefined') {
     window.extractVanillaPdfText = extractVanillaPdfText;
     window.toggleDiffView = toggleDiffView;
     window.clearInput = clearInput;
+    window.resetParentSession = resetParentSession;
+    window.revokeInheritedConstraint = revokeInheritedConstraint;
+    window.selectActivePhase = selectActivePhase;
+    window.setOutputView = setOutputView;
+    window.applyClarifySlot = applyClarifySlot;
+    window.closeClarifyInlineBox = closeClarifyInlineBox;
+    window.generateRepairFromVerify = generateRepairFromVerify;
     window.compress = compress;
     window.renderResult = renderResult;
     window.switchTab = switchTab;
@@ -3121,6 +3746,13 @@ if (typeof globalThis !== 'undefined') {
     globalThis.extractVanillaPdfText = extractVanillaPdfText;
     globalThis.toggleDiffView = toggleDiffView;
     globalThis.clearInput = clearInput;
+    globalThis.resetParentSession = resetParentSession;
+    globalThis.revokeInheritedConstraint = revokeInheritedConstraint;
+    globalThis.selectActivePhase = selectActivePhase;
+    globalThis.setOutputView = setOutputView;
+    globalThis.applyClarifySlot = applyClarifySlot;
+    globalThis.closeClarifyInlineBox = closeClarifyInlineBox;
+    globalThis.generateRepairFromVerify = generateRepairFromVerify;
     globalThis.compress = compress;
     globalThis.renderResult = renderResult;
     globalThis.switchTab = switchTab;

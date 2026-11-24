@@ -288,6 +288,29 @@ fn extract_verbatim_spans(raw: &str) -> (Vec<String>, Vec<String>) {
             }
         }
 
+        // 1.5. Comparative/budget bounds: "under $100/mo", "below $500k", "within 50ms", "max $200"
+        if matches!(
+            low.as_str(),
+            "under" | "below" | "within" | "max" | "over" | "above"
+        ) && i + 1 < n
+        {
+            let next_raw = tokens[i + 1]
+                .trim_matches(|c: char| matches!(c, ',' | '.' | ';' | '!' | '?' | '"' | '\''));
+            let has_digit = next_raw.chars().any(|c| c.is_ascii_digit());
+            let has_unit_or_currency = next_raw.starts_with('$')
+                || next_raw.contains('/')
+                || next_raw.ends_with('%')
+                || next_raw.chars().any(|c| c.is_ascii_alphabetic());
+            if has_digit && has_unit_or_currency {
+                let bound = format!("Target/Bound: {} {}", low, next_raw);
+                if !inclusions.contains(&bound) {
+                    inclusions.push(bound);
+                }
+                i += 2;
+                continue;
+            }
+        }
+
         // 2. Quantitative + unit bounds: `<number> <unit>` (e.g., "1800 cal", "500 mg", "2000 usd")
         let is_number = !clean.is_empty()
             && clean

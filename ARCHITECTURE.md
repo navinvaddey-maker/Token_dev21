@@ -6,7 +6,7 @@ Stack        : Rust | Axum | SQLite → PostgreSQL (GAP-15 migration path)
 Scale        : Monolithic service, designed for millions of records
 Owner        : navinvaddey
 Version      : 3.8.0 (Cloud vs Own Data Exclusive RAG Mode + Local Offline Companion Service)
-Last updated : 2026-11-18 by Antigravity (Gemini 4 Hydrogen)
+Last updated : 2026-11-24 by Antigravity (Gemini 4 Hydrogen)
 Status       : Single Canonical Source of Truth (consolidated from v1, v2, v3, and recent implementations)
 ```
 
@@ -369,6 +369,14 @@ User compresses prompt
 
 ---
 
+7. **Stateful Parent → Continuation Structural Prompting (`src/npae/continuation/`, `src/npae/aggressive/structurer/render.rs`, `src/npae/aggressive/engine.rs`, `src/lib.rs`, `src/domain.rs`, `src/api.rs`)**:
+   - **Tenant-Scoped `PromptStateLedger` (`AppState.prompt_ledgers`)**: Bounded in-memory `DashMap` (`MAX_PROMPT_LEDGERS = 10_000`) keyed by `(tenant_id, user_id, parent_id)`. Stores `parent_raw_prompt`, `locked_axis` (`Domain × ActorPerspective × IntentClass`, `rule_locked`), `ConstraintLedger` (`Active` / `Superseded` / `Revoked` for `SL-1`), `PhaseCursor`, `resolved_slots`, and append-only `FactRegistry` (`[F1..Fk]` for `SL-3`).
+   - **Dual-Path Continuation Diffing (`ParentMatcher` + `ContinuationRouter`)**: Supports both **Path A (delta-only follow-up)** and **Path B (retyped/edited full raw prompt)** by computing a normalized clause diff against `parent_raw_prompt`. Classifies deltas into `SlotFill`, `ConstraintPatch` (`Add` / `Override` / `Revoke`), `PhaseStep`, `EvidenceDrill`, `ArtifactTransform`, or `TopicReset` (with `SL-2` hysteresis preventing dollar/keyword hijacks on locked domains).
+   - **Dual-Output Rendering (`optimized_prompt` + `ContinuationMeta.delta_prompt`) & Repair Loop**: `optimized_prompt` carries the clean rehydrated single-turn prompt (pruning superseded Turn 1 constraints and expanding only the active phase) while `ContinuationMeta.delta_prompt` carries the KV-cache-friendly delta prompt (`[CONSTRAINTS_PATCH]`, `[PHASE_CURSOR]`, `[NEW_FACTS]`, `[TASK]`), alongside deterministic `Verifier → RepairPrompt` synthesis from `GroundingReport` failures. `HallucinationGuard` (`L3`) validates against reconciled `Active` constraints only.
+   - **Guest Statelessness**: Unauthenticated `/api/demo/compress` remains stateless on the backend; guest multi-turn continuity runs client-side in `static/app.js` / `static/mock_api.js`.
+
+---
+
 ## 7. Fine-Tuning Strategy (Anti-Hallucination)
 
 ### 7.1 Why the Engine Hallucinates Today
@@ -628,4 +636,9 @@ GAP-15 (1 week): PostgreSQL migration when sessions > 50K
     - Rate Limiting, Timeouts & Concurrency: Added trusted-proxy-gated (`TRUSTED_PROXIES`) per-IP auth rate limiter and per-`(tenant_id, user_id)` token-bucket limiter with LRU eviction; added global 60s timeout middleware, `DefaultBodyLimit` (256 KiB JSON / 52 MiB multipart), `pdf_ingest_sem`, `aggressive_sem`, `compress_sem`, bounded `TenantLearningPool` with DB hydration & LRU eviction, SQLite chunk insert transaction, and `spawn_blocking` offloading.
     - RAG & Prompt Injection Hardening: Enforced magic-byte/MIME/extension PDF checks, `MAX_DOCX_XML_BYTES` (16 MiB) ZIP-bomb cap, `MAX_EXTRACTED_TEXT_BYTES` (20 MiB), `rag_top_k` `1..=20` clamping with `saturating_mul`, `<context trust="untrusted">` XML/attribute escaping (`&<>"'`), validated `app_mode`/`mode`/`geography` allowlists, removed untrusted RAG promotion into `# CONSTRAINTS:` / `=== SYSTEM PROMPT ===`.
     - Client & Error Hygiene: Escaped `&<>"'` in `admin.js`/`app.js` `escapeHtml`, removed auth token `console.log`, added opaque error responses with correlation `error_id`, `CorsLayer` (`ALLOWED_ORIGINS`), and security headers. (CSP `'unsafe-inline'` retained until Phase B migrates remaining inline `onclick=` handlers in `index.html`/`admin.html`.)
+
+[2026-11-24] [Antigravity] ARCHITECTURE.md
+  Stateful Parent → Continuation Structural Prompting (§6.7):
+    - Implemented tenant-scoped `PromptStateLedger` (`AppState.prompt_ledgers` in `src/lib.rs`, wired through `src/domain.rs`, `src/api.rs`, `src/npae/continuation/`, `src/npae/aggressive/engine.rs`, and `src/npae/aggressive/structurer/render.rs`) with `ParentMatcher` (Path A delta follow-up / Path B edit continuation), `ContinuationRouter`, `ConstraintLedger` (`SL-1`), domain hysteresis (`SL-2`), append-only `FactRegistry` (`SL-3`), and `Verifier → RepairPrompt` synthesis.
+    - Clarified dual-output contract: `optimized_prompt` carries the rehydrated single-turn prompt while `ContinuationMeta.delta_prompt` carries the KV-cache-friendly delta prompt.
 ```

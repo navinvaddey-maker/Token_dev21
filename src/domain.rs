@@ -8,6 +8,8 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use std::collections::BTreeMap;
+
 use crate::{
     classifier::ScenarioClassifier,
     data::Repository,
@@ -18,12 +20,29 @@ use crate::{
         token_history::TokenHistory,
         user::{LoginRequest, LoginResponse, RegisterRequest, User},
     },
+    npae::aggressive::constraints::extract_constraints,
+    npae::aggressive::engine::{AggressiveEngine, ContinuationInput},
+    npae::aggressive::structurer::{render_delta_prompt, scrub_superseded_terms, HttpStructurer},
+    npae::continuation::ledger::{
+        strip_directive_or_exclusion_prefix, tokenize_boundary, tokens_contain_subsequence,
+    },
+    npae::continuation::router::extract_non_constraint_delta_instruction,
+    npae::continuation::{
+        ConstraintKind, ConstraintOp, ConstraintStatus, ContinuationKind, ContinuationPath,
+        ContinuationRouter, LockedAxis, ParentMatcher, PhaseStatus, PromptStateLedger,
+    },
+    npae::grounding::verifier::{contains_prompt_injection, sanitize_untrusted_fact},
+    npae::schema::types::{
+        ConstraintView, ContinuationMeta, NpaeConfig, PhaseView, RenderStyle, RepairContext,
+        StructuredPromptResponse,
+    },
     session::SessionHistory,
     utils::tokens::estimate_tokens,
     AppState,
 };
 
 const ENGINE_VERSION: &str = "2.0.0";
+const MAX_PROMPT_LEDGERS: usize = 10_000;
 
 /// Allowed non-privileged business types for public user registration.
 const ALLOWED_BUSINESS_TYPES: &[&str] = &[
@@ -274,10 +293,6 @@ pub async fn compress_new(
     compress_new_scoped(state, user_id_str, "default", req).await
 }
 
-/// Executes prompt compression with explicit tenant scoping.
-///
-/// # Errors
-/// Returns `AppError` on execution or persistence failure.
 /// Executes stateless prompt compression for unauthenticated sandbox visitors.
 ///
 /// # Arguments
@@ -364,6 +379,476 @@ pub async fn compress_demo(
     }
 }
 
+/// Builds the `(tenant_id, user_id, ledger_id)` composite key for `state.prompt_ledgers`.
+fn scoped_ledger_key(tenant_id: &str, user_id_str: &str, ledger_id: &str) -> String {
+    format!("{tenant_id}:{user_id_str}:{ledger_id}")
+}
+
+/// Looks up a tenant-and-user-scoped [`PromptStateLedger`] and its raw parent prompt.
+fn lookup_scoped_ledger(
+    state: &AppState,
+    tenant_id: &str,
+    user_id_str: &str,
+    parent_id: Option<&str>,
+) -> Option<(PromptStateLedger, String)> {
+    let pid = parent_id.map(str::trim).filter(|s| !s.is_empty())?;
+    let key = scoped_ledger_key(tenant_id, user_id_str, pid);
+    state
+        .prompt_ledgers
+        .get(&key)
+        .map(|entry| entry.value().clone())
+}
+
+/// Persists a tenant-and-user-scoped [`PromptStateLedger`] with bounded eviction.
+fn store_scoped_ledger(
+    state: &AppState,
+    tenant_id: &str,
+    user_id_str: &str,
+    ledger: PromptStateLedger,
+    parent_raw: String,
+) {
+    let key = scoped_ledger_key(tenant_id, user_id_str, &ledger.ledger_id);
+    if !state.prompt_ledgers.contains_key(&key) && state.prompt_ledgers.len() >= MAX_PROMPT_LEDGERS
+    {
+        // FIX: High #1 — drop the `DashMap::Iter` shard read guard before calling `.remove()`.
+        let evict_key = state.prompt_ledgers.iter().next().map(|e| e.key().clone());
+        if let Some(evict_key) = evict_key {
+            state.prompt_ledgers.remove(&evict_key);
+        }
+    }
+    state.prompt_ledgers.insert(key, (ledger, parent_raw));
+}
+
+/// Executes Aggressive Mode with tenant-and-user-scoped stateful parent→continuation tracking.
+///
+/// // ARCH: ARCHITECTURE.md §6.7 — shared by `/api/compress` (Aggressive) and `/api/v1/aggressive`,
+/// // enforcing `(tenant_id, user_id)` ledger isolation and bounded `MAX_PROMPT_LEDGERS` eviction.
+///
+/// # Errors
+/// Returns [`AppError`] on worker failure or engine execution failure.
+///
+/// # Panics
+/// Never.
+#[allow(clippy::too_many_arguments)]
+pub async fn run_aggressive_scoped(
+    state: &AppState,
+    user_id_str: &str,
+    tenant_id: &str,
+    prompt: &str,
+    route: &str,
+    remote_addr: &str,
+    cfg: &NpaeConfig,
+    enrichment: &crate::types::EnrichmentContext,
+    parent_id: Option<&str>,
+    revoked_constraints: Vec<String>,
+    active_phase: Option<u32>,
+    resolved_slots: BTreeMap<String, String>,
+    repair_context: Option<RepairContext>,
+) -> Result<StructuredPromptResponse, AppError> {
+    let found_parent = lookup_scoped_ledger(state, tenant_id, user_id_str, parent_id);
+    let prev_parent_raw = found_parent.as_ref().map(|(_, raw)| raw.clone());
+    let mut ledger_opt = found_parent.as_ref().map(|(l, _)| l.clone());
+
+    let prompt_for_repr = prompt.to_string();
+    let repr = tokio::task::spawn_blocking(move || {
+        crate::npae::compression::pipeline::run_parallel_pipeline(&prompt_for_repr)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+    .map_err(AppError::Engine)?;
+
+    let structurer = HttpStructurer {
+        route: route.to_string(),
+        remote_addr: remote_addr.to_string(),
+        body: prompt.to_string(),
+    };
+    let reconstructed = state.pipeline.reconstruct_input(prompt);
+
+    let cont_input = ContinuationInput {
+        parent_ledger: ledger_opt.clone(),
+        parent_raw_prompt: prev_parent_raw.clone(),
+        explicit_parent_id: parent_id.map(str::to_string),
+        revoked_constraints,
+        active_phase,
+        resolved_slots,
+        repair_context,
+    };
+
+    let resp = AggressiveEngine::run_with_continuation(
+        prompt,
+        &repr,
+        cfg,
+        state.npae_config.clone(),
+        state.ory_engine.clone(),
+        &structurer,
+        &reconstructed,
+        Some(enrichment),
+        &mut ledger_opt,
+        Some(cont_input),
+    )
+    .await
+    .map_err(AppError::Engine)?;
+
+    if let Some(updated_ledger) = ledger_opt {
+        let parent_raw_to_store = match resp.continuation.as_ref().map(|c| c.path) {
+            Some(ContinuationPath::DeltaFollowUp) => {
+                prev_parent_raw.unwrap_or_else(|| prompt.to_string())
+            }
+            _ => prompt.to_string(),
+        };
+        store_scoped_ledger(
+            state,
+            tenant_id,
+            user_id_str,
+            updated_ledger,
+            parent_raw_to_store,
+        );
+    }
+
+    Ok(resp)
+}
+
+/// Reconciles parent-ledger state for Balanced/Gentle/Auto pipeline continuations.
+///
+/// // ARCH: ARCHITECTURE.md §6.7 — preserves active constraints, resolved slots, output format,
+/// // active phase guidance, and non-constraint Path A follow-up instructions into `reconciled`.
+fn prepare_legacy_continuation(
+    state: &AppState,
+    user_id_str: &str,
+    tenant_id: &str,
+    req: &crate::api::CompressRequest,
+    scenario: Option<&crate::classifier::signal::ScenarioSignal>,
+) -> (String, PromptStateLedger, String, ContinuationMeta) {
+    let found_parent =
+        lookup_scoped_ledger(state, tenant_id, user_id_str, req.parent_id.as_deref());
+
+    if let Some((mut existing, parent_raw)) = found_parent {
+        let delta = ParentMatcher::extract_delta(&parent_raw, &req.raw_text, true);
+        if delta.path != ContinuationPath::TopicReset {
+            existing.advance_turn();
+
+            let mut resolved_any = false;
+            if let Some(ref slots) = req.resolved_slots {
+                for (k, v) in slots {
+                    if existing.resolve_slot(k, v) {
+                        resolved_any = true;
+                    }
+                }
+            }
+            if let Some(ref revoked) = req.revoked_constraints {
+                if !revoked.is_empty() {
+                    let ops: Vec<ConstraintOp> = revoked
+                        .iter()
+                        .map(|t| ConstraintOp::Revoke { target: t.clone() })
+                        .collect();
+                    existing.apply_constraint_ops(&ops);
+                }
+            }
+
+            let mut route = ContinuationRouter::classify(
+                &delta,
+                &existing.open_slots,
+                !existing.phases.is_empty(),
+                req.repair_context.is_some(),
+            );
+            if resolved_any && !route.all_kinds.contains(&ContinuationKind::SlotFill) {
+                route.all_kinds.push(ContinuationKind::SlotFill);
+            }
+            existing.apply_constraint_ops(&route.constraint_ops);
+            if let Some(ref fmt) = route.output_format_override {
+                existing.output_format = fmt.clone();
+            }
+            let target_phase = req.active_phase.or(route.target_phase);
+            if let Some(p) = target_phase {
+                if existing.set_active_phase(p) {
+                    for phase in &mut existing.phases {
+                        if phase.phase_number != p && phase.status == PhaseStatus::Pending {
+                            phase.status = PhaseStatus::Deferred;
+                        }
+                    }
+                }
+            }
+
+            let mut scrub_list: Vec<String> = existing
+                .superseded_targets()
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+            for entry in &existing.constraints {
+                if entry.status == ConstraintStatus::Revoked
+                    && !scrub_list
+                        .iter()
+                        .any(|s| s.eq_ignore_ascii_case(&entry.text))
+                {
+                    scrub_list.push(entry.text.clone());
+                }
+            }
+            let scrub_refs: Vec<&str> = scrub_list.iter().map(String::as_str).collect();
+            let raw_base = if delta.path == ContinuationPath::EditContinuation {
+                req.raw_text.as_str()
+            } else {
+                existing.objective.as_str()
+            };
+            let mut reconciled = scrub_superseded_terms(raw_base, &scrub_refs);
+            if delta.path == ContinuationPath::EditContinuation {
+                existing.objective = reconciled.clone();
+            }
+
+            let base_low = reconciled.to_lowercase();
+            let base_tokens = tokenize_boundary(&base_low);
+            let mut extra = Vec::new();
+            for inc in existing.active_inclusions() {
+                let inc_low = inc.text.to_lowercase();
+                let inc_tokens = tokenize_boundary(&inc_low);
+                let core_tokens = tokenize_boundary(strip_directive_or_exclusion_prefix(&inc_low));
+                if !tokens_contain_subsequence(&base_tokens, &inc_tokens)
+                    && (core_tokens.is_empty()
+                        || !tokens_contain_subsequence(&base_tokens, &core_tokens))
+                {
+                    extra.push(inc.text.clone());
+                }
+            }
+            for exc in existing.active_exclusions() {
+                let exc_low = exc.text.to_lowercase();
+                let exc_tokens = tokenize_boundary(&exc_low);
+                if !tokens_contain_subsequence(&base_tokens, &exc_tokens) {
+                    // FIX: Medium #3 — ensure exclusions without an explicit negation prefix are
+                    // prefixed with `"exclude "` before appending to `reconciled`.
+                    let starts_with_neg = ["no ", "without ", "never ", "avoid ", "exclude "]
+                        .iter()
+                        .any(|p| exc_low.starts_with(p));
+                    if starts_with_neg {
+                        extra.push(exc.text.clone());
+                    } else {
+                        extra.push(format!("exclude {}", exc.text));
+                    }
+                }
+            }
+            if !existing.resolved_slots.is_empty() {
+                for (k, v) in &existing.resolved_slots {
+                    if contains_prompt_injection(k) || contains_prompt_injection(v) {
+                        continue;
+                    }
+                    let clean_k = sanitize_untrusted_fact(&k.replace(['[', ']'], ""));
+                    let clean_v = sanitize_untrusted_fact(&v.replace(['[', ']'], ""));
+                    if !clean_k.is_empty()
+                        && !clean_v.is_empty()
+                        && !base_low.contains(&clean_v.to_lowercase())
+                    {
+                        extra.push(format!("{clean_k}: {clean_v}"));
+                    }
+                }
+            }
+            // FIX: High #3 — preserve non-markdown output format & active phase guidance.
+            if !existing.output_format.trim().is_empty()
+                && !existing.output_format.eq_ignore_ascii_case("markdown")
+                && !base_low.contains(&existing.output_format.to_lowercase())
+            {
+                extra.push(format!("Output format: {}", existing.output_format.trim()));
+            }
+            if let Some(p) = target_phase {
+                if let Some(phase) = existing.phases.iter().find(|ph| ph.phase_number == p) {
+                    extra.push(format!(
+                        "Focus on Phase {} ({}): {}",
+                        phase.phase_number, phase.name, phase.description
+                    ));
+                } else {
+                    extra.push(format!("Focus on Phase {p}"));
+                }
+            }
+            if !extra.is_empty() {
+                if !reconciled.is_empty() && !reconciled.ends_with(['.', '!', '?']) {
+                    reconciled.push('.');
+                }
+                reconciled.push(' ');
+                reconciled.push_str(&extra.join("; "));
+                reconciled.push('.');
+            }
+
+            if delta.path == ContinuationPath::DeltaFollowUp {
+                if let Some(follow_up) =
+                    extract_non_constraint_delta_instruction(&delta.delta_text, &existing)
+                {
+                    let scrubbed_follow_up = scrub_superseded_terms(&follow_up, &scrub_refs);
+                    let trimmed_follow_up = scrubbed_follow_up.trim();
+                    if !trimmed_follow_up.is_empty()
+                        && !reconciled
+                            .to_lowercase()
+                            .contains(&trimmed_follow_up.to_lowercase())
+                    {
+                        reconciled.push_str("\nFollow-up instruction: ");
+                        reconciled.push_str(trimmed_follow_up);
+                    }
+                }
+            }
+
+            let delta_prompt = render_delta_prompt(&existing, &route, &[], &req.raw_text);
+            let meta = build_legacy_continuation_meta(
+                &existing,
+                delta.path,
+                route.primary_kind,
+                route.all_kinds,
+                route.delta_summary,
+                Some(delta_prompt),
+            );
+            let parent_raw_to_store = if delta.path == ContinuationPath::EditContinuation {
+                req.raw_text.clone()
+            } else {
+                parent_raw
+            };
+            return (reconciled, existing, parent_raw_to_store, meta);
+        }
+
+        // TopicReset path: fresh ledger
+        let mut fresh = PromptStateLedger::new(Uuid::new_v4().to_string());
+        fresh.advance_turn();
+        fresh.objective = req.raw_text.clone();
+        seed_legacy_ledger(&mut fresh, &req.raw_text, scenario);
+        let meta = build_legacy_continuation_meta(
+            &fresh,
+            ContinuationPath::TopicReset,
+            ContinuationKind::TopicReset,
+            vec![ContinuationKind::TopicReset],
+            req.raw_text.chars().take(160).collect(),
+            None,
+        );
+        return (req.raw_text.clone(), fresh, req.raw_text.clone(), meta);
+    }
+
+    // Initial cold start
+    let mut fresh = PromptStateLedger::new(Uuid::new_v4().to_string());
+    fresh.advance_turn();
+    fresh.objective = req.raw_text.clone();
+    seed_legacy_ledger(&mut fresh, &req.raw_text, scenario);
+    let meta = build_legacy_continuation_meta(
+        &fresh,
+        ContinuationPath::Initial,
+        ContinuationKind::Initial,
+        vec![ContinuationKind::Initial],
+        req.raw_text.chars().take(160).collect(),
+        None,
+    );
+    (req.raw_text.clone(), fresh, req.raw_text.clone(), meta)
+}
+
+/// Seeds constraints and initial 3-axis classification into a freshly created legacy ledger.
+fn seed_legacy_ledger(
+    ledger: &mut PromptStateLedger,
+    raw_text: &str,
+    scenario: Option<&crate::classifier::signal::ScenarioSignal>,
+) {
+    let (inclusions, exclusions) = extract_constraints(raw_text, &[], &[]);
+    let mut ops = Vec::new();
+    for inc in inclusions {
+        ops.push(ConstraintOp::AddInclusion { text: inc });
+    }
+    for exc in exclusions {
+        ops.push(ConstraintOp::AddExclusion { text: exc });
+    }
+    ledger.apply_constraint_ops(&ops);
+    if let Some(sig) = scenario {
+        ledger.locked_axis = Some(LockedAxis {
+            domain: sig.domain.clone(),
+            perspective: "practitioner".to_string(),
+            intent: sig.intent_class.clone(),
+            confidence: sig.confidence.clamp(0.0, 1.0),
+        });
+    }
+}
+
+/// Reverses XML entity escaping produced by `sanitize_untrusted_fact` before storing into `SL-3`.
+fn unescape_xml_entities(s: &str) -> String {
+    s.replace("&#x27;", "'")
+        .replace("&quot;", "\"")
+        .replace("&gt;", ">")
+        .replace("&lt;", "<")
+        .replace("&amp;", "&")
+}
+
+/// Builds [`ContinuationMeta`] from a [`PromptStateLedger`] and route metadata.
+fn build_legacy_continuation_meta(
+    ledger: &PromptStateLedger,
+    path: ContinuationPath,
+    primary_kind: ContinuationKind,
+    all_kinds: Vec<ContinuationKind>,
+    delta_summary: String,
+    delta_prompt: Option<String>,
+) -> ContinuationMeta {
+    let active_constraints = ledger
+        .constraints
+        .iter()
+        .filter(|c| c.status == ConstraintStatus::Active)
+        .map(|c| ConstraintView {
+            id: c.id.clone(),
+            kind: match c.kind {
+                ConstraintKind::Inclusion => "inclusion",
+                ConstraintKind::Exclusion => "exclusion",
+                ConstraintKind::Format => "format",
+                ConstraintKind::LengthBound => "length_bound",
+                ConstraintKind::Tone => "tone",
+            }
+            .to_string(),
+            text: c.text.clone(),
+            status: "active".to_string(),
+        })
+        .collect();
+    let superseded_constraints = ledger
+        .superseded_targets()
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    let phases = ledger
+        .phases
+        .iter()
+        .map(|p| PhaseView {
+            phase_number: p.phase_number,
+            name: p.name.clone(),
+            status: match p.status {
+                PhaseStatus::Pending => "pending",
+                PhaseStatus::Active => "active",
+                PhaseStatus::Done => "done",
+                PhaseStatus::Deferred => "deferred",
+            }
+            .to_string(),
+        })
+        .collect();
+    let active_phase = ledger
+        .phases
+        .iter()
+        .find(|p| p.status == PhaseStatus::Active)
+        .map(|p| p.phase_number);
+
+    ContinuationMeta {
+        ledger_id: ledger.ledger_id.clone(),
+        turn_number: ledger.turn_count.max(1),
+        path,
+        primary_kind,
+        all_kinds,
+        delta_summary,
+        active_constraints,
+        superseded_constraints,
+        phases,
+        active_phase,
+        open_slots: ledger.open_slots.clone(),
+        delta_prompt,
+        resolved_slots: ledger.resolved_slots.clone(),
+    }
+}
+
+/// Executes prompt compression with explicit tenant and user scoping, persisting history,
+/// behavioral learning updates, and multi-turn continuation ledgers.
+///
+/// # Arguments
+/// * `state` - Shared application state containing DB pool, pipeline, and ledger store.
+/// * `user_id_str` - Authenticated user UUID string.
+/// * `tenant_id` - Authenticated tenant identifier.
+/// * `req` - Compression request payload.
+///
+/// # Errors
+/// Returns [`AppError`] on validation, engine execution, or database persistence failure.
+///
+/// # Panics
+/// Never.
 pub async fn compress_new_scoped(
     state: &AppState,
     user_id_str: &str,
@@ -454,7 +939,9 @@ pub async fn compress_new_scoped(
     // 3. Run the 7-stage pipeline (0A → 6B) with tenant-scoped, bounded session cache
     let session_key = format!("{tenant_id}:{user_id_str}");
     if !state.sessions.contains_key(&session_key) && state.sessions.len() >= 10_000 {
-        if let Some(evict_key) = state.sessions.iter().next().map(|e| e.key().clone()) {
+        // FIX: High #1 — drop the `DashMap::Iter` shard read guard before calling `.remove()`.
+        let evict_key = state.sessions.iter().next().map(|e| e.key().clone());
+        if let Some(evict_key) = evict_key {
             state.sessions.remove(&evict_key);
         }
     }
@@ -464,7 +951,7 @@ pub async fn compress_new_scoped(
         .or_insert_with(|| SessionHistory::new(10))
         .clone();
 
-    let npae_cfg = crate::npae::schema::types::NpaeConfig {
+    let npae_cfg = NpaeConfig {
         ambiguity_threshold: req.npae_ambiguity_threshold,
         max_questions: req.npae_max_questions,
         confidence_threshold: req.npae_confidence_threshold,
@@ -473,24 +960,138 @@ pub async fn compress_new_scoped(
         target_model_family: None,
     };
 
-    let orchestrator_response = state
-        .pipeline
-        .process(
+    // FIX: High #2 — repair continuations must always route through `run_aggressive_scoped`
+    // regardless of whether the UI selected `balanced`/`gentle` or `aggressive`.
+    let is_explicit_aggressive = req
+        .mode
+        .as_deref()
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"))
+        || req.npae_render_style == Some(RenderStyle::CachedMultiTurn)
+        || req.repair_context.is_some();
+
+    let (orchestrator_response, legacy_state_to_save) = if is_explicit_aggressive {
+        let resp = run_aggressive_scoped(
+            state,
+            user_id_str,
+            tenant_id,
             &req.raw_text,
-            &mut session,
-            scenario,
-            req.mode.as_deref(),
-            Some(&npae_cfg),
-            Some(enrichment),
+            "/api/compress",
+            "authenticated",
+            &npae_cfg,
+            &enrichment,
+            req.parent_id.as_deref(),
+            req.revoked_constraints.clone().unwrap_or_default(),
+            req.active_phase,
+            req.resolved_slots.clone().unwrap_or_default(),
+            req.repair_context.clone(),
         )
-        .await
-        .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+        .await?;
+        (crate::types::OrchestratorResponse::Aggressive(resp), None)
+    } else {
+        let (prompt_for_pipeline, legacy_ledger, parent_raw_to_store, legacy_cont_meta) =
+            prepare_legacy_continuation(state, user_id_str, tenant_id, &req, scenario.as_ref());
+        let orch = state
+            .pipeline
+            .process(
+                &prompt_for_pipeline,
+                &mut session,
+                scenario,
+                req.mode.as_deref(),
+                Some(&npae_cfg),
+                Some(enrichment),
+            )
+            .await
+            .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+        (
+            orch,
+            Some((legacy_ledger, parent_raw_to_store, legacy_cont_meta)),
+        )
+    };
 
     state.sessions.insert(session_key, session);
 
-    let compression_response = match orchestrator_response {
-        crate::types::OrchestratorResponse::Legacy(resp) => resp,
-        crate::types::OrchestratorResponse::Aggressive(resp) => {
+    let (compression_response, legacy_cont_meta_opt) = match orchestrator_response {
+        crate::types::OrchestratorResponse::Legacy(resp) => {
+            let cont_meta = if let Some((ledger, parent_raw, meta)) = legacy_state_to_save {
+                store_scoped_ledger(state, tenant_id, user_id_str, ledger, parent_raw);
+                Some(meta)
+            } else {
+                None
+            };
+            (resp, cont_meta)
+        }
+        crate::types::OrchestratorResponse::Aggressive(mut resp) => {
+            // FIX: Medium #6, Medium #4 & Low #5 — when auto-mode (`req.mode` non-"aggressive")
+            // routes to `OrchestratorResponse::Aggressive` on Turn 1 OR Turn 2+, update and
+            // persist `legacy_state_to_save` in `state.prompt_ledgers`, unescaping XML entities
+            // before re-registering `[F#]` facts.
+            if let Some((mut ledger, parent_raw, mut meta)) = legacy_state_to_save {
+                if matches!(
+                    meta.path,
+                    ContinuationPath::Initial | ContinuationPath::TopicReset
+                ) {
+                    let perspective = ledger
+                        .locked_axis
+                        .as_ref()
+                        .map_or_else(|| "practitioner".to_string(), |a| a.perspective.clone());
+                    let intent = ledger
+                        .locked_axis
+                        .as_ref()
+                        .map_or_else(|| "build".to_string(), |a| a.intent.clone());
+                    ledger.apply_initial_structured(
+                        &resp.structured_prompt,
+                        &perspective,
+                        &intent,
+                        resp.confidence_score,
+                        resp.ambiguity_analysis.gap_zones.clone(),
+                    );
+                } else if ledger.phases.is_empty()
+                    && !resp.structured_prompt.execution_phases.is_empty()
+                {
+                    ledger.phases = resp
+                        .structured_prompt
+                        .execution_phases
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, phase)| crate::npae::continuation::PhaseEntry {
+                            phase_number: u32::from(phase.phase_number),
+                            name: phase.name.clone(),
+                            description: phase.description.clone(),
+                            status: if meta
+                                .active_phase
+                                .is_some_and(|ap| ap == u32::from(phase.phase_number))
+                                || (meta.active_phase.is_none() && idx == 0)
+                            {
+                                PhaseStatus::Active
+                            } else {
+                                PhaseStatus::Pending
+                            },
+                        })
+                        .collect();
+                }
+
+                if !resp.grounding_facts.is_empty() {
+                    let pairs: Vec<(String, &str)> = resp
+                        .grounding_facts
+                        .iter()
+                        .map(|f| (unescape_xml_entities(&f.text), "rag"))
+                        .collect();
+                    let ref_pairs: Vec<(&str, &str)> =
+                        pairs.iter().map(|(t, s)| (t.as_str(), *s)).collect();
+                    ledger.register_facts(&ref_pairs);
+                }
+
+                meta = build_legacy_continuation_meta(
+                    &ledger,
+                    meta.path,
+                    meta.primary_kind,
+                    meta.all_kinds,
+                    meta.delta_summary,
+                    meta.delta_prompt,
+                );
+                store_scoped_ledger(state, tenant_id, user_id_str, ledger, parent_raw);
+                resp.continuation = Some(meta);
+            }
             let mut verbose = crate::models::verbose::SqlxVerbose::default();
 
             let token_original = resp.token_original as usize;
@@ -641,7 +1242,7 @@ pub async fn compress_new_scoped(
     .map_err(AppError::Database)?;
 
     // 7. Build response
-    let json_resp = serde_json::json!({
+    let mut json_resp = serde_json::json!({
         "id":               history_id,
         "optimized_prompt":  compression_response.response,
         "token_original":   token_original,
@@ -677,6 +1278,13 @@ pub async fn compress_new_scoped(
         "clusters":         compression_response.clusters,
         "delta_tokens":     compression_response.delta_tokens,
     });
+    if let Some(cont_meta) = legacy_cont_meta_opt {
+        if let (Some(obj), Ok(meta_val)) =
+            (json_resp.as_object_mut(), serde_json::to_value(&cont_meta))
+        {
+            obj.insert("continuation".to_string(), meta_val);
+        }
+    }
 
     // 8. Implicit Signal Detection
     let prev_history = Repository::list_history_scoped(&state.pool, user_id_str, tenant_id, 1, 1)

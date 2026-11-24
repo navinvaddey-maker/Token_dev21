@@ -2028,6 +2028,256 @@ dialog.studio-dialog::backdrop {
     to { translate: 0 0; opacity: 1; }
 }
 
+/* ── Phase 4: Multi-Turn Continuation UI ─────────── */
+.parent-lock-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.65rem;
+    background: var(--tag-bg);
+    border: 1px solid var(--copy-border);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.parent-lock-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.parent-lock-badge {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--head-text);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.continuation-mode-pill {
+    font-size: 0.69rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 0.16rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: var(--surface-bg);
+    color: var(--accent-text);
+}
+
+.continuation-mode-pill.mode-delta {
+    color: var(--accent-text);
+    border-color: var(--copy-border);
+}
+
+.continuation-mode-pill.mode-edit {
+    color: var(--warning);
+    border-color: rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.parent-reset-btn {
+    min-block-size: 1.75rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 0.45rem;
+    border: 1px solid var(--glass-border);
+    background: var(--surface-bg);
+    color: var(--body-text);
+    font-family: inherit;
+    font-size: 0.73rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.parent-reset-btn:hover {
+    border-color: var(--accent-text);
+    color: var(--head-text);
+    background: var(--card-sub-bg);
+}
+
+.ledger-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.65rem;
+    background: var(--card-sub-bg);
+    border: 1px solid var(--glass-border);
+}
+
+.ledger-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.ledger-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-right: 0.15rem;
+}
+
+.constraint-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    background: var(--surface-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--head-text);
+    transition: opacity 150ms ease, border-color 150ms ease;
+}
+
+.constraint-chip-include {
+    border-color: rgba(16, 185, 129, 0.35);
+    color: var(--success);
+}
+
+.constraint-chip-exclude {
+    border-color: rgba(239, 68, 68, 0.35);
+    color: var(--danger);
+}
+
+.constraint-chip-revoked {
+    opacity: 0.48;
+    text-decoration: line-through;
+    border-style: dashed;
+}
+
+.constraint-revoke-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.constraint-revoke-btn:hover {
+    background: rgba(239, 68, 68, 0.14);
+    color: var(--danger);
+}
+
+.phase-pill {
+    min-block-size: 1.75rem;
+    padding: 0.22rem 0.6rem;
+    border-radius: 0.45rem;
+    font-family: inherit;
+    font-size: 0.73rem;
+    font-weight: 600;
+    background: var(--surface-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--body-text);
+    cursor: pointer;
+    transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.phase-pill:hover {
+    border-color: var(--accent-text);
+    color: var(--head-text);
+}
+
+.phase-pill.active {
+    background: var(--btn-grad);
+    color: var(--btn-text);
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.phase-pill.done {
+    border-color: rgba(16, 185, 129, 0.4);
+    color: var(--success);
+}
+
+.output-view-pills {
+    padding: 0.15rem;
+    border-radius: 0.5rem;
+}
+
+.output-view-pills .mode-pill {
+    min-block-size: 1.65rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+}
+
+.clarify-inline-box {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 0.55rem;
+    background: var(--card-sub-bg);
+    border: 1px solid var(--copy-border);
+}
+
+.clarify-inline-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--accent-text);
+    max-width: 100%;
+}
+
+.clarify-inline-input {
+    flex: 1;
+    min-width: 10rem;
+    padding: 0.32rem 0.55rem;
+    border-radius: 0.42rem;
+    border: 1px solid var(--inp-border);
+    background: var(--inp-bg);
+    color: var(--head-text);
+    font-family: inherit;
+    font-size: 0.78rem;
+}
+
+.clarify-inline-input:focus {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+}
+
+.clarify-apply-btn {
+    min-block-size: 1.85rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.42rem;
+    border: none;
+    background: var(--btn-grad);
+    color: var(--btn-text);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.repair-trigger-btn {
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--warning);
+    font-weight: 700;
+}
+
 /* ── Container & Responsive Reflow ────────────────── */
 @container (max-width: 780px) {
     .bento-span-6,

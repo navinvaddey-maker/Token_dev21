@@ -506,8 +506,24 @@ pub struct CompressRequest {
     pub npae_ambiguity_threshold: Option<f32>,
     pub npae_max_questions: Option<u8>,
     pub npae_confidence_threshold: Option<f32>,
+    /// Optional NPAE Aggressive render style (`crisp`, `harness`, or `cached_multi_turn`).
     #[serde(default)]
     pub npae_render_style: Option<crate::npae::schema::types::RenderStyle>,
+    /// Optional parent ledger ID linking this turn to an earlier prompt state.
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// Optional constraint IDs (`"C1"`) or target terms to revoke on this turn.
+    #[serde(default)]
+    pub revoked_constraints: Option<Vec<String>>,
+    /// Optional 1-based execution phase number to focus on this turn.
+    #[serde(default)]
+    pub active_phase: Option<u32>,
+    /// Optional slot name -> value overrides resolving open ambiguity gaps.
+    #[serde(default)]
+    pub resolved_slots: Option<std::collections::BTreeMap<String, String>>,
+    /// Optional verification-guided repair context for targeted repair synthesis.
+    #[serde(default)]
+    pub repair_context: Option<crate::npae::schema::types::RepairContext>,
 }
 
 async fn demo_compress(
@@ -530,10 +546,14 @@ async fn demo_compress(
     req.rag_enabled = Some(false);
     req.rag_document_ids = None;
 
+    // FIX: Medium #13 & High #2 — treat `CachedMultiTurn` and `repair_context` as Aggressive
+    // for `aggressive_sem` acquisition to match `domain::compress_new_scoped`.
     let is_aggressive = req
         .mode
         .as_deref()
-        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"));
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"))
+        || req.npae_render_style == Some(crate::npae::schema::types::RenderStyle::CachedMultiTurn)
+        || req.repair_context.is_some();
     let _permit = if is_aggressive {
         state
             .aggressive_sem
@@ -573,10 +593,14 @@ async fn compress(
 ) -> Result<axum::response::Response, AppError> {
     validate_prompt_bounds(&req.raw_text)?;
 
+    // FIX: Medium #13 & High #2 — treat `CachedMultiTurn` and `repair_context` as Aggressive
+    // for `aggressive_sem` acquisition to match `domain::compress_new_scoped`.
     let is_aggressive = req
         .mode
         .as_deref()
-        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"));
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("aggressive"))
+        || req.npae_render_style == Some(crate::npae::schema::types::RenderStyle::CachedMultiTurn)
+        || req.repair_context.is_some();
     let _permit = if is_aggressive {
         state
             .aggressive_sem
@@ -870,34 +894,22 @@ async fn npae_aggressive(
             }
         }
 
-        let prompt_for_repr = req.prompt.clone();
-        let repr = tokio::task::spawn_blocking(move || {
-            crate::npae::compression::pipeline::run_parallel_pipeline(&prompt_for_repr)
-        })
-        .await
-        .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
-        .map_err(AppError::Engine)?;
-
-        let structurer = crate::npae::aggressive::structurer::HttpStructurer {
-            route: "/api/v1/aggressive".to_string(),
-            remote_addr: "authenticated".to_string(),
-            body: req.prompt.clone(),
-        };
-
-        let reconstructed = state.pipeline.reconstruct_input(&req.prompt);
-
-        crate::npae::aggressive::engine::AggressiveEngine::run(
+        crate::domain::run_aggressive_scoped(
+            &state,
+            &auth.user_id,
+            &auth.tenant_id,
             &req.prompt,
-            &repr,
+            "/api/v1/aggressive",
+            "authenticated",
             cfg,
-            state.npae_config.clone(),
-            state.ory_engine.clone(),
-            &structurer,
-            &reconstructed,
-            Some(&enrichment),
+            &enrichment,
+            req.parent_id.as_deref(),
+            req.revoked_constraints.unwrap_or_default(),
+            req.active_phase,
+            req.resolved_slots.unwrap_or_default(),
+            req.repair_context,
         )
         .await
-        .map_err(AppError::Engine)
     };
 
     let resp = tokio::time::timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS), fut)

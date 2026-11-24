@@ -1,6 +1,21 @@
 use crate::npae::compression::types::CompressedRepr;
 use serde::{Deserialize, Serialize};
 
+/// Targeted repair context supplied when retrying or correcting failed/missing verification items.
+#[derive(Deserialize, Serialize, Debug, Clone, Default, PartialEq, Eq)]
+pub struct RepairContext {
+    /// Claims or verification assertions that failed grounding/constraint checks.
+    #[serde(default)]
+    pub failed_items: Vec<String>,
+    /// Requested items missing from the candidate response.
+    #[serde(default)]
+    pub missing_items: Vec<String>,
+    /// Additional diagnostic details explaining why repair is needed.
+    #[serde(default)]
+    pub details: Vec<String>,
+}
+
+/// Request payload for `POST /api/v1/aggressive`.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AggressiveRequest {
     pub prompt: String,
@@ -8,6 +23,21 @@ pub struct AggressiveRequest {
     pub rag_enabled: Option<bool>,
     pub rag_document_ids: Option<Vec<String>>,
     pub rag_top_k: Option<usize>,
+    /// Optional parent ledger ID linking this turn to an earlier prompt state.
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// Optional constraint IDs (`"C1"`) or target terms to revoke on this turn.
+    #[serde(default)]
+    pub revoked_constraints: Option<Vec<String>>,
+    /// Optional 1-based execution phase number to focus on this turn.
+    #[serde(default)]
+    pub active_phase: Option<u32>,
+    /// Optional slot name -> value overrides resolving open ambiguity gaps.
+    #[serde(default)]
+    pub resolved_slots: Option<std::collections::BTreeMap<String, String>>,
+    /// Optional verification-guided repair context for targeted repair synthesis.
+    #[serde(default)]
+    pub repair_context: Option<RepairContext>,
 }
 
 /// Controls how [`StructuredPrompt`] is rendered into `optimized_prompt` in Aggressive mode.
@@ -24,6 +54,10 @@ pub enum RenderStyle {
     /// and a strict `FOUND` / `PARTIAL_MATCH` / `NOT_FOUND` output contract.
     #[serde(alias = "Harness", alias = "HARNESS")]
     Harness,
+    /// Stateful multi-turn continuation rendering mode (Phase 1 routes to Crisp baseline until
+    /// Phase 2 delta renderer is attached).
+    #[serde(alias = "cached_multi_turn", alias = "CachedMultiTurn")]
+    CachedMultiTurn,
 }
 
 /// Target downstream LLM family for adaptive prompt formatting in Aggressive Crisp mode.
@@ -87,6 +121,85 @@ pub struct StructuredPromptResponse {
     /// Numbered `[F#]` facts emitted when `render_style == RenderStyle::Harness` (omitted when empty).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub grounding_facts: Vec<crate::npae::grounding::verifier::NumberedFact>,
+    /// Optional stateful continuation metadata emitted for multi-turn parent chains.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation: Option<ContinuationMeta>,
+}
+
+/// Serialized summary view of a tracked constraint inside [`ContinuationMeta`].
+///
+/// # Invariants
+/// `id` matches the stable `C#` identifier assigned by [`crate::npae::continuation::ledger::PromptStateLedger`].
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ConstraintView {
+    /// Stable constraint identifier (for example `"C1"`).
+    pub id: String,
+    /// Constraint category (`"inclusion"`, `"exclusion"`, `"format"`, `"length_bound"`, `"tone"`).
+    pub kind: String,
+    /// Human-readable constraint statement.
+    pub text: String,
+    /// Lifecycle status (`"active"`, `"superseded"`, `"revoked"`).
+    pub status: String,
+}
+
+/// Serialized summary view of an execution phase inside [`ContinuationMeta`].
+///
+/// # Invariants
+/// `phase_number` is 1-based.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct PhaseView {
+    /// 1-based execution phase number.
+    pub phase_number: u32,
+    /// Concise phase title.
+    pub name: String,
+    /// Lifecycle status (`"pending"`, `"active"`, `"done"`, `"deferred"`).
+    pub status: String,
+}
+
+/// Stateful multi-turn continuation metadata returned alongside [`StructuredPromptResponse`].
+///
+/// // ARCH: ARCHITECTURE.md §6.7 — surfaces parent-delta path, continuation route, active and
+/// // superseded constraints, phase cursor, and remaining open slots.
+///
+/// # Invariants
+/// `turn_number >= 1` for initialized ledger responses.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ContinuationMeta {
+    /// Persistent ledger identifier for this prompt branch.
+    pub ledger_id: String,
+    /// 1-based turn index within the ledger.
+    pub turn_number: u32,
+    /// Continuation path selected by [`crate::npae::continuation::diff::ParentMatcher`].
+    pub path: crate::npae::continuation::diff::ContinuationPath,
+    /// Highest-priority continuation intent selected by [`crate::npae::continuation::router::ContinuationRouter`].
+    pub primary_kind: crate::npae::continuation::router::ContinuationKind,
+    /// All continuation intents detected on this turn.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub all_kinds: Vec<crate::npae::continuation::router::ContinuationKind>,
+    /// Concise single-line summary of the delta applied on this turn.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub delta_summary: String,
+    /// Currently active constraints enforced by the ledger.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub active_constraints: Vec<ConstraintView>,
+    /// Constraint texts superseded on this or prior turns.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub superseded_constraints: Vec<String>,
+    /// Execution phases tracked by the ledger.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phases: Vec<PhaseView>,
+    /// Active phase number, if any phase is currently active.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_phase: Option<u32>,
+    /// Remaining unresolved ambiguity slots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub open_slots: Vec<String>,
+    /// Compact turn-delta prompt emitted alongside the full rehydrated prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta_prompt: Option<String>,
+    /// Slot values resolved on this or prior turns.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub resolved_slots: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -164,7 +277,7 @@ pub struct PromptConstraints {
     pub tone: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct LengthBound {
     pub min: u32,
     pub max: u32,

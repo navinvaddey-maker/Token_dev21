@@ -37,6 +37,10 @@ pub struct AppState {
     pub ory_engine: Arc<Mutex<crate::npae::ory::OryEngine>>,
     pub rag_store: Arc<crate::rag::store::RagStore>,
     pub sessions: Arc<dashmap::DashMap<String, crate::session::SessionHistory>>,
+    /// Tenant-and-user-scoped stateful parent→continuation ledgers (`(ledger, parent_raw_prompt)`).
+    pub prompt_ledgers: Arc<
+        dashmap::DashMap<String, (crate::npae::continuation::ledger::PromptStateLedger, String)>,
+    >,
     pub embedding_engine: Arc<crate::rag::embeddings::EmbeddingEngine>,
     pub scenario_router: Arc<crate::scenario::ScenarioModeRouter>,
     pub pdf_ingest_sem: Arc<Semaphore>,
@@ -48,6 +52,7 @@ impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("sessions_count", &self.sessions.len())
+            .field("prompt_ledgers_count", &self.prompt_ledgers.len())
             .field(
                 "pdf_ingest_permits",
                 &self.pdf_ingest_sem.available_permits(),

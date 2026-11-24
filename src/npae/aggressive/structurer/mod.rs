@@ -12,6 +12,7 @@ mod render;
 mod templates;
 
 pub use builder::{build, build_with_blueprint};
+pub(crate) use evidence::extract_declarative_user_fact;
 pub use evidence::{
     collect_grounding_facts, derive_requested_items, EvidenceBundle, EvidenceConflict,
     EvidenceItem, EvidenceKind, PackedEvidence, PromptBudget, Provenance,
@@ -23,8 +24,9 @@ pub use ingest::{
 pub use prune::{condense_task_instruction, prune_task_instruction};
 pub use render::{
     format_persona_guardrail, render_crisp_prompt, render_crisp_prompt_for_model,
-    render_crisp_prompt_with_evidence, render_crisp_prompt_with_rag, render_harness_prompt,
-    render_harness_prompt_with_evidence, render_harness_prompt_with_options,
+    render_crisp_prompt_with_evidence, render_crisp_prompt_with_rag, render_delta_prompt,
+    render_harness_prompt, render_harness_prompt_with_evidence, render_harness_prompt_with_options,
+    render_repair_prompt, scrub_superseded_terms,
 };
 
 #[cfg(test)]

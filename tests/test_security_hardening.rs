@@ -88,6 +88,7 @@ async fn setup_test_app_with_permits(
         ory_engine,
         rag_store: Arc::new(RagStore::new(pool.clone())),
         sessions: Arc::new(DashMap::new()),
+        prompt_ledgers: Arc::new(DashMap::new()),
         embedding_engine,
         scenario_router,
         pdf_ingest_sem: Arc::new(Semaphore::new(pdf_permits)),

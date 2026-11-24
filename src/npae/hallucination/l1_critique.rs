@@ -42,6 +42,16 @@ pub fn extract_non_task_scaffolding(output: &str) -> Option<String> {
         return Some(format!("{prefix}\n{suffix}"));
     }
 
+    // FIX: Medium #1 — for `# REPAIR DIRECTIVE` prompts, exclude the diagnostic
+    // `# FAILED / MISSING ITEMS TO REPAIR:` section so caller failure metrics (e.g. `50%`) or
+    // URLs inside diagnostics do not trigger false L2/L3 `[UNCERTAIN]` prefixes.
+    if let Some(diag_idx) = output.find("# FAILED / MISSING ITEMS TO REPAIR:") {
+        let prefix = &output[..diag_idx];
+        let rest = &output[diag_idx + "# FAILED / MISSING ITEMS TO REPAIR:".len()..];
+        let suffix = rest.find("\n# ").map_or("", |idx| &rest[idx..]);
+        return Some(format!("{prefix}\n{suffix}"));
+    }
+
     None
 }
 
