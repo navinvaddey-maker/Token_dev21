@@ -270,16 +270,16 @@ impl AggressiveEngine {
             }
         }
 
+        let evidence_ctx = EvidenceBuildCtx {
+            structured: &structured,
+            raw_input: raw,
+            raw_ctx_opt: raw_ctx_opt.as_deref(),
+            derived_rag: derived_rag.as_ref(),
+            enrichment,
+            is_continuation: false,
+        };
         let (evidence_bundle, fact_id_map, packed_evidence, has_external_evidence, _newly_minted) =
-            build_evidence_and_register_facts(
-                &structured,
-                raw,
-                raw_ctx_opt.as_deref(),
-                derived_rag.as_ref(),
-                enrichment,
-                &mut active_ledger,
-                false,
-            );
+            build_evidence_and_register_facts(&evidence_ctx, &mut active_ledger);
 
         let render_style = cfg.render_style.unwrap_or_default();
         let target_model = cfg.target_model_family.unwrap_or_default();
@@ -524,16 +524,16 @@ impl AggressiveEngine {
             vec![]
         };
 
+        let evidence_ctx = EvidenceBuildCtx {
+            structured: &structured,
+            raw_input: &rehydrated_crisp_raw_input,
+            raw_ctx_opt,
+            derived_rag: derived_rag.as_ref(),
+            enrichment,
+            is_continuation: true,
+        };
         let (evidence_bundle, fact_id_map, packed_evidence, has_external_evidence, newly_minted) =
-            build_evidence_and_register_facts(
-                &structured,
-                &rehydrated_crisp_raw_input,
-                raw_ctx_opt,
-                derived_rag.as_ref(),
-                enrichment,
-                existing,
-                true,
-            );
+            build_evidence_and_register_facts(&evidence_ctx, existing);
         let newly_minted_facts: Vec<NumberedFact> = newly_minted
             .into_iter()
             .map(|f| NumberedFact {
@@ -886,16 +886,27 @@ fn reconcile_structured_prompt(
     let scrub_refs: Vec<&str> = scrub_list.iter().map(String::as_str).collect();
 
     structured.constraints.required_inclusions.retain(|item| {
+        let item_low = item.trim().to_lowercase();
+        let item_core = strip_directive_or_exclusion_prefix(&item_low);
         !matches_any_scrub_term(item, &scrub_refs)
-            && !existing
-                .active_exclusions()
-                .iter()
-                .any(|exc| exc.text.eq_ignore_ascii_case(item))
+            && !existing.active_exclusions().iter().any(|exc| {
+                let exc_low = exc.text.trim().to_lowercase();
+                let exc_core = strip_directive_or_exclusion_prefix(&exc_low);
+                exc.text.eq_ignore_ascii_case(item)
+                    || (!item_core.is_empty() && item_core == exc_core)
+            })
     });
-    structured
-        .constraints
-        .forbidden_topics
-        .retain(|item| !matches_any_scrub_term(item, &scrub_refs));
+    structured.constraints.forbidden_topics.retain(|item| {
+        let item_low = item.trim().to_lowercase();
+        let item_core = strip_directive_or_exclusion_prefix(&item_low);
+        !matches_any_scrub_term(item, &scrub_refs)
+            && !existing.active_inclusions().iter().any(|inc| {
+                let inc_low = inc.text.trim().to_lowercase();
+                let inc_core = strip_directive_or_exclusion_prefix(&inc_low);
+                inc.text.eq_ignore_ascii_case(item)
+                    || (!item_core.is_empty() && item_core == inc_core)
+            })
+    });
 
     for inc in existing.active_inclusions() {
         if !structured
@@ -978,17 +989,22 @@ fn reconcile_structured_prompt(
     }
 }
 
+/// Borrowed inputs for [`build_evidence_and_register_facts`].
+struct EvidenceBuildCtx<'a> {
+    structured: &'a StructuredPrompt,
+    raw_input: &'a str,
+    raw_ctx_opt: Option<&'a str>,
+    derived_rag: Option<&'a DerivedRagContext>,
+    enrichment: Option<&'a crate::types::EnrichmentContext>,
+    is_continuation: bool,
+}
+
 /// Builds `EvidenceBundle`, registers all facts into `ledger` (`SL-3`) prior to packing,
 /// backfills prior `ledger.facts` on continuation turns, and packs with aligned `[F#]` IDs so
 /// `detect_numeric_conflicts` and Stage 6B compaction preserve stable Turn 1+ fact identities.
 fn build_evidence_and_register_facts(
-    structured: &StructuredPrompt,
-    raw_input: &str,
-    raw_ctx_opt: Option<&str>,
-    derived_rag: Option<&DerivedRagContext>,
-    enrichment: Option<&crate::types::EnrichmentContext>,
+    ctx: &EvidenceBuildCtx<'_>,
     ledger: &mut PromptStateLedger,
-    is_continuation: bool,
 ) -> (
     super::structurer::EvidenceBundle,
     HashMap<String, String>,
@@ -996,6 +1012,13 @@ fn build_evidence_and_register_facts(
     bool,
     Vec<crate::npae::continuation::FactEntry>,
 ) {
+    let structured = ctx.structured;
+    let raw_input = ctx.raw_input;
+    let raw_ctx_opt = ctx.raw_ctx_opt;
+    let derived_rag = ctx.derived_rag;
+    let enrichment = ctx.enrichment;
+    let is_continuation = ctx.is_continuation;
+
     let has_rag_data = derived_rag
         .as_ref()
         .is_some_and(|r| !r.facts.is_empty() || !r.detailed_facts.is_empty());

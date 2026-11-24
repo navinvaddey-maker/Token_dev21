@@ -561,6 +561,25 @@ impl PromptStateLedger {
         }
 
         let id = self.allocate_constraint_id();
+        // FIX: Medium #2 — supersede any active opposite-kind constraint on the same core
+        // target so contradictory `[STRICT]` and `[AVOID]` rules cannot coexist.
+        let opposite_kind = match kind {
+            ConstraintKind::Inclusion => Some(ConstraintKind::Exclusion),
+            ConstraintKind::Exclusion => Some(ConstraintKind::Inclusion),
+            ConstraintKind::Format | ConstraintKind::LengthBound | ConstraintKind::Tone => None,
+        };
+        if let Some(opp_kind) = opposite_kind {
+            for entry in &mut self.constraints {
+                if entry.status == ConstraintStatus::Active
+                    && entry.kind == opp_kind
+                    && constraint_matches_target(&entry.text, trimmed)
+                {
+                    entry.status = ConstraintStatus::Superseded { by_id: id.clone() };
+                    entry.updated_turn = turn;
+                }
+            }
+        }
+
         self.constraints.push(ConstraintEntry {
             id: id.clone(),
             kind,
@@ -921,5 +940,39 @@ mod tests {
                 .map(String::as_str),
             Some("AWS ECS Fargate")
         );
+    }
+
+    #[test]
+    fn test_opposite_kind_constraint_supersedes_contradiction() {
+        let mut ledger = PromptStateLedger::new("led-opp");
+        ledger.advance_turn();
+        ledger.apply_constraint_ops(&[ConstraintOp::AddInclusion {
+            text: "Redis".to_string(),
+        }]);
+        assert_eq!(ledger.active_inclusions().len(), 1);
+        assert_eq!(ledger.constraints[0].id, "C1");
+
+        ledger.advance_turn();
+        ledger.apply_constraint_ops(&[ConstraintOp::AddExclusion {
+            text: "no Redis".to_string(),
+        }]);
+        assert_eq!(ledger.active_inclusions().len(), 0);
+        assert_eq!(ledger.active_exclusions().len(), 1);
+        assert_eq!(ledger.active_exclusions()[0].text, "no Redis");
+        assert!(matches!(
+            ledger.constraints[0].status,
+            ConstraintStatus::Superseded { ref by_id } if by_id == "C2"
+        ));
+
+        ledger.advance_turn();
+        ledger.apply_constraint_ops(&[ConstraintOp::AddInclusion {
+            text: "Include Redis".to_string(),
+        }]);
+        assert_eq!(ledger.active_exclusions().len(), 0);
+        assert_eq!(ledger.active_inclusions().len(), 1);
+        assert!(matches!(
+            ledger.constraints[1].status,
+            ConstraintStatus::Superseded { ref by_id } if by_id == "C3"
+        ));
     }
 }

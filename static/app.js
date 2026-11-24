@@ -1537,7 +1537,9 @@ async function compress(isSilent = false, opts = {}) {
         } else if (result.continuation) {
             const cont = result.continuation;
             State.parentId = cont.ledger_id || State.parentId || result.id;
-            if (!State.parentRawPrompt || cont.path === 'edit_continuation' || cont.path === 'topic_reset' || cont.turn_number === 1) {
+            if (cont.path === 'topic_reset' || cont.turn_number === 1) {
+                if (raw) State.parentRawPrompt = raw;
+            } else if (!State.parentRawPrompt || cont.path === 'edit_continuation') {
                 if (typedRaw) State.parentRawPrompt = typedRaw;
                 else if (!State.parentRawPrompt && raw) State.parentRawPrompt = raw;
             }

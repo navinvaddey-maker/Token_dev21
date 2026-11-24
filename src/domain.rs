@@ -324,18 +324,60 @@ pub async fn compress_demo(
         target_model_family: None,
     };
 
-    let orchestrator_response = state
-        .pipeline
-        .process(
+    let orchestrator_response = if req.repair_context.is_some() {
+        // FIX: Low #2 — route demo requests carrying `repair_context` through
+        // `AggressiveEngine::run_with_continuation` with an ephemeral ledger (100% stateless).
+        let prompt_for_repr = req.raw_text.clone();
+        let repr = tokio::task::spawn_blocking(move || {
+            crate::npae::compression::pipeline::run_parallel_pipeline(&prompt_for_repr)
+        })
+        .await
+        .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+        .map_err(AppError::Engine)?;
+
+        let structurer = HttpStructurer {
+            route: "/api/demo/compress".to_string(),
+            remote_addr: "demo".to_string(),
+            body: req.raw_text.clone(),
+        };
+        let reconstructed = state.pipeline.reconstruct_input(&req.raw_text);
+        let mut ephemeral_ledger: Option<PromptStateLedger> = None;
+        let cont_input = ContinuationInput {
+            revoked_constraints: req.revoked_constraints.unwrap_or_default(),
+            active_phase: req.active_phase,
+            resolved_slots: req.resolved_slots.unwrap_or_default(),
+            repair_context: req.repair_context,
+            ..ContinuationInput::default()
+        };
+        let resp = AggressiveEngine::run_with_continuation(
             &req.raw_text,
-            &mut session,
-            scenario,
-            req.mode.as_deref(),
-            Some(&npae_cfg),
+            &repr,
+            &npae_cfg,
+            state.npae_config.clone(),
+            state.ory_engine.clone(),
+            &structurer,
+            &reconstructed,
             None,
+            &mut ephemeral_ledger,
+            Some(cont_input),
         )
         .await
-        .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?;
+        .map_err(AppError::Engine)?;
+        crate::types::OrchestratorResponse::Aggressive(resp)
+    } else {
+        state
+            .pipeline
+            .process(
+                &req.raw_text,
+                &mut session,
+                scenario,
+                req.mode.as_deref(),
+                Some(&npae_cfg),
+                None,
+            )
+            .await
+            .map_err(|e: Box<dyn std::error::Error>| AppError::Engine(e.to_string()))?
+    };
 
     let demo_id = format!("demo-{}", Uuid::new_v4());
     match orchestrator_response {
@@ -1045,6 +1087,12 @@ pub async fn compress_new_scoped(
                         resp.confidence_score,
                         resp.ambiguity_analysis.gap_zones.clone(),
                     );
+                    if !req.raw_text.trim().is_empty() {
+                        ledger.objective = req.raw_text.clone();
+                    }
+                    if let Some(p) = req.active_phase {
+                        ledger.set_active_phase(p);
+                    }
                 } else if ledger.phases.is_empty()
                     && !resp.structured_prompt.execution_phases.is_empty()
                 {
