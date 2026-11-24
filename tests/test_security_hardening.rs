@@ -381,9 +381,11 @@ async fn test_per_ip_rate_limiting_and_spoofed_xff_ignored_without_trusted_proxi
 
     let peer_addr: SocketAddr = "198.51.100.1:45678".parse().expect("socket addr");
 
-    // Auth limiter has capacity 15.0; after rapid requests, bucket is exhausted.
-    let mut hit_429 = false;
+    // Auth limiter has capacity 15.0; dispatch burst concurrently so debug-mode bcrypt latency
+    // cannot refill the 0.5 tokens/sec bucket mid-loop.
+    let mut set = tokio::task::JoinSet::new();
     for i in 0..25 {
+        let app = app.clone();
         let mut req = Request::builder()
             .method("POST")
             .uri("/api/login")
@@ -398,13 +400,17 @@ async fn test_per_ip_rate_limiting_and_spoofed_xff_ignored_without_trusted_proxi
             ))
             .expect("req");
         req.extensions_mut().insert(ConnectInfo(peer_addr));
+        set.spawn(async move { app.oneshot(req).await.expect("resp").status() });
+    }
 
-        let resp = app.clone().oneshot(req).await.expect("resp");
-        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+    let mut hit_429 = false;
+    while let Some(res) = set.join_next().await {
+        if res.expect("join") == StatusCode::TOO_MANY_REQUESTS {
             hit_429 = true;
             break;
         }
     }
+    set.abort_all();
     assert!(
         hit_429,
         "Rate limit must trigger after exhausting token bucket"
@@ -426,7 +432,7 @@ async fn test_per_ip_rate_limiting_and_spoofed_xff_ignored_without_trusted_proxi
         .expect("req");
     req_spoofed.extensions_mut().insert(ConnectInfo(peer_addr));
 
-    let resp_spoofed = app.clone().oneshot(req_spoofed).await.expect("resp");
+    let resp_spoofed = app.oneshot(req_spoofed).await.expect("resp");
     assert_eq!(
         resp_spoofed.status(),
         StatusCode::TOO_MANY_REQUESTS,

@@ -17,6 +17,7 @@ const State = {
     lastResult: null,
     lastTs: null,
     currentMode: 'balanced',
+    outcomePreset: 'saver',
     currentModelRate: 0.005, // Default GPT-4o: $0.005 / 1k tokens ($5 / 1M)
     currentRoiScale: 1000,
     showDiff: true,
@@ -258,6 +259,10 @@ function syncModeAvailability() {
     const hiddenMode = document.getElementById('mode');
     if (hiddenMode) {
         hiddenMode.value = State.currentMode;
+    }
+
+    if (typeof syncOutcomePresetFromControls === 'function') {
+        syncOutcomePresetFromControls();
     }
 }
 
@@ -536,15 +541,72 @@ function loadPreset(key) {
 // ── Segmented Mode Pills (R5) ──────────────────────────────────────────────
 
 /**
- * Selects a compression mode via segmented pills ('gentle' | 'balanced' | 'aggressive').
+ * Updates visual active state and aria-checked on the 3 primary outcome preset pills.
+ * # Arguments
+ * * `activePreset` - 'factchecked' | 'saver' | 'blueprint' | null
  */
-function selectMode(mode) {
-    if (!State.token && mode !== 'gentle') {
-        showToast('Guest mode only supports Light Polish. Sign in to unlock Smart Trim and Deep Blueprint.', 'error');
-        syncModeAvailability();
-        return;
+function updateOutcomePillsUI(activePreset) {
+    ['factchecked', 'saver', 'blueprint'].forEach(p => {
+        const btn = document.getElementById('po-' + p);
+        if (!btn) return;
+        const isActive = p === activePreset;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+}
+
+/**
+ * Synchronizes the primary outcome preset pills from the fine-tune mode and harness checkbox.
+ */
+function syncOutcomePresetFromControls() {
+    const mode = State.currentMode || document.getElementById('mode')?.value || 'balanced';
+    const harnessChecked = Boolean(document.getElementById('opt-harness-enabled')?.checked);
+
+    let matched = null;
+    if (mode === 'aggressive' && harnessChecked) {
+        matched = 'factchecked';
+    } else if (mode === 'balanced' && !harnessChecked) {
+        matched = 'saver';
+    } else if (mode === 'aggressive' && !harnessChecked) {
+        matched = 'blueprint';
     }
 
+    State.outcomePreset = matched;
+    updateOutcomePillsUI(matched);
+}
+
+/**
+ * Applies an outcome-driven preset ('factchecked' | 'saver' | 'blueprint') by updating
+ * the hallucination harness contract and compression mode together.
+ * # Arguments
+ * * `preset` - 'factchecked' | 'saver' | 'blueprint'
+ */
+function selectOutcomePreset(preset) {
+    const harnessEl = document.getElementById('opt-harness-enabled');
+    let targetMode = 'balanced';
+
+    if (preset === 'factchecked') {
+        if (harnessEl) harnessEl.checked = true;
+        targetMode = 'aggressive';
+    } else if (preset === 'blueprint') {
+        if (harnessEl) harnessEl.checked = false;
+        targetMode = 'aggressive';
+    } else {
+        preset = 'saver';
+        if (harnessEl) harnessEl.checked = false;
+        targetMode = 'balanced';
+    }
+
+    State.outcomePreset = preset;
+    updateOutcomePillsUI(preset);
+    selectMode(targetMode);
+}
+
+/**
+ * Selects a compression mode via segmented pills ('gentle' | 'balanced' | 'aggressive').
+ * All 3 modes are available in the guest trial sandbox (up to GUEST_MAX_USES runs).
+ */
+function selectMode(mode) {
     State.currentMode = mode;
     ['gentle', 'balanced', 'aggressive'].forEach(m => {
         const btn = document.getElementById('pm-' + m);
@@ -559,6 +621,8 @@ function selectMode(mode) {
     if (hiddenMode) {
         hiddenMode.value = mode;
     }
+
+    syncOutcomePresetFromControls();
 
     const promptInput = document.getElementById('prompt-input');
     if (promptInput && promptInput.value.trim().split(/\s+/).filter(Boolean).length >= 8) {
@@ -859,14 +923,41 @@ function clearInput() {
     if (btn) btn.disabled = true;
 
     const tesEl = document.getElementById('tes-score');
-    if (tesEl) tesEl.textContent = 'Quality Ready';
+    if (tesEl) {
+        tesEl.textContent = 'Quality Ready';
+        delete tesEl.dataset.tes;
+    }
 
+    const summaryPillEl = document.getElementById('output-summary-pill');
     const tokEl = document.getElementById('output-token-count');
     const pctEl = document.getElementById('output-saving-pct');
     const costEl = document.getElementById('cost-saved');
+    const statOrigEl = document.getElementById('stat-original');
+    const statFinalEl = document.getElementById('stat-final');
+    const statSavedEl = document.getElementById('stat-saved');
+    const tokenPctEl = document.getElementById('token-saving-pct');
+    const tokenBarEl = document.getElementById('token-progress-bar');
+    if (summaryPillEl) summaryPillEl.textContent = '0 tokens';
     if (tokEl) tokEl.textContent = '0 tokens';
     if (pctEl) pctEl.textContent = '0% saved';
     if (costEl) costEl.textContent = '$0.00 saved / 1k runs';
+    if (statOrigEl) statOrigEl.textContent = '0';
+    if (statFinalEl) statFinalEl.textContent = '0';
+    if (statSavedEl) statSavedEl.textContent = '0';
+    if (tokenPctEl) tokenPctEl.textContent = '0% saved';
+    if (tokenBarEl) tokenBarEl.style.width = '0%';
+
+    const qBreakdown = document.getElementById('quality-breakdown');
+    if (qBreakdown) {
+        qBreakdown.innerHTML = `
+            <span>Efficiency (TES): <strong>—</strong></span>
+            <span>Meaning (SFS): <strong>—</strong></span>
+            <span>Rules Kept (SCS): <strong>—</strong></span>
+        `;
+    }
+
+    const verifyBtn = document.getElementById('btn-verify-workbench');
+    if (verifyBtn) verifyBtn.style.display = 'none';
 }
 
 // ── Compression Lifecycle (R1, R2, R3, R5) ─────────────────────────────────
@@ -988,16 +1079,24 @@ async function compress(isSilent = false) {
 }
 
 /**
- * Toggles the quality score breakdown panel and keeps aria-expanded synchronized.
+ * Synchronizes #tes-score aria-expanded attribute with the native #inspector-drawer open state.
+ */
+function syncInspectorAriaExpanded() {
+    const drawer = document.getElementById('inspector-drawer');
+    const trigger = document.getElementById('tes-score');
+    if (drawer && trigger) {
+        trigger.setAttribute('aria-expanded', drawer.open ? 'true' : 'false');
+    }
+}
+
+/**
+ * Toggles the native Inspector <details> drawer and keeps aria-expanded synchronized.
  */
 function toggleQualityBreakdown() {
-    const panel = document.getElementById('quality-breakdown');
-    const trigger = document.getElementById('tes-score');
-    if (!panel) return;
-    const isNowHidden = panel.classList.toggle('hidden');
-    if (trigger) {
-        trigger.setAttribute('aria-expanded', isNowHidden ? 'false' : 'true');
-    }
+    const drawer = document.getElementById('inspector-drawer');
+    if (!drawer) return;
+    drawer.open = !drawer.open;
+    syncInspectorAriaExpanded();
 }
 
 /**
@@ -1046,6 +1145,7 @@ function renderResult(result) {
     const saved = result.token_saved || 0;
     const pct = result.savings_pct !== undefined ? result.savings_pct : (orig > 0 ? Math.round((saved / orig) * 100) : 0);
 
+    const elSummaryPill = document.getElementById('output-summary-pill');
     const elTokCount = document.getElementById('output-token-count');
     const elSavingPct = document.getElementById('output-saving-pct');
     const elOrig = document.getElementById('stat-original');
@@ -1058,6 +1158,7 @@ function renderResult(result) {
     const architectPctLabel = (orig > 0 && final > orig)
         ? `+${Math.round(((final - orig) / orig) * 100)}% output`
         : 'Deep Architect';
+    if (elSummaryPill) elSummaryPill.textContent = `${final} tokens`;
     if (elTokCount) elTokCount.textContent = `${final} tokens`;
     if (elSavingPct) elSavingPct.textContent = isArchitect ? architectPctLabel : `${pct}% saved`;
     if (elOrig) elOrig.textContent = orig.toLocaleString();
@@ -1066,22 +1167,45 @@ function renderResult(result) {
     if (elBar) elBar.style.width = Math.min(Math.max(pct, 0), 100) + '%';
     if (elPct) elPct.textContent = isArchitect ? architectPctLabel : `${pct}% saved`;
 
-    // TES quality badge update (R3) — supports both Aggressive (tes_score) and Legacy (dual_score.tes)
+    // Calm plain-English quality summary on #tes-score + full metrics inside Inspector drawer
     const tesScore = result.tes_score !== undefined
         ? result.tes_score
         : (result.dual_score && result.dual_score.tes !== undefined ? result.dual_score.tes : 9.7);
+    const hasFacts = Array.isArray(result.grounding_facts) && result.grounding_facts.length > 0;
+    const harnessActive = Boolean(document.getElementById('opt-harness-enabled')?.checked);
+
     const elTes = document.getElementById('tes-score');
     if (elTes) {
-        elTes.textContent = `TES ${Number(tesScore).toFixed(2)} Hallucination-Free`;
+        elTes.dataset.tes = Number(tesScore).toFixed(2);
+        if (harnessActive || hasFacts) {
+            elTes.textContent = '✓ Fact-Checked Ready';
+        } else if (isArchitect) {
+            elTes.textContent = '✓ Blueprint Ready';
+        } else if (pct > 0) {
+            elTes.textContent = `✓ Ready · ${pct}% shorter`;
+        } else {
+            elTes.textContent = '✓ Quality Ready';
+        }
     }
 
     const qBreakdown = document.getElementById('quality-breakdown');
-    if (qBreakdown && result.dual_score) {
+    if (qBreakdown) {
+        const ds = result.dual_score || {};
+        const qTes = Number(ds.tes !== undefined ? ds.tes : tesScore).toFixed(2);
+        const qSfs = ds.sfs !== undefined ? Number(ds.sfs).toFixed(2) : '—';
+        const qScs = ds.scs !== undefined ? Number(ds.scs).toFixed(2) : '—';
+        const modeStr = escapeHtml(String(result.mode || State.currentMode || 'balanced').toUpperCase());
         qBreakdown.innerHTML = `
-            <span>Efficiency (TES): <strong>${Number(result.dual_score.tes || 0).toFixed(2)}</strong></span>
-            <span>Meaning (SFS): <strong>${Number(result.dual_score.sfs || 0).toFixed(2)}</strong></span>
-            <span>Rules Kept (SCS): <strong>${Number(result.dual_score.scs || 0).toFixed(2)}</strong></span>
+            <span>Efficiency (TES): <strong>${qTes}</strong></span>
+            <span>Meaning (SFS): <strong>${qSfs}</strong></span>
+            <span>Rules Kept (SCS): <strong>${qScs}</strong></span>
+            <span>Mode: <strong>${modeStr}</strong></span>
         `;
+    }
+
+    const verifyBtn = document.getElementById('btn-verify-workbench');
+    if (verifyBtn) {
+        verifyBtn.style.display = (hasFacts || harnessActive) ? 'inline-flex' : 'none';
     }
 
     // Live dollar cost savings calculation (R3)
@@ -2151,6 +2275,37 @@ function initTablistKeyboardNav() {
 }
 
 /**
+ * Enables Left/Right and Up/Down arrow keyboard navigation on ARIA radiogroups
+ * (`#outcome-pills`, `#mode-pills`), moving focus and activating the adjacent option.
+ */
+function initRadiogroupKeyboardNav() {
+    document.querySelectorAll('[role="radiogroup"]').forEach(group => {
+        group.addEventListener('keydown', (e) => {
+            if (
+                e.key !== 'ArrowRight' &&
+                e.key !== 'ArrowLeft' &&
+                e.key !== 'ArrowDown' &&
+                e.key !== 'ArrowUp'
+            ) {
+                return;
+            }
+            const radios = Array.from(group.querySelectorAll('[role="radio"]'))
+                .filter(r => !r.disabled && r.style.display !== 'none');
+            if (radios.length < 2) return;
+            const idx = radios.indexOf(document.activeElement);
+            if (idx === -1) return;
+            e.preventDefault();
+            const isForward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+            const nextIdx = isForward
+                ? (idx + 1) % radios.length
+                : (idx - 1 + radios.length) % radios.length;
+            radios[nextIdx].focus();
+            radios[nextIdx].click();
+        });
+    });
+}
+
+/**
  * Studio ⌘K / Ctrl+K Command Palette for fast keyboard-first navigation & actions.
  */
 function openStudioCommandPalette() {
@@ -2519,6 +2674,7 @@ function initStudioDeclarativeEvents() {
         openPlaybookModal: () => openPlaybookModal(),
         closePlaybookModal: () => closePlaybookModal(),
         showPrivacyLocalInfo: () => showPrivacyLocalInfo(),
+        selectOutcomePreset: (arg) => selectOutcomePreset(arg),
         selectMode: (arg) => selectMode(arg),
         clearInput: () => clearInput(),
         compress: () => compress(),
@@ -2563,6 +2719,7 @@ function initStudioDeclarativeEvents() {
         else if (act === 'toggleDiffView') toggleDiffView();
         else if (act === 'updateModelPricing') updateModelPricing();
         else if (act === 'updateRoiScale') updateRoiScale();
+        else if (act === 'syncOutcomePresetFromControls') syncOutcomePresetFromControls();
         else if (act === 'setDataSource') RagWorkspace.setDataSource(el.value);
         else if (act === 'handleScenarioModeChange') handleScenarioModeChange(el.value);
         else if (act === 'handleDomainChange') handleDomainChange(el.value);
@@ -2584,6 +2741,11 @@ function initStudioDeclarativeEvents() {
         if (act === 'handleLogin') handleLogin(e);
         else if (act === 'handleRegister') handleRegister(e);
     });
+
+    const inspectorDrawer = document.getElementById('inspector-drawer');
+    if (inspectorDrawer) {
+        inspectorDrawer.addEventListener('toggle', syncInspectorAriaExpanded);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2591,6 +2753,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     initCustomSkinModal();
     initTablistKeyboardNav();
+    initRadiogroupKeyboardNav();
     initStudioCommandPalette();
     loadPresetsFromFile();
     initOryxOwl3dIcon('oryx-logo-3d', 'oryx-owl-pbr-canvas');
@@ -2905,6 +3068,8 @@ if (typeof window !== 'undefined') {
     window.SAMPLE_PRESETS = SAMPLE_PRESETS;
     window.MODEL_PRICES = MODEL_PRICES;
     window.loadPreset = loadPreset;
+    window.selectOutcomePreset = selectOutcomePreset;
+    window.syncOutcomePresetFromControls = syncOutcomePresetFromControls;
     window.selectMode = selectMode;
     window.updateModelPricing = updateModelPricing;
     window.updateCostMetrics = updateCostMetrics;
@@ -2943,6 +3108,8 @@ if (typeof globalThis !== 'undefined') {
     globalThis.SAMPLE_PRESETS = SAMPLE_PRESETS;
     globalThis.MODEL_PRICES = MODEL_PRICES;
     globalThis.loadPreset = loadPreset;
+    globalThis.selectOutcomePreset = selectOutcomePreset;
+    globalThis.syncOutcomePresetFromControls = syncOutcomePresetFromControls;
     globalThis.selectMode = selectMode;
     globalThis.updateModelPricing = updateModelPricing;
     globalThis.updateCostMetrics = updateCostMetrics;

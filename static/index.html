@@ -14,7 +14,7 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap"
         rel="stylesheet" />
     <link rel="stylesheet" href="styles/tokens.css?v=20261120" />
-    <link rel="stylesheet" href="styles/studio.css?v=20261121" />
+    <link rel="stylesheet" href="styles/studio.css?v=20261124" />
     <style>
         /* Critical-path desktop container & responsive breakpoints */
         .glass-card {
@@ -299,33 +299,53 @@
                                     <option value="financial">Financial</option>
                                 </select>
 
-                                <!-- Controls Row: Segmented Mode Pills (R5) -->
-                                <div class="pane-controls-row">
-                                    <div class="segmented-mode-pills" id="mode-pills" role="radiogroup"
-                                        aria-label="Compression Mode">
-                                        <button type="button" role="radio" class="mode-pill" data-mode="gentle"
-                                            id="pm-gentle" aria-checked="false" data-action="selectMode" data-arg="gentle">Light
-                                            Polish</button>
-                                        <button type="button" role="radio" class="mode-pill active"
-                                            data-mode="balanced" id="pm-balanced" aria-checked="true"
-                                            title="Smart Trim: 30-55% token reduction with 100% constraint locks" data-action="selectMode" data-arg="balanced">Smart
-                                            Trim</button>
-                                        <button type="button" role="radio" class="mode-pill"
-                                            data-mode="aggressive" id="pm-aggressive" aria-checked="false"
-                                            title="Deep Blueprint: CRISP multi-phase scaffolding"
-                                            data-action="selectMode" data-arg="aggressive">Deep Blueprint</button>
-                                    </div>
-                                    <input type="hidden" id="mode" value="balanced">
+                                <!-- Primary Outcome Presets (Option 3) -->
+                                <div class="segmented-mode-pills outcome-pills" id="outcome-pills" role="radiogroup"
+                                    aria-label="Outcome Preset">
+                                    <button type="button" role="radio" class="mode-pill" data-outcome="factchecked"
+                                        id="po-factchecked" aria-checked="false" data-action="selectOutcomePreset"
+                                        data-arg="factchecked" title="Deep Blueprint + Hallucination-Proof Contract">🛡️ Fact-Checked</button>
+                                    <button type="button" role="radio" class="mode-pill active" data-outcome="saver"
+                                        id="po-saver" aria-checked="true" data-action="selectOutcomePreset"
+                                        data-arg="saver" title="Smart Trim: 30-55% token reduction with 100% constraint locks">✨ Token Saver</button>
+                                    <button type="button" role="radio" class="mode-pill" data-outcome="blueprint"
+                                        id="po-blueprint" aria-checked="false" data-action="selectOutcomePreset"
+                                        data-arg="blueprint" title="Deep Blueprint: CRISP multi-phase scaffolding">📐 Full Blueprint</button>
                                 </div>
 
-                                <div class="adv-options-row">
-                                    <label id="opt-rag-label" for="opt-rag-enabled"
-                                        title="Sign in to unlock RAG grounding"><input type="checkbox"
-                                            id="opt-rag-enabled" disabled> Ground with my PDFs</label>
-                                    <label id="opt-harness-label" for="opt-harness-enabled"
-                                        title="Wrap facts in untrusted XML &amp; enforce citation contract"><input type="checkbox"
-                                            id="opt-harness-enabled"> Hallucination-Proof Contract</label>
-                                </div>
+                                <!-- Fine-tune & Sources Disclosure (Collapsed by default) -->
+                                <details class="studio-disclosure" id="advanced-options-disclosure">
+                                    <summary class="studio-disclosure-summary">Fine-tune &amp; Sources</summary>
+                                    <div class="studio-disclosure-body">
+                                        <!-- Controls Row: Segmented Mode Pills (R5) -->
+                                        <div class="pane-controls-row">
+                                            <div class="segmented-mode-pills" id="mode-pills" role="radiogroup"
+                                                aria-label="Compression Mode">
+                                                <button type="button" role="radio" class="mode-pill" data-mode="gentle"
+                                                    id="pm-gentle" aria-checked="false" data-action="selectMode" data-arg="gentle">Light
+                                                    Polish</button>
+                                                <button type="button" role="radio" class="mode-pill active"
+                                                    data-mode="balanced" id="pm-balanced" aria-checked="true"
+                                                    title="Smart Trim: 30-55% token reduction with 100% constraint locks" data-action="selectMode" data-arg="balanced">Smart
+                                                    Trim</button>
+                                                <button type="button" role="radio" class="mode-pill"
+                                                    data-mode="aggressive" id="pm-aggressive" aria-checked="false"
+                                                    title="Deep Blueprint: CRISP multi-phase scaffolding"
+                                                    data-action="selectMode" data-arg="aggressive">Deep Blueprint</button>
+                                            </div>
+                                            <input type="hidden" id="mode" value="balanced">
+                                        </div>
+
+                                        <div class="adv-options-row">
+                                            <label id="opt-rag-label" for="opt-rag-enabled"
+                                                title="Sign in to unlock RAG grounding"><input type="checkbox"
+                                                    id="opt-rag-enabled" disabled> Ground with my PDFs</label>
+                                            <label id="opt-harness-label" for="opt-harness-enabled"
+                                                title="Wrap facts in untrusted XML &amp; enforce citation contract"><input type="checkbox"
+                                                    id="opt-harness-enabled" data-change="syncOutcomePresetFromControls"> Hallucination-Proof Contract</label>
+                                        </div>
+                                    </div>
+                                </details>
 
                                 <div class="pane-actions-row">
                                     <button type="button" class="clear-btn" data-action="clearInput">Clear</button>
@@ -346,7 +366,7 @@
                                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                                         <span class="pane-title">AI-Ready Prompt</span>
                                         <button type="button" class="tes-badge" id="tes-score" data-tes="0.97"
-                                            aria-expanded="false" aria-controls="quality-breakdown"
+                                            aria-expanded="false" aria-controls="inspector-drawer"
                                             data-action="toggleQualityBreakdown"
                                             title="Inspect quality score breakdown">Quality Ready</button>
                                     </div>
@@ -355,8 +375,6 @@
                                         <span>Highlight changes</span>
                                     </label>
                                 </div>
-                                <div id="quality-breakdown" class="quality-breakdown hidden" role="region"
-                                    aria-label="Quality Score Breakdown"></div>
 
                                 <!-- Output Box with Non-Blocking Inline Progress (R5) -->
                                 <div id="output-container" class="output-container">
@@ -403,40 +421,59 @@
 
                                     <div class="telemetry-bar">
                                         <div class="telemetry-stats">
-                                            <span id="output-token-count" class="stat-tok">0 tokens</span>
+                                            <span id="output-summary-pill" class="stat-tok">0 tokens</span>
                                             <span id="output-saving-pct" class="stat-pct">0% saved</span>
-                                            <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-                                            <label for="model-select" class="visually-hidden">Target model
-                                                pricing</label>
-                                            <select id="model-select" class="tc-select model-select-compact"
-                                                data-change="updateModelPricing">
-                                                <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
-                                                <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
-                                                <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
-                                            </select>
-                                            <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
-                                            <select id="roi-scale-select" class="tc-select model-select-compact"
-                                                data-change="updateRoiScale" title="Monthly prompt volume for ROI projection">
-                                                <option value="1000" selected>1k runs</option>
-                                                <option value="100000">100k / mo</option>
-                                                <option value="1000000">1M / mo</option>
-                                            </select>
                                             <button type="button" class="copy-btn" id="copy-result-btn"
                                                 data-action="copyResult">📋 Copy</button>
                                             <button type="button" class="copy-btn" id="launch-chatgpt-btn"
                                                 data-action="launchInExternalAi" data-arg="chatgpt" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
                                             <button type="button" class="copy-btn" id="launch-claude-btn"
                                                 data-action="launchInExternalAi" data-arg="claude" title="Copy prompt and open in Claude">↗ Claude</button>
-                                            <button type="button" class="copy-btn" id="export-audit-btn"
-                                                data-action="exportAuditCard" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
-                                            <button type="button" class="copy-btn" id="export-svg-btn"
-                                                data-action="exportAuditSvg" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
                                             <button type="button" class="copy-btn" id="btn-verify-workbench"
                                                 data-action="openWorkbenchVerifyModal" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
                                         </div>
                                     </div>
+
+                                    <!-- Collapsible Inspector Drawer (Collapsed by default) -->
+                                    <details class="studio-disclosure inspector-drawer" id="inspector-drawer">
+                                        <summary class="studio-disclosure-summary">Inspector · Quality, Cost &amp; Exports</summary>
+                                        <div class="studio-disclosure-body inspector-body">
+                                            <div id="quality-breakdown" class="quality-breakdown">
+                                                <span>Efficiency (TES): <strong>—</strong></span>
+                                                <span>Meaning (SFS): <strong>—</strong></span>
+                                                <span>Rules Kept (SCS): <strong>—</strong></span>
+                                            </div>
+                                            <div class="inspector-metrics-row">
+                                                <div class="telemetry-stats">
+                                                    <span id="output-token-count" class="stat-tok">0 tokens</span>
+                                                    <span id="cost-saved" class="stat-cost">$0.00 saved / 1k runs</span>
+                                                </div>
+                                                <div class="inspector-controls-row">
+                                                    <label for="model-select" class="visually-hidden">Target model
+                                                        pricing</label>
+                                                    <select id="model-select" class="tc-select model-select-compact"
+                                                        data-change="updateModelPricing">
+                                                        <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
+                                                        <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
+                                                        <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
+                                                    </select>
+                                                    <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
+                                                    <select id="roi-scale-select" class="tc-select model-select-compact"
+                                                        data-change="updateRoiScale" title="Monthly prompt volume for ROI projection">
+                                                        <option value="1000" selected>1k runs</option>
+                                                        <option value="100000">100k / mo</option>
+                                                        <option value="1000000">1M / mo</option>
+                                                    </select>
+                                                    <button type="button" class="copy-btn" id="export-audit-btn"
+                                                        data-action="exportAuditCard" title="Copy Markdown Token &amp; Quality Audit Card">📊 Audit Card</button>
+                                                    <button type="button" class="copy-btn" id="export-svg-btn"
+                                                        data-action="exportAuditSvg" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </details>
                                     <div id="clarifying-pills" class="preset-strip" style="display: none; margin-top: 0.5rem;"></div>
 
                                     <div class="feedback-row">
@@ -831,7 +868,7 @@
 
     <script src="mock_api.js?v=6"></script>
     <script src="rag_workspace.js?v=2"></script>
-    <script src="app.js?v=20261121"></script>
+    <script src="app.js?v=20261124"></script>
 </body>
 
 </html>

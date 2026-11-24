@@ -282,6 +282,646 @@ const GOLDEN_SET: &[GoldenCase] = &[
         expected_intent: IntentClass::Transform,
         expected_constraints: &[],
     },
+    GoldenCase {
+        id: "ADV-04",
+        prompt: "Explain how plants and planet ecosystems support human protein nutrition without artificial sweeteners",
+        expected_domains: &["nutrition", "education"],
+        // "plants"/"planet" must not match "plan" -> Explain, not Build; "without artificial sweeteners" captured
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &["artificial sweeteners"],
+    },
+    GoldenCase {
+        id: "ADV-05",
+        prompt: "Debug why our prefix parser fails on Rust code terror logs and anyhow returns null",
+        expected_domains: &["software"],
+        // Explicit Debug ("debug"); "terror", "prefix", "anyhow" must not distort parsing
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    // --- FINANCE EXPANDED (3) ---
+    GoldenCase {
+        id: "FIN-07",
+        prompt: "Create a personal budget from my paycheck to pay off credit card debt and build an emergency fund",
+        expected_domains: &["finance"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "FIN-08",
+        prompt: "Evaluate Sharpe ratio, CAGR, and dividend yield across an institutional equity and bond portfolio",
+        expected_domains: &["finance"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "FIN-09",
+        prompt: "Optimize a retirement portfolio under 500000 usd with no crypto and avoid high-fee mutual funds",
+        expected_domains: &["finance"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["500000 usd", "crypto", "high-fee mutual funds"],
+    },
+    // --- MEDICAL / HEALTH EXPANDED (4) ---
+    GoldenCase {
+        id: "MED-06",
+        prompt: "Explain my symptoms of knee pain and cardiovascular fatigue without aspirin and under 120 bpm",
+        expected_domains: &["medical", "health"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &["aspirin", "120 bpm"],
+    },
+    GoldenCase {
+        id: "MED-07",
+        prompt: "Design a cardiology patient rehabilitation protocol with 500 mg daily dosage and no penicillin",
+        expected_domains: &["medical", "health"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["500 mg", "penicillin"],
+    },
+    GoldenCase {
+        id: "MED-08",
+        prompt: "Analyze fasting blood glucose under 140 mg/dl and pathology biomarkers for clinical diagnosis",
+        expected_domains: &["medical", "health"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["140 mg/dl"],
+    },
+    GoldenCase {
+        id: "MED-09",
+        prompt: "Troubleshoot recurring postoperative hospital fever symptoms while avoiding opioids",
+        expected_domains: &["medical", "health"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &["opioids"],
+    },
+    // --- NUTRITION EXPANDED (4) ---
+    GoldenCase {
+        id: "NUT-06",
+        prompt: "Create a vegetarian meal plan under 1500 cal with no soy and without refined sugar",
+        expected_domains: &["nutrition"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["1500 cal", "soy", "refined sugar"],
+    },
+    GoldenCase {
+        id: "NUT-07",
+        prompt: "Build a clinical dietitian nutrition protocol at 1800 kcal avoiding peanuts and no dairy",
+        expected_domains: &["nutrition"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["1800 kcal", "peanuts", "dairy"],
+    },
+    GoldenCase {
+        id: "NUT-08",
+        prompt: "Convert my high-carb athlete diet into a low fiber keto macro plan without gluten",
+        expected_domains: &["nutrition"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["Low fiber", "Gluten"],
+    },
+    GoldenCase {
+        id: "NUT-09",
+        prompt: "Analyze protein and micronutrient intake for a vegan diet under 2000 calories",
+        expected_domains: &["nutrition"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["2000 calories"],
+    },
+    // --- LEGAL EXPANDED (4) ---
+    GoldenCase {
+        id: "LEG-06",
+        prompt: "Can I legally dispute my landlord withholding my security deposit and avoid arbitration?",
+        expected_domains: &["legal"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["arbitration"],
+    },
+    GoldenCase {
+        id: "LEG-07",
+        prompt: "Draft an NDA contract for intellectual property licensing with GDPR compliance and exclude indemnity",
+        expected_domains: &["legal"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["GDPR", "indemnity"],
+    },
+    GoldenCase {
+        id: "LEG-08",
+        prompt: "Is it legal to transfer customer data across EU jurisdiction without GDPR consent?",
+        expected_domains: &["legal"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["GDPR"],
+    },
+    GoldenCase {
+        id: "LEG-09",
+        prompt: "Rewrite a commercial vendor liability clause into plain statutory language without ambiguous terms",
+        expected_domains: &["legal"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["ambiguous terms"],
+    },
+    // --- EDUCATION EXPANDED (4) ---
+    GoldenCase {
+        id: "EDU-06",
+        prompt: "Help me learn linear algebra and calculus to pass my university exam without expensive textbooks",
+        expected_domains: &["education"],
+        // "learn" must NOT trigger finance/WealthBuild ("earn")
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["expensive textbooks"],
+    },
+    GoldenCase {
+        id: "EDU-07",
+        prompt: "Explain how students should study planetary orbits and plant biology in an academic lecture",
+        expected_domains: &["education", "science"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "EDU-08",
+        prompt: "Convert a synchronous classroom curriculum into an e-learning certification course with no group projects",
+        expected_domains: &["education"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["group projects"],
+    },
+    GoldenCase {
+        id: "EDU-09",
+        prompt: "Analyze student assessment pass rates across our pedagogy and tutor training program",
+        expected_domains: &["education"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    // --- TRAVEL EXPANDED (4) ---
+    GoldenCase {
+        id: "TRV-06",
+        prompt: "Plan a family vacation itinerary to Kyoto under 2000 usd with vegetarian dining and no red-eye flights",
+        expected_domains: &["travel"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["2000 usd", "vegetarian", "red-eye flights"],
+    },
+    GoldenCase {
+        id: "TRV-07",
+        prompt: "Design a travel agency honeymoon resort package avoiding tourist traps and under 1500 eur",
+        expected_domains: &["travel"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["tourist traps", "1500 eur"],
+    },
+    GoldenCase {
+        id: "TRV-08",
+        prompt: "Analyze hotel booking and flight transit pricing for a summer backpacking excursion",
+        expected_domains: &["travel"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "TRV-09",
+        prompt: "Explain tourism visa logistics and destination sightseeing transit for a solo roadtrip",
+        expected_domains: &["travel"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    // --- SOFTWARE (8) ---
+    GoldenCase {
+        id: "SW-01",
+        prompt: "Build a production grade Rust REST API microservice with PostgreSQL and no external API dependencies",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["Production-grade", "No external API"],
+    },
+    GoldenCase {
+        id: "SW-02",
+        prompt: "Debug a deadlock error in our TypeScript backend database connection pool under burst traffic",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SW-03",
+        prompt: "Refactor our Python GraphQL backend service to avoid blocking calls and without ORM overhead",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["blocking calls", "ORM overhead"],
+    },
+    GoldenCase {
+        id: "SW-04",
+        prompt: "Explain how compiler optimizations and memory safety work in Rust software architecture",
+        expected_domains: &["software", "computers"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SW-05",
+        prompt: "Analyze SQL versus NoSQL database indexing tradeoffs for a high-throughput backend API under 200ms",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SW-06",
+        prompt: "Design a full-stack TypeScript SDK that must not use global state while avoiding external dependencies",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["external dependencies"],
+    },
+    GoldenCase {
+        id: "SW-07",
+        prompt: "Troubleshoot a regression bug in our JavaScript frontend state manager without third-party plugins",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &["third-party plugins"],
+    },
+    GoldenCase {
+        id: "SW-08",
+        prompt: "Migrate a legacy Python REST backend into an async Rust microservice with no external API calls",
+        expected_domains: &["software"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["No external API"],
+    },
+    // --- BUSINESS (7) ---
+    GoldenCase {
+        id: "BIZ-01",
+        prompt: "Build a B2B SaaS go-to-market pricing strategy to lower churn and grow MRR on a low budget",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["Budget-constrained", "SaaS"],
+    },
+    GoldenCase {
+        id: "BIZ-02",
+        prompt: "Analyze customer acquisition cost, ARR expansion, and startup unit economics for investor funding",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "BIZ-03",
+        prompt: "Create a bootstrap venture growth plan for a B2B consulting business without paid ads",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["Budget-constrained", "paid ads"],
+    },
+    GoldenCase {
+        id: "BIZ-04",
+        prompt: "Explain how SaaS founders structure enterprise pricing tiers, retention, and revenue scaling",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &["SaaS"],
+    },
+    GoldenCase {
+        id: "BIZ-05",
+        prompt: "How do I build a fintech unicorn and become a billionaire in payments without venture funding?",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["venture funding"],
+    },
+    GoldenCase {
+        id: "BIZ-06",
+        prompt: "Compare B2B enterprise sales versus B2C subscription monetization for a startup business plan",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "BIZ-07",
+        prompt: "Transform a freelance consulting offer into a scalable SaaS business model avoiding custom services",
+        expected_domains: &["business"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["SaaS", "custom services"],
+    },
+    // --- CYBERSECURITY (7) ---
+    GoldenCase {
+        id: "SEC-01",
+        prompt: "Conduct a penetration test and vulnerability assessment for zero-trust network firewall encryption",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SEC-02",
+        prompt: "Debug a SIEM alert and malware threat indicator on our SOC endpoint authentication service",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SEC-03",
+        prompt: "Analyze XSS, CSRF, and zero-day vulnerability risks in our zero-trust authorization firewall",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SEC-04",
+        prompt: "Explain how end-to-end encryption and zero-trust authentication prevent network firewall breaches",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "SEC-05",
+        prompt: "Design a SOC incident response playbook with no plaintext logs and avoid hardcoded secrets",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["plaintext logs", "hardcoded secrets"],
+    },
+    GoldenCase {
+        id: "SEC-06",
+        prompt: "Migrate legacy password hashing to Argon2 encryption without weak ciphers and must not store plaintext",
+        expected_domains: &["cybersecurity"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["weak ciphers"],
+    },
+    GoldenCase {
+        id: "SEC-07",
+        prompt: "Create an application security threat model with GDPR privacy controls and no third-party cookies",
+        expected_domains: &["cybersecurity", "legal"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["GDPR", "third-party cookies"],
+    },
+    // --- REAL-ESTATE (8) ---
+    GoldenCase {
+        id: "RE-01",
+        prompt: "Help me learn and build a plan for buying a house with a max $500k budget and neighborhood appraisal comps",
+        expected_domains: &["real-estate"],
+        // Adversarial traps: "learn" (vs earn), "appraisal" (vs app), "$500k" (vs wealth)
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "RE-02",
+        prompt: "I would appreciate help buying an apartment and compare mortgage rates without adjustable-rate loans",
+        expected_domains: &["real-estate"],
+        // "appreciate" + "apartment" vs "app" trap; "without adjustable-rate loans" extracted
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["adjustable-rate loans"],
+    },
+    GoldenCase {
+        id: "RE-03",
+        prompt: "How do I become a licensed real estate agent and start a residential brokerage with MLS listings?",
+        expected_domains: &["real-estate"],
+        // Practitioner perspective; trailing '?' -> Analyze
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "RE-04",
+        prompt: "Analyze multifamily rental property cap rate, NOI, and commercial real estate underwriting",
+        expected_domains: &["real-estate"],
+        // Investor perspective
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "RE-05",
+        prompt: "Explain escrow, home appraisal, zoning rules, and closing costs for a first-time homebuyer",
+        expected_domains: &["real-estate"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "RE-06",
+        prompt: "Build a property investment acquisition checklist under 500000 usd avoiding flood zones",
+        expected_domains: &["real-estate"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["500000 usd", "flood zones"],
+    },
+    GoldenCase {
+        id: "RE-07",
+        prompt: "My landlord raised rent mid-lease; review commercial and residential tenant property rights",
+        expected_domains: &["real-estate", "legal"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "RE-08",
+        prompt: "Plan a commercial real estate lease negotiation strategy without personal guarantees",
+        expected_domains: &["real-estate"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["personal guarantees"],
+    },
+    // --- ECOMMERCE (7) ---
+    GoldenCase {
+        id: "EC-01",
+        prompt: "Design an ecommerce Shopify online store checkout flow to increase conversion and reduce cart abandonment",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "EC-02",
+        prompt: "Analyze SKU inventory turnover, warehouse fulfillment speed, and marketplace shipping logistics",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "EC-03",
+        prompt: "Debug a payment gateway error during WooCommerce shopping cart checkout on our online store",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "EC-04",
+        prompt: "Create a direct-to-consumer storefront fulfillment plan without dropshipping and under 50 usd shipping",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["dropshipping", "50 usd"],
+    },
+    GoldenCase {
+        id: "EC-05",
+        prompt: "Explain how marketplace SKU catalog indexing and warehouse fulfillment optimize ecommerce logistics",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "EC-06",
+        prompt: "Migrate our WooCommerce product catalog and shopping cart to Shopify avoiding inventory downtime",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["inventory downtime"],
+    },
+    GoldenCase {
+        id: "EC-07",
+        prompt: "Compare fulfillment warehouse costs and marketplace payment gateway fees for online retail",
+        expected_domains: &["ecommerce"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    // --- DEVOPS (7) ---
+    GoldenCase {
+        id: "DEV-01",
+        prompt: "Build a Terraform and Kubernetes GitOps CI/CD pipeline on AWS with Prometheus observability monitoring",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "DEV-02",
+        prompt: "Debug a Helm chart Docker rollout failure and Grafana monitoring gap in our Kubernetes cluster",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "DEV-03",
+        prompt: "Analyze multi-cloud AWS versus GCP Terraform infrastructure reliability and SRE observability costs",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "DEV-04",
+        prompt: "Explain how GitOps CI/CD pipelines, Ansible automation, and Prometheus monitoring improve SRE uptime",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "DEV-05",
+        prompt: "Migrate legacy Docker Compose deployments to Kubernetes Helm charts without downtime and no root containers",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["downtime", "root containers"],
+    },
+    GoldenCase {
+        id: "DEV-06",
+        prompt: "Design a zero-downtime CI/CD deployment pipeline on Azure avoiding manual deployments under 200ms",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["manual deployments"],
+    },
+    GoldenCase {
+        id: "DEV-07",
+        prompt: "Troubleshoot Ansible infrastructure provisioning latency and Kubernetes pod scheduling errors",
+        expected_domains: &["devops"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    // --- AI-ML (7) ---
+    GoldenCase {
+        id: "AI-01",
+        prompt: "Design an LLM transformer fine-tuning and RLHF alignment pipeline with vector database RAG embeddings",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "AI-02",
+        prompt: "Debug neural transformer token inference drift and RAG retrieval prompt failures in our LLM agent",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "AI-03",
+        prompt: "Explain how RLHF alignment, vector embeddings, and transformer attention improve LLM safety",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "AI-04",
+        prompt: "Analyze LLM inference latency versus fine-tuning accuracy and RAG vector database recall",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "AI-05",
+        prompt: "Convert a monolithic prompt chain into a multi-agent RAG workflow without quantization loss",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["quantization loss"],
+    },
+    GoldenCase {
+        id: "AI-06",
+        prompt: "Build a grounded LLM agent evaluation harness avoiding hallucinations and no external weights",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["hallucinations", "external weights"],
+    },
+    GoldenCase {
+        id: "AI-07",
+        prompt: "Compare open-weight transformer fine-tuning versus RAG prompt engineering for AI safety alignment",
+        expected_domains: &["ai-ml"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    // --- PHARMA (8) ---
+    GoldenCase {
+        id: "PHM-01",
+        prompt: "Design a pharmaceutical biosimilar drug formulation and pharmacokinetics clinical trial protocol",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "PHM-02",
+        prompt: "Analyze drug toxicology, pharmacodynamics, and FDA regulatory pharmacovigilance safety data",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "PHM-03",
+        prompt: "Explain pharmaceutical pharmacokinetics, dosage bioavailability, and FDA clinical trial phases",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "PHM-04",
+        prompt: "Build a 50 mg oral compound formulation without toxic excipients and avoiding hepatotoxicity",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["50 mg", "toxic excipients", "hepatotoxicity"],
+    },
+    GoldenCase {
+        id: "PHM-05",
+        prompt: "Troubleshoot batch instability and compound degradation errors in pharmaceutical drug formulation",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Debug,
+        expected_constraints: &[],
+    },
+    GoldenCase {
+        id: "PHM-06",
+        prompt: "Is it legal to market a compounded pharmaceutical drug without FDA regulatory approval?",
+        expected_domains: &["legal", "pharma"],
+        // LegalQuery rule precedence: legal owns role when question is explicitly legal
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["FDA regulatory approval"],
+    },
+    GoldenCase {
+        id: "PHM-07",
+        prompt: "Compare biosimilar drug development toxicology pathways with no animal testing",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["animal testing"],
+    },
+    GoldenCase {
+        id: "PHM-08",
+        prompt: "Transform an IV biotech compound formulation into a stable oral dosage form excluding lactose",
+        expected_domains: &["pharma"],
+        expected_intent: IntentClass::Transform,
+        expected_constraints: &["lactose"],
+    },
+    // --- MULTI-DOMAIN COLLISIONS & EXTRA PERSPECTIVE / ADVERSARIAL CASES (4) ---
+    GoldenCase {
+        id: "COL-01",
+        prompt: "Plan a 1800 cal vegetarian diet and travel itinerary for Goa under 2000 usd with no peanuts",
+        expected_domains: &["nutrition", "travel"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["1800 cal", "vegetarian", "2000 usd", "peanuts"],
+    },
+    GoldenCase {
+        id: "COL-02",
+        prompt: "Design a production grade Rust API with zero-trust authentication and avoid hardcoded secrets",
+        expected_domains: &["software", "cybersecurity"],
+        expected_intent: IntentClass::Build,
+        expected_constraints: &["Production-grade", "hardcoded secrets"],
+    },
+    GoldenCase {
+        id: "COL-03",
+        prompt: "Analyze deploying a fine-tuned LLM RAG service on Kubernetes Terraform pipelines without downtime",
+        expected_domains: &["ai-ml", "devops"],
+        expected_intent: IntentClass::Analyze,
+        expected_constraints: &["downtime"],
+    },
+    GoldenCase {
+        id: "COL-04",
+        prompt: "Explain why prefix caching and anyhow exception handling matter in Rust microservice engineering",
+        expected_domains: &["software"],
+        // Substring traps: "prefix" (fix), "anyhow" (why), "why" (Analyze) -> Explain vs Analyze tie => Explain wins!
+        expected_intent: IntentClass::Explain,
+        expected_constraints: &[],
+    },
 ];
 
 /// Simulate the domain resolution logic in `AggressiveEngine::run` (lines 37–71 of `engine.rs`)
@@ -334,16 +974,10 @@ fn evaluate_aggressive_golden_set() {
     let mut per_domain_tp: BTreeMap<&str, usize> = BTreeMap::new();
     let mut per_domain_fp: BTreeMap<&str, usize> = BTreeMap::new();
     let mut per_domain_fn: BTreeMap<&str, usize> = BTreeMap::new();
-    let canonical_domains: BTreeSet<&str> = [
-        "finance",
-        "medical",
-        "nutrition",
-        "legal",
-        "education",
-        "travel",
-    ]
-    .into_iter()
-    .collect();
+    let canonical_domains: BTreeSet<&str> = GOLDEN_SET
+        .iter()
+        .map(|case| case.expected_domains[0])
+        .collect();
 
     for case in GOLDEN_SET {
         let (pred_domain, pred_intent, conf, locked) =
@@ -360,10 +994,14 @@ fn evaluate_aggressive_golden_set() {
                 abstained += 1;
             } else {
                 wrong_domain += 1;
-                if canonical_domains.contains(pred_domain.as_str()) {
-                    *per_domain_fp
-                        .entry(Box::leak(pred_domain.clone().into_boxed_str()))
-                        .or_default() += 1;
+                let fp_bucket = if pred_domain == "health" && !canonical_domains.contains("health")
+                {
+                    "medical"
+                } else {
+                    pred_domain.as_str()
+                };
+                if let Some(&canon) = canonical_domains.get(fp_bucket) {
+                    *per_domain_fp.entry(canon).or_default() += 1;
                 }
             }
         }
@@ -376,6 +1014,7 @@ fn evaluate_aggressive_golden_set() {
         let (inc, forb) =
             extract_constraints(case.prompt, &config.domain_taxonomy, &config.constraints);
         let all_c: Vec<String> = inc.into_iter().chain(forb).collect();
+        let mut missing_constraints = Vec::new();
         for exp_c in case.expected_constraints {
             total_constraints += 1;
             if all_c
@@ -383,19 +1022,23 @@ fn evaluate_aggressive_golden_set() {
                 .any(|c| c.to_lowercase().contains(&exp_c.to_lowercase()))
             {
                 matched_constraints += 1;
+            } else {
+                missing_constraints.push(*exp_c);
             }
         }
 
-        if !domain_ok || !intent_ok {
+        if !domain_ok || !intent_ok || !missing_constraints.is_empty() {
             println!(
-                "[MISS] {} | domain: pred='{}' exp={:?} (conf={:.3}, locked={}) | intent: pred={:?} exp={:?}",
+                "[MISS] {} | domain: pred='{}' exp={:?} (conf={:.3}, locked={}) | intent: pred={:?} exp={:?} | missing_constraints={:?} (got={:?})",
                 case.id,
                 pred_domain,
                 case.expected_domains,
                 conf,
                 locked,
                 pred_intent,
-                case.expected_intent
+                case.expected_intent,
+                missing_constraints,
+                all_c
             );
         }
     }
@@ -454,20 +1097,31 @@ fn evaluate_aggressive_golden_set() {
     );
 
     assert!(
-        domain_hits >= 32,
+        GOLDEN_SET.len() >= 100,
+        "VER-01 requires >= 100 golden prompts, got {}",
+        GOLDEN_SET.len()
+    );
+    assert!(
+        macro_f1 >= 0.92,
+        "VER-01 requires Domain Macro-F1 >= 0.92, got {:.3}",
+        macro_f1
+    );
+    assert!(
+        constraint_recall >= 0.98,
+        "VER-01 requires Constraint Recall >= 0.98, got {:.3}",
+        constraint_recall
+    );
+    assert!(
+        (domain_hits as f64 / n) >= 0.92,
         "Domain accuracy regression: {}/{}",
         domain_hits,
         GOLDEN_SET.len()
     );
     assert!(
-        intent_hits >= 32,
+        (intent_hits as f64 / n) >= 0.92,
         "Intent accuracy regression: {}/{}",
         intent_hits,
         GOLDEN_SET.len()
-    );
-    assert_eq!(
-        matched_constraints, total_constraints,
-        "Expected 100% constraint recall on golden set"
     );
 }
 

@@ -69,6 +69,27 @@ async function runTestSuite() {
         url: 'http://localhost:8081/'
     });
     const doc = dom.window.document;
+    // Offline JSDOM fetch mock: guest /api/demo/compress hits TypeError fallback to MockAPI.compress;
+    // signed-in /api/compress returns MockAPI.compress response (or simulated HTTP status) without network calls.
+    let mockCompressStatus = 200;
+    dom.window.fetch = async (url, opts = {}) => {
+        if (url === '/api/compress' && opts.body && dom.window.MockAPI) {
+            if (mockCompressStatus !== 200) {
+                return {
+                    ok: false,
+                    status: mockCompressStatus,
+                    json: async () => ({ error: { message: `HTTP ${mockCompressStatus} failure` } })
+                };
+            }
+            const payload = JSON.parse(opts.body);
+            return {
+                ok: true,
+                status: 200,
+                json: async () => dom.window.MockAPI.compress(payload)
+            };
+        }
+        throw new dom.window.TypeError('Offline JSDOM');
+    };
 
     // 1.4 R1: Zero-Auth Sandbox elements
     const mainSec = doc.getElementById('main-section');
@@ -133,6 +154,37 @@ async function runTestSuite() {
     const modePills = doc.querySelectorAll('.mode-pill, [data-mode]');
     assert(modePills.length >= 3, `R5: Segmented mode selection pills exist (found ${modePills.length})`);
 
+    // Option 3: Outcome Presets & Collapsed Disclosures
+    const outcomePills = doc.getElementById('outcome-pills');
+    const poFact = doc.getElementById('po-factchecked');
+    const poSaver = doc.getElementById('po-saver');
+    const poBlueprint = doc.getElementById('po-blueprint');
+    assert(!!outcomePills && !!poFact && !!poSaver && !!poBlueprint, 'Option 3: Primary Outcome Presets (Fact-Checked, Token Saver, Full Blueprint) exist');
+    assert(poSaver.classList.contains('active') && poSaver.getAttribute('aria-checked') === 'true', 'Option 3: Token Saver preset is active by default');
+
+    const advDisclosure = doc.getElementById('advanced-options-disclosure');
+    assert(
+        advDisclosure && advDisclosure.tagName === 'DETAILS' && !advDisclosure.open &&
+        !!advDisclosure.querySelector('#mode-pills') &&
+        !!advDisclosure.querySelector('#pm-gentle') &&
+        !!advDisclosure.querySelector('#pm-balanced') &&
+        !!advDisclosure.querySelector('#pm-aggressive') &&
+        !!advDisclosure.querySelector('#opt-rag-enabled') &&
+        !!advDisclosure.querySelector('#opt-harness-enabled'),
+        'Option 3: #advanced-options-disclosure is collapsed <details> containing mode pills and source toggles'
+    );
+
+    const inspectorDrawerInit = doc.getElementById('inspector-drawer');
+    assert(
+        inspectorDrawerInit && inspectorDrawerInit.tagName === 'DETAILS' && !inspectorDrawerInit.open &&
+        !!inspectorDrawerInit.querySelector('#quality-breakdown') &&
+        !!inspectorDrawerInit.querySelector('#cost-saved') &&
+        !!inspectorDrawerInit.querySelector('#model-select') &&
+        !!inspectorDrawerInit.querySelector('#export-audit-btn') &&
+        !!inspectorDrawerInit.querySelector('#export-svg-btn'),
+        'Option 3: #inspector-drawer is collapsed <details> containing quality breakdown, cost telemetry, and export buttons'
+    );
+
     const domainChip = doc.getElementById('domain-chip') || doc.getElementById('domain-name');
     assert(!!domainChip, 'R5: Auto-detected domain chip element exists');
 
@@ -190,7 +242,7 @@ async function runTestSuite() {
         const el = doc.getElementById(id);
         assert(el && el.style.display === 'none' && el.disabled === true, `R1: ${id} tab is hidden and disabled for Guests`);
     });
-    assert(doc.getElementById('opt-rag-enabled').disabled === true && doc.getElementById('opt-harness-enabled').disabled === true, 'R1: RAG and Harness checkboxes are disabled for Guests');
+    assert(doc.getElementById('opt-rag-enabled').disabled === true && doc.getElementById('opt-harness-enabled').disabled === false, 'R1: Cloud RAG checkbox disabled for Guests while Grounding Harness remains enabled');
     assert(doc.getElementById('btn-feedback-up').disabled === true && doc.getElementById('btn-feedback-down').disabled === true, 'R1: Feedback buttons are disabled for Guests');
 
     win.switchTab('ask');
@@ -245,9 +297,18 @@ async function runTestSuite() {
     win.updateModelPricing();
     assert(costSaved.textContent.includes('$0.31 saved / 1k runs'), `R3 Math: Gemini 2.5 Pro calculated $0.31 saved (got ${costSaved.textContent})`);
 
-    // TES fidelity score check
-    win.renderResult(win.State.lastResult);
-    assert(tesBadge.textContent.includes('TES 0.98'), `R3 TES: Badge renders score (got ${tesBadge.textContent})`);
+    // TES fidelity score check (calm badge on header + detailed TES/SFS/SCS inside Inspector)
+    win.renderResult({
+        ...win.State.lastResult,
+        dual_score: { tes: 0.98, sfs: 0.96, scs: 0.99 }
+    });
+    assert(tesBadge.textContent.includes('✓ Ready · 50% shorter'), `R3 TES: Calm header summary rendered (got "${tesBadge.textContent}")`);
+    const qBreakdownText = doc.getElementById('quality-breakdown').textContent;
+    assert(
+        qBreakdownText.includes('0.98') && qBreakdownText.includes('0.96') && qBreakdownText.includes('0.99'),
+        `R3 Inspector: Quality breakdown populated TES/SFS/SCS inside #inspector-drawer (got "${qBreakdownText.trim()}")`
+    );
+    assert(doc.getElementById('output-summary-pill').textContent.includes('250 tokens'), 'Option 3: #output-summary-pill shows compressed token count');
 
     // 2.5 R4: Multi-Format Drag & Drop and Instant Token Estimation
     console.log('Testing R4: File Ingestion & Token Estimation...');
@@ -282,15 +343,56 @@ async function runTestSuite() {
     const extractedPdfText = await win.extractVanillaPdfText(fakePdfFile);
     assert(extractedPdfText.includes('test invoice agreement'), `R4 PDF: Extracted text from raw PDF stream (got: "${extractedPdfText}")`);
 
-    // 2.6 R5: Guest Mode Restrictions & Authenticated Mode Pills
-    console.log('Testing R5: Mode Pills & Domain Detection...');
-    assert(doc.getElementById('pm-gentle').disabled === false && doc.getElementById('pm-gentle').classList.contains('active'), 'Guest Mode: Light Polish pill is enabled and active by default');
-    assert(doc.getElementById('pm-balanced').disabled === true && doc.getElementById('pm-aggressive').disabled === true, 'Guest Mode: Smart Trim and Deep Blueprint pills are disabled');
+    // 2.6 R5: Guest Mode Sandbox (all 3 modes + outcome presets up to 3 runs) & Authenticated Access
+    console.log('Testing R5: Mode Pills, Outcome Presets & Domain Detection...');
+    win.updateUserBar();
+    assert(
+        doc.getElementById('pm-gentle').disabled === false &&
+        doc.getElementById('pm-balanced').disabled === false &&
+        doc.getElementById('pm-aggressive').disabled === false &&
+        doc.getElementById('pm-balanced').classList.contains('active'),
+        'Guest Mode: All 3 modes available in sandbox with Smart Trim active by default'
+    );
 
-    win.selectMode('aggressive');
-    assert(win.State.currentMode === 'gentle' && doc.getElementById('mode').value === 'gentle', 'Guest Mode: Attempting to select Aggressive keeps Gentle active');
+    // Outcome Preset mapping checks
+    win.selectOutcomePreset('factchecked');
+    assert(
+        win.State.currentMode === 'aggressive' &&
+        doc.getElementById('opt-harness-enabled').checked === true &&
+        doc.getElementById('po-factchecked').classList.contains('active') &&
+        doc.getElementById('po-factchecked').getAttribute('aria-checked') === 'true' &&
+        doc.getElementById('po-saver').getAttribute('aria-checked') === 'false',
+        'Option 3: Fact-Checked preset maps to aggressive + harness and syncs aria-checked'
+    );
 
-    // Verify 4th guest compression is blocked after 3 completed Light Polish runs
+    win.selectOutcomePreset('blueprint');
+    assert(
+        win.State.currentMode === 'aggressive' &&
+        doc.getElementById('opt-harness-enabled').checked === false &&
+        doc.getElementById('po-blueprint').classList.contains('active') &&
+        doc.getElementById('po-blueprint').getAttribute('aria-checked') === 'true',
+        'Option 3: Full Blueprint preset maps to aggressive + crisp and syncs aria-checked'
+    );
+
+    win.selectOutcomePreset('saver');
+    assert(
+        win.State.currentMode === 'balanced' &&
+        doc.getElementById('opt-harness-enabled').checked === false &&
+        doc.getElementById('po-saver').classList.contains('active') &&
+        doc.getElementById('po-saver').getAttribute('aria-checked') === 'true',
+        'Option 3: Token Saver preset maps to balanced + crisp and syncs aria-checked'
+    );
+
+    win.selectMode('gentle');
+    assert(
+        win.State.currentMode === 'gentle' &&
+        !doc.getElementById('po-factchecked').classList.contains('active') &&
+        !doc.getElementById('po-saver').classList.contains('active') &&
+        !doc.getElementById('po-blueprint').classList.contains('active'),
+        'Option 3: Fine-tune Light Polish clears outcome preset active highlight'
+    );
+
+    // Verify 4th guest compression is blocked after 3 completed runs
     promptInput.value = 'one two three four five six seven eight nine ten';
     win.validatePromptLength();
     while (win.State.guestUses < 3) {
@@ -298,7 +400,7 @@ async function runTestSuite() {
     }
     const prevResult = win.State.lastResult;
     await win.compress(false);
-    assert(win.State.lastResult === prevResult && doc.getElementById('auth-section').style.display === 'block', 'Guest Mode: 4th compression blocked after 3 Light Polish runs and opens sign-in');
+    assert(win.State.lastResult === prevResult && doc.getElementById('auth-section').style.display === 'block', 'Guest Mode: 4th compression blocked after 3 runs and opens sign-in');
     win.closeAuthSection();
 
     // Sign in to unlock all modes and unlimited compressions
@@ -318,6 +420,22 @@ async function runTestSuite() {
     win.selectMode('gentle');
     assert(doc.getElementById('pm-gentle').classList.contains('active'), 'R5: Gentle mode pill marked active');
     assert(doc.getElementById('mode').value === 'gentle', 'R5: Hidden #mode input updated to gentle');
+
+    // AUD-02: Signed-in API.compress must reject on HTTP 500 instead of falling back to MockAPI.compress
+    mockCompressStatus = 500;
+    let apiRejectedOn500 = false;
+    try {
+        await win.API.compress({
+            raw_text: 'Verify signed-in HTTP 500 error propagation without mock fallback.',
+            mode: 'balanced',
+            domain: 'General'
+        });
+    } catch (err) {
+        apiRejectedOn500 = err && err.message.includes('500');
+    } finally {
+        mockCompressStatus = 200;
+    }
+    assert(apiRejectedOn500, 'AUD-02: Signed-in API.compress rejects on HTTP 500 rather than falling back to MockAPI');
 
     // Test domain keyword heuristic
     assert(win.detectDomain('mortgage interest rate and down payment') === 'Real Estate & Finance', 'R5: Domain detected Real Estate & Finance');
@@ -471,8 +589,9 @@ async function runTestSuite() {
     assert(outputBox.textContent.includes('[EXECUTION]'), 'E2E: CRISP prompt contains execution plan');
     assert(outputBox.textContent.includes('[CONSTRAINTS]'), 'E2E: CRISP prompt contains constraints tag');
 
-    // 5. Verifies TES Fidelity score
-    assert(tesBadge.textContent.includes('TES 0.97') || tesBadge.textContent.includes('TES 0.98'), 'E2E: TES score badge displayed');
+    // 5. Verifies calm quality badge & Inspector TES/SFS/SCS metrics
+    assert(tesBadge.textContent.startsWith('✓'), `E2E: Calm quality badge displayed (got "${tesBadge.textContent}")`);
+    assert(doc.getElementById('quality-breakdown').textContent.includes('Efficiency (TES):'), 'E2E: Inspector quality breakdown populated');
 
     // 6. Evaluates cost savings on GPT-4o
     modelSelect.value = '0.005';
@@ -679,11 +798,24 @@ async function runTestSuite() {
     assert(doc.getElementById('studio-cmd-modal')?.tagName === 'DIALOG', 'Modern UI: #studio-cmd-modal (⌘K) uses native <dialog>');
 
     const tesBtn = doc.getElementById('tes-score');
+    const inspectorDrawer = doc.getElementById('inspector-drawer');
     assert(tesBtn && tesBtn.tagName === 'BUTTON', 'A11y: #tes-score quality trigger is a native <button>');
+    assert(inspectorDrawer && inspectorDrawer.tagName === 'DETAILS' && !inspectorDrawer.open, 'Modern UI: #inspector-drawer starts collapsed as native <details>');
     win.toggleQualityBreakdown();
-    assert(tesBtn.getAttribute('aria-expanded') === 'true', 'A11y: toggleQualityBreakdown() updates aria-expanded="true"');
+    assert(inspectorDrawer.open === true && tesBtn.getAttribute('aria-expanded') === 'true', 'A11y: toggleQualityBreakdown() opens #inspector-drawer and updates aria-expanded="true"');
     win.toggleQualityBreakdown();
-    assert(tesBtn.getAttribute('aria-expanded') === 'false', 'A11y: toggleQualityBreakdown() resets aria-expanded="false"');
+    assert(inspectorDrawer.open === false && tesBtn.getAttribute('aria-expanded') === 'false', 'A11y: toggleQualityBreakdown() closes #inspector-drawer and resets aria-expanded="false"');
+
+    // Radiogroup keyboard navigation: ArrowRight on #outcome-pills moves from #po-factchecked -> #po-saver
+    poFact.focus();
+    outcomePills.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    assert(
+        doc.activeElement === poSaver &&
+        poSaver.classList.contains('active') &&
+        poSaver.getAttribute('aria-checked') === 'true' &&
+        poFact.getAttribute('aria-checked') === 'false',
+        'A11y: ArrowRight on #outcome-pills moves focus and selection from #po-factchecked to #po-saver'
+    );
 
     win.openStudioCommandPalette();
     assert(doc.querySelectorAll('#studio-cmd-list .cmd-palette-item').length >= 5, 'Modern UI: Studio ⌘K Command Palette populates quick actions');
