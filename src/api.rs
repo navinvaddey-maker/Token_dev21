@@ -162,6 +162,7 @@ pub fn router(state: AppState) -> Router {
     let auth = Router::new()
         .route("/api/register", post(register))
         .route("/api/login", post(login))
+        .route("/api/logout", post(logout))
         .route("/api/demo/compress", post(demo_compress))
         .layer(middleware::from_fn_with_state(
             auth_limiter,
@@ -183,6 +184,7 @@ pub fn router(state: AppState) -> Router {
         ));
 
     let protected = Router::new()
+        .route("/api/me", get(me))
         .route("/api/compress", post(compress))
         .route("/api/tokens/:id/decompress", get(decompress))
         .route("/api/history", get(history))
@@ -305,7 +307,7 @@ pub async fn security_headers_middleware(
     headers.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:49152; frame-ancestors 'none'; object-src 'none'",
+            "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:49152; frame-ancestors 'none'; object-src 'none'",
         ),
     );
     resp
@@ -350,14 +352,33 @@ async fn auth_middleware(
     mut req: axum::http::Request<axum::body::Body>,
     next: middleware::Next,
 ) -> Result<axum::response::Response, AppError> {
-    let token = req
+    let bearer_token = req
         .headers()
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_string);
+
+    let cookie_token = if bearer_token.is_none() {
+        req.headers()
+            .get(axum::http::header::COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|cookies| {
+                cookies.split(';').find_map(|part| {
+                    let (k, v) = part.trim().split_once('=')?;
+                    (k.trim() == "tce_session" && !v.trim().is_empty())
+                        .then(|| v.trim().to_string())
+                })
+            })
+    } else {
+        None
+    };
+
+    let token = bearer_token
+        .or(cookie_token)
         .ok_or(AppError::Unauthorized)?;
 
-    let mut auth_ctx = domain::verify_jwt_claims(token)?;
+    let mut auth_ctx = domain::verify_jwt_claims(&token)?;
 
     let user = crate::data::Repository::find_user_by_id(&state.pool, &auth_ctx.user_id)
         .await
@@ -410,7 +431,49 @@ async fn login(
     Json(req): Json<LoginRequest>,
 ) -> Result<axum::response::Response, AppError> {
     let resp = domain::login_user(&state.pool, req).await?;
-    Ok((StatusCode::OK, Json(resp)).into_response())
+    let cookie_val = format!(
+        "tce_session={}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400",
+        resp.token
+    );
+    let mut http_resp = (StatusCode::OK, Json(resp)).into_response();
+    if let Ok(hv) = axum::http::HeaderValue::from_str(&cookie_val) {
+        http_resp
+            .headers_mut()
+            .insert(axum::http::header::SET_COOKIE, hv);
+    }
+    Ok(http_resp)
+}
+
+async fn logout() -> Result<axum::response::Response, AppError> {
+    let mut http_resp = StatusCode::NO_CONTENT.into_response();
+    http_resp.headers_mut().insert(
+        axum::http::header::SET_COOKIE,
+        axum::http::HeaderValue::from_static(
+            "tce_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+        ),
+    );
+    Ok(http_resp)
+}
+
+async fn me(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthContext>,
+) -> Result<axum::response::Response, AppError> {
+    let user = crate::data::Repository::find_user_by_id(&state.pool, &auth.user_id)
+        .await
+        .map_err(AppError::Database)?
+        .ok_or(AppError::Unauthorized)?;
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "user_id": user.id,
+            "username": user.username,
+            "business_type": user.business_type,
+            "role": user.role,
+            "tenant_id": user.tenant_id,
+        })),
+    )
+        .into_response())
 }
 
 // ── Health check ───────────────────────────────────────────────────────────
@@ -869,6 +932,11 @@ async fn npae_verify_grounding(
     State(state): State<AppState>,
     Json(req): Json<crate::npae::grounding::verifier::VerifyGroundingRequest>,
 ) -> Result<axum::response::Response, AppError> {
+    // FIX: Empty `llm_answer` must map to 400 Bad Request (`AppError::Validation`) to match
+    // `GroundingError::EmptyAnswer`, while oversized payloads still hit `validate_prompt_bounds` (422).
+    if req.llm_answer.trim().is_empty() {
+        return Err(AppError::Validation("llm_answer must not be empty".into()));
+    }
     validate_prompt_bounds(&req.llm_answer)?;
     let _permit = state
         .compress_sem

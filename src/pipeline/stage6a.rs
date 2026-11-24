@@ -197,6 +197,9 @@ impl Stage6a {
             push_unique(&lock.text);
         }
         for c in &schema_filled.resolved_schema.constraints {
+            if c.name.eq_ignore_ascii_case("preserve_hard_constraints") {
+                continue;
+            }
             push_unique(&c.name);
         }
 
@@ -208,10 +211,13 @@ impl Stage6a {
         if haystack_lower.contains(phrase_lower) {
             return true;
         }
-        let phrase_words: Vec<&str> = phrase_lower
+        let mut phrase_words: Vec<&str> = phrase_lower
             .split(|c: char| !c.is_alphanumeric())
             .filter(|s| !s.is_empty())
             .collect();
+        if phrase_words.len() >= 2 && phrase_words[0] == "do" && phrase_words[1] == "not" {
+            phrase_words.remove(0);
+        }
         if phrase_words.is_empty() {
             return true;
         }

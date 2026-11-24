@@ -120,9 +120,9 @@
                     </div>
                     <span class="sandbox-badge" id="sandbox-badge">● Guest Mode</span>
                     <button type="button" class="icon-btn-header cmd-trigger-btn" id="btn-studio-cmd"
-                        onclick="openStudioCommandPalette()" title="Quick Actions (⌘K)"
+                        data-action="openStudioCommandPalette" title="Quick Actions (⌘K)"
                         aria-label="Open Command Palette">⌘K</button>
-                    <button type="button" class="icon-btn-header" id="btn-theme-toggle" onclick="toggleTheme()"
+                    <button type="button" class="icon-btn-header" id="btn-theme-toggle" data-action="toggleTheme"
                         title="Toggle Light/Dark Theme" aria-label="Toggle Theme">🌙</button>
                     <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin"
                         aria-label="Customize Skin">🎨</button>
@@ -141,18 +141,18 @@
                         <div class="dialog-header">
                             <h2 id="auth-dialog-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">
                                 Account Access</h2>
-                            <button type="button" class="btn-ghost" onclick="closeAuthSection()"
+                            <button type="button" class="btn-ghost" data-action="closeAuthSection"
                                 aria-label="Close Account Access">✕ Close</button>
                         </div>
                         <div class="auth-tabs" role="tablist" aria-label="Account actions">
                             <button type="button" class="auth-tab active" role="tab" aria-selected="true"
-                                onclick="switchAuthTab('login')" id="tab-login">Login</button>
+                                data-action="switchAuthTab" data-arg="login" id="tab-login">Login</button>
                             <button type="button" class="auth-tab" role="tab" aria-selected="false"
-                                onclick="switchAuthTab('register')" id="tab-register">Register</button>
+                                data-action="switchAuthTab" data-arg="register" id="tab-register">Register</button>
                         </div>
 
                         <!-- Login Form -->
-                        <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+                        <form class="auth-form active" id="form-login" data-submit="handleLogin">
                             <div class="form-row">
                                 <label for="login-username" class="section-label">Username</label>
                                 <input type="text" id="login-username" class="tc-input" autocomplete="username"
@@ -167,7 +167,7 @@
                         </form>
 
                         <!-- Register Form -->
-                        <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
+                        <form class="auth-form" id="form-register" data-submit="handleRegister">
                             <div class="form-row">
                                 <label for="reg-username" class="section-label">Username</label>
                                 <input type="text" id="reg-username" class="tc-input" autocomplete="username"
@@ -210,22 +210,22 @@
                             <a href="/admin.html" id="admin-link" class="btn-ghost"
                                 style="display: none; text-decoration: none;">🛡️ Admin</a>
                             <button type="button" class="btn-ghost" id="auth-toggle-btn"
-                                onclick="toggleAuthSection()">Sign In / Register</button>
+                                data-action="toggleAuthSection">Sign In / Register</button>
                         </div>
                     </div>
 
                     <nav class="nav-bar" role="tablist" aria-label="Workspace sections">
                         <button type="button" class="nav-tab active" role="tab" aria-selected="true"
-                            aria-controls="tab-compress" onclick="switchTab('compress')" id="nav-compress">Optimize
+                            aria-controls="tab-compress" data-action="switchTab" data-arg="compress" id="nav-compress">Optimize
                             Prompt</button>
                         <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-ask-content" onclick="switchTab('ask')" id="nav-ask"
+                            aria-controls="tab-ask-content" data-action="switchTab" data-arg="ask" id="nav-ask"
                             style="display: none;" disabled aria-disabled="true">Ask My Docs</button>
                         <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-history-content" onclick="switchTab('history')" id="nav-history"
+                            aria-controls="tab-history-content" data-action="switchTab" data-arg="history" id="nav-history"
                             style="display: none;" disabled aria-disabled="true">History</button>
                         <button type="button" class="nav-tab" role="tab" aria-selected="false"
-                            aria-controls="tab-stats-content" onclick="switchTab('stats')" id="nav-stats"
+                            aria-controls="tab-stats-content" data-action="switchTab" data-arg="stats" id="nav-stats"
                             style="display: none;" disabled aria-disabled="true">Insights</button>
                     </nav>
 
@@ -237,15 +237,15 @@
                         <div class="preset-strip">
                             <span class="preset-label">Try sample:</span>
                             <button type="button" class="preset-chip" data-preset="house" id="preset-house"
-                                onclick="loadPreset('house')">🏠 Buying a House</button>
+                                data-action="loadPreset" data-arg="house">🏠 Buying a House</button>
                             <button type="button" class="preset-chip" data-preset="bug" id="preset-bug"
-                                onclick="loadPreset('bug')">🐛 Bug Report</button>
+                                data-action="loadPreset" data-arg="bug">🐛 Bug Report</button>
                             <button type="button" class="preset-chip" data-preset="legal" id="preset-legal"
-                                onclick="loadPreset('legal')">⚖️ Contract Review</button>
+                                data-action="loadPreset" data-arg="legal">⚖️ Contract Review</button>
                             <button type="button" class="preset-chip" id="btn-open-playbooks"
-                                onclick="openPlaybookModal()">📚 Playbooks (12+ Domains)</button>
+                                data-action="openPlaybookModal">📚 Playbooks (12+ Domains)</button>
                             <button type="button" class="preset-chip" id="btn-private-local-badge"
-                                onclick="showPrivacyLocalInfo()" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Zero-Upload Local Docs</button>
+                                data-action="showPrivacyLocalInfo" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Zero-Upload Local Docs</button>
                         </div>
 
                         <div class="workbench-split" data-workbench-split id="workbench-container">
@@ -277,7 +277,7 @@
                                     <label class="file-upload-btn" for="file-input">
                                         <span>📄 Attach PDF / TXT / MD</span>
                                         <input type="file" id="file-input" accept=".pdf,.txt,.md"
-                                            class="visually-hidden" onchange="handleFileSelect(event)">
+                                            class="visually-hidden" data-change="handleFileSelect">
                                     </label>
                                     <div class="domain-chip" id="domain-chip" data-domain>
                                         Detected lens: <strong id="domain-name">General</strong> · <span id="perspective-badge" style="color: var(--accent-text); font-weight: 600;">Consumer</span>
@@ -304,16 +304,16 @@
                                     <div class="segmented-mode-pills" id="mode-pills" role="radiogroup"
                                         aria-label="Compression Mode">
                                         <button type="button" role="radio" class="mode-pill" data-mode="gentle"
-                                            id="pm-gentle" aria-checked="false" onclick="selectMode('gentle')">Light
+                                            id="pm-gentle" aria-checked="false" data-action="selectMode" data-arg="gentle">Light
                                             Polish</button>
                                         <button type="button" role="radio" class="mode-pill active"
                                             data-mode="balanced" id="pm-balanced" aria-checked="true"
-                                            title="Smart Trim: 30-55% token reduction with 100% constraint locks" onclick="selectMode('balanced')">Smart
+                                            title="Smart Trim: 30-55% token reduction with 100% constraint locks" data-action="selectMode" data-arg="balanced">Smart
                                             Trim</button>
                                         <button type="button" role="radio" class="mode-pill"
                                             data-mode="aggressive" id="pm-aggressive" aria-checked="false"
                                             title="Deep Blueprint: CRISP multi-phase scaffolding"
-                                            onclick="selectMode('aggressive')">Deep Blueprint</button>
+                                            data-action="selectMode" data-arg="aggressive">Deep Blueprint</button>
                                     </div>
                                     <input type="hidden" id="mode" value="balanced">
                                 </div>
@@ -328,9 +328,9 @@
                                 </div>
 
                                 <div class="pane-actions-row">
-                                    <button type="button" class="clear-btn" onclick="clearInput()">Clear</button>
+                                    <button type="button" class="clear-btn" data-action="clearInput">Clear</button>
                                     <button type="button" class="tc-compress-btn workbench-compress-btn"
-                                        onclick="compress()" id="compress-btn" disabled>
+                                        data-action="compress" id="compress-btn" disabled>
                                         ⚡ Compress Prompt
                                     </button>
                                 </div>
@@ -347,11 +347,11 @@
                                         <span class="pane-title">AI-Ready Prompt</span>
                                         <button type="button" class="tes-badge" id="tes-score" data-tes="0.97"
                                             aria-expanded="false" aria-controls="quality-breakdown"
-                                            onclick="toggleQualityBreakdown()"
+                                            data-action="toggleQualityBreakdown"
                                             title="Inspect quality score breakdown">Quality Ready</button>
                                     </div>
                                     <label class="diff-toggle-label" for="diff-toggle">
-                                        <input type="checkbox" id="diff-toggle" checked onchange="toggleDiffView()">
+                                        <input type="checkbox" id="diff-toggle" checked data-change="toggleDiffView">
                                         <span>Highlight changes</span>
                                     </label>
                                 </div>
@@ -411,30 +411,30 @@
                                             <label for="model-select" class="visually-hidden">Target model
                                                 pricing</label>
                                             <select id="model-select" class="tc-select model-select-compact"
-                                                onchange="updateModelPricing()">
+                                                data-change="updateModelPricing">
                                                 <option value="0.005" selected>GPT-4o ($0.005/1k)</option>
                                                 <option value="0.003">Claude 3.5 Sonnet ($0.003/1k)</option>
                                                 <option value="0.00125">Gemini 2.5 Pro ($0.00125/1k)</option>
                                             </select>
                                             <label for="roi-scale-select" class="visually-hidden">Monthly run volume</label>
                                             <select id="roi-scale-select" class="tc-select model-select-compact"
-                                                onchange="updateRoiScale()" title="Monthly prompt volume for ROI projection">
+                                                data-change="updateRoiScale" title="Monthly prompt volume for ROI projection">
                                                 <option value="1000" selected>1k runs</option>
                                                 <option value="100000">100k / mo</option>
                                                 <option value="1000000">1M / mo</option>
                                             </select>
                                             <button type="button" class="copy-btn" id="copy-result-btn"
-                                                onclick="copyResult()">📋 Copy</button>
+                                                data-action="copyResult">📋 Copy</button>
                                             <button type="button" class="copy-btn" id="launch-chatgpt-btn"
-                                                onclick="launchInExternalAi('chatgpt')" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
+                                                data-action="launchInExternalAi" data-arg="chatgpt" title="Copy prompt and open in ChatGPT">↗ ChatGPT</button>
                                             <button type="button" class="copy-btn" id="launch-claude-btn"
-                                                onclick="launchInExternalAi('claude')" title="Copy prompt and open in Claude">↗ Claude</button>
+                                                data-action="launchInExternalAi" data-arg="claude" title="Copy prompt and open in Claude">↗ Claude</button>
                                             <button type="button" class="copy-btn" id="export-audit-btn"
-                                                onclick="exportAuditCard()" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
+                                                data-action="exportAuditCard" title="Copy Markdown Token & Quality Audit Card">📊 Audit Card</button>
                                             <button type="button" class="copy-btn" id="export-svg-btn"
-                                                onclick="exportAuditSvg()" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
+                                                data-action="exportAuditSvg" title="Download shareable SVG Audit Card">🖼️ Save SVG</button>
                                             <button type="button" class="copy-btn" id="btn-verify-workbench"
-                                                onclick="openWorkbenchVerifyModal()" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
+                                                data-action="openWorkbenchVerifyModal" style="display: none;" title="Verify an LLM reply against this prompt's facts">🛡️ Verify Reply</button>
                                         </div>
                                     </div>
                                     <div id="clarifying-pills" class="preset-strip" style="display: none; margin-top: 0.5rem;"></div>
@@ -444,10 +444,10 @@
                                             style="font-size: 0.78rem; color: var(--accent-text); display: none; margin-right: auto; font-weight: 500;">✓
                                             Feedback recorded</span>
                                         <button type="button" class="btn-success-sm" id="btn-feedback-up"
-                                            onclick="submitFeedback('thumbs_up')" disabled
+                                            data-action="submitFeedback" data-arg="thumbs_up" disabled
                                             title="Sign in to submit feedback">👍 Useful</button>
                                         <button type="button" class="btn-danger-sm" id="btn-feedback-down"
-                                            onclick="submitFeedback('thumbs_down')" disabled
+                                            data-action="submitFeedback" data-arg="thumbs_down" disabled
                                             title="Sign in to submit feedback">👎 Not Useful</button>
                                     </div>
                                 </div>
@@ -468,12 +468,12 @@
                                 <div class="rag-source-toggle" role="radiogroup" aria-label="RAG Data Source">
                                     <label class="rag-source-option active" id="rag-opt-cloud">
                                         <input type="radio" name="ask-data-source" value="cloud" checked
-                                            onchange="RagWorkspace.setDataSource('cloud')">
+                                            data-change="setDataSource">
                                         <span>☁️ Cloud Data</span>
                                     </label>
                                     <label class="rag-source-option" id="rag-opt-own">
                                         <input type="radio" name="ask-data-source" value="own"
-                                            onchange="RagWorkspace.setDataSource('own')">
+                                            data-change="setDataSource">
                                         <span>💻 Own Data</span>
                                     </label>
                                 </div>
@@ -512,7 +512,7 @@
                                         <code class="rag-cmd-snippet"
                                             id="local-rag-start-cmd">cargo run --bin rag -- --watch ./docs</code>
                                         <button type="button" class="copy-btn" id="local-rag-copy-cmd-btn"
-                                            onclick="RagWorkspace.copyStartCommand()"
+                                            data-action="copyStartCommand"
                                             style="width:100%;font-size:0.72rem;padding:0.3rem 0.5rem;min-block-size:1.9rem;">📋
                                             Copy Start Command</button>
                                     </div>
@@ -520,12 +520,12 @@
                                         <code>.pdf</code> &amp; <code>.docx</code> stay strictly on your machine. Only
                                         top-k text chunks are used for prompt assembly.</div>
                                     <button type="button" id="local-rag-refresh-btn" class="btn-ghost"
-                                        onclick="RagWorkspace.checkLocalHealth()"
+                                        data-action="checkLocalHealth"
                                         style="width:100%;font-size:0.74rem;padding:0.35rem 0.5rem;">↻ Check Local
                                         Status</button>
                                 </div>
 
-                                <button type="button" class="btn-ghost" onclick="RagWorkspace.openVerifyModal()"
+                                <button type="button" class="btn-ghost" data-action="openVerifyModal"
                                     style="width:100%;font-size:0.78rem;">🛡️ Verify LLM Reply</button>
                             </aside>
 
@@ -536,7 +536,7 @@
                                         <label for="scenario-mode-select" class="section-label">Pipeline Mode</label>
                                         <div class="select-wrap">
                                             <select id="scenario-mode-select" class="tc-select"
-                                                onchange="handleScenarioModeChange(this.value)">
+                                                data-change="handleScenarioModeChange">
                                                 <option value="Scenario">Scenario Mode</option>
                                                 <option value="Regular" selected>Regular Mode</option>
                                             </select>
@@ -548,7 +548,7 @@
                                         <label for="scenario-domain-select" class="section-label">Domain Scope</label>
                                         <div class="select-wrap">
                                             <select id="scenario-domain-select" class="tc-select"
-                                                onchange="handleDomainChange(this.value)">
+                                                data-change="handleDomainChange">
                                                 <option value="" disabled selected>-- Select Domain --</option>
                                                 <option value="legal">Legal</option>
                                                 <option value="business">Business</option>
@@ -595,7 +595,7 @@
                                         placeholder="Ask a question against internal knowledge base..."></textarea>
                                 </div>
 
-                                <button type="button" class="tc-compress-btn" onclick="executeScenarioAsk()"
+                                <button type="button" class="tc-compress-btn" data-action="executeScenarioAsk"
                                     id="ask-btn">
                                     🔍 Query Internal Knowledge Base
                                 </button>
@@ -638,7 +638,7 @@
                                             </div>
                                             <button type="button" class="tc-compress-btn"
                                                 id="scenario-compress-aggressive-btn"
-                                                onclick="executeScenarioAggressiveCompress()"
+                                                data-action="executeScenarioAggressiveCompress"
                                                 style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.82rem; margin: 0;">
                                                 🔥 Compress in Aggressive Mode for LLM
                                             </button>
@@ -659,7 +659,7 @@
                                                     (Hallucination-Free)</span>
                                             </div>
                                             <button type="button" class="copy-btn" id="copy-aggr-prompt-btn"
-                                                onclick="copyAggressivePrompt()">
+                                                data-action="copyAggressivePrompt">
                                                 📋 Copy for LLM
                                             </button>
                                         </div>
@@ -690,19 +690,19 @@
                                     <label for="history-search" class="visually-hidden">Search history</label>
                                     <input type="text" id="history-search" class="tc-input"
                                         placeholder="Search prompts, CRISP outputs, or domains..."
-                                        oninput="filterHistory(this.value)">
+                                        data-input="filterHistory">
                                 </div>
                                 <div class="bento-model-pills" role="group" aria-label="Filter history by mode">
                                     <button type="button" class="bento-model-pill active" data-history-mode="all"
-                                        onclick="setHistoryModeFilter('all')">All</button>
+                                        data-action="setHistoryModeFilter" data-arg="all">All</button>
                                     <button type="button" class="bento-model-pill" data-history-mode="gentle"
-                                        onclick="setHistoryModeFilter('gentle')">Light Polish</button>
+                                        data-action="setHistoryModeFilter" data-arg="gentle">Light Polish</button>
                                     <button type="button" class="bento-model-pill" data-history-mode="balanced"
-                                        onclick="setHistoryModeFilter('balanced')">Smart Trim</button>
+                                        data-action="setHistoryModeFilter" data-arg="balanced">Smart Trim</button>
                                     <button type="button" class="bento-model-pill" data-history-mode="aggressive"
-                                        onclick="setHistoryModeFilter('aggressive')">Deep Blueprint</button>
+                                        data-action="setHistoryModeFilter" data-arg="aggressive">Deep Blueprint</button>
                                 </div>
-                                <select id="history-sort" class="tc-select" onchange="setHistorySort(this.value)"
+                                <select id="history-sort" class="tc-select" data-change="setHistorySort"
                                     aria-label="Sort history"
                                     style="width:auto; min-width:9rem; padding:0.45rem 1.8rem 0.45rem 0.75rem; font-size:0.78rem;">
                                     <option value="newest">Newest first</option>
@@ -715,7 +715,7 @@
                                 <div class="auth-gate-title">Save Compression History</div>
                                 <div class="auth-gate-desc">Create a free account or sign in to persist and search past
                                     prompt compression history across devices.</div>
-                                <button type="button" class="tc-compress-btn" onclick="openAuthModal()"
+                                <button type="button" class="tc-compress-btn" data-action="openAuthModal"
                                     style="width: auto; padding: 0.65rem 1.5rem;">Sign In / Register</button>
                             </div>
                             <div id="history-list"></div>
@@ -733,14 +733,14 @@
                                         model cost impact.</div>
                                 </div>
                                 <button type="button" class="insights-refresh-btn" id="insights-refresh-btn"
-                                    onclick="loadStats()">↻ Refresh</button>
+                                    data-action="loadStats">↻ Refresh</button>
                             </div>
                             <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
                                 <div class="auth-gate-icon" aria-hidden="true">📊</div>
                                 <div class="auth-gate-title">Personal Usage Analytics</div>
                                 <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency,
                                     and cost reductions over time.</div>
-                                <button type="button" class="tc-compress-btn" onclick="openAuthModal()"
+                                <button type="button" class="tc-compress-btn" data-action="openAuthModal"
                                     style="width: auto; padding: 0.65rem 1.5rem;">Sign In / Register</button>
                             </div>
                             <div class="insights-bento" id="global-stats"></div>
@@ -788,7 +788,7 @@
             <div class="dialog-header">
                 <h2 id="verify-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Verify LLM Reply
                 </h2>
-                <button type="button" class="btn-ghost" onclick="RagWorkspace.closeVerifyModal()"
+                <button type="button" class="btn-ghost" data-action="closeVerifyModal"
                     aria-label="Close Verifier Dialog">✕</button>
             </div>
             <div class="form-row">
@@ -801,7 +801,7 @@
                 <textarea id="verify-answer-input" class="tc-textarea" style="min-height: 5.5rem;"
                     placeholder="Paste the AI's answer here..."></textarea>
             </div>
-            <button type="button" class="tc-compress-btn" onclick="RagWorkspace.runVerify()">Run Grounding
+            <button type="button" class="tc-compress-btn" data-action="runVerify">Run Grounding
                 Check</button>
             <div id="verify-result-box" class="output-box"
                 style="display:none;margin-top:0.75rem;max-height:14rem;overflow:auto;font-family:'Inter',sans-serif;"></div>
@@ -812,11 +812,11 @@
         <div class="dialog-inner">
             <div class="dialog-header">
                 <h2 id="playbook-modal-title" class="tc-headline" style="font-size: 1.15rem; margin: 0;">Domain Playbooks</h2>
-                <button type="button" class="btn-ghost" onclick="closePlaybookModal()" aria-label="Close Playbooks">✕</button>
+                <button type="button" class="btn-ghost" data-action="closePlaybookModal" aria-label="Close Playbooks">✕</button>
             </div>
             <div class="form-row">
                 <label for="playbook-search" class="visually-hidden">Filter playbooks</label>
-                <input type="text" id="playbook-search" class="tc-input" placeholder="Filter by domain (e.g. Healthcare, Finance, Legal, DevOps)..." oninput="renderPlaybooks(this.value)">
+                <input type="text" id="playbook-search" class="tc-input" placeholder="Filter by domain (e.g. Healthcare, Finance, Legal, DevOps)..." data-input="renderPlaybooks">
             </div>
             <div id="playbook-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.65rem;max-height:22rem;overflow:auto;margin-top:0.5rem;"></div>
         </div>

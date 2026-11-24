@@ -29,7 +29,7 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
 
 ## Phase 0 — Baseline Check (Start Here First)
 
-- [ ] **[AUD-00] Capture current build, lint, test, and security baseline** `Effort: XS` `[Verification]`
+- [x] **[AUD-00] Capture current build, lint, test, and security baseline** `Effort: XS` `[Verification]`
   - Run from repo root before any edits (status currently `[UNVERIFIED - NOT IN CONTEXT]`):
     - `cargo fmt --all -- --check`
     - `cargo clippy --workspace --all-targets --all-features -- -D warnings`
@@ -115,7 +115,7 @@ Do **not** jump straight into growth features or neural refactors. Follow this s
     - Remove `|| s == "null"` from `is_local_origin` in `src/bin/rag.rs:138` to block sandboxed-iframe / `data:` origin probing of `127.0.0.1:49152`. Add optional per-launch `RAG_AUTH_TOKEN` (`X-Local-Rag-Token`) support for `/retrieve` and `/reindex`.
     - Enforce `validate_prompt_bounds` on `req.output` in `npae_hallucination_check` (`api.rs:788`), bound `llm_answer` / `harness_prompt` / `facts` + acquire `compress_sem` + add inner `REQUEST_TIMEOUT_SECS` in `npae_verify_grounding` (`api.rs:808`), and acquire `compress_sem` on non-aggressive `/api/compress` (`api.rs:453`).
     - Remove the duplicate `domain::is_admin(&state.pool, &auth.user_id)` query in `admin_middleware` (`api.rs:344`) since `auth_middleware` (`api.rs:365-373`) already reloads `user.role` from SQLite on every request.
-  - **Later (Phase B Security):** Migrate inline `onclick=` handlers out of `static/index.html` and `static/admin.html` so `'unsafe-inline'` can be removed from `script-src` in `security_headers_middleware` (`api.rs:307`), and move JWTs out of `localStorage` into `HttpOnly` cookies.
+  - **Completed (Phase B Security):** Migrated inline `on*=` handlers out of `static/index.html`, `static/admin.html`, `static/app.js`, and `static/rag_workspace.js` into delegated listeners, removed `'unsafe-inline'` from `script-src` in `security_headers_middleware`, and moved browser JWT auth to `HttpOnly` `tce_session` cookies (`POST /api/login`, `POST /api/logout`, `GET /api/me`).
 
 ---
 

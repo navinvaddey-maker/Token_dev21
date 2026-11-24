@@ -155,7 +155,7 @@
                     <div class="hud-panel">
                         <div class="hud-panel-head">
                             <span class="hud-panel-title">Ops Terminal</span>
-                            <button type="button" class="btn-refresh" onclick="loadOverview()" style="padding:3px 9px; font-size:11px;">↻ Sync</button>
+                            <button type="button" class="btn-refresh" data-admin-action="loadOverview" style="padding:3px 9px; font-size:11px;">↻ Sync</button>
                         </div>
                         <div class="hud-ops-terminal" id="hud-live-feed">
                             <div class="hud-kpi-sub">Awaiting pipeline telemetry... <span class="hud-cursor"></span></div>
@@ -208,14 +208,14 @@
                 <div class="table-header" style="gap:10px; flex-wrap:wrap;">
                     <h2>Global Compression History</h2>
                     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                        <input type="text" id="admin-history-search" placeholder="Filter by user ID or mode..." oninput="renderHistory()" style="padding:7px 11px; border-radius:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:12px;">
-                        <select id="admin-history-mode" onchange="renderHistory()" style="padding:7px 11px; border-radius:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:12px;">
+                        <input type="text" id="admin-history-search" placeholder="Filter by user ID or mode..." style="padding:7px 11px; border-radius:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:12px;">
+                        <select id="admin-history-mode" style="padding:7px 11px; border-radius:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#f8fafc; font-size:12px;">
                             <option value="all">All Modes</option>
                             <option value="gentle">Gentle</option>
                             <option value="balanced">Balanced</option>
                             <option value="aggressive">Aggressive</option>
                         </select>
-                        <button type="button" class="btn-refresh" onclick="loadHistory()">↻ Refresh</button>
+                        <button type="button" class="btn-refresh" data-admin-action="loadHistory">↻ Refresh</button>
                     </div>
                 </div>
                 <table id="history-table">
@@ -249,7 +249,7 @@
             <div class="table-container glass" style="margin-bottom: 2rem;">
                 <div class="table-header">
                     <h2>Feedback Signals By Type</h2>
-                    <button class="btn-refresh" onclick="loadFeedback()">↻ Refresh</button>
+                    <button type="button" class="btn-refresh" data-admin-action="loadFeedback">↻ Refresh</button>
                 </div>
                 <table id="feedback-type-table">
                     <caption class="visually-hidden">Feedback signals grouped by type</caption>

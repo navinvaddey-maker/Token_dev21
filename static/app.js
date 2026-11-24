@@ -110,11 +110,11 @@ async function handleLogin(e) {
         if (!data.business_type) {
             throw new Error('Invalid login response: missing business_type');
         }
-        State.token    = data.token;
+        State.token    = 'cookie';
         State.userId   = data.user_id;
         State.username = data.username;
         State.role     = data.role || 'user';
-        localStorage.setItem('tce_token', data.token);
+        localStorage.removeItem('tce_token');
         localStorage.setItem('tce_user_id', data.user_id);
         localStorage.setItem('tce_username', data.username);
         localStorage.setItem('tce_business_type', data.business_type);
@@ -169,7 +169,8 @@ function isAdminUser() {
 }
 
 function logout() {
-    // ARCH: §1 Reality Check — Session termination transitions gracefully to zero-auth sandbox
+    // ARCH: §1 Reality Check — Session termination clears HttpOnly cookie and returns to sandbox
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
     State.token = null;
     State.userId = null;
     State.username = null;
@@ -1527,7 +1528,7 @@ function renderHistoryList(records) {
                 <div class="auth-gate-icon">🕒</div>
                 <div class="auth-gate-title">No Compression History Yet</div>
                 <div class="auth-gate-desc">Your past prompt optimizations will appear here with side-by-side CRISP diffs and one-click restore.</div>
-                <button type="button" class="tc-compress-btn" onclick="switchTab('compress')" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
+                <button type="button" class="tc-compress-btn" data-action="switchTab" data-arg="compress" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
             </div>`;
         return;
     }
@@ -1537,7 +1538,7 @@ function renderHistoryList(records) {
             <div class="bento-card insights-empty">
                 <div class="auth-gate-title">No Matching Runs</div>
                 <div class="auth-gate-desc">Try clearing your search query or switching the mode filter.</div>
-                <button type="button" class="history-btn primary" onclick="resetHistoryFilters()" style="padding: 8px 16px;">Reset Filters</button>
+                <button type="button" class="history-btn primary" data-action="resetHistoryFilters" style="padding: 8px 16px;">Reset Filters</button>
             </div>`;
         return;
     }
@@ -1765,7 +1766,7 @@ function renderInsightsBento(stats) {
                 <div class="auth-gate-icon">✨</div>
                 <div class="auth-gate-title">No Compression Telemetry Yet</div>
                 <div class="auth-gate-desc">Run your first prompt optimization to unlock 14-day token trajectories, mode efficiency, and model cost savings.</div>
-                <button type="button" class="tc-compress-btn" onclick="switchTab('compress')" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
+                <button type="button" class="tc-compress-btn" data-action="switchTab" data-arg="compress" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
             </div>
         `;
         return;
@@ -1787,7 +1788,7 @@ function renderInsightsBento(stats) {
         <button type="button"
             class="bento-model-pill ${key === activeModelKey ? 'active' : ''}"
             data-insights-model="${key}"
-            onclick="setInsightsModel('${key}')">${escapeHtml(cfg.label)}</button>
+            data-action="setInsightsModel" data-arg="${key}">${escapeHtml(cfg.label)}</button>
     `).join('');
 
     const modes = Array.isArray(stats.mode_breakdown) ? stats.mode_breakdown : [];
@@ -2506,29 +2507,113 @@ function initOryxOwl3dIcon(containerId, canvasId) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initStudioDeclarativeEvents() {
+    const clickActions = {
+        openStudioCommandPalette: () => openStudioCommandPalette(),
+        toggleTheme: () => toggleTheme(),
+        closeAuthSection: () => closeAuthSection(),
+        switchAuthTab: (arg) => switchAuthTab(arg),
+        toggleAuthSection: () => toggleAuthSection(),
+        switchTab: (arg) => switchTab(arg),
+        loadPreset: (arg) => loadPreset(arg),
+        openPlaybookModal: () => openPlaybookModal(),
+        closePlaybookModal: () => closePlaybookModal(),
+        showPrivacyLocalInfo: () => showPrivacyLocalInfo(),
+        selectMode: (arg) => selectMode(arg),
+        clearInput: () => clearInput(),
+        compress: () => compress(),
+        toggleQualityBreakdown: () => toggleQualityBreakdown(),
+        copyResult: () => copyResult(),
+        launchInExternalAi: (arg) => launchInExternalAi(arg),
+        exportAuditCard: () => exportAuditCard(),
+        exportAuditSvg: () => exportAuditSvg(),
+        openWorkbenchVerifyModal: () => openWorkbenchVerifyModal(),
+        submitFeedback: (arg) => submitFeedback(arg),
+        copyStartCommand: () => RagWorkspace.copyStartCommand(),
+        checkLocalHealth: () => RagWorkspace.checkLocalHealth(),
+        openVerifyModal: () => RagWorkspace.openVerifyModal(),
+        closeVerifyModal: () => RagWorkspace.closeVerifyModal(),
+        runVerify: () => RagWorkspace.runVerify(),
+        exportVerifyReport: () => RagWorkspace.exportVerifyReport(),
+        executeScenarioAsk: () => executeScenarioAsk(),
+        executeScenarioAggressiveCompress: () => executeScenarioAggressiveCompress(),
+        copyAggressivePrompt: () => copyAggressivePrompt(),
+        setHistoryModeFilter: (arg) => setHistoryModeFilter(arg),
+        resetHistoryFilters: () => resetHistoryFilters(),
+        openAuthModal: () => openAuthModal(),
+        loadStats: () => loadStats(),
+        setInsightsModel: (arg) => setInsightsModel(arg),
+    };
+
+    document.addEventListener('click', (e) => {
+        const el = e.target.closest('[data-action]');
+        if (!el) return;
+        const action = el.getAttribute('data-action');
+        const arg = el.getAttribute('data-arg');
+        if (clickActions[action]) {
+            clickActions[action](arg, e, el);
+        }
+    });
+
+    document.addEventListener('change', (e) => {
+        const el = e.target.closest('[data-change]');
+        if (!el) return;
+        const act = el.getAttribute('data-change');
+        if (act === 'handleFileSelect') handleFileSelect(e);
+        else if (act === 'toggleDiffView') toggleDiffView();
+        else if (act === 'updateModelPricing') updateModelPricing();
+        else if (act === 'updateRoiScale') updateRoiScale();
+        else if (act === 'setDataSource') RagWorkspace.setDataSource(el.value);
+        else if (act === 'handleScenarioModeChange') handleScenarioModeChange(el.value);
+        else if (act === 'handleDomainChange') handleDomainChange(el.value);
+        else if (act === 'setHistorySort') setHistorySort(el.value);
+    });
+
+    document.addEventListener('input', (e) => {
+        const el = e.target.closest('[data-input]');
+        if (!el) return;
+        const act = el.getAttribute('data-input');
+        if (act === 'filterHistory') filterHistory(el.value);
+        else if (act === 'renderPlaybooks') renderPlaybooks(el.value);
+    });
+
+    document.addEventListener('submit', (e) => {
+        const el = e.target.closest('[data-submit]');
+        if (!el) return;
+        const act = el.getAttribute('data-submit');
+        if (act === 'handleLogin') handleLogin(e);
+        else if (act === 'handleRegister') handleRegister(e);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    initStudioDeclarativeEvents();
     initTheme();
     initCustomSkinModal();
     initTablistKeyboardNav();
     initStudioCommandPalette();
     loadPresetsFromFile();
     initOryxOwl3dIcon('oryx-logo-3d', 'oryx-owl-pbr-canvas');
-    const token = localStorage.getItem('tce_token');
-    const userId = localStorage.getItem('tce_user_id');
-    const username = localStorage.getItem('tce_username');
-    const businessType = localStorage.getItem('tce_business_type');
-    const role = localStorage.getItem('tce_role');
 
-    if (token && userId && username) {
-        State.token = token;
-        State.userId = userId;
-        State.username = username;
-        State.businessType = businessType;
-        State.role = role;
-        showMainSection();
-        loadScenarioRegistry();
-    } else {
-        // Zero-Auth Sandbox initialized immediately (R1)
+    // Hydrate session from HttpOnly cookie via GET /api/me (fallback to zero-auth sandbox).
+    localStorage.removeItem('tce_token');
+    let hydrated = false;
+    try {
+        const meRes = await fetch('/api/me', { credentials: 'same-origin' });
+        if (meRes.ok) {
+            const me = await meRes.json();
+            State.token = 'cookie';
+            State.userId = me.user_id;
+            State.username = me.username;
+            State.businessType = me.business_type;
+            State.role = me.role;
+            showMainSection();
+            loadScenarioRegistry();
+            hydrated = true;
+        }
+    } catch (_) {}
+
+    if (!hydrated) {
         updateUserBar();
     }
 

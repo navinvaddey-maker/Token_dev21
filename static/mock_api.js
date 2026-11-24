@@ -78,16 +78,12 @@ const MockAPI = {
  */
 const API = {
     async call(path, options = {}) {
-        const headers = { 
+        const headers = {
             'Content-Type': 'application/json',
-            ...options.headers 
+            ...options.headers
         };
-        
-        if (typeof State !== 'undefined' && State.token) {
-            headers['Authorization'] = `Bearer ${State.token}`;
-        }
 
-        const r = await fetch(path, { ...options, headers });
+        const r = await fetch(path, { ...options, headers, credentials: 'same-origin' });
         
         if (r.status === 401) {
             console.warn('Endpoint 401 unauthorized:', path);
@@ -171,11 +167,7 @@ const API = {
     async ragUpload(file) {
         const formData = new FormData();
         formData.append('file', file);
-        const headers = {};
-        if (typeof State !== 'undefined' && State.token) {
-            headers['Authorization'] = `Bearer ${State.token}`;
-        }
-        const r = await fetch('/api/rag/upload', { method: 'POST', headers, body: formData });
+        const r = await fetch('/api/rag/upload', { method: 'POST', credentials: 'same-origin', body: formData });
         if (!r.ok) {
             const err = await r.json().catch(() => ({}));
             throw new Error(err.error?.message || err.error || 'Upload failed');

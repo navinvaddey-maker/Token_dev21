@@ -302,7 +302,7 @@ const RagWorkspace = {
                     <span style="font-size:0.76rem;color:var(--head-text);font-weight:600;">Score: ${scorePct}%</span>
                     <span style="font-size:0.72rem;color:var(--text-muted);">Unsupported: ${unsupported.length} · Missing: ${missing.length}</span>
                 </div>
-                <button type="button" class="copy-btn" onclick="RagWorkspace.exportVerifyReport()" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
+                <button type="button" class="copy-btn" data-action="exportVerifyReport" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
             </div>
         `;
 

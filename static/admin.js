@@ -1,9 +1,8 @@
 const State = {
-    token: localStorage.getItem('tce_token'),
-    userId: localStorage.getItem('tce_user_id'),
-    username: localStorage.getItem('tce_username'),
-    businessType: localStorage.getItem('tce_business_type'),
-    role: localStorage.getItem('tce_role'),
+    userId: null,
+    username: null,
+    businessType: null,
+    role: null,
     currentSection: 'overview',
     users: [],
     history: [],
@@ -13,12 +12,27 @@ const State = {
 
 // ── Init ────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Client-side UX guard; server enforces authoritative RBAC on all admin endpoints.
-    const isAdmin = (State.role && State.role.toLowerCase() === 'admin') ||
-        (State.businessType && State.businessType.toLowerCase() === 'admin');
-    if (!State.token || !isAdmin) {
-        window.location.href = '/'; // Redirect to login if no token or not admin
+document.addEventListener('DOMContentLoaded', async () => {
+    // Authoritative session verification via HttpOnly cookie (`GET /api/me`).
+    try {
+        const meRes = await fetch('/api/me', { credentials: 'same-origin' });
+        if (!meRes.ok) {
+            window.location.href = '/';
+            return;
+        }
+        const me = await meRes.json();
+        const isAdmin = (me.role && me.role.toLowerCase() === 'admin') ||
+            (me.business_type && me.business_type.toLowerCase() === 'admin');
+        if (!isAdmin) {
+            window.location.href = '/';
+            return;
+        }
+        State.userId = me.user_id;
+        State.username = me.username;
+        State.businessType = me.business_type;
+        State.role = me.role;
+    } catch (_) {
+        window.location.href = '/';
         return;
     }
 
@@ -304,7 +318,10 @@ function initEventListeners() {
     });
 
     // Logout
-    document.getElementById('logout-btn').addEventListener('click', () => {
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        try {
+            await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (_) {}
         localStorage.removeItem('tce_token');
         localStorage.removeItem('tce_user_id');
         localStorage.removeItem('tce_username');
@@ -315,6 +332,14 @@ function initEventListeners() {
 
     // Delegated click listeners to prevent inline handler script injection
     document.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-admin-action]');
+        if (actionBtn) {
+            const act = actionBtn.getAttribute('data-admin-action');
+            if (act === 'loadOverview') loadOverview();
+            else if (act === 'loadHistory') loadHistory();
+            else if (act === 'loadFeedback') loadFeedback();
+            return;
+        }
         const copyChip = e.target.closest('.copy-hud-chip');
         if (copyChip) {
             const val = copyChip.getAttribute('data-copy-val');
@@ -414,9 +439,14 @@ function switchSection(sectionId) {
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
 async function apiFetch(url, options = {}) {
+    const historySearchEl = document.getElementById('admin-history-search');
+    if (historySearchEl) historySearchEl.addEventListener('input', renderHistory);
+    const historyModeEl = document.getElementById('admin-history-mode');
+    if (historyModeEl) historyModeEl.addEventListener('change', renderHistory);
+
     const defaultOptions = {
+        credentials: 'same-origin',
         headers: {
-            'Authorization': `Bearer ${State.token}`,
             'Content-Type': 'application/json'
         }
     };
@@ -1187,9 +1217,7 @@ async function handleRagUpload() {
 
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${State.token}`
-            },
+            credentials: 'same-origin',
             body: formData
         });
 
