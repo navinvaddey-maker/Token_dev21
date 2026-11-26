@@ -128,9 +128,10 @@ async fn main() -> anyhow::Result<()> {
         ) {
             loop {
                 if watcher.wait_for_change(2000).is_ok() {
-                    let _guard = watcher_file_lock
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let _guard =
+                        token_compress_engine::utils::sync::OryxSyncGuard::lock_mutex_recovering_poison(
+                            &watcher_file_lock,
+                        );
                     if let Ok(new_config) =
                         token_compress_engine::npae::aggressive::config::ConfigLoader::load(
                             "config/unified.json",
@@ -165,9 +166,10 @@ async fn main() -> anyhow::Result<()> {
                     "config/feedback.json",
                 )
             {
-                let _guard = enricher_file_lock
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let _guard =
+                    token_compress_engine::utils::sync::OryxSyncGuard::lock_mutex_recovering_poison(
+                        &enricher_file_lock,
+                    );
                 let mut current_config = enricher_config_handle.read();
                 if let Ok(true) = enricher.process(&mut current_config, &mut store, 5) {
                     enricher_config_handle.swap(current_config.clone());

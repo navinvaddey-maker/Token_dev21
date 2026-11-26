@@ -1490,32 +1490,7 @@ fn detect_risk_tolerance(lower: &str) -> Option<String> {
 /// # Panics
 /// Never.
 pub(crate) fn has_word_or_phrase(lower: &str, needle: &str) -> bool {
-    let target = needle.trim();
-    if target.is_empty() {
-        return false;
-    }
-    let bytes = lower.as_bytes();
-    let t_bytes = target.as_bytes();
-    if t_bytes.len() > bytes.len() {
-        return false;
-    }
-
-    let is_word_char = |b: u8| b.is_ascii_alphanumeric();
-    let mut start = 0;
-    while let Some(rel_idx) = lower[start..].find(target) {
-        let idx = start + rel_idx;
-        let end = idx + t_bytes.len();
-        let left_ok = idx == 0 || !is_word_char(bytes[idx - 1]);
-        let right_ok = end == bytes.len() || !is_word_char(bytes[end]);
-        if left_ok && right_ok {
-            return true;
-        }
-        start = idx + 1;
-        while start < lower.len() && !lower.is_char_boundary(start) {
-            start += 1;
-        }
-    }
-    false
+    crate::utils::text::OryxTextMatcher::contains_whole_word_or_phrase(lower, needle)
 }
 
 /// Detects the user's `ActorPerspective` (`Consumer`, `Practitioner`, or `Investor`) within `domain`

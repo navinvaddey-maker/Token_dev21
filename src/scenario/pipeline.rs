@@ -380,7 +380,10 @@ impl ScenarioOutputComposer {
                         format!("{} (Page {})", m.source_file, page_str)
                     })
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
-                let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                let safe_src =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        &src,
+                    );
                 format!("[Ref {}]: {}", i + 1, safe_src)
             })
             .collect();
@@ -408,7 +411,8 @@ impl ScenarioOutputComposer {
 
         let geo_suffix = geography
             .map(|g| {
-                let safe_geo = crate::npae::grounding::verifier::sanitize_untrusted_fact(g);
+                let safe_geo =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(g);
                 format!(" (Jurisdiction / Region: {})", safe_geo.to_uppercase())
             })
             .unwrap_or_default();
@@ -437,7 +441,10 @@ impl ScenarioOutputComposer {
         } else {
             body.push_str("- Identified Completeness Gaps (You must explicitly highlight these missing parameters to the user):\n");
             for issue in gap_issues {
-                let safe_issue = crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
+                let safe_issue =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        issue,
+                    );
                 body.push_str(&format!("  * [GAP WARNING]: {}\n", safe_issue));
             }
         }
@@ -521,7 +528,9 @@ impl ScenarioOutputComposer {
         // 2. USER SCENARIO OBJECTIVE
         body.push_str("# 2. USER SCENARIO OBJECTIVE\n");
         let safe_question =
-            crate::npae::grounding::verifier::sanitize_untrusted_fact(question.trim());
+            crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                question.trim(),
+            );
         body.push_str(&safe_question);
         body.push_str("\n\n");
 
@@ -540,9 +549,14 @@ impl ScenarioOutputComposer {
                     format!("{} (Page {})", m.source_file, page_str)
                 })
                 .unwrap_or_else(|| format!("Document-{}", i + 1));
-            let doc_ref = crate::npae::grounding::verifier::sanitize_untrusted_fact(&doc_ref_raw);
+            let doc_ref =
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                    &doc_ref_raw,
+                );
             let safe_content =
-                crate::npae::grounding::verifier::sanitize_untrusted_fact(c.content.trim());
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                    c.content.trim(),
+                );
             body.push_str(&format!(
                 "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n### Key Evidence [{}] (from {})\n{}\n    </content>\n  </chunk>\n",
                 i + 1,
@@ -561,7 +575,10 @@ impl ScenarioOutputComposer {
             body.push_str("  <!-- All pre-parser parameter validation checks passed cleanly -->\n");
         } else {
             for issue in gap_issues {
-                let safe_issue = crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
+                let safe_issue =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        issue,
+                    );
                 body.push_str(&format!("  [GAP WARNING]: {}\n", safe_issue));
             }
         }
@@ -663,7 +680,10 @@ impl ScenarioRegularPipeline {
                         format!("{} (Page {})", m.source_file, page_str)
                     })
                     .unwrap_or_else(|| format!("Doc-{}", i + 1));
-                let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                let safe_src =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        &src,
+                    );
                 format!("[Ref {}]: {}", i + 1, safe_src)
             })
             .collect();
@@ -688,7 +708,9 @@ impl ScenarioRegularPipeline {
         body.push_str("<context trust=\"untrusted\">\n");
         for (i, c) in rag_chunks.iter().enumerate() {
             let safe_content =
-                crate::npae::grounding::verifier::sanitize_untrusted_fact(&c.content);
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                    &c.content,
+                );
             let src = c
                 .metadata
                 .as_ref()
@@ -700,7 +722,8 @@ impl ScenarioRegularPipeline {
                     format!("{} (Page {})", m.source_file, page_str)
                 })
                 .unwrap_or_else(|| format!("Doc-{}", i + 1));
-            let safe_src = crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+            let safe_src =
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(&src);
             body.push_str(&format!(
                 "  <chunk id=\"ID-{:02}\" source=\"{}\">\n    {}\n  </chunk>\n",
                 i + 1,

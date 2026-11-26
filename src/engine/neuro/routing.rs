@@ -1,28 +1,47 @@
-use super::context::PipelineContext;
+//! Topology-driven downstream stage routing (`ARCHITECTURE.md` §1.1, §1.2).
+//!
+//! Maps a prompt's classified structural topology (`Sequential`, `Hierarchical`, `Graph`,
+//! or `Tabular`) to its sparse-coding mode and boundary prior configuration.
 
+/// Structural topology classification for a prompt.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TopologyType {
+    /// Linear or chronological instruction flow.
     Sequential,
+    /// Nested sections, trees, or multi-level headings.
     Hierarchical,
+    /// Interconnected entity or dependency relationships.
     Graph,
+    /// Row/column structured data or tables.
     Tabular,
 }
 
+/// Sparse-coding and boundary-detection parameters selected for a [`TopologyType`].
 #[derive(Debug, Clone)]
 pub struct StageProfile {
+    /// Sparse coding strategy identifier (`"temporal"`, `"tree"`, `"spectral"`, `"columnar"`).
     pub sparse_mode: String,
+    /// Boundary detection prior (`"linear"`, `"recursive"`, `"community"`, `"row_delimited"`).
     pub boundary_prior: String,
 }
 
+/// Result wrapper carrying the detected [`TopologyType`].
 #[derive(Debug, Clone)]
 pub struct TopologyResult {
+    /// Classified topology variant.
     pub topology_type: TopologyType,
 }
 
-/// GAP-05: Topology Router uses classification to route downstream processing
+/// Maps classified prompt topology to downstream [`StageProfile`] configuration (`GAP-05`).
+#[derive(Debug, Clone, Copy, Default)]
 pub struct TopologyRouter;
 
 impl TopologyRouter {
+    /// Returns the [`StageProfile`] matching `topology.topology_type`.
+    ///
+    /// # Panics
+    /// Never.
+    #[must_use]
     pub fn configure(&self, topology: &TopologyResult) -> StageProfile {
         match topology.topology_type {
             TopologyType::Sequential => StageProfile {
@@ -41,62 +60,6 @@ impl TopologyRouter {
                 sparse_mode: "columnar".into(),
                 boundary_prior: "row_delimited".into(),
             },
-        }
-    }
-}
-
-/// GAP-07: Processing mode taxonomy and decision stage
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ProcessingMode {
-    Generative,
-    Extractive,
-    Classifying,
-    Translating,
-    Summarizing,
-}
-
-pub struct ModeDecisionStage;
-
-impl ModeDecisionStage {
-    pub fn decide(
-        &self,
-        _boundary_map: &serde_json::Value,
-        _ctx: &PipelineContext,
-    ) -> ProcessingMode {
-        // Feature extraction and model prediction go here
-
-        // Mock prediction based on working memory
-        let _span = (); // ctx.working_memory.snapshot();
-        ProcessingMode::Generative
-    }
-}
-
-/// GAP-08: Branching gate between direct fill and validation modes
-pub struct SchemaResult {
-    pub confidence: f32,
-}
-
-pub enum StageVariant {
-    Stage4,
-    Stage4B,
-}
-
-pub struct SchemaGate {
-    pub confidence_threshold: f32,
-}
-
-impl SchemaGate {
-    pub fn new() -> Self {
-        Self {
-            confidence_threshold: 0.75,
-        }
-    }
-
-    pub fn route(&self, schema_result: &SchemaResult, _ctx: &PipelineContext) -> StageVariant {
-        if schema_result.confidence >= self.confidence_threshold {
-            StageVariant::Stage4 // Direct fill
-        } else {
-            StageVariant::Stage4B // Full validation mode
         }
     }
 }

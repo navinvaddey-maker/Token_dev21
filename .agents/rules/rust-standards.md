@@ -1,3 +1,8 @@
+---
+trigger: glob
+globs: "**/*.rs,**/Cargo.toml"
+---
+
 # Project rules (always apply)
 
 ## Architecture
@@ -7,6 +12,8 @@
 
 ## Code
 - No unsafe, unwrap, panic, todo, or dbg!. Use typed errors (thiserror in libraries, anyhow only in main).
+- New shared utility structs in `src/utils/*` must use the `Oryx*` prefix (e.g. `OryxTokenEstimator`, `OryxTextMatcher`, `OryxVectorMath`, `OryxHasher`, `OryxSecuritySanitizer`, `OryxSyncGuard`), while preserving existing domain/engine struct names.
+- Use intention-revealing `verb_noun` or `verb_noun_scoped` (for tenant-isolated operations) method names rather than vague verbs (`check`, `handle`, `do_work`).
 - Handlers stay thin: parse input, call a use case, map the error. No SQL in handlers.
 - Every public function has a doc comment.
 

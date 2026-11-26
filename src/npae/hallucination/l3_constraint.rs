@@ -42,24 +42,7 @@ fn extract_negative_targets(prompt: &str) -> Vec<(String, String)> {
 
 /// Returns `true` when `haystack` contains `pattern` bounded on both sides by non-alphanumeric chars.
 fn contains_bounded_phrase(haystack: &str, pattern: &str) -> bool {
-    let mut start = 0usize;
-    while let Some(rel_idx) = haystack[start..].find(pattern) {
-        let abs_start = start + rel_idx;
-        let abs_end = abs_start + pattern.len();
-        let left_ok = haystack[..abs_start]
-            .chars()
-            .next_back()
-            .is_none_or(|c| !c.is_alphanumeric() && c != '_');
-        let right_ok = haystack[abs_end..]
-            .chars()
-            .next()
-            .is_none_or(|c| !c.is_alphanumeric() && c != '_');
-        if left_ok && right_ok {
-            return true;
-        }
-        start = abs_end;
-    }
-    false
+    crate::utils::text::OryxTextMatcher::contains_identifier_bounded_phrase(haystack, pattern)
 }
 
 /// Returns `true` when an explicit override or revocation in `prompt_lower` supersedes

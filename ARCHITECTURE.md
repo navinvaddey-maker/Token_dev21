@@ -30,8 +30,8 @@ The codebase has **three distinct pipeline systems** — all partially wired, no
 | Implementation | File | Status |
 |---|---|---|
 | `PipelineOrchestrator` | `src/pipeline/orchestrator.rs` | **Active Canonical Engine** — used in `/api/compress` |
-| `engine/pipeline.rs::run()` | `src/engine/pipeline.rs` | **Legacy (Deprecated)** — 5-stage predecessor |
-| `engine/neuro/` | `src/engine/neuro/` | **Internal Subroutines** — topology routing used by Stage 1 |
+| `engine/pipeline.rs::run()` | `src/engine/pipeline.rs` | **Legacy (Deprecated v1)** — retained only for historical regression tests |
+| `engine/neuro/` | `src/engine/neuro/` | **Internal Subroutine** — topology router used by Stage 1; dead `neuro/*` drafts removed |
 
 `PipelineOrchestrator` is the single canonical active execution engine across all modes.
 
@@ -228,7 +228,7 @@ The Ask (RAG) workspace (`static/index.html`, `static/app.js`, `static/rag_works
 
 | Component | File | What it does |
 |---|---|---|
-| `EmbeddingEngine` | `src/rag/embeddings.rs` | FNV-1a hash projection (NOT neural). Deterministic TF-IDF feature hashing. |
+| `EmbeddingEngine` | `src/rag/embeddings.rs` | Local all-MiniLM-L6-v2 ONNX neural embeddings (384-dim, L2-normalized) with deterministic FNV-1a feature-hashing fallback. |
 | `DocumentIngester` | `src/rag/ingest.rs` | PDF → text (pdf-extract crate) → sliding window chunks → hash embed → SQLite BLOB |
 | `RagStore` | `src/rag/store.rs` | CRUD for `rag_documents` + `rag_chunks`. Full-table cosine scan in Rust. |
 | `DocumentRetriever` | `src/rag/retriever.rs` | Embed query → cosine search → log metrics to `rag_retrieval_logs` |
@@ -251,12 +251,12 @@ The Ask (RAG) workspace (`static/index.html`, `static/app.js`, `static/rag_works
 
 | Gap | Severity | Details |
 |---|---|---|
-| **RAG not wired into pipeline** | ✅ **FIXED (GAP-31)** | `EnrichmentContext` is populated in `domain.rs`/`api.rs`, passed to `orchestrator.process()` & `AggressiveEngine::run()`. In Gentle/Balanced mode, chunks render in Stage 6A. In Aggressive mode, `DerivedRagContext` derives clean, non-repetitive facts (250-token budget) into `context.background` without raw source citations, resolving gap zones and hallucination checks. |
+| **RAG not wired into pipeline** | ✅ **FIXED (GAP-31)** | `EnrichmentContext` is populated in `src/domain/` and `src/api/`, passed to `orchestrator.process()` & `AggressiveEngine::run()`. In Gentle/Balanced mode, chunks render in Stage 6A. In Aggressive mode, `DerivedRagContext` derives clean, non-repetitive facts (250-token budget) into `context.background` without raw source citations, resolving gap zones and hallucination checks. |
 
 | **Hash-based embeddings, not semantic** | 🟠 Medium | FNV-1a hash projection. Paraphrases and synonyms produce lower similarity than neural models. Comment in code: "For production, replace with sentence-transformers or fastembed-rs." |
 | **Two incompatible embedding spaces** | ✅ **FIXED (GAP-32)** | Both RAG and ORY now share `crate::rag::embeddings::EmbeddingEngine` (384-dim FNV-1a feature hashing + TF-IDF term weighting). Vectors across RAG & ORY are 100% compatible. |
 | **Full-table cosine scan** | 🟠 High | `RagStore::search()` loads ALL user embeddings into memory. Self-documented limit: <10K chunks. No ANN index. |
-| **RAG injection is caller-side only** | ✅ **FIXED (GAP-31)** | RAG chunks are automatically retrieved in `domain.rs` when `rag_enabled` is true, and automatically injected into prompt context during Stage 6A output generation. |
+| **RAG injection is caller-side only** | ✅ **FIXED (GAP-31)** | RAG chunks are automatically retrieved in `src/domain/` when `rag_enabled` is true, and automatically injected into prompt context during Stage 6A output generation. |
 | **No re-ranking** | 🟡 Medium | Top-K by cosine similarity only. No cross-encoder, no BM25 hybrid, no diversity filter. |
 | **No chunk quality filter** | 🟡 Medium | Very short chunks and near-empty pages are not filtered during ingestion. |
 | **Config re-read on every ingest** | 🟡 Medium | `detect_domain()` opens and parses `config/unified.json` on every PDF ingest. No caching. |
@@ -369,7 +369,7 @@ User compresses prompt
 
 ---
 
-7. **Stateful Parent → Continuation Structural Prompting (`src/npae/continuation/`, `src/npae/aggressive/structurer/render.rs`, `src/npae/aggressive/engine.rs`, `src/lib.rs`, `src/domain.rs`, `src/api.rs`)**:
+7. **Stateful Parent → Continuation Structural Prompting (`src/npae/continuation/`, `src/npae/aggressive/structurer/render.rs`, `src/npae/aggressive/engine.rs`, `src/lib.rs`, `src/domain/`, `src/api/`)**:
    - **Tenant-Scoped `PromptStateLedger` (`AppState.prompt_ledgers`)**: Bounded in-memory `DashMap` (`MAX_PROMPT_LEDGERS = 10_000`) keyed by `(tenant_id, user_id, parent_id)`. Stores `parent_raw_prompt`, `locked_axis` (`Domain × ActorPerspective × IntentClass`, `rule_locked`), `ConstraintLedger` (`Active` / `Superseded` / `Revoked` for `SL-1`), `PhaseCursor`, `resolved_slots`, and append-only `FactRegistry` (`[F1..Fk]` for `SL-3`).
    - **Dual-Path Continuation Diffing (`ParentMatcher` + `ContinuationRouter`)**: Supports both **Path A (delta-only follow-up)** and **Path B (retyped/edited full raw prompt)** by computing a normalized clause diff against `parent_raw_prompt`. Classifies deltas into `SlotFill`, `ConstraintPatch` (`Add` / `Override` / `Revoke`), `PhaseStep`, `EvidenceDrill`, `ArtifactTransform`, or `TopicReset` (with `SL-2` hysteresis preventing dollar/keyword hijacks on locked domains).
    - **Dual-Output Rendering (`optimized_prompt` + `ContinuationMeta.delta_prompt`) & Repair Loop**: `optimized_prompt` carries the clean rehydrated single-turn prompt (pruning superseded Turn 1 constraints and expanding only the active phase) while `ContinuationMeta.delta_prompt` carries the KV-cache-friendly delta prompt (`[CONSTRAINTS_PATCH]`, `[PHASE_CURSOR]`, `[NEW_FACTS]`, `[TASK]`), alongside deterministic `Verifier → RepairPrompt` synthesis from `GroundingReport` failures. `HallucinationGuard` (`L3`) validates against reconciled `Active` constraints only.

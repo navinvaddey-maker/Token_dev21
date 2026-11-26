@@ -246,15 +246,7 @@ fn jaccard_similarity(a: &[String], b: &[String]) -> f32 {
     if a.is_empty() || b.is_empty() {
         return 0.0;
     }
-    let set_a: HashSet<&str> = a.iter().map(String::as_str).collect();
-    let set_b: HashSet<&str> = b.iter().map(String::as_str).collect();
-    let intersection = set_a.intersection(&set_b).count();
-    let union = set_a.union(&set_b).count();
-    if union == 0 {
-        0.0
-    } else {
-        (usize_to_f32(intersection) / usize_to_f32(union)).clamp(0.0, 1.0)
-    }
+    crate::utils::text::OryxTextMatcher::compute_jaccard_token_similarity(a, b).clamp(0.0, 1.0)
 }
 
 /// Counts matching leading tokens between `a` and `b`.

@@ -485,26 +485,7 @@ fn build_background(profile: &IntentProfile, user_level: &str, ctx: &BuildContex
 /// Returns `true` when `text_lower` contains `needle` on word boundaries, preventing substring
 /// false positives such as `"learn"` matching `"earn"` or `"appraisal"` matching `"app"`.
 pub(super) fn has_whole_word_or_phrase(text_lower: &str, needle: &str) -> bool {
-    if needle.is_empty() || text_lower.len() < needle.len() {
-        return false;
-    }
-    let bytes = text_lower.as_bytes();
-    let mut start = 0;
-    while let Some(pos) = text_lower.get(start..).and_then(|s| s.find(needle)) {
-        let abs = start + pos;
-        let end = abs + needle.len();
-        let left_ok = abs == 0
-            || bytes
-                .get(abs - 1)
-                .is_none_or(|b| !b.is_ascii_alphanumeric());
-        let right_ok =
-            end == bytes.len() || bytes.get(end).is_none_or(|b| !b.is_ascii_alphanumeric());
-        if left_ok && right_ok {
-            return true;
-        }
-        start = abs + 1;
-    }
-    false
+    crate::utils::text::OryxTextMatcher::contains_whole_word_or_phrase(text_lower, needle)
 }
 
 /// Returns `true` when the prompt is genuinely a wealth-engineering / net-worth compounding query,

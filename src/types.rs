@@ -181,6 +181,30 @@ pub struct ChunkMetadata {
     pub source_file: String,
 }
 
+impl From<crate::rag::types::SearchResult> for RagChunk {
+    /// Converts a retrieved RAG [`crate::rag::types::SearchResult`] into a pipeline [`RagChunk`].
+    ///
+    /// Clamps negative `page_number` values to `0` before narrowing `i64` to `u32`.
+    ///
+    /// # Panics
+    /// Never.
+    fn from(res: crate::rag::types::SearchResult) -> Self {
+        Self {
+            domain_tag: res.document_domain.unwrap_or_else(|| "general".to_string()),
+            content: res.chunk.content,
+            metadata: Some(ChunkMetadata {
+                page_number: res
+                    .chunk
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.page_number)
+                    .map(|p| u32::try_from(p.max(0)).unwrap_or(0)),
+                source_file: res.document_filename,
+            }),
+        }
+    }
+}
+
 /// A structured key-value datum supplied via `EnrichmentContext` (e.g. CRM/DB field, user profile,
 /// or API metric) that enters `EvidenceBundle` with `Provenance::StructuredRecord`.
 ///
@@ -489,5 +513,75 @@ impl CorrectionCycle {
         let overall = (scoring.tes + scoring.sfs + scoring.scs) / 3.0;
         let gap = (10.0 - overall).max(0.0);
         gap * 0.30
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rag::types::{
+        ChunkMetadata as StorageChunkMetadata, RagChunk as StorageRagChunk, SearchResult,
+    };
+
+    #[test]
+    fn test_rag_chunk_from_search_result() {
+        let sr = SearchResult {
+            chunk: StorageRagChunk {
+                id: "c1".to_string(),
+                document_id: "d1".to_string(),
+                chunk_index: 0,
+                content: "Revenue rose 15%.".to_string(),
+                embedding: None,
+                metadata: Some(StorageChunkMetadata {
+                    page_number: Some(4),
+                    section_title: None,
+                    char_offset_start: None,
+                    char_offset_end: None,
+                }),
+                token_count: Some(4),
+                created_at: chrono::Utc::now(),
+                embedding_model: "all-MiniLM-L6-v2".to_string(),
+                model_version: "1.0".to_string(),
+            },
+            similarity_score: 0.91,
+            document_filename: "annual_report.pdf".to_string(),
+            document_domain: None,
+        };
+        let converted = RagChunk::from(sr);
+        assert_eq!(converted.domain_tag, "general");
+        assert_eq!(converted.content, "Revenue rose 15%.");
+        let meta = converted.metadata.as_ref();
+        assert_eq!(meta.and_then(|m| m.page_number), Some(4));
+        assert_eq!(
+            meta.map(|m| m.source_file.as_str()),
+            Some("annual_report.pdf")
+        );
+
+        // Negative page_number clamps safely to 0
+        let sr_neg = SearchResult {
+            chunk: StorageRagChunk {
+                id: "c2".to_string(),
+                document_id: "d2".to_string(),
+                chunk_index: 1,
+                content: "Statute §12".to_string(),
+                embedding: None,
+                metadata: Some(StorageChunkMetadata {
+                    page_number: Some(-5),
+                    section_title: None,
+                    char_offset_start: None,
+                    char_offset_end: None,
+                }),
+                token_count: Some(3),
+                created_at: chrono::Utc::now(),
+                embedding_model: "all-MiniLM-L6-v2".to_string(),
+                model_version: "1.0".to_string(),
+            },
+            similarity_score: 0.85,
+            document_filename: "act.pdf".to_string(),
+            document_domain: Some("legal".to_string()),
+        };
+        let converted_neg = RagChunk::from(sr_neg);
+        assert_eq!(converted_neg.domain_tag, "legal");
+        assert_eq!(converted_neg.metadata.and_then(|m| m.page_number), Some(0));
     }
 }

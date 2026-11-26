@@ -8,7 +8,6 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::npae::schema::types::{DeliverableType, LengthBound, StructuredPrompt};
 
@@ -649,20 +648,12 @@ impl PromptStateLedger {
 
 /// Tokenizes `text` into lowercase alphanumeric/hyphen boundary tokens.
 pub(crate) fn tokenize_boundary(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric() && c != '-')
-        .filter(|t| !t.is_empty())
-        .map(str::to_lowercase)
-        .collect()
+    crate::utils::text::OryxTextMatcher::tokenize_alphanumeric_words(text)
 }
 
 /// Returns `true` when `haystack` contains `needle` as a contiguous token subsequence.
 pub(crate) fn tokens_contain_subsequence(haystack: &[String], needle: &[String]) -> bool {
-    if needle.is_empty() || haystack.len() < needle.len() {
-        return false;
-    }
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
+    crate::utils::text::OryxTextMatcher::contains_contiguous_token_span(haystack, needle)
 }
 
 /// Strips leading directive or exclusion prefixes from a lowercase constraint/target phrase.
@@ -740,9 +731,7 @@ fn constraint_matches_target(entry_text: &str, target: &str) -> bool {
 
 /// Computes lowercase SHA-256 hex digest for canonical fact deduplication (`SL-3`).
 fn compute_sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
+    crate::utils::hash::OryxHasher::compute_sha256_hex_digest(bytes)
 }
 
 #[cfg(test)]

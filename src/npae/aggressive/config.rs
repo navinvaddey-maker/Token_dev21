@@ -335,10 +335,7 @@ impl ConfigHandle {
     /// Never panics (recovers from poisoned lock via `into_inner`).
     #[must_use]
     pub fn read(&self) -> UnifiedConfig {
-        // FIX: Recover inner config if RwLock is poisoned instead of panicking via unwrap() (nrule.md §6).
-        self.inner
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        crate::utils::sync::OryxSyncGuard::read_rwlock_recovering_poison(&self.inner)
             .config
             .as_ref()
             .clone()
@@ -353,11 +350,7 @@ impl ConfigHandle {
     #[must_use]
     pub fn read_arc(&self) -> Arc<UnifiedConfig> {
         Arc::clone(
-            &self
-                .inner
-                .read()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .config,
+            &crate::utils::sync::OryxSyncGuard::read_rwlock_recovering_poison(&self.inner).config,
         )
     }
 
@@ -367,9 +360,7 @@ impl ConfigHandle {
     /// Never panics (recovers from poisoned lock via `into_inner`).
     #[must_use]
     pub fn lookup_domain_index(&self, name: &str) -> Option<usize> {
-        self.inner
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        crate::utils::sync::OryxSyncGuard::read_rwlock_recovering_poison(&self.inner)
             .domain_index
             .get(name)
     }
@@ -379,12 +370,9 @@ impl ConfigHandle {
     /// # Panics
     /// Never panics (recovers from poisoned lock via `into_inner`).
     pub fn swap(&self, new_config: UnifiedConfig) {
-        // FIX: Recover write guard if RwLock is poisoned instead of panicking via unwrap() (nrule.md §6).
         let domain_index = DomainIndex::from_taxonomy(&new_config.domain_taxonomy);
-        let mut lock = self
-            .inner
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut lock =
+            crate::utils::sync::OryxSyncGuard::write_rwlock_recovering_poison(&self.inner);
         lock.config = Arc::new(new_config);
         lock.domain_index = domain_index;
     }

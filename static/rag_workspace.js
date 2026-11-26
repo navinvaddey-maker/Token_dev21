@@ -280,9 +280,11 @@ const RagWorkspace = {
         const outEl = document.getElementById('verify-result-box');
         if (!outEl) return;
         this.lastVerifyReport = report;
-        const esc = typeof escapeHtml === 'function'
-            ? escapeHtml
-            : (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const esc = typeof OryxDomUtils !== 'undefined' && OryxDomUtils.escapeHtmlEntities
+            ? OryxDomUtils.escapeHtmlEntities
+            : (typeof escapeHtml === 'function'
+                ? escapeHtml
+                : (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
 
         const passed = Boolean(report.passed);
         const scorePct = Math.round((Number(report.grounding_score || 0)) * 100);

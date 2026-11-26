@@ -86,7 +86,10 @@ impl Stage6a {
                 parts.push(format!("**Semantic Context:** {}", ctx));
             }
             if let Some(rag) = rag_opt {
-                let safe_rag = crate::npae::grounding::verifier::sanitize_untrusted_fact(&rag);
+                let safe_rag =
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        &rag,
+                    );
                 parts.push(format!(
                     "**Source Knowledge:**\n<retrieved_context trust=\"untrusted\">\n{}\n</retrieved_context>",
                     safe_rag
@@ -390,7 +393,8 @@ impl Stage6a {
             }
         }
         if let Some(rag) = rag_opt {
-            let safe_rag = crate::npae::grounding::verifier::sanitize_untrusted_fact(&rag);
+            let safe_rag =
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(&rag);
             lines.push(format!(
                 "**Source Knowledge:**\n<retrieved_context trust=\"untrusted\">\n{}\n</retrieved_context>",
                 safe_rag
@@ -534,12 +538,16 @@ impl Stage6a {
                 .as_ref()
                 .map(|m| {
                     let safe_source =
-                        crate::npae::grounding::verifier::sanitize_untrusted_fact(&m.source_file);
+                        crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                            &m.source_file,
+                        );
                     format!("[Source: {}{}]\n", safe_source, page_str)
                 })
                 .unwrap_or_default();
             let safe_content =
-                crate::npae::grounding::verifier::sanitize_untrusted_fact(&chunk.content);
+                crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                    &chunk.content,
+                );
             text.push_str(&format!("{}{}\n\n", source_str, safe_content));
         }
         let trimmed = text.trim();

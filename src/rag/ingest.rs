@@ -3,7 +3,6 @@
 //! Implements PDF document processing, text extraction, chunking, and embedding
 //! storage in accordance with `ARCHITECTURE.md §3.1`.
 
-use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::fs::File;
 use std::io::Write;
@@ -205,9 +204,7 @@ impl DocumentIngester {
         let sanitized_filename = sanitize_upload_filename(filename);
 
         // Calculate SHA-256 content hash
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        let content_hash = format!("{:x}", hasher.finalize());
+        let content_hash = crate::utils::hash::OryxHasher::compute_sha256_hex_digest(bytes);
 
         // Check if document already exists for this tenant and user
         if let Ok(Some(existing_doc)) = self

@@ -849,7 +849,7 @@ impl RagStore {
         }
 
         // Reciprocal Rank Fusion (RRF) with smoothing constant k = 60.0
-        let k = 60.0f32;
+        let k = crate::utils::math::OryxVectorMath::RRF_SMOOTHING_K;
         let mut scores: std::collections::HashMap<String, (f32, SearchResult)> =
             std::collections::HashMap::new();
 

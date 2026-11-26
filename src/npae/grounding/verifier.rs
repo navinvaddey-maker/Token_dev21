@@ -14,21 +14,6 @@ use thiserror::Error;
 /// for a `FOUND` claim to be accepted as grounded.
 const FOUND_MIN_LEXICAL_SUPPORT: f32 = 0.34;
 
-/// Prompt-injection trigger substrings screened in untrusted fact lines (Rules §9).
-const INJECTION_MARKERS: &[&str] = &[
-    "ignore previous",
-    "ignore all previous",
-    "ignore instructions",
-    "disregard previous",
-    "disregard all",
-    "system override",
-    "system prompt",
-    "new instructions",
-    "you must now",
-    "forget previous",
-    "developer mode",
-];
-
 /// Errors returned when a grounding verification request is malformed.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum GroundingError {
@@ -160,13 +145,7 @@ pub struct GroundingReport {
 /// Never.
 #[must_use]
 pub fn sanitize_untrusted_fact(raw: &str) -> String {
-    let collapsed: String = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    collapsed
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#x27;")
+    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(raw)
 }
 
 /// Returns `true` if `text` contains a known prompt-injection override phrase.
@@ -175,10 +154,7 @@ pub fn sanitize_untrusted_fact(raw: &str) -> String {
 /// Never.
 #[must_use]
 pub fn contains_prompt_injection(text: &str) -> bool {
-    let lower = text.to_lowercase();
-    INJECTION_MARKERS
-        .iter()
-        .any(|marker| lower.contains(marker))
+    crate::utils::security::OryxSecuritySanitizer::has_prompt_injection_markers(text)
 }
 
 /// Splits `text` into sentences on `.`, `!`, `?`, and newlines while preserving decimal numbers
@@ -188,48 +164,7 @@ pub fn contains_prompt_injection(text: &str) -> bool {
 /// Never.
 #[must_use]
 pub fn split_sentences_preserving_decimals(text: &str) -> Vec<String> {
-    let mut sentences = Vec::new();
-    let chars: Vec<char> = text.chars().collect();
-    let mut current = String::new();
-
-    for (idx, &ch) in chars.iter().enumerate() {
-        if ch == '\n' || ch == '!' || ch == '?' {
-            let trimmed = current.trim();
-            if !trimmed.is_empty() {
-                // Keep trailing '?' so callers can distinguish questions from declarative facts.
-                let mut entry = trimmed.to_string();
-                if ch == '?' {
-                    entry.push('?');
-                }
-                sentences.push(entry);
-            }
-            current.clear();
-            continue;
-        }
-
-        if ch == '.' {
-            let prev_is_digit = idx > 0 && chars.get(idx - 1).is_some_and(char::is_ascii_digit);
-            let next_is_digit = chars.get(idx + 1).is_some_and(char::is_ascii_digit);
-            if prev_is_digit && next_is_digit {
-                current.push(ch);
-                continue;
-            }
-            let trimmed = current.trim();
-            if !trimmed.is_empty() {
-                sentences.push(trimmed.to_string());
-            }
-            current.clear();
-            continue;
-        }
-
-        current.push(ch);
-    }
-
-    let trailing = current.trim();
-    if !trailing.is_empty() {
-        sentences.push(trailing.to_string());
-    }
-    sentences
+    crate::utils::text::OryxTextMatcher::split_sentences_preserving_decimals(text)
 }
 
 /// Parses `<facts ...>...</facts>` from a rendered harness prompt into [`NumberedFact`] entries.
@@ -309,12 +244,7 @@ pub fn parse_requested_items_from_harness_prompt(prompt: &str) -> Vec<String> {
         let cleaned = strip_numbered_list_prefix(trimmed);
         if !cleaned.is_empty() {
             items.push(
-                cleaned
-                    .replace("&quot;", "\"")
-                    .replace("&#x27;", "'")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&amp;", "&"),
+                crate::utils::security::OryxSecuritySanitizer::unescape_xml_entities(cleaned),
             );
         }
     }

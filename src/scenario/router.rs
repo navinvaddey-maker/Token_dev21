@@ -234,21 +234,7 @@ impl ScenarioModeRouter {
 
                         let chunks: Vec<crate::types::RagChunk> = retrieved
                             .into_iter()
-                            .map(|res| crate::types::RagChunk {
-                                domain_tag: res
-                                    .document_domain
-                                    .unwrap_or_else(|| "general".to_string()),
-                                content: res.chunk.content,
-                                metadata: Some(crate::types::ChunkMetadata {
-                                    page_number: res
-                                        .chunk
-                                        .metadata
-                                        .as_ref()
-                                        .and_then(|m| m.page_number)
-                                        .map(|p| p as u32),
-                                    source_file: res.document_filename,
-                                }),
-                            })
+                            .map(crate::types::RagChunk::from)
                             .collect();
                         (chunks, base_namespace)
                     }
@@ -347,9 +333,9 @@ impl ScenarioModeRouter {
                                                             })
                                                     };
                                                     let clean_src =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(&src);
                                                     let clean_content =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(fact.text.trim());
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(fact.text.trim());
                                                     fact_chunks_xml.push_str(&format!(
                                                     "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
                                                     idx + 1,
@@ -371,9 +357,9 @@ impl ScenarioModeRouter {
                                                             domain_cfg.label.clone()
                                                         });
                                                     let clean_src =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(&src);
                                                     let clean_content =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(fact.trim());
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(fact.trim());
                                                     fact_chunks_xml.push_str(&format!(
                                                     "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
                                                     idx + 1,
@@ -392,9 +378,9 @@ impl ScenarioModeRouter {
                                                             domain_cfg.label.clone()
                                                         });
                                                     let clean_src =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(&src);
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(&src);
                                                     let clean_content =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(c.content.trim());
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(c.content.trim());
                                                     fact_chunks_xml.push_str(&format!(
                                                     "  <chunk id=\"ID-{:02}\">\n    <source>{}</source>\n    <content>\n{}. {}\n    </content>\n  </chunk>\n",
                                                     idx + 1,
@@ -431,7 +417,7 @@ impl ScenarioModeRouter {
                                                         break;
                                                     }
                                                     let safe_constraint =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(trimmed);
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(trimmed);
                                                     aggressive_constraints.push(safe_constraint);
                                                 }
                                             }
@@ -452,7 +438,7 @@ impl ScenarioModeRouter {
                                             } else {
                                                 for issue in &gap_issues {
                                                     let safe_issue =
-                                                    crate::npae::grounding::verifier::sanitize_untrusted_fact(issue);
+                                                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(issue);
                                                     gaps_xml.push_str(&format!(
                                                         "  [GAP WARNING]: {}\n",
                                                         safe_issue
@@ -462,7 +448,7 @@ impl ScenarioModeRouter {
                                             gaps_xml.push_str("</metadata_gaps>\n");
 
                                             let safe_question =
-                                            crate::npae::grounding::verifier::sanitize_untrusted_fact(question.trim());
+                                            crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(question.trim());
                                             let clean_aggressive = format!(
                                             "{}\n\n=== USER PROMPT ===\n# 2. USER SCENARIO OBJECTIVE\n{}\n\n# 3. VERIFIED GROUNDING CONTEXT (COMPRESSED FACT MATRIX)\n{}{}\n\n{}\n# TASK / DIRECTIVE\nAnalyze the scenario against the verified facts above. Comply strictly with all System constraints and the Target Schema contract.\n",
                                             system_part,
@@ -560,21 +546,7 @@ impl ScenarioModeRouter {
 
                         let chunks: Vec<crate::types::RagChunk> = retrieved
                             .into_iter()
-                            .map(|res| crate::types::RagChunk {
-                                domain_tag: res
-                                    .document_domain
-                                    .unwrap_or_else(|| "general".to_string()),
-                                content: res.chunk.content,
-                                metadata: Some(crate::types::ChunkMetadata {
-                                    page_number: res
-                                        .chunk
-                                        .metadata
-                                        .as_ref()
-                                        .and_then(|m| m.page_number)
-                                        .map(|p| p as u32),
-                                    source_file: res.document_filename,
-                                }),
-                            })
+                            .map(crate::types::RagChunk::from)
                             .collect();
                         (chunks, permitted_ns)
                     }
@@ -797,7 +769,9 @@ mod tests {
                     break;
                 }
                 let safe_constraint =
-                    crate::npae::grounding::verifier::sanitize_untrusted_fact(trimmed);
+                    crate::utils::security::OryxSecuritySanitizer::escape_untrusted_xml_content(
+                        trimmed,
+                    );
                 aggressive_constraints.push(safe_constraint);
             }
         }

@@ -325,17 +325,7 @@ impl Stage4 {
 
     /// Converts a hyphenated or underscored domain slug into title case (e.g., `"real-estate"` -> `"Real Estate"`).
     fn title_case_slug(slug: &str) -> String {
-        slug.split(['-', '_'])
-            .filter(|w| !w.is_empty())
-            .map(|w| {
-                let mut chars = w.chars();
-                match chars.next() {
-                    None => String::new(),
-                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
+        crate::utils::text::OryxTextMatcher::format_slug_as_title_case(slug)
     }
 }
 

@@ -94,169 +94,45 @@ pub fn merge_reconstruction_into_schema(out: &mut AlgorithmOutput) {
 
 /// Adds implicit deliverables for Balanced/Aggressive when constraints or domain signals imply them.
 ///
+/// Delegates to [`crate::algorithms::schema_filling::infer_implicit_deliverables_from_context`]
+/// so Stage 4 and Stage 6B share one canonical deliverable inference table.
+///
 /// # Panics
 /// Never.
 pub fn infer_implicit_deliverables(out: &mut AlgorithmOutput) {
-    let mode = out.mode.as_ref();
-    let allow_infer = matches!(
-        mode,
-        Some(crate::types::Mode::Balanced) | Some(crate::types::Mode::Aggressive)
-    );
-    if !allow_infer {
-        return;
-    }
-
-    let constraint_text: String = out
-        .resolved_schema
-        .constraints
-        .iter()
-        .map(|c| c.name.to_lowercase())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let task_text = out
-        .resolved_schema
-        .task
-        .as_deref()
-        .unwrap_or("")
-        .to_lowercase();
-    let norm_text = out
+    let extra_sources: Vec<String> = out
         .normalization
         .as_ref()
-        .map(|n| n.normalized_text.to_lowercase())
-        .unwrap_or_default();
-    let combined = format!("{task_text} {constraint_text} {norm_text}");
-    let domain = out
-        .scenario
-        .as_ref()
-        .map(|s| s.domain.as_str())
-        .unwrap_or("");
+        .map(|n| n.normalized_text.clone())
+        .into_iter()
+        .collect();
+    crate::algorithms::schema_filling::infer_implicit_deliverables_from_context(
+        out.resolved_schema.task.as_deref(),
+        &out.resolved_schema.constraints,
+        out.mode.as_ref(),
+        out.scenario.as_ref(),
+        &extra_sources,
+        &mut out.resolved_schema.output,
+    );
+}
 
-    let push_unique = |list: &mut Vec<crate::types::Deliverable>, item: &str| {
-        if !list.iter().any(|d| d.name.eq_ignore_ascii_case(item)) {
-            list.push(crate::types::Deliverable {
-                name: item.to_string(),
-            });
-        }
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Mode;
 
-    let meal_plan = domain == "nutrition"
-        || combined.contains("meal")
-        || combined.contains("nutrition")
-        || (combined.contains("plan")
-            && ["diet", "calorie", "protein", "macro"]
-                .iter()
-                .any(|k| combined.contains(k)));
-    let dietary_constraints = [
-        "fiber",
-        "dairy",
-        "nightshade",
-        "carb",
-        "macro",
-        "calorie",
-        "vegan",
-        "keto",
-    ]
-    .iter()
-    .any(|k| combined.contains(k));
-
-    if meal_plan && dietary_constraints {
-        for extra in ["shopping_list", "substitution_guide"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    }
-
-    if out.resolved_schema.output.len() >= 2 {
-        return;
-    }
-
-    if matches!(
-        domain,
-        "software" | "software-engineering" | "devops" | "devops-infra" | "tech" | "computers"
-    ) || [
-        "kubernetes",
-        "microservice",
-        "backend",
-        "dockerfile",
-        "pipeline",
-        "rust",
-        "python",
-    ]
-    .iter()
-    .any(|k| combined.contains(k))
-    {
-        for extra in ["architecture_outline", "verification_steps"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if domain == "finance"
-        || [
-            "portfolio",
-            "asset allocation",
-            "cashflow",
-            "retirement",
-            "sharpe",
-        ]
-        .iter()
-        .any(|k| combined.contains(k))
-    {
-        for extra in ["risk_breakdown", "allocation_summary"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if domain == "legal"
-        || [
-            "contract",
-            "statute",
-            "indemnification",
-            "gdpr",
-            "hipaa",
-            "nda",
-        ]
-        .iter()
-        .any(|k| combined.contains(k))
-    {
-        for extra in ["statutory_basis", "compliance_checklist"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if matches!(domain, "medical" | "health" | "pharma")
-        || ["clinical", "patient", "diagnosis", "symptom", "biomarker"]
+    #[test]
+    fn test_infer_implicit_deliverables_delegates() {
+        let mut out = AlgorithmOutput::default();
+        out.mode = Some(Mode::Aggressive);
+        out.resolved_schema.task = Some("Review GDPR contract compliance".to_string());
+        infer_implicit_deliverables(&mut out);
+        let names: Vec<&str> = out
+            .resolved_schema
+            .output
             .iter()
-            .any(|k| combined.contains(k))
-    {
-        for extra in ["clinical_considerations", "safety_precautions"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if domain == "travel"
-        || ["itinerary", "vacation", "sightseeing", "flight", "hotel"]
-            .iter()
-            .any(|k| combined.contains(k))
-    {
-        for extra in ["daily_itinerary", "logistics_summary"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if domain == "education"
-        || ["curriculum", "syllabus", "pedagogy", "lesson", "student"]
-            .iter()
-            .any(|k| combined.contains(k))
-    {
-        for extra in ["learning_objectives", "practice_exercises"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if matches!(
-        domain,
-        "business" | "business-strategy" | "marketing" | "ecommerce"
-    ) || ["go-to-market", "monetize", "campaign", "revenue", "startup"]
-        .iter()
-        .any(|k| combined.contains(k))
-    {
-        for extra in ["action_plan", "kpi_metrics"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
-    } else if domain == "real-estate"
-        || ["property", "mortgage", "cap rate", "reit", "multifamily"]
-            .iter()
-            .any(|k| combined.contains(k))
-    {
-        for extra in ["market_comparables", "roi_projection"] {
-            push_unique(&mut out.resolved_schema.output, extra);
-        }
+            .map(|d| d.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["statutory_basis", "compliance_checklist"]);
     }
 }

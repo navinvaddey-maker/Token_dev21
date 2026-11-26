@@ -14,13 +14,13 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 use xml::reader::{EventReader, XmlEvent};
 use zip::ZipArchive;
 
 use super::embeddings::{cosine_similarity, EmbeddingEngine};
 use super::types::{DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIM};
+use crate::utils::{hash::OryxHasher, math::OryxVectorMath};
 
 /// Maximum supported local document size (50 MiB).
 pub const MAX_LOCAL_FILE_BYTES: u64 = 50 * 1024 * 1024;
@@ -30,8 +30,6 @@ pub const MAX_DOCX_XML_BYTES: u64 = 16 * 1024 * 1024;
 const DEFAULT_CHUNK_WORDS: usize = 200;
 /// Default overlap between adjacent chunks in words.
 const DEFAULT_CHUNK_OVERLAP: usize = 32;
-/// RRF constant `k` matching `RagStore::search_hybrid_filtered`.
-const RRF_K: f32 = 60.0;
 /// Default index filename stored inside the watched folder.
 pub const DEFAULT_INDEX_FILENAME: &str = ".rag_local_index.json";
 
@@ -501,12 +499,11 @@ impl LocalIndexStore {
             if cand.lexical_score <= 0.0 && cand.vector_score < 0.12 {
                 continue;
             }
-            let vec_rrf = 1.0 / (RRF_K + vec_ranks[idx] as f32);
-            let lex_rrf = lex_ranks[idx]
-                .map(|r| 1.0 / (RRF_K + r as f32))
-                .unwrap_or(0.0);
-            // Scale by RRF_K / 2.0 so top dual-matched chunks score close to 1.0 while preserving rank order.
-            let combined = (vec_rrf + lex_rrf) * (RRF_K * 0.5);
+            let combined = OryxVectorMath::compute_normalized_rrf_score(
+                Some(vec_ranks[idx]),
+                lex_ranks[idx],
+                OryxVectorMath::RRF_SMOOTHING_K,
+            );
             scored.push((idx, combined));
         }
 
@@ -554,9 +551,7 @@ impl LocalIndexStore {
 
 /// Computes SHA-256 hex digest for raw file bytes.
 pub fn compute_sha256_hex(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
+    OryxHasher::compute_sha256_hex_digest(bytes)
 }
 
 /// Normalizes and validates requested file extensions (`.pdf`, `.docx`).

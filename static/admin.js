@@ -1,3 +1,21 @@
+if (typeof globalThis.OryxDomUtils === 'undefined') {
+    class OryxDomUtils {
+        static escapeHtmlEntities(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    }
+    globalThis.OryxDomUtils = OryxDomUtils;
+    if (typeof window !== 'undefined') {
+        window.OryxDomUtils = OryxDomUtils;
+    }
+}
+
 const State = {
     userId: null,
     username: null,
@@ -398,6 +416,12 @@ function initEventListeners() {
 
     // Edit form submit
     document.getElementById('edit-user-form').addEventListener('submit', handleEditUser);
+
+    // History filters (bound once on init rather than per apiFetch call)
+    const historySearchEl = document.getElementById('admin-history-search');
+    if (historySearchEl) historySearchEl.addEventListener('input', renderHistory);
+    const historyModeEl = document.getElementById('admin-history-mode');
+    if (historyModeEl) historyModeEl.addEventListener('change', renderHistory);
 
     // RAG listeners
     initRagEventListeners();
@@ -1322,6 +1346,9 @@ async function deleteRagDoc(id) {
 }
 
 function escapeHtml(str) {
+    if (typeof OryxDomUtils !== 'undefined' && OryxDomUtils.escapeHtmlEntities) {
+        return OryxDomUtils.escapeHtmlEntities(str);
+    }
     const d = document.createElement('div');
     d.textContent = str == null ? '' : String(str);
     return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');

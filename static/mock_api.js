@@ -3,6 +3,34 @@
 //! sandbox execution when unauthenticated, and communicates with Axum backend when signed in.
 
 /**
+ * Shared DOM utilities for robust HTML entity escaping (Phase 2).
+ */
+class OryxDomUtils {
+    /**
+     * Escapes HTML special characters in untrusted strings.
+     * Matches app.js apostrophe entity (&#39;) for 100% test compatibility.
+     * 
+     * # Arguments
+     * * `value` - Any input value (string, number, null, undefined)
+     */
+    static escapeHtmlEntities(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+}
+if (typeof window !== 'undefined') {
+    window.OryxDomUtils = OryxDomUtils;
+}
+if (typeof globalThis !== 'undefined') {
+    globalThis.OryxDomUtils = OryxDomUtils;
+}
+
+/**
  * Client-side continuation & constraint/phase reconciliation helpers (Phase 4).
  * Provides deterministic Turn 1 extraction and Guest Mode multi-turn rehydration
  * with zero backend state.

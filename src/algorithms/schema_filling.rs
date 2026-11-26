@@ -238,10 +238,10 @@ impl SchemaFilling {
         let task_inferred = task.is_some();
 
         if layers >= 2 {
-            Self::infer_implicit_deliverables(
-                &task,
+            infer_implicit_deliverables_from_context(
+                task.as_deref(),
                 &constraints,
-                &mode,
+                mode.as_ref(),
                 scenario.as_ref(),
                 &all_sources,
                 &mut deliverables,
@@ -267,160 +267,6 @@ impl SchemaFilling {
             output: deliverables,
             null_fields,
             task_inferred,
-        }
-    }
-
-    /// Infers concise domain-specific deliverables when `mode` is `Balanced` or `Aggressive`.
-    ///
-    /// # Panics
-    /// Never.
-    fn infer_implicit_deliverables(
-        task: &Option<String>,
-        constraints: &[Constraint],
-        mode: &Option<Mode>,
-        scenario: Option<&ScenarioSignal>,
-        all_sources: &[String],
-        deliverables: &mut Vec<Deliverable>,
-    ) {
-        let allow = matches!(mode, Some(Mode::Balanced) | Some(Mode::Aggressive));
-        if !allow {
-            return;
-        }
-
-        let task_text = task.as_deref().unwrap_or("").to_lowercase();
-        let constraint_text: String = constraints
-            .iter()
-            .map(|c| c.name.to_lowercase())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let source_text: String = all_sources
-            .iter()
-            .map(|s| s.to_lowercase())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let combined = format!("{task_text} {constraint_text} {source_text}");
-        let domain = scenario.map(|s| s.domain.as_str()).unwrap_or("");
-
-        let push_unique = |list: &mut Vec<Deliverable>, item: &str| {
-            if !list.iter().any(|d| d.name.eq_ignore_ascii_case(item)) {
-                list.push(Deliverable {
-                    name: item.to_string(),
-                });
-            }
-        };
-
-        // 1. Nutrition / Dietary meal plan
-        let meal_plan = domain == "nutrition"
-            || combined.contains("meal")
-            || combined.contains("nutrition")
-            || (combined.contains("plan")
-                && ["diet", "calorie", "protein", "macro"]
-                    .iter()
-                    .any(|k| combined.contains(k)));
-        let dietary = [
-            "fiber",
-            "dairy",
-            "nightshade",
-            "carb",
-            "macro",
-            "calorie",
-            "vegan",
-            "keto",
-        ]
-        .iter()
-        .any(|k| combined.contains(k));
-        if meal_plan && dietary {
-            push_unique(deliverables, "shopping_list");
-            push_unique(deliverables, "substitution_guide");
-        }
-
-        // Only infer domain deliverables when deliverables list is still empty (or under 2 items)
-        // to keep Balanced Mode concise.
-        if deliverables.len() >= 2 {
-            return;
-        }
-
-        if matches!(
-            domain,
-            "software" | "software-engineering" | "devops" | "devops-infra" | "tech" | "computers"
-        ) || [
-            "kubernetes",
-            "microservice",
-            "backend",
-            "dockerfile",
-            "pipeline",
-            "rust",
-            "python",
-        ]
-        .iter()
-        .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "architecture_outline");
-            push_unique(deliverables, "verification_steps");
-        } else if domain == "finance"
-            || [
-                "portfolio",
-                "asset allocation",
-                "cashflow",
-                "retirement",
-                "sharpe",
-            ]
-            .iter()
-            .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "risk_breakdown");
-            push_unique(deliverables, "allocation_summary");
-        } else if domain == "legal"
-            || [
-                "contract",
-                "statute",
-                "indemnification",
-                "gdpr",
-                "hipaa",
-                "nda",
-            ]
-            .iter()
-            .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "statutory_basis");
-            push_unique(deliverables, "compliance_checklist");
-        } else if matches!(domain, "medical" | "health" | "pharma")
-            || ["clinical", "patient", "diagnosis", "symptom", "biomarker"]
-                .iter()
-                .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "clinical_considerations");
-            push_unique(deliverables, "safety_precautions");
-        } else if domain == "travel"
-            || ["itinerary", "vacation", "sightseeing", "flight", "hotel"]
-                .iter()
-                .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "daily_itinerary");
-            push_unique(deliverables, "logistics_summary");
-        } else if domain == "education"
-            || ["curriculum", "syllabus", "pedagogy", "lesson", "student"]
-                .iter()
-                .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "learning_objectives");
-            push_unique(deliverables, "practice_exercises");
-        } else if matches!(
-            domain,
-            "business" | "business-strategy" | "marketing" | "ecommerce"
-        ) || ["go-to-market", "monetize", "campaign", "revenue", "startup"]
-            .iter()
-            .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "action_plan");
-            push_unique(deliverables, "kpi_metrics");
-        } else if domain == "real-estate"
-            || ["property", "mortgage", "cap rate", "reit", "multifamily"]
-                .iter()
-                .any(|k| combined.contains(k))
-        {
-            push_unique(deliverables, "market_comparables");
-            push_unique(deliverables, "roi_projection");
         }
     }
 
@@ -679,6 +525,167 @@ pub struct FillResult {
     pub task_inferred: bool,
 }
 
+type DomainDeliverableRule = (
+    &'static [&'static str],
+    &'static [&'static str],
+    [&'static str; 2],
+);
+
+const DOMAIN_DELIVERABLE_RULES: &[DomainDeliverableRule] = &[
+    (
+        &[
+            "software",
+            "software-engineering",
+            "devops",
+            "devops-infra",
+            "tech",
+            "computers",
+        ],
+        &[
+            "kubernetes",
+            "microservice",
+            "backend",
+            "dockerfile",
+            "pipeline",
+            "rust",
+            "python",
+        ],
+        ["architecture_outline", "verification_steps"],
+    ),
+    (
+        &["finance"],
+        &[
+            "portfolio",
+            "asset allocation",
+            "cashflow",
+            "retirement",
+            "sharpe",
+        ],
+        ["risk_breakdown", "allocation_summary"],
+    ),
+    (
+        &["legal"],
+        &[
+            "contract",
+            "statute",
+            "indemnification",
+            "gdpr",
+            "hipaa",
+            "nda",
+        ],
+        ["statutory_basis", "compliance_checklist"],
+    ),
+    (
+        &["medical", "health", "pharma"],
+        &["clinical", "patient", "diagnosis", "symptom", "biomarker"],
+        ["clinical_considerations", "safety_precautions"],
+    ),
+    (
+        &["travel"],
+        &["itinerary", "vacation", "sightseeing", "flight", "hotel"],
+        ["daily_itinerary", "logistics_summary"],
+    ),
+    (
+        &["education"],
+        &["curriculum", "syllabus", "pedagogy", "lesson", "student"],
+        ["learning_objectives", "practice_exercises"],
+    ),
+    (
+        &["business", "business-strategy", "marketing", "ecommerce"],
+        &["go-to-market", "monetize", "campaign", "revenue", "startup"],
+        ["action_plan", "kpi_metrics"],
+    ),
+    (
+        &["real-estate"],
+        &["property", "mortgage", "cap rate", "reit", "multifamily"],
+        ["market_comparables", "roi_projection"],
+    ),
+];
+
+/// Infers concise domain-specific deliverables from task, constraints, scenario, and extra
+/// context sources when `mode` is [`Mode::Balanced`] or [`Mode::Aggressive`].
+///
+/// // ARCH: ARCHITECTURE.md §1.2, §1.5 — Canonical implicit deliverable inference shared between
+/// // Stage 4 (`SchemaFilling`) and Stage 6B (`correction::cycle`).
+///
+/// # Panics
+/// Never.
+pub fn infer_implicit_deliverables_from_context(
+    task: Option<&str>,
+    constraints: &[Constraint],
+    mode: Option<&Mode>,
+    scenario: Option<&ScenarioSignal>,
+    extra_sources: &[String],
+    deliverables: &mut Vec<Deliverable>,
+) {
+    if !matches!(mode, Some(Mode::Balanced | Mode::Aggressive)) {
+        return;
+    }
+
+    let task_text = task.unwrap_or("").to_lowercase();
+    let constraint_text = constraints
+        .iter()
+        .map(|c| c.name.to_lowercase())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let source_text = extra_sources
+        .iter()
+        .map(|s| s.to_lowercase())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let combined = format!("{task_text} {constraint_text} {source_text}");
+    let domain = scenario.map_or("", |s| s.domain.as_str());
+
+    let push_unique = |list: &mut Vec<Deliverable>, item: &str| {
+        if !list.iter().any(|d| d.name.eq_ignore_ascii_case(item)) {
+            list.push(Deliverable {
+                name: item.to_string(),
+            });
+        }
+    };
+
+    // 1. Nutrition / Dietary meal plan
+    let meal_plan = domain == "nutrition"
+        || combined.contains("meal")
+        || combined.contains("nutrition")
+        || (combined.contains("plan")
+            && ["diet", "calorie", "protein", "macro"]
+                .iter()
+                .any(|k| combined.contains(k)));
+    let dietary = [
+        "fiber",
+        "dairy",
+        "nightshade",
+        "carb",
+        "macro",
+        "calorie",
+        "vegan",
+        "keto",
+    ]
+    .iter()
+    .any(|k| combined.contains(k));
+    if meal_plan && dietary {
+        for extra in ["shopping_list", "substitution_guide"] {
+            push_unique(deliverables, extra);
+        }
+    }
+
+    // Only infer domain deliverables when deliverables list is still empty (or under 2 items)
+    // to keep Balanced Mode concise.
+    if deliverables.len() >= 2 {
+        return;
+    }
+
+    for &(domains, keywords, outputs) in DOMAIN_DELIVERABLE_RULES {
+        if domains.contains(&domain) || keywords.iter().any(|k| combined.contains(k)) {
+            for extra in outputs {
+                push_unique(deliverables, extra);
+            }
+            break;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -782,5 +789,32 @@ mod tests {
             has_auth_injection,
             "Expected at least one auth/authorization related scope injection"
         );
+    }
+
+    #[test]
+    fn infer_implicit_deliverables_from_context_domains() {
+        let mut deliverables = Vec::new();
+        infer_implicit_deliverables_from_context(
+            Some("Design a kubernetes microservice backend"),
+            &[],
+            Some(&Mode::Balanced),
+            None,
+            &[],
+            &mut deliverables,
+        );
+        let names: Vec<&str> = deliverables.iter().map(|d| d.name.as_str()).collect();
+        assert_eq!(names, vec!["architecture_outline", "verification_steps"]);
+
+        // Gentle mode must not infer implicit deliverables
+        let mut gentle_deliverables = Vec::new();
+        infer_implicit_deliverables_from_context(
+            Some("Design a kubernetes microservice backend"),
+            &[],
+            Some(&Mode::Gentle),
+            None,
+            &[],
+            &mut gentle_deliverables,
+        );
+        assert!(gentle_deliverables.is_empty());
     }
 }

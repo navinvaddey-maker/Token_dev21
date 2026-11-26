@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Enterprise Architecture & Tiered Subagent Workflow (Always Active)
 
 These rules complement [.agents/rules/nrule.md](file:///Users/navinvaddey/token_compress_engine/.agents/rules/nrule.md) and [.agents/rules/rust-standards.md](file:///Users/navinvaddey/token_compress_engine/.agents/rules/rust-standards.md). Precedence follows `nrule.md` §0 (`nrule.md` > `rust-standards.md` / `enterprise-workflow.md` unless explicitly overridden by `ARCHITECTURE.md` or Navin).
@@ -11,11 +15,11 @@ For any task involving architecture, code, config, schema, or execution:
 1. **Enterprise Architecture Analysis**:
    - Re-read `ARCHITECTURE.md` (per `nrule.md` §1) and map the request across the enterprise layers:
      - **Presentation & Local Companion**: `static/{index.html,admin.html,app.js,admin.js,rag_workspace.js,mock_api.js}` and `src/bin/rag.rs` (`127.0.0.1:49152` Own Data IPC)
-     - **API & Security Boundary**: `src/api.rs`, `src/main.rs`, `src/errors.rs` (CORS, security headers, 60s global + 15s handler / 30s–65s upload timeouts, `DefaultBodyLimit`, `auth_middleware`, `RateLimiter`)
-     - **Domain & Scenario Layer**: `src/domain.rs`, `src/scenario/`, `src/classifier/`, `src/npae/aggressive/{intent,role}.rs` (3-Axis Intent Tensor $D \times P \times I$)
+     - **API & Security Boundary**: `src/api/`, `src/main.rs`, `src/errors.rs` (CORS, security headers, 60s global + 15s handler / 30s–65s upload timeouts, `DefaultBodyLimit`, `auth_middleware`, `RateLimiter`)
+     - **Domain & Scenario Layer**: `src/domain/`, `src/scenario/`, `src/classifier/`, `src/npae/aggressive/{intent,role}.rs` (3-Axis Intent Tensor $D \times P \times I$)
      - **Pipeline, NPAE & Ory**: `src/pipeline/orchestrator.rs` (canonical; `src/engine/pipeline.rs` is deprecated), Stages `-1..6B`, `src/algorithms/`, `src/scoring/`, `src/npae/`, `src/npae/grounding/verifier.rs`
      - **RAG & Embeddings**: `src/rag/{embeddings,ingest,store,retriever,local,types}.rs`, `EnrichmentContext` (`src/types.rs`), untrusted XML fencing (`structurer/render.rs`, `scenario/router.rs`, `stage6a.rs`)
-     - **Persistence & Config**: `src/data.rs` (`Repository`), `src/db/schema_registry.rs`, `crates/db/`, `migrations/`, `src/npae/aggressive/config.rs` (`ConfigHandle` / `DomainIndex`), `config/{unified.json,scenario/*.json}`
+     - **Persistence & Config**: `src/data/`, `src/db/schema_registry.rs`, `crates/db/`, `migrations/`, `src/npae/aggressive/config.rs` (`ConfigHandle` / `DomainIndex`), `config/{unified.json,scenario/*.json}`
 2. **Research First**:
    - Inspect real files, callers, `Cargo.toml`, `Cargo.lock`, and `migrations/` before proposing changes.
    - Surface architectural fit, security/multi-tenancy boundaries (`tenant_id`, `user_id`), concurrency/blocking risks, and any drift against `ARCHITECTURE.md` or `rust-standards.md` (per `nrule.md` §1.4, STOP and flag contradictions).
@@ -30,10 +34,13 @@ For any task involving architecture, code, config, schema, or execution:
 
 ### 2.1 Naming Conventions
 - **Rust (`src/`, `crates/`)**: `snake_case` modules, functions, variables; `PascalCase` structs, enums, traits; `SCREAMING_SNAKE_CASE` constants. `Cargo.toml` forbids `unsafe_code` and denies `todo`/`dbg_macro`; `unwrap_used`/`expect_used`/`panic` are `warn` and enforced as errors via `cargo clippy ... -- -D warnings`.
+- **New Shared Utility Structs (`src/utils/*`)**: Must use the `Oryx*` prefix (e.g. `OryxTokenEstimator`, `OryxTextMatcher`, `OryxVectorMath`, `OryxHasher`, `OryxSecuritySanitizer`, `OryxSyncGuard`).
+- **Existing Rust Domain/Engine Structs & SQL Identifiers**: Preserve existing names (`snake_case` JSON wire keys and SQL columns).
+- **Methods**: Use intention-revealing `verb_noun` or `verb_noun_scoped` names rather than vague verbs (`check`, `handle`, `do_work`).
 - **SQL & Migrations (`migrations/`)**: `NNNN_snake_case_description.sql`, `snake_case` tables/columns/indexes, forward-only migrations.
-- **Frontend JS (`static/*.js`)**: `camelCase` functions/variables, `UPPER_SNAKE_CASE` constants, kebab-case/BEM CSS classes.
+- **Frontend JS (`static/*.js`)**: `camelCase` functions/variables, `UPPER_SNAKE_CASE` constants, kebab-case/BEM CSS classes. New helper classes must use the `Oryx*` prefix (e.g., `OryxDomUtils`).
 - **Python Utility Scripts (`*.py`)**: `snake_case` functions/variables, `PascalCase` classes, `UPPER_SNAKE_CASE` constants.
-- **JSON / API Payloads**: `snake_case` fields matching `src/api.rs` and `src/types.rs`.
+- **JSON / API Payloads**: `snake_case` fields matching `src/api/` and `src/types.rs`.
 
 ### 2.2 Exception & Error Catching (Zero Silent Failures)
 - **Rust**: Use `Result<T, E>` + `?` propagation everywhere. Prefer `thiserror` (`AppError` in `src/errors.rs`) in library/domain modules and `anyhow` only at binary edges (`src/main.rs`, `src/bin/rag.rs`). Preserve context; sanitize DB/internal/engine errors behind `error_id` correlation UUIDs at the HTTP boundary.

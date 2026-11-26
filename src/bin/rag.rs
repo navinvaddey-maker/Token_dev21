@@ -24,6 +24,7 @@ use token_compress_engine::rag::local::{
     LocalHealthResponse, LocalIndexStore, LocalRagError, LocalRetrieveRequest,
     DEFAULT_INDEX_FILENAME,
 };
+use token_compress_engine::utils::sync::OryxSyncGuard;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 const DEFAULT_PORT: u16 = 49152;
@@ -145,9 +146,7 @@ fn sync_blocking(
 ) -> Result<token_compress_engine::rag::local::SyncSummary, String> {
     // Clone or operate on a working copy outside the lock so readers never stall during ONNX embedding.
     let mut working_store = {
-        let guard = store_lock
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let guard = OryxSyncGuard::read_rwlock_recovering_poison(store_lock);
         guard.clone()
     };
 
@@ -156,9 +155,7 @@ fn sync_blocking(
         .map_err(|e| e.to_string())?;
 
     if summary.indexed > 0 || summary.removed > 0 {
-        let mut guard = store_lock
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut guard = OryxSyncGuard::write_rwlock_recovering_poison(store_lock);
         *guard = working_store;
     }
 
@@ -166,10 +163,7 @@ fn sync_blocking(
 }
 
 fn build_health(state: &CompanionState) -> LocalHealthResponse {
-    let guard = state
-        .store
-        .read()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let guard = OryxSyncGuard::read_rwlock_recovering_poison(&state.store);
     LocalHealthResponse {
         status: "ok".to_string(),
         watched_dir: state.watch_dir.to_string_lossy().to_string(),
@@ -219,9 +213,7 @@ async fn retrieve_handler(
 
     // ARCH: §6 Async Rules — run ONNX query embedding & scoring in spawn_blocking.
     let res = tokio::task::spawn_blocking(move || {
-        let guard = store
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let guard = OryxSyncGuard::read_rwlock_recovering_poison(&store);
         guard.retrieve(&req, &embeddings)
     })
     .await;
@@ -258,10 +250,7 @@ fn run_stdin_loop(state: &CompanionState) -> Result<()> {
         }
         let output = match serde_json::from_str::<LocalRetrieveRequest>(trimmed) {
             Ok(req) => {
-                let guard = state
-                    .store
-                    .read()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let guard = OryxSyncGuard::read_rwlock_recovering_poison(&state.store);
                 match guard.retrieve(&req, &state.embeddings) {
                     Ok(resp) => serde_json::to_string(&resp)?,
                     Err(err) => serde_json::to_string(

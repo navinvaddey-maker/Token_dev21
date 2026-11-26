@@ -2894,6 +2894,9 @@ function showToast(msg, type) {
 }
 
 function escapeHtml(text) {
+    if (typeof OryxDomUtils !== 'undefined' && OryxDomUtils.escapeHtmlEntities) {
+        return OryxDomUtils.escapeHtmlEntities(text);
+    }
     const d = document.createElement('div');
     d.textContent = text == null ? '' : String(text);
     return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');

@@ -1,3 +1,5 @@
+//! LEGACY (v1): Retained solely for historical regression tests (`tests/test_principles.rs`, `tests/test_autodetect.rs`, `tests/test_dup.rs`). Canonical engine is `crate::pipeline::orchestrator::PipelineOrchestrator`.
+
 use super::PrincipleResult;
 use once_cell::sync::Lazy;
 use regex::Regex;

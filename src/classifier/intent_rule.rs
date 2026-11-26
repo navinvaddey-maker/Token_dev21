@@ -460,16 +460,7 @@ fn phrase_hit(haystack: &str, needle: &str) -> bool {
 }
 
 fn title_case_slug(slug: &str) -> String {
-    slug.split(|c: char| c == '-' || c == '_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+    crate::utils::text::OryxTextMatcher::format_slug_as_title_case(slug)
 }
 
 #[cfg(test)]

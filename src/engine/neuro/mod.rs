@@ -1,9 +1,3 @@
-pub mod context;
-pub mod correction;
-pub mod memory;
-pub mod normalization;
-pub mod orchestrator;
+//! Internal neural topology routing module (`ARCHITECTURE.md` §1.1).
+
 pub mod routing;
-pub mod schema_filling;
-pub mod scope_injection;
-pub mod scoring;

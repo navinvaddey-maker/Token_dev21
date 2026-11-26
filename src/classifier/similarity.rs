@@ -21,7 +21,7 @@ pub fn cosine_similarity_normalized(query: &[f32], archetype: &[f32]) -> f32 {
         query.len(),
         archetype.len()
     );
-    query.iter().zip(archetype.iter()).map(|(a, b)| a * b).sum()
+    crate::utils::math::OryxVectorMath::compute_unit_dot_similarity(query, archetype)
 }
 
 /// Holds one archetype's similarity score alongside its metadata.

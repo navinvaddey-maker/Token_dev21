@@ -198,10 +198,7 @@ impl EmbeddingEngine {
 /// Compute cosine similarity between two L2-normalized vectors.
 /// Returns value in [-1.0, 1.0] where 1.0 = identical.
 pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() {
-        return 0.0;
-    }
-    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+    crate::utils::math::OryxVectorMath::compute_unit_dot_similarity(a, b)
 }
 
 // ── Internals ──────────────────────────────────────────────────────────────
@@ -218,32 +215,17 @@ fn tokenize(text: &str) -> Vec<String> {
 
 /// Deterministic hash function (FNV-1a) for stable cross-session consistency.
 fn stable_hash(s: &str) -> u64 {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for byte in s.bytes() {
-        hash ^= byte as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    hash
+    crate::utils::hash::OryxHasher::compute_fnv1a_primary_u64(s)
 }
 
 /// Secondary hash for sign determination (different seed).
 fn stable_hash_secondary(s: &str) -> u64 {
-    let mut hash: u64 = 0x517cc1b727220a95;
-    for byte in s.bytes() {
-        hash ^= byte as u64;
-        hash = hash.wrapping_mul(0x9e3779b97f4a7c15);
-    }
-    hash
+    crate::utils::hash::OryxHasher::compute_fnv1a_secondary_u64(s)
 }
 
 /// L2 normalize a vector in-place.
 fn l2_normalize(v: &mut [f32]) {
-    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm > 1e-10 {
-        for x in v.iter_mut() {
-            *x /= norm;
-        }
-    }
+    crate::utils::math::OryxVectorMath::normalize_l2_in_place(v);
 }
 
 /// Minimal English stop-word set.
