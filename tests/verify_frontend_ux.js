@@ -40,12 +40,14 @@ async function runTestSuite() {
 
     const htmlPath = path.resolve(__dirname, '../static/index.html');
     const appJsPath = path.resolve(__dirname, '../static/app.js');
+    const oryxDomUtilsPath = path.resolve(__dirname, '../static/oryx_dom_utils.js');
     const mockJsPath = path.resolve(__dirname, '../static/mock_api.js');
     const optJsPath = path.resolve(__dirname, '../static/prompt_optimizer.js');
     const devJsPath = path.resolve(__dirname, '../static/dev_engine.js');
 
     const html = fs.readFileSync(htmlPath, 'utf8');
     const appJs = fs.readFileSync(appJsPath, 'utf8');
+    const oryxDomUtilsJs = fs.readFileSync(oryxDomUtilsPath, 'utf8');
     const mockJs = fs.readFileSync(mockJsPath, 'utf8');
     const optJs = fs.readFileSync(optJsPath, 'utf8');
     const devJs = fs.readFileSync(devJsPath, 'utf8');
@@ -205,6 +207,7 @@ async function runTestSuite() {
         doc.body.appendChild(scriptEl);
     }
 
+    injectScript(oryxDomUtilsJs);
     injectScript(mockJs);
     injectScript(optJs);
     injectScript(devJs);
@@ -923,6 +926,225 @@ async function runTestSuite() {
 
     assert(!adminHtml.includes('hud-mode'), 'Admin P3: CRT scanline hud-mode class retired');
     assert(adminHtml.includes('id="btn-admin-theme"') && adminHtml.includes('<th scope="col">'), 'Admin P3: Shared theme toggle and accessible <th scope="col"> headers present');
+
+    // Suite 10: Prismatic Oryx 3D Brand System, Hover-Only Motion & Monochrome HIG Icons
+    console.log('\n--- Suite 10: Prismatic Oryx 3D Brand System, Hover-Only Motion & Monochrome HIG Icons ---');
+    const adminJs = fs.readFileSync(path.resolve(__dirname, '../static/admin.js'), 'utf8');
+    const ragJs = fs.readFileSync(path.resolve(__dirname, '../static/rag_workspace.js'), 'utf8');
+
+    // 10.1 Favicon & multi-density .oryx-3d-emblem srcset in index.html & admin.html
+    assert(
+        html.includes('favicon.svg') &&
+        adminHtml.includes('favicon.svg'),
+        'Oryx 3D: index.html and admin.html link favicon.svg'
+    );
+    const indexEmblemImg = doc.querySelector('#oryx-logo-3d .oryx-3d-emblem img');
+    assert(
+        indexEmblemImg !== null &&
+        (indexEmblemImg.getAttribute('srcset') || '').includes('logo-1x.png') &&
+        (indexEmblemImg.getAttribute('srcset') || '').includes('1x') &&
+        (indexEmblemImg.getAttribute('srcset') || '').includes('logo.png') &&
+        (indexEmblemImg.getAttribute('srcset') || '').includes('2x'),
+        'Oryx 3D: index.html .oryx-3d-emblem uses multi-density srcset (logo-1x.png 1x, logo.png 2x)'
+    );
+    assert(
+        adminHtml.includes('class="oryx-3d-emblem"') &&
+        /logo-1x\.png[^"']*1x,\s*logo\.png[^"']*2x/.test(adminHtml),
+        'Oryx 3D: admin.html .oryx-3d-emblem uses multi-density srcset (logo-1x.png 1x, logo.png 2x)'
+    );
+
+    // 10.2 Legacy Sobel PBR owl artifacts removed
+    const legacyOwlFiles = [html, adminHtml, studioCss, appJs, adminJs];
+    const hasLegacyOwl = legacyOwlFiles.some(src =>
+        src.includes('.owl-3d-rig') ||
+        src.includes('oryx-owl-pbr-canvas') ||
+        src.includes('initOryxOwl3dIcon')
+    );
+    assert(!hasLegacyOwl, 'Oryx 3D: Legacy .owl-3d-rig, #oryx-owl-pbr-canvas, and initOryxOwl3dIcon absent across HTML/CSS/JS');
+
+    // 10.3 Hover-only tilt emblem behavior (calm at rest, idempotent, tilts on pointermove, resets on pointerleave & pointercancel, respects reduced motion)
+    const logoContainer = doc.getElementById('oryx-logo-3d');
+    const logoEmblem = logoContainer ? logoContainer.querySelector('.oryx-3d-emblem') : null;
+    const logoHost = logoContainer ? (logoContainer.closest('.tc-logo, .logo') || logoContainer) : null;
+    if (win.OryxDomUtils && typeof win.OryxDomUtils.initHoverTiltEmblem === 'function') {
+        win.OryxDomUtils.initHoverTiltEmblem('oryx-logo-3d');
+        // Idempotent second call must be a clean no-op
+        win.OryxDomUtils.initHoverTiltEmblem('oryx-logo-3d');
+    }
+    assert(
+        logoContainer !== null &&
+        logoContainer.dataset.oryx3dInit === '1' &&
+        logoEmblem !== null &&
+        logoEmblem.style.getPropertyValue('--oryx-rx') === '0deg' &&
+        logoEmblem.style.getPropertyValue('--oryx-ry') === '0deg',
+        'Oryx 3D: initHoverTiltEmblem is idempotent, marks #oryx-logo-3d with data-oryx3d-init="1", and starts calm at 0deg rest pose'
+    );
+    if (logoHost && logoEmblem) {
+        const PointerOrMouseEvent = win.PointerEvent || win.MouseEvent;
+        logoHost.dispatchEvent(new PointerOrMouseEvent('pointermove', { clientX: 48, clientY: 6, bubbles: true }));
+        const ryMoved = logoEmblem.style.getPropertyValue('--oryx-ry');
+        assert(
+            ryMoved !== '' && ryMoved !== '0deg' && ryMoved !== '0.00deg',
+            `Oryx 3D: pointermove tilts .oryx-3d-emblem (--oryx-ry=${ryMoved})`
+        );
+        logoHost.dispatchEvent(new PointerOrMouseEvent('pointerleave', { bubbles: true }));
+        assert(
+            logoEmblem.style.getPropertyValue('--oryx-rx') === '0deg' &&
+            logoEmblem.style.getPropertyValue('--oryx-ry') === '0deg',
+            'Oryx 3D: pointerleave resets .oryx-3d-emblem back to 0deg'
+        );
+
+        // Verify pointercancel also resets pose back to 0deg
+        logoHost.dispatchEvent(new PointerOrMouseEvent('pointermove', { clientX: 48, clientY: 6, bubbles: true }));
+        const ryMovedAgain = logoEmblem.style.getPropertyValue('--oryx-ry');
+        logoHost.dispatchEvent(new PointerOrMouseEvent('pointercancel', { bubbles: true }));
+        assert(
+            ryMovedAgain !== '0deg' &&
+            logoEmblem.style.getPropertyValue('--oryx-rx') === '0deg' &&
+            logoEmblem.style.getPropertyValue('--oryx-ry') === '0deg',
+            'Oryx 3D: pointercancel resets .oryx-3d-emblem back to 0deg'
+        );
+
+        // Verify prefers-reduced-motion: reduce keeps emblem at 0deg during pointermove
+        const origMatchMedia = win.matchMedia;
+        win.matchMedia = (q) => ({ matches: q.includes('prefers-reduced-motion: reduce)'), media: q });
+        logoHost.dispatchEvent(new PointerOrMouseEvent('pointermove', { clientX: 48, clientY: 6, bubbles: true }));
+        const rxReduced = logoEmblem.style.getPropertyValue('--oryx-rx');
+        const ryReduced = logoEmblem.style.getPropertyValue('--oryx-ry');
+        win.matchMedia = origMatchMedia;
+        assert(
+            rxReduced === '0deg' && ryReduced === '0deg',
+            `Oryx 3D: prefers-reduced-motion: reduce keeps emblem at 0deg (--oryx-rx=${rxReduced}, --oryx-ry=${ryReduced})`
+        );
+    }
+
+    // 10.3b CSS mask icon architecture & DOM data-icon coverage across index.html + admin.html
+    assert(
+        !/@property\s+--icon(?:-start)?\s*\{[^}]*inherits:\s*false/i.test(tokensCss) &&
+        tokensCss.includes('--oryx-glyph') &&
+        tokensCss.includes('.oryx-icon-start:not(.oryx-icon):not(:empty)::before') &&
+        !tokensCss.includes(':where(.oryx-icon-start') &&
+        tokensCss.includes('-webkit-mask-image: var(--oryx-glyph)') &&
+        tokensCss.includes('mask-image: var(--oryx-glyph)') &&
+        tokensCss.includes('forced-color-adjust: none'),
+        'HIG Icons: tokens.css uses inheriting --oryx-glyph, non-:where() selectors, mask-image longhands, and forced-color-adjust: none without non-inheriting @property'
+    );
+
+    const adminDom = new JSDOM(adminHtml, { url: 'http://localhost:8081/admin.html' });
+    const adminDoc = adminDom.window.document;
+    const customSkinBtn = doc.getElementById('btn-custom-skin');
+    assert(
+        customSkinBtn !== null &&
+        customSkinBtn.getAttribute('data-icon') === 'palette' &&
+        !customSkinBtn.hasAttribute('data-action'),
+        'HIG Icons: #btn-custom-skin carries data-icon="palette" without spurious data-action="customSkin"'
+    );
+
+    const iconAuditFailures = [];
+    for (const [pageName, pageDoc] of [['index.html', doc], ['admin.html', adminDoc]]) {
+        const iconEls = pageDoc.querySelectorAll('.oryx-icon, .oryx-icon-start');
+        iconEls.forEach((el) => {
+            const id = el.id || '';
+            if (id === 'btn-theme-toggle' || id === 'btn-admin-theme') {
+                return;
+            }
+            const iconName = el.getAttribute('data-icon');
+            if (!iconName) {
+                iconAuditFailures.push(`${pageName}#${id || el.className}: missing data-icon`);
+                return;
+            }
+            const tokenName = `--icon-${iconName}:`;
+            const selectorName = `[data-icon="${iconName}"]`;
+            if (!tokensCss.includes(tokenName) || !tokensCss.includes(selectorName)) {
+                iconAuditFailures.push(`${pageName}#${id || iconName}: missing token/mapping for ${iconName}`);
+            }
+        });
+    }
+    assert(
+        iconAuditFailures.length === 0,
+        `HIG Icons: Every .oryx-icon / .oryx-icon-start across index.html and admin.html resolves to a defined tokens.css glyph (issues: ${iconAuditFailures.join('; ') || 'none'})`
+    );
+
+    // 10.3c On-disk asset verification (logos, favicon, 3D badges, shared OryxDomUtils module)
+    const requiredAssets = [
+        '../static/logo.png',
+        '../static/logo-1x.png',
+        '../static/favicon.svg',
+        '../static/oryx_dom_utils.js',
+        '../static/icons/badge-vault.png',
+        '../static/icons/badge-vault-1x.png',
+        '../static/icons/badge-telemetry.png',
+        '../static/icons/badge-telemetry-1x.png',
+        '../static/icons/badge-doc.png',
+        '../static/icons/badge-doc-1x.png'
+    ];
+    const missingOrEmptyAssets = requiredAssets.filter((relPath) => {
+        const fullPath = path.resolve(__dirname, relPath);
+        return !fs.existsSync(fullPath) || fs.statSync(fullPath).size <= 0;
+    });
+    assert(
+        missingOrEmptyAssets.length === 0,
+        `Oryx 3D: All required brand assets and static/oryx_dom_utils.js exist on disk with size > 0 (missing: ${missingOrEmptyAssets.join(', ') || 'none'})`
+    );
+
+    // 10.4 3D Hero Badges in gates, drop overlay, and runtime empty states with alt=""
+    const vaultGateImg = doc.querySelector('#history-auth-gate img.oryx-hero-badge-img');
+    const telemetryGateImg = doc.querySelector('#stats-auth-gate img.oryx-hero-badge-img');
+    const docDropImg = doc.querySelector('#drop-overlay img.oryx-hero-badge-img');
+    assert(
+        vaultGateImg !== null && (vaultGateImg.getAttribute('src') || '').includes('badge-vault') && vaultGateImg.getAttribute('alt') === '' &&
+        telemetryGateImg !== null && (telemetryGateImg.getAttribute('src') || '').includes('badge-telemetry') && telemetryGateImg.getAttribute('alt') === '' &&
+        docDropImg !== null && (docDropImg.getAttribute('src') || '').includes('badge-doc') && docDropImg.getAttribute('alt') === '',
+        'Oryx 3D: #history-auth-gate, #stats-auth-gate, and #drop-overlay render 3D hero badges with alt=""'
+    );
+
+    if (typeof win.renderHistoryList === 'function') {
+        win.renderHistoryList([]);
+    }
+    const emptyHistoryBadge = doc.querySelector('#history-list img.oryx-hero-badge-img');
+    if (typeof win.renderInsightsBento === 'function') {
+        win.renderInsightsBento({ total_compressions: 0 });
+    }
+    const emptyInsightsBadge = doc.querySelector('#global-stats img.oryx-hero-badge-img');
+    assert(
+        emptyHistoryBadge !== null && (emptyHistoryBadge.getAttribute('src') || '').includes('badge-vault') && emptyHistoryBadge.getAttribute('alt') === '' &&
+        emptyInsightsBadge !== null && (emptyInsightsBadge.getAttribute('src') || '').includes('badge-telemetry') && emptyInsightsBadge.getAttribute('alt') === '',
+        'Oryx 3D: Empty states for History and Insights render 3D hero badges (badge-vault, badge-telemetry) with alt=""'
+    );
+
+    // 10.5 Theme toggle empty textContent + ARIA label sync, and zero raw decorative emojis
+    const themeBtn = doc.getElementById('btn-theme-toggle');
+    win.toggleTheme();
+    const darkAria = themeBtn ? themeBtn.getAttribute('aria-label') : '';
+    const darkText = themeBtn ? themeBtn.textContent : null;
+    win.toggleTheme();
+    const lightAria = themeBtn ? themeBtn.getAttribute('aria-label') : '';
+    const lightText = themeBtn ? themeBtn.textContent : null;
+    assert(
+        themeBtn !== null &&
+        darkText === '' &&
+        lightText === '' &&
+        darkAria !== lightAria &&
+        (darkAria === 'Switch to Light Theme' || darkAria === 'Switch to Dark Theme') &&
+        (lightAria === 'Switch to Light Theme' || lightAria === 'Switch to Dark Theme'),
+        `HIG Icons: #btn-theme-toggle keeps textContent === "" while updating aria-label (${darkAria} <-> ${lightAria})`
+    );
+
+    const emojiRegex = /[\u{1F300}-\u{1FAFF}]/gu;
+    const emojiHits = [];
+    for (const [name, src] of [
+        ['index.html', html],
+        ['admin.html', adminHtml],
+        ['app.js', appJs],
+        ['admin.js', adminJs],
+        ['rag_workspace.js', ragJs]
+    ]) {
+        const matches = src.match(emojiRegex);
+        if (matches && matches.length > 0) {
+            emojiHits.push(`${name}: ${matches.join('')}`);
+        }
+    }
+    assert(emojiHits.length === 0, `HIG Icons: Zero raw decorative emojis remain across frontend files (hits: ${emojiHits.join('; ') || 'none'})`);
 
     // Final Summary
     console.log('\n======================================================');

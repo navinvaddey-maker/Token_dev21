@@ -7,14 +7,16 @@
     <meta name="color-scheme" content="light dark">
     <meta name="description" content="Oryx Intelligence Engine — CRISP framework powered prompt & token optimization">
     <title>Oryx Studio — Prompt &amp; Token Optimization</title>
-    <link rel="icon" type="image/png" href="logo.png?v=20261121" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20261127" />
+    <link rel="alternate icon" type="image/png" href="logo-1x.png?v=20261127" />
+    <link rel="apple-touch-icon" href="logo.png?v=20261127" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="styles/tokens.css?v=20261124-hig" />
-    <link rel="stylesheet" href="styles/studio.css?v=20261124-hig" />
+    <link rel="stylesheet" href="styles/tokens.css?v=20261127-oryx2" />
+    <link rel="stylesheet" href="styles/studio.css?v=20261127-oryx2" />
     <style>
         /* Critical-path desktop container & responsive breakpoints */
         .glass-card {
@@ -85,25 +87,11 @@
                 <div class="toolbar-left">
                     <div class="tc-logo" id="oryx-logo-wrap">
                         <div class="tc-logo-icon" id="oryx-logo-3d" aria-hidden="true">
-                            <div class="owl-3d-rig">
-                                <div class="owl-3d-slice owl-3d-slab-back"></div>
-                                <div class="owl-3d-slice owl-3d-slab-bevel"></div>
-                                <div class="owl-3d-slice owl-3d-slab-face">
-                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
-                                </div>
-                                <div class="owl-3d-slice owl-3d-relief-wings">
-                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
-                                </div>
-                                <div class="owl-3d-slice owl-3d-relief-core">
-                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
-                                </div>
-                                <div class="owl-3d-slice owl-3d-relief-crown">
-                                    <img src="logo.png?v=20261121" alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
-                                </div>
-                                <div class="owl-3d-slice owl-3d-pbr-layer">
-                                    <canvas id="oryx-owl-pbr-canvas" width="60" height="60" class="owl-3d-pbr-canvas"></canvas>
-                                </div>
-                                <div class="owl-3d-slice owl-3d-sheen"></div>
+                            <div class="oryx-3d-emblem">
+                                <img src="logo-1x.png?v=20261127"
+                                    srcset="logo-1x.png?v=20261127 1x, logo.png?v=20261127 2x"
+                                    alt="" width="30" height="30" class="tc-logo-img" decoding="async" />
+                                <span class="oryx-3d-glint" aria-hidden="true"></span>
                             </div>
                         </div>
                         <div class="tc-logo-text">Oryx<span>Studio</span></div>
@@ -133,10 +121,10 @@
                         <span class="cmd-search-label">Search</span>
                         <kbd id="header-cmd-kbd" class="macos-kbd">⌘K</kbd>
                     </button>
-                    <button type="button" class="icon-btn-header" id="btn-theme-toggle" data-action="toggleTheme"
-                        title="Toggle Light/Dark Theme" aria-label="Toggle Theme">🌙</button>
-                    <button type="button" class="icon-btn-header" id="btn-custom-skin" title="Customize Skin"
-                        aria-label="Customize Skin">🎨</button>
+                    <button type="button" class="icon-btn-header oryx-icon" id="btn-theme-toggle" data-action="toggleTheme"
+                        title="Toggle Light/Dark Theme" aria-label="Switch to Dark Theme"></button>
+                    <button type="button" class="icon-btn-header oryx-icon" id="btn-custom-skin" data-icon="palette" title="Customize Skin"
+                        aria-label="Customize Skin"></button>
                     <a href="/admin.html" id="admin-link" class="btn-ghost toolbar-admin-link"
                         style="display: none; text-decoration: none;">Admin</a>
                     <div class="toolbar-user-group">
@@ -231,16 +219,16 @@
                             </div>
                             <div class="preset-strip">
                                 <span class="preset-label">Try sample:</span>
-                                <button type="button" class="preset-chip" data-preset="house" id="preset-house"
-                                    data-action="loadPreset" data-arg="house">🏠 Buying a House</button>
-                                <button type="button" class="preset-chip" data-preset="bug" id="preset-bug"
-                                    data-action="loadPreset" data-arg="bug">🐛 Bug Report</button>
-                                <button type="button" class="preset-chip" data-preset="legal" id="preset-legal"
-                                    data-action="loadPreset" data-arg="legal">⚖️ Contract Review</button>
-                                <button type="button" class="preset-chip" id="btn-open-playbooks"
-                                    data-action="openPlaybookModal">📚 Playbooks</button>
-                                <button type="button" class="preset-chip" id="btn-private-local-badge"
-                                    data-action="showPrivacyLocalInfo" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">🔒 Local Docs</button>
+                                <button type="button" class="preset-chip oryx-icon-start" data-preset="house" id="preset-house"
+                                    data-action="loadPreset" data-arg="house" data-icon="home">Buying a House</button>
+                                <button type="button" class="preset-chip oryx-icon-start" data-preset="bug" id="preset-bug"
+                                    data-action="loadPreset" data-arg="bug" data-icon="bug">Bug Report</button>
+                                <button type="button" class="preset-chip oryx-icon-start" data-preset="legal" id="preset-legal"
+                                    data-action="loadPreset" data-arg="legal" data-icon="scale">Contract Review</button>
+                                <button type="button" class="preset-chip oryx-icon-start" id="btn-open-playbooks"
+                                    data-action="openPlaybookModal" data-icon="book">Playbooks</button>
+                                <button type="button" class="preset-chip oryx-icon-start" id="btn-private-local-badge"
+                                    data-action="showPrivacyLocalInfo" data-icon="lock" title="100% Local Private PDF/DOCX RAG on 127.0.0.1:49152">Local Docs</button>
                             </div>
                         </div>
 
@@ -259,7 +247,7 @@
                                 <!-- Phase 4: Parent Lock Bar (hidden until Turn 1 succeeds) -->
                                 <div id="parent-lock-bar" class="parent-lock-bar" style="display: none;" aria-live="polite">
                                     <div class="parent-lock-info">
-                                        <span id="parent-lock-badge" class="parent-lock-badge">🔒 Linked to Parent · Turn 1</span>
+                                        <span id="parent-lock-badge" class="parent-lock-badge oryx-icon-start" data-icon="lock">Linked to Parent · Turn 1</span>
                                         <span id="continuation-mode-pill" class="continuation-mode-pill mode-delta">Delta Follow-Up</span>
                                     </div>
                                     <button type="button" class="parent-reset-btn" id="new-prompt-btn" data-action="resetParentSession" title="Clear parent context and start a fresh prompt">New Prompt</button>
@@ -271,7 +259,9 @@
                                         aria-describedby="prompt-error"
                                         placeholder="Paste your lengthy prompt here, or drag &amp; drop a PDF, TXT, or MD file..."></textarea>
                                     <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
-                                        <span style="font-size: 1.6rem;">📄</span>
+                                        <img src="icons/badge-doc-1x.png?v=20261127"
+                                            srcset="icons/badge-doc-1x.png?v=20261127 1x, icons/badge-doc.png?v=20261127 2x"
+                                            alt="" width="52" height="52" class="oryx-hero-badge-img" loading="lazy" decoding="async" />
                                         <span>Drop .pdf, .txt, or .md to extract text</span>
                                     </div>
                                 </div>
@@ -281,7 +271,7 @@
                                 <!-- File Ingestion & Auto-Detected Domain (R4, R5) -->
                                 <div class="pane-meta-row">
                                     <label class="file-upload-btn" for="file-input">
-                                        <span>📄 Attach PDF / TXT / MD</span>
+                                        <span class="oryx-icon-start" data-icon="paperclip">Attach PDF / TXT / MD</span>
                                         <input type="file" id="file-input" accept=".pdf,.txt,.md"
                                             class="visually-hidden" data-change="handleFileSelect">
                                     </label>
@@ -538,12 +528,12 @@
                                     <label class="rag-source-option active" id="rag-opt-cloud">
                                         <input type="radio" name="ask-data-source" value="cloud" checked
                                             data-change="setDataSource">
-                                        <span>☁️ Cloud Data</span>
+                                        <span class="oryx-icon-start" data-icon="cloud">Cloud Data</span>
                                     </label>
                                     <label class="rag-source-option" id="rag-opt-own">
                                         <input type="radio" name="ask-data-source" value="own"
                                             data-change="setDataSource">
-                                        <span>💻 Own Data</span>
+                                        <span class="oryx-icon-start" data-icon="laptop">Own Data</span>
                                     </label>
                                 </div>
 
@@ -580,10 +570,9 @@
                                         style="display:flex;flex-direction:column;gap:0.4rem;">
                                         <code class="rag-cmd-snippet"
                                             id="local-rag-start-cmd">cargo run --bin rag -- --watch ./docs</code>
-                                        <button type="button" class="copy-btn" id="local-rag-copy-cmd-btn"
-                                            data-action="copyStartCommand"
-                                            style="width:100%;font-size:0.72rem;padding:0.3rem 0.5rem;min-block-size:1.9rem;">📋
-                                            Copy Start Command</button>
+                                        <button type="button" class="copy-btn oryx-icon-start" id="local-rag-copy-cmd-btn"
+                                            data-action="copyStartCommand" data-icon="clipboard"
+                                            style="width:100%;font-size:0.72rem;padding:0.3rem 0.5rem;min-block-size:1.9rem;">Copy Start Command</button>
                                     </div>
                                     <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.45;">Raw
                                         <code>.pdf</code> &amp; <code>.docx</code> stay strictly on your machine. Only
@@ -594,8 +583,8 @@
                                         Status</button>
                                 </div>
 
-                                <button type="button" class="btn-ghost" data-action="openVerifyModal"
-                                    style="width:100%;font-size:0.78rem;">🛡️ Verify LLM Reply</button>
+                                <button type="button" class="btn-ghost oryx-icon-start" data-action="openVerifyModal" data-icon="shield-check"
+                                    style="width:100%;font-size:0.78rem;">Verify LLM Reply</button>
                             </aside>
 
                             <div>
@@ -664,9 +653,9 @@
                                         placeholder="Ask a question against internal knowledge base..."></textarea>
                                 </div>
 
-                                <button type="button" class="tc-compress-btn" data-action="executeScenarioAsk"
-                                    id="ask-btn">
-                                    🔍 Query Internal Knowledge Base
+                                <button type="button" class="tc-compress-btn oryx-icon-start" data-action="executeScenarioAsk"
+                                    id="ask-btn" data-icon="search">
+                                    Query Internal Knowledge Base
                                 </button>
 
                                 <div id="scenario-result-section" style="display:none; margin-top: 1.25rem;">
@@ -698,19 +687,14 @@
                                             <div>
                                                 <h3
                                                     style="margin: 0 0 0.25rem 0; font-size: 0.94rem; color: var(--head-text); display: flex; align-items: center; gap: 0.4rem;">
-                                                    <span aria-hidden="true">⚡</span> Satisfied with Grounded Evidence?
+                                                    <span class="oryx-icon" data-icon="zap" aria-hidden="true"></span> Satisfied with Grounded Evidence?
                                                 </h3>
                                                 <p style="margin: 0; font-size: 0.82rem; color: var(--body-text);">
                                                     Convert to an ultra-clean prompt for LLMs: strips raw chunk wrappers
                                                     and compresses context with zero hallucination.
                                                 </p>
                                             </div>
-                                            <button type="button" class="tc-compress-btn"
-                                                id="scenario-compress-aggressive-btn"
-                                                data-action="executeScenarioAggressiveCompress"
-                                                style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.82rem; margin: 0;">
-                                                🔥 Compress in Aggressive Mode for LLM
-                                            </button>
+                                            <button type="button" class="tc-compress-btn oryx-icon-start" id="scenario-compress-aggressive-btn" data-action="executeScenarioAggressiveCompress" data-icon="flame" style="width: auto; padding: 0.65rem 1.25rem; font-size: 0.82rem; margin: 0;">Compress in Aggressive Mode for LLM</button>
                                         </div>
                                     </div>
 
@@ -727,9 +711,9 @@
                                                 <span class="badge badge-success" id="scenario-aggr-tes">TES: 0.98
                                                     (Hallucination-Free)</span>
                                             </div>
-                                            <button type="button" class="copy-btn" id="copy-aggr-prompt-btn"
-                                                data-action="copyAggressivePrompt">
-                                                📋 Copy for LLM
+                                            <button type="button" class="copy-btn oryx-icon-start" id="copy-aggr-prompt-btn"
+                                                data-action="copyAggressivePrompt" data-icon="clipboard">
+                                                Copy for LLM
                                             </button>
                                         </div>
 
@@ -780,7 +764,11 @@
                                 </select>
                             </div>
                             <div id="history-auth-gate" class="auth-gate-card" style="display: none;">
-                                <div class="auth-gate-icon" aria-hidden="true">🔒</div>
+                                <div class="auth-gate-icon" aria-hidden="true">
+                                    <img src="icons/badge-vault-1x.png?v=20261127"
+                                        srcset="icons/badge-vault-1x.png?v=20261127 1x, icons/badge-vault.png?v=20261127 2x"
+                                        alt="" width="56" height="56" class="oryx-hero-badge-img" loading="lazy" decoding="async" />
+                                </div>
                                 <div class="auth-gate-title">Save Compression History</div>
                                 <div class="auth-gate-desc">Create a free account or sign in to persist and search past
                                     prompt compression history across devices.</div>
@@ -805,7 +793,11 @@
                                     data-action="loadStats">↻ Refresh</button>
                             </div>
                             <div id="stats-auth-gate" class="auth-gate-card" style="display: none;">
-                                <div class="auth-gate-icon" aria-hidden="true">📊</div>
+                                <div class="auth-gate-icon" aria-hidden="true">
+                                    <img src="icons/badge-telemetry-1x.png?v=20261127"
+                                        srcset="icons/badge-telemetry-1x.png?v=20261127 1x, icons/badge-telemetry.png?v=20261127 2x"
+                                        alt="" width="56" height="56" class="oryx-hero-badge-img" loading="lazy" decoding="async" />
+                                </div>
                                 <div class="auth-gate-title">Personal Usage Analytics</div>
                                 <div class="auth-gate-desc">Sign in to track cumulative token savings, model efficiency,
                                     and cost reductions over time.</div>
@@ -909,9 +901,10 @@
         </div>
     </dialog>
 
-    <script src="mock_api.js?v=6"></script>
-    <script src="rag_workspace.js?v=2"></script>
-    <script src="app.js?v=20261124-hig"></script>
+    <script src="oryx_dom_utils.js?v=20261127-oryx2"></script>
+    <script src="mock_api.js?v=20261127-oryx2"></script>
+    <script src="rag_workspace.js?v=20261127-oryx2"></script>
+    <script src="app.js?v=20261127-oryx2"></script>
 </body>
 
 </html>

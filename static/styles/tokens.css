@@ -394,3 +394,179 @@ html[data-theme="dark"], html.dark, body.dark, body.theme-dark, body.theme-night
         scroll-behavior: auto !important;
     }
 }
+
+/* FIX: Non-inheriting @property blocked pseudo-element ::before from reading --oryx-glyph from its own host element */
+
+@keyframes webkit-301609 {}
+@supports ((-webkit-nbsp-mode: normal) or (-webkit-touch-callout: none) or (font: -apple-system-body)) and (content-visibility: auto) {
+    @layer webkit-301609-fix {
+        ::before, ::after {
+            animation: webkit-301609 0s;
+        }
+    }
+}
+
+:root {
+    --icon-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'/%3E%3C/svg%3E");
+    --icon-sun: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2m-7.07-14.93 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41'/%3E%3C/svg%3E");
+    --icon-palette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.5' cy='6.5' r='.5' fill='black'/%3E%3Ccircle cx='17.5' cy='10.5' r='.5' fill='black'/%3E%3Ccircle cx='8.5' cy='7.5' r='.5' fill='black'/%3E%3Ccircle cx='6.5' cy='12.5' r='.5' fill='black'/%3E%3Cpath d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9Z'/%3E%3C/svg%3E");
+    --icon-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E");
+    --icon-bug: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m8 2 1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3 3 0 1 1 6 0v1'/%3E%3Cpath d='M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6'/%3E%3Cpath d='M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M22 13h-4M17.2 17c2.1.1 3.8 1.9 3.8 4'/%3E%3C/svg%3E");
+    --icon-scale: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2'/%3E%3C/svg%3E");
+    --icon-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20'/%3E%3C/svg%3E");
+    --icon-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
+    --icon-file-text: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8'/%3E%3C/svg%3E");
+    --icon-cloud: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z'/%3E%3C/svg%3E");
+    --icon-laptop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16'/%3E%3C/svg%3E");
+    --icon-clipboard: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1'/%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3C/svg%3E");
+    --icon-shield-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+    --icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+    --icon-zap: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'/%3E%3C/svg%3E");
+    --icon-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'/%3E%3C/svg%3E");
+    --icon-paperclip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'/%3E%3C/svg%3E");
+    --icon-upload: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' x2='12' y1='3' y2='15'/%3E%3C/svg%3E");
+    --icon-message: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/%3E%3C/svg%3E");
+    --icon-menu: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4' x2='20' y1='12' y2='12'/%3E%3Cline x1='4' x2='20' y1='6' y2='6'/%3E%3Cline x1='4' x2='20' y1='18' y2='18'/%3E%3C/svg%3E");
+}
+
+[data-icon="moon"] { --oryx-glyph: var(--icon-moon); }
+[data-icon="sun"] { --oryx-glyph: var(--icon-sun); }
+[data-icon="palette"] { --oryx-glyph: var(--icon-palette); }
+[data-icon="home"] { --oryx-glyph: var(--icon-home); }
+[data-icon="bug"] { --oryx-glyph: var(--icon-bug); }
+[data-icon="scale"] { --oryx-glyph: var(--icon-scale); }
+[data-icon="book"] { --oryx-glyph: var(--icon-book); }
+[data-icon="lock"] { --oryx-glyph: var(--icon-lock); }
+[data-icon="file-text"] { --oryx-glyph: var(--icon-file-text); }
+[data-icon="cloud"] { --oryx-glyph: var(--icon-cloud); }
+[data-icon="laptop"] { --oryx-glyph: var(--icon-laptop); }
+[data-icon="clipboard"] { --oryx-glyph: var(--icon-clipboard); }
+[data-icon="shield-check"] { --oryx-glyph: var(--icon-shield-check); }
+[data-icon="search"] { --oryx-glyph: var(--icon-search); }
+[data-icon="zap"] { --oryx-glyph: var(--icon-zap); }
+[data-icon="flame"] { --oryx-glyph: var(--icon-flame); }
+[data-icon="paperclip"] { --oryx-glyph: var(--icon-paperclip); }
+[data-icon="upload"] { --oryx-glyph: var(--icon-upload); }
+[data-icon="message"] { --oryx-glyph: var(--icon-message); }
+[data-icon="menu"] { --oryx-glyph: var(--icon-menu); }
+
+#btn-custom-skin {
+    --oryx-glyph: var(--icon-palette);
+}
+#btn-theme-toggle,
+#btn-admin-theme {
+    --oryx-glyph: var(--icon-moon);
+}
+:is(html[data-theme="dark"], html.dark, body.dark, body.theme-dark, body.theme-night) :is(#btn-theme-toggle, #btn-admin-theme) {
+    --oryx-glyph: var(--icon-sun);
+}
+
+.oryx-icon-start > *,
+.oryx-icon > * {
+    --oryx-glyph: none;
+}
+
+.oryx-icon-start::before,
+.oryx-icon::before {
+    content: "";
+    display: inline-block;
+    width: var(--icon-style-size, 1.05em);
+    height: var(--icon-style-size, 1.05em);
+    background-color: var(--icon-style-color, currentColor);
+    -webkit-mask-image: var(--oryx-glyph);
+    mask-image: var(--oryx-glyph);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    vertical-align: calc(0.5cap - var(--icon-style-size, 1.05em) / 2 + var(--icon-style-voffset, -0.02em));
+    flex: 0 0 auto;
+    pointer-events: none;
+    forced-color-adjust: none;
+}
+
+.oryx-icon-start:not(.oryx-icon):not(:empty)::before {
+    margin-inline-end: var(--icon-style-spacing, 0.38em);
+}
+
+.btn-copied.oryx-icon-start::before {
+    display: none;
+}
+
+.oryx-3d-emblem {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border-radius: inherit;
+    display: block;
+    transform-style: preserve-3d;
+    transform: perspective(360px) rotateX(var(--oryx-rx, 0deg)) rotateY(var(--oryx-ry, 0deg)) scale(var(--oryx-scale, 1));
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease;
+    filter: drop-shadow(0 2px 6px rgba(10, 132, 255, 0.18)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
+}
+.oryx-3d-glint {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--oryx-glint-opacity, 0);
+    background: radial-gradient(circle at var(--oryx-glint-x, 30%) var(--oryx-glint-y, 24%), rgba(224, 247, 255, 0.55) 0%, rgba(56, 189, 248, 0.18) 38%, transparent 68%);
+    mix-blend-mode: screen;
+    transition: opacity 180ms ease;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    :is(.tc-logo, .logo):hover .oryx-3d-emblem {
+        --oryx-scale: 1.05;
+        filter: drop-shadow(0 5px 12px rgba(10, 132, 255, 0.32)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.36));
+        will-change: transform;
+    }
+    :is(.tc-logo, .logo):hover .oryx-3d-glint {
+        --oryx-glint-opacity: 0.92;
+    }
+}
+.oryx-hero-badge-img {
+    width: 3.5rem;
+    height: 3.5rem;
+    display: block;
+    margin-inline: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 8px 20px rgba(10, 132, 255, 0.22)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.32));
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oryx-hero-badge-surface {
+    width: 3.5rem;
+    height: 3.5rem;
+    display: inline-block;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.oryx-hero-badge-surface--vault {
+    background-image: url("/icons/badge-vault.png?v=20261127");
+    background-image: image-set(
+        url("/icons/badge-vault-1x.png?v=20261127") type("image/png") 1x,
+        url("/icons/badge-vault.png?v=20261127") type("image/png") 2x
+    );
+}
+.oryx-hero-badge-surface--telemetry {
+    background-image: url("/icons/badge-telemetry.png?v=20261127");
+    background-image: image-set(
+        url("/icons/badge-telemetry-1x.png?v=20261127") type("image/png") 1x,
+        url("/icons/badge-telemetry.png?v=20261127") type("image/png") 2x
+    );
+}
+.oryx-hero-badge-surface--doc {
+    background-image: url("/icons/badge-doc.png?v=20261127");
+    background-image: image-set(
+        url("/icons/badge-doc-1x.png?v=20261127") type("image/png") 1x,
+        url("/icons/badge-doc.png?v=20261127") type("image/png") 2x
+    );
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    :is(.auth-gate-card, .insights-empty, .drop-zone):hover .oryx-hero-badge-img {
+        transform: translateY(-2px) scale(1.04);
+    }
+}
+

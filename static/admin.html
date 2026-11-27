@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <title>Admin Console | Oryx Studio</title>
-    <link rel="icon" type="image/png" href="logo.png?v=20261121">
-    <link rel="stylesheet" href="styles/tokens.css?v=20261120">
-    <link rel="stylesheet" href="admin.css?v=20261121">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20261127">
+    <link rel="alternate icon" type="image/png" href="logo-1x.png?v=20261127">
+    <link rel="apple-touch-icon" href="logo.png?v=20261127">
+    <link rel="stylesheet" href="styles/tokens.css?v=20261127-oryx2">
+    <link rel="stylesheet" href="admin.css?v=20261127-oryx2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -16,25 +18,11 @@
     <nav class="sidebar" id="admin-sidebar" aria-label="Admin navigation">
         <div class="logo" id="admin-logo-wrap">
             <span class="logo-icon" id="admin-logo-3d" aria-hidden="true">
-                <span class="owl-3d-rig">
-                    <span class="owl-3d-slice owl-3d-slab-back"></span>
-                    <span class="owl-3d-slice owl-3d-slab-bevel"></span>
-                    <span class="owl-3d-slice owl-3d-slab-face">
-                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
-                    </span>
-                    <span class="owl-3d-slice owl-3d-relief-wings">
-                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
-                    </span>
-                    <span class="owl-3d-slice owl-3d-relief-core">
-                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
-                    </span>
-                    <span class="owl-3d-slice owl-3d-relief-crown">
-                        <img src="logo.png?v=20261121" alt="" width="36" height="36" class="logo-icon-img" decoding="async">
-                    </span>
-                    <span class="owl-3d-slice owl-3d-pbr-layer">
-                        <canvas id="admin-owl-pbr-canvas" width="72" height="72" class="owl-3d-pbr-canvas"></canvas>
-                    </span>
-                    <span class="owl-3d-slice owl-3d-sheen"></span>
+                <span class="oryx-3d-emblem">
+                    <img src="logo-1x.png?v=20261127"
+                        srcset="logo-1x.png?v=20261127 1x, logo.png?v=20261127 2x"
+                        alt="" width="36" height="36" class="logo-icon-img" decoding="async">
+                    <span class="oryx-3d-glint" aria-hidden="true"></span>
                 </span>
             </span>
             <span class="logo-text">Oryx Admin</span>
@@ -44,8 +32,8 @@
             <li data-section="users"><a href="#">User Management</a></li>
             <li data-section="history"><a href="#">Global History</a></li>
             <li data-section="feedback"><a href="#">Feedback Signals</a></li>
-            <li data-section="rag"><a href="#">📚 RAG Knowledge Base</a></li>
-            <li data-section="ask"><a href="#">💬 Ask (RAG)</a></li>
+            <li data-section="rag"><a href="#" class="oryx-icon-start" data-icon="book">RAG Knowledge Base</a></li>
+            <li data-section="ask"><a href="#" class="oryx-icon-start" data-icon="message">Ask (RAG)</a></li>
         </ul>
         <div class="sidebar-footer">
             <a href="/" class="back-studio-link">← Back to Studio</a>
@@ -56,7 +44,7 @@
     <main class="content" id="admin-main" tabindex="-1">
         <header class="hud-header-bar">
             <div class="hud-title-group">
-                <button type="button" id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle Menu">☰</button>
+                <button type="button" id="mobile-menu-btn" class="mobile-menu-btn oryx-icon" data-icon="menu" aria-label="Toggle Menu"></button>
                 <h1 id="section-title">Overview</h1>
             </div>
             <div class="hud-telemetry-strip">
@@ -68,7 +56,7 @@
                 <span class="hud-mono-chip" id="hud-utc-clock">--:--:-- UTC</span>
                 <button type="button" class="hud-cmd-btn" id="btn-auto-sync" title="Toggle 10s Live Telemetry Auto-Sync">AUTO-SYNC: ON</button>
                 <button type="button" class="hud-cmd-btn" id="btn-cmd-palette" title="Open Command Palette (⌘K)">⌘K Jump</button>
-                <button type="button" class="hud-cmd-btn" id="btn-admin-theme" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">☀️</button>
+                <button type="button" class="hud-cmd-btn oryx-icon" id="btn-admin-theme" title="Toggle Light/Dark Theme" aria-label="Switch to Light Theme"></button>
                 <div class="user-info">
                     <span id="admin-username">Admin</span>
                     <div class="avatar" id="admin-avatar">A</div>
@@ -308,7 +296,7 @@
                 <!-- Drop Zone -->
                 <div class="drop-zone" id="drop-zone">
                     <div class="drop-zone-inner">
-                        <div class="drop-icon">📄</div>
+                        <div class="drop-icon" aria-hidden="true"><img src="icons/badge-doc-1x.png?v=20261127" srcset="icons/badge-doc-1x.png?v=20261127 1x, icons/badge-doc.png?v=20261127 2x" alt="" width="60" height="60" class="oryx-hero-badge-img" loading="lazy" decoding="async"></div>
                         <p class="drop-title">Drag &amp; drop your PDF here</p>
                         <p class="drop-hint">or click to browse — max 50 MB, 500 pages</p>
                         <input type="file" id="pdf-file-input" accept=".pdf" hidden>
@@ -316,7 +304,7 @@
                     </div>
                     <!-- Selected file chip -->
                     <div class="file-chip hidden" id="file-chip">
-                        <span class="chip-icon">📎</span>
+                        <span class="chip-icon oryx-icon" data-icon="paperclip" aria-hidden="true"></span>
                         <span id="chip-name">filename.pdf</span>
                         <button class="chip-remove" id="chip-remove" title="Remove">✕</button>
                     </div>
@@ -331,8 +319,8 @@
                 </div>
 
                 <div class="upload-actions">
-                    <button class="btn-primary" id="upload-btn" disabled>
-                        <span class="btn-icon">⬆</span> Upload &amp; Ingest
+                    <button type="button" class="btn-primary oryx-icon-start" data-icon="upload" id="upload-btn" disabled>
+                        Upload &amp; Ingest
                     </button>
                     <p class="upload-note">Processing runs in the background. Status updates below.</p>
                 </div>
@@ -408,8 +396,8 @@
                     <textarea id="admin-scenario-query-input" class="admin-textarea" placeholder="Ask a question against internal knowledge base..."></textarea>
                 </div>
 
-                <button type="button" id="admin-ask-btn" class="btn-primary" style="margin-bottom: 1.25rem;">
-                    🔍 Query Internal Knowledge Base
+                <button type="button" id="admin-ask-btn" class="btn-primary oryx-icon-start" data-icon="search" style="margin-bottom: 1.25rem;">
+                    Query Internal Knowledge Base
                 </button>
 
                 <div id="admin-scenario-result-section" style="display:none;">
@@ -450,6 +438,7 @@
         </div>
     </div>
 
-    <script src="admin.js?v=20261121"></script>
+    <script src="oryx_dom_utils.js?v=20261127-oryx2"></script>
+    <script src="admin.js?v=20261127-oryx2"></script>
 </body>
 </html>

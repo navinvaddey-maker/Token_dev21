@@ -51,9 +51,10 @@ const RagWorkspace = {
         if (ownOpt) ownOpt.classList.toggle('active', normalized === 'own');
 
         if (askBtn) {
+            askBtn.dataset.icon = normalized === 'own' ? 'laptop' : 'search';
             askBtn.textContent = normalized === 'own'
-                ? '💻 Query Own Local Folder'
-                : '🔍 Query Internal Knowledge Base';
+                ? 'Query Own Local Folder'
+                : 'Query Internal Knowledge Base';
         }
 
         if (normalized === 'own') {
@@ -312,8 +313,8 @@ const RagWorkspace = {
                     <span style="font-size:0.72rem;color:var(--text-muted);">Grounded: ${grounded.length} · Partial: ${partial.length} · Not Found: ${notFound.length} · Unsupported: ${unsupported.length} · Missing: ${missing.length}</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
-                    ${!passed ? '<button type="button" class="copy-btn repair-trigger-btn" data-action="generateRepairFromVerify" style="padding:0.22rem 0.55rem;font-size:0.72rem;">⚡ Generate Repair Prompt</button>' : ''}
-                    <button type="button" class="copy-btn" data-action="exportVerifyReport" style="padding:0.22rem 0.55rem;font-size:0.72rem;">📋 Export Report</button>
+                    ${!passed ? '<button type="button" class="copy-btn repair-trigger-btn oryx-icon-start" data-icon="zap" data-action="generateRepairFromVerify" style="padding:0.22rem 0.55rem;font-size:0.72rem;">Generate Repair Prompt</button>' : ''}
+                    <button type="button" class="copy-btn oryx-icon-start" data-icon="clipboard" data-action="exportVerifyReport" style="padding:0.22rem 0.55rem;font-size:0.72rem;">Export Report</button>
                 </div>
             </div>
         `;

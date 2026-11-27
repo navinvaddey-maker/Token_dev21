@@ -9,6 +9,72 @@ if (typeof globalThis.OryxDomUtils === 'undefined') {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+
+        /**
+         * Initializes calm hover-only 3D tilt & specular glint on a `.oryx-3d-emblem` container.
+         * Zero `requestAnimationFrame` idle loop and zero `<canvas>` pixel shaders.
+         *
+         * # Arguments
+         * * `containerId` - DOM ID of the `.tc-logo-icon` / `.logo-icon` wrapper containing `.oryx-3d-emblem`.
+         *
+         * # Panics
+         * Never throws; catches DOM/matchMedia errors and logs a structured warning.
+         */
+        static initHoverTiltEmblem(containerId) {
+            try {
+                const container = document.getElementById(containerId);
+                const emblem = container?.querySelector('.oryx-3d-emblem');
+                if (!container || !emblem || container.dataset.oryx3dInit === '1') {
+                    return;
+                }
+                container.dataset.oryx3dInit = '1';
+
+                const resetRestingPose = () => {
+                    emblem.style.setProperty('--oryx-rx', '0deg');
+                    emblem.style.setProperty('--oryx-ry', '0deg');
+                    emblem.style.setProperty('--oryx-glint-x', '30%');
+                    emblem.style.setProperty('--oryx-glint-y', '24%');
+                };
+
+                resetRestingPose();
+
+                const targetHost = container.closest('.tc-logo, .logo') || container;
+                const prefersReducedMotion = () => Boolean(
+                    typeof window !== 'undefined' &&
+                    typeof window.matchMedia === 'function' &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                );
+
+                targetHost.addEventListener('pointermove', (e) => {
+                    if (prefersReducedMotion()) {
+                        resetRestingPose();
+                        return;
+                    }
+                    const rect = container.getBoundingClientRect();
+                    const halfW = Math.max(1, (rect.width || 36) * 0.5);
+                    const halfH = Math.max(1, (rect.height || 36) * 0.5);
+                    const cx = rect.left + (rect.width || 36) * 0.5;
+                    const cy = rect.top + (rect.height || 36) * 0.5;
+                    const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / halfW));
+                    const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / halfH));
+
+                    emblem.style.setProperty('--oryx-ry', `${(dx * 14).toFixed(2)}deg`);
+                    emblem.style.setProperty('--oryx-rx', `${(-dy * 12).toFixed(2)}deg`);
+                    emblem.style.setProperty('--oryx-glint-x', `${Math.round(50 - dx * 34)}%`);
+                    emblem.style.setProperty('--oryx-glint-y', `${Math.round(50 - dy * 34)}%`);
+                }, { passive: true });
+
+                targetHost.addEventListener('pointerleave', () => {
+                    resetRestingPose();
+                }, { passive: true });
+
+                targetHost.addEventListener('pointercancel', () => {
+                    resetRestingPose();
+                }, { passive: true });
+            } catch (err) {
+                console.warn('[Oryx3D] Hover tilt init failed:', err);
+            }
+        }
     }
     globalThis.OryxDomUtils = OryxDomUtils;
     if (typeof window !== 'undefined') {
@@ -60,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         avatarEl.textContent = State.username.charAt(0).toUpperCase();
     }
     initAdminTheme();
-    initOryxOwl3dIcon('admin-logo-3d', 'admin-owl-pbr-canvas');
+    OryxDomUtils.initHoverTiltEmblem('admin-logo-3d');
     initEventListeners();
     initHudClock();
     initCommandPalette();
@@ -68,229 +134,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     initAutoSync();
     loadOverview();
 });
-
-// ARCH: ARCHITECTURE.md §2 Full Component Map (Presentation Layer) — Option 3 Volumetric 3D + Sobel PBR Owl Icon
-/**
- * Initializes the Option 3 Volumetric 3D Stack + Normal-Lit Gold Specular Owl Icon.
- * Computes a Sobel 3D surface normal map from logo.png and animates 3D tilt + additive PBR gold lighting.
- *
- * # Arguments
- * - `containerId`: DOM element ID of the `.tc-logo-icon` / `.logo-icon` 3D stage container.
- * - `canvasId`: DOM element ID of the front `.owl-3d-pbr-canvas` additive specular layer.
- */
-function initOryxOwl3dIcon(containerId, canvasId) {
-    try {
-        const container = document.getElementById(containerId);
-        const canvas = document.getElementById(canvasId);
-        if (!container || !canvas || typeof canvas.getContext !== 'function') {
-            return;
-        }
-        if (container.dataset.owl3dInit === '1') {
-            return;
-        }
-        container.dataset.owl3dInit = '1';
-
-        const rig = container.querySelector('.owl-3d-rig');
-        const ctx = canvas.getContext('2d');
-        if (!rig || !ctx) {
-            return;
-        }
-
-        const w = canvas.width;
-        const h = canvas.height;
-        if (w <= 0 || h <= 0) {
-            return;
-        }
-        let basePixels = null;
-        let normals = null;
-        let outBuffer = null;
-
-        function renderPbrFrame(lx, ly, lz) {
-            if (!basePixels || !normals || !outBuffer) return;
-            const dst = outBuffer.data;
-            const hx = lx;
-            const hy = ly;
-            const hz = lz + 1.0;
-            const hLen = Math.hypot(hx, hy, hz) || 1.0;
-            const nhx = hx / hLen;
-            const nhy = hy / hLen;
-            const nhz = hz / hLen;
-
-            for (let i = 0; i < w * h; i++) {
-                const p = i * 4;
-                const n = i * 3;
-                const r = basePixels[p];
-                const g = basePixels[p + 1];
-                const b = basePixels[p + 2];
-                const nx = normals[n];
-                const ny = normals[n + 1];
-                const nz = normals[n + 2] || 1.0;
-
-                const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
-                const specAngle = Math.max(0, nx * nhx + ny * nhy + nz * nhz);
-                const isGoldOrEye = (r - b) > 24;
-                const specPower = isGoldOrEye
-                    ? Math.pow(specAngle, 12) * 145 + diff * 32
-                    : Math.pow(specAngle, 20) * 48;
-
-                dst[p] = Math.min(255, specPower * 1.2);
-                dst[p + 1] = Math.min(255, specPower * 0.92);
-                dst[p + 2] = Math.min(255, specPower * 0.36);
-                dst[p + 3] = 255;
-            }
-            ctx.putImageData(outBuffer, 0, 0);
-        }
-
-        const img = new Image();
-        img.onerror = (err) => {
-            console.warn('[Oryx3D] Failed to load owl texture:', err);
-        };
-        img.onload = () => {
-            try {
-                if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
-                const off = document.createElement('canvas');
-                off.width = w;
-                off.height = h;
-                const octx = off.getContext('2d');
-                if (!octx) return;
-                octx.drawImage(img, 0, 0, w, h);
-                basePixels = octx.getImageData(0, 0, w, h).data;
-                normals = new Float32Array(w * h * 3);
-                outBuffer = ctx.createImageData(w, h);
-
-                const heightMap = new Float32Array(w * h);
-                for (let i = 0; i < w * h; i++) {
-                    const r = basePixels[i * 4];
-                    const g = basePixels[i * 4 + 1];
-                    const b = basePixels[i * 4 + 2];
-                    const goldBias = Math.max(0, (r - b) * 0.65);
-                    heightMap[i] = (0.35 * r + 0.45 * g + 0.2 * b + goldBias) / 255;
-                }
-
-                for (let y = 1; y < h - 1; y++) {
-                    for (let x = 1; x < w - 1; x++) {
-                        const idx = y * w + x;
-                        const dx = (heightMap[idx + 1] - heightMap[idx - 1]) * 4.2;
-                        const dy = (heightMap[idx + w] - heightMap[idx - w]) * 4.2;
-                        const len = Math.hypot(dx, dy, 1.0) || 1.0;
-                        normals[idx * 3] = -dx / len;
-                        normals[idx * 3 + 1] = -dy / len;
-                        normals[idx * 3 + 2] = 1.0 / len;
-                    }
-                }
-                renderPbrFrame(0.35, -0.35, 0.87);
-            } catch (err) {
-                console.warn('[Oryx3D] Normal-map computation skipped:', err);
-            }
-        };
-        img.src = 'logo.png?v=20261121';
-
-        const mq = typeof window.matchMedia === 'function'
-            ? window.matchMedia('(prefers-reduced-motion: reduce)')
-            : null;
-        let reducedMotion = Boolean(mq && mq.matches);
-        let rafId = null;
-        let pointerActive = false;
-        let lastPointerTs = 0;
-        let targetRx = 11;
-        let targetRy = -15;
-        let curRx = 11;
-        let curRy = -15;
-        let phase = 0;
-
-        function stopLoop() {
-            if (rafId !== null) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-            }
-        }
-
-        function tick() {
-            rafId = null;
-            if (reducedMotion || document.hidden) {
-                return;
-            }
-            try {
-                phase += 0.025;
-                if (pointerActive && Date.now() - lastPointerTs > 1800) {
-                    pointerActive = false;
-                }
-                if (!pointerActive) {
-                    targetRy = Math.sin(phase) * 19;
-                    targetRx = Math.cos(phase * 0.8) * 13;
-                }
-                curRx += (targetRx - curRx) * 0.14;
-                curRy += (targetRy - curRy) * 0.14;
-                rig.style.transform = `rotateX(${curRx.toFixed(2)}deg) rotateY(${curRy.toFixed(2)}deg)`;
-
-                const lx = Math.cos(phase * 1.3) * 0.55 + (curRy / 30) * 0.45;
-                const ly = Math.sin(phase * 1.3) * 0.55 - (curRx / 30) * 0.45;
-                const lz = 0.78;
-                const lLen = Math.hypot(lx, ly, lz) || 1.0;
-
-                const sx = Math.round(50 + (lx / lLen) * 38);
-                const sy = Math.round(50 + (ly / lLen) * 38);
-                rig.style.setProperty('--owl-sheen-x', `${sx}%`);
-                rig.style.setProperty('--owl-sheen-y', `${sy}%`);
-
-                renderPbrFrame(lx / lLen, ly / lLen, lz / lLen);
-                rafId = requestAnimationFrame(tick);
-            } catch (err) {
-                console.warn('[Oryx3D] Render loop halted:', err);
-                stopLoop();
-            }
-        }
-
-        function startLoop() {
-            if (reducedMotion) {
-                stopLoop();
-                rig.style.transform = 'rotateX(10deg) rotateY(-14deg)';
-                return;
-            }
-            if (!document.hidden && rafId === null) {
-                rafId = requestAnimationFrame(tick);
-            }
-        }
-
-        if (mq && typeof mq.addEventListener === 'function') {
-            mq.addEventListener('change', (e) => {
-                reducedMotion = Boolean(e.matches);
-                startLoop();
-            });
-        }
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopLoop();
-            } else {
-                startLoop();
-            }
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            if (reducedMotion || document.hidden) return;
-            const rect = container.getBoundingClientRect();
-            const cx = rect.left + rect.width * 0.5;
-            const cy = rect.top + rect.height * 0.5;
-            const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / 220));
-            const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / 220));
-            pointerActive = true;
-            lastPointerTs = Date.now();
-            targetRy = dx * 25;
-            targetRx = -dy * 22;
-        }, { passive: true });
-
-        window.addEventListener('mouseout', (e) => {
-            if (!e.relatedTarget) {
-                pointerActive = false;
-            }
-        }, { passive: true });
-
-        startLoop();
-    } catch (err) {
-        console.warn('[Oryx3D] Failed to initialize 3D owl icon:', err);
-    }
-}
 
 function applyAdminTheme(themeClass) {
     const normalized = (themeClass === 'theme-light') ? 'theme-light' : 'theme-dark';
@@ -301,7 +144,7 @@ function applyAdminTheme(themeClass) {
     document.body.classList.add(normalized);
     const btn = document.getElementById('btn-admin-theme');
     if (btn) {
-        btn.textContent = normalized === 'theme-dark' ? '☀️' : '🌙';
+        btn.textContent = '';
         btn.setAttribute('aria-label', normalized === 'theme-dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme');
     }
 }

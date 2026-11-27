@@ -124,19 +124,19 @@ const State = {
 const SAMPLE_PRESETS = {
     house: {
         id: "house",
-        label: "🏠 Buying a House",
+        label: "Buying a House",
         domain: "Real Estate & Finance",
         text: "Hi there! I'm really excited and also honestly pretty nervous because my spouse and I have finally decided to take the plunge and buy our very first house together, and we have been saving up for years and years to get to this point, so it feels like a huge milestone in our lives. The thing is, we don't really know where to start at all and the whole process seems super overwhelming with so many different moving parts, legal jargon, financial requirements, and hidden costs that people warn you about. Could you please walk me through the entire process of buying a house from the very beginning all the way to getting the keys, in as much detail as possible?\n\nSpecifically, I would love it if you could explain everything we need to know about getting our finances in order first, like what credit score we should aim for, how much money we actually need saved up for a down payment versus closing costs and emergency funds, and how mortgage pre-approval works compared to pre-qualification, as well as the different types of loans available like conventional, FHA, or fixed-rate versus adjustable-rate mortgages. After that, could you explain how to find a good real estate agent, what to look for when touring homes and neighborhoods, how to figure out what a fair offer price is, and what kind of contingencies we should definitely include in our purchase agreement—like inspection contingencies, appraisal contingencies, and financing contingencies—so we don't end up stuck in a bad deal?\n\nFurthermore, once an offer is accepted, what happens during the escrow and underwriting period? I want to understand what a home inspector actually checks, how we can negotiate repairs or credits if they find major issues with the roof, foundation, plumbing, or electrical systems, what the lender is doing behind the scenes during underwriting, why we need title insurance and homeowners insurance, and what happens during the final walkthrough and closing day when we have to sign a million documents and wire the funds. Please also include any common rookie mistakes first-time homebuyers make so we can avoid them, and feel free to use clear examples, tips, and thorough explanations for every single step because we want to be completely prepared before we even talk to a lender or an agent!"
     },
     bug: {
         id: "bug",
-        label: "🐛 Bug Report",
+        label: "Bug Report",
         domain: "Software Engineering",
         text: "Hi team, whenever a user tries to log in on Safari after clearing cookies, the dashboard just spins forever and in the console it says something about 401 unauthorized on /api/stats. Can you look at our auth flow and tell me why this happens and how to fix it cleanly without breaking Chrome?"
     },
     legal: {
         id: "legal",
-        label: "⚖️ Contract Review",
+        label: "Contract Review",
         domain: "Legal & Compliance",
         text: "Please read through this vendor SaaS agreement carefully and tell me if there are any weird indemnification clauses, auto-renewal traps, or data ownership issues that could hurt our startup if we sign it before our Series A."
     }
@@ -1213,7 +1213,7 @@ function updateContinuationModePill() {
     if (!hasParent) return;
 
     if (lockBadge) {
-        lockBadge.textContent = `🔒 Linked to Parent · Turn ${State.turnNumber || 1}`;
+        lockBadge.textContent = `Linked to Parent · Turn ${State.turnNumber || 1}`;
     }
     if (modePill) {
         const mode = detectContinuationInputMode(promptInput ? promptInput.value : '');
@@ -2174,7 +2174,7 @@ function launchInExternalAi(provider) {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
     showToast(
         encoded.length <= 1800
-            ? `Opened ${provider === 'claude' ? 'Claude' : 'ChatGPT'}! Bring the reply back to 🛡️ Verify Reply.`
+            ? `Opened ${provider === 'claude' ? 'Claude' : 'ChatGPT'}! Bring the reply back to Verify Reply.`
             : `Prompt copied to clipboard! Paste into ${provider === 'claude' ? 'Claude' : 'ChatGPT'} and verify the reply here.`,
         'success'
     );
@@ -2274,10 +2274,33 @@ function exportAuditSvg() {
     const modeLabel = escapeHtml(String(r.mode || State.currentMode || 'balanced').toUpperCase());
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="680" height="240" viewBox="0 0 680 240">
+  <defs>
+    <linearGradient id="audit-oryx-bg" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E2738"/>
+      <stop offset="100%" stop-color="#0D121B"/>
+    </linearGradient>
+    <linearGradient id="audit-oryx-horn" x1="6" y1="6" x2="16" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E2F2FF"/>
+      <stop offset="45%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0A84FF"/>
+    </linearGradient>
+    <linearGradient id="audit-oryx-core" x1="16" y1="16" x2="16" y2="27" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7CF3FF"/>
+      <stop offset="100%" stop-color="#0A84FF"/>
+    </linearGradient>
+  </defs>
   <rect width="680" height="240" rx="16" fill="#0f172a"/>
   <rect x="1" y="1" width="678" height="238" rx="15" fill="none" stroke="#1e293b" stroke-width="2"/>
-  <text x="32" y="44" fill="#38bdf8" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="700">ORYX STUDIO · TOKEN &amp; GROUNDING AUDIT CARD</text>
-  <text x="648" y="44" text-anchor="end" fill="#94a3b8" font-family="monospace" font-size="12">MODE: ${modeLabel}</text>
+  <g transform="translate(32,24)">
+    <g transform="scale(0.75)">
+      <rect x="1" y="1" width="30" height="30" rx="7.5" fill="url(#audit-oryx-bg)" stroke="#38bdf8" stroke-opacity="0.45" stroke-width="1.25"/>
+      <path d="M6.2 6.4L12.1 10.2L15.7 16.5L12.3 20.6L6.2 6.4Z" fill="url(#audit-oryx-horn)"/>
+      <path d="M25.8 6.4L19.9 10.2L16.3 16.5L19.7 20.6L25.8 6.4Z" fill="url(#audit-oryx-horn)"/>
+      <path d="M16 15.8L20.3 21.1L16 26.8L11.7 21.1L16 15.8Z" fill="url(#audit-oryx-core)" stroke="#E0F7FF" stroke-width="0.7" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <text x="64" y="43" fill="#38bdf8" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="700">ORYX STUDIO · TOKEN &amp; GROUNDING AUDIT CARD</text>
+  <text x="648" y="43" text-anchor="end" fill="#94a3b8" font-family="monospace" font-size="12">MODE: ${modeLabel}</text>
   <text x="32" y="102" fill="#f8fafc" font-family="Inter,system-ui,sans-serif" font-size="34" font-weight="800">${orig} → ${fin} tokens (${saved >= 0 ? `-${pct}%` : `+${Math.abs(pct)}%`})</text>
   <text x="32" y="142" fill="#10b981" font-family="Inter,system-ui,sans-serif" font-size="18" font-weight="700">Est. Savings (${scaleLabel}): $${estSavings}</text>
   <rect x="32" y="168" width="616" height="44" rx="10" fill="#1e293b"/>
@@ -2309,7 +2332,7 @@ async function submitFeedback(rating) {
 
     try {
         await API.feedback({ history_id: State.lastResult.id, rating });
-        showToast(rating === 'thumbs_up' ? 'Thanks for the feedback! 👍' : 'Feedback recorded 👎', 'success');
+        showToast(rating === 'thumbs_up' ? 'Thanks for the feedback!' : 'Feedback recorded.', 'success');
 
         if (btnUp && btnDown) {
             btnUp.disabled = true;
@@ -2490,7 +2513,7 @@ function renderHistoryList(records) {
     if (!cachedHistoryRecords.length) {
         list.innerHTML = `
             <div class="bento-card insights-empty">
-                <div class="auth-gate-icon">🕒</div>
+                <div class="auth-gate-icon" aria-hidden="true"><img src="icons/badge-vault-1x.png?v=20261127" srcset="icons/badge-vault-1x.png?v=20261127 1x, icons/badge-vault.png?v=20261127 2x" alt="" width="56" height="56" class="oryx-hero-badge-img" loading="lazy" decoding="async" /></div>
                 <div class="auth-gate-title">No Compression History Yet</div>
                 <div class="auth-gate-desc">Your past prompt optimizations will appear here with side-by-side CRISP diffs and one-click restore.</div>
                 <button type="button" class="tc-compress-btn" data-action="switchTab" data-arg="compress" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
@@ -2728,7 +2751,7 @@ function renderInsightsBento(stats) {
     if (totalRuns === 0) {
         container.innerHTML = `
             <div class="bento-card bento-span-12 insights-empty">
-                <div class="auth-gate-icon">✨</div>
+                <div class="auth-gate-icon" aria-hidden="true"><img src="icons/badge-telemetry-1x.png?v=20261127" srcset="icons/badge-telemetry-1x.png?v=20261127 1x, icons/badge-telemetry.png?v=20261127 2x" alt="" width="56" height="56" class="oryx-hero-badge-img" loading="lazy" decoding="async" /></div>
                 <div class="auth-gate-title">No Compression Telemetry Yet</div>
                 <div class="auth-gate-desc">Run your first prompt optimization to unlock 14-day token trajectories, mode efficiency, and model cost savings.</div>
                 <button type="button" class="tc-compress-btn" data-action="switchTab" data-arg="compress" style="width: auto; padding: 10px 22px;">Optimize a Prompt</button>
@@ -2998,7 +3021,7 @@ function applyThemeClass(themeClass) {
     document.body.classList.add(normalized);
     const btn = document.getElementById('btn-theme-toggle');
     if (btn) {
-        btn.textContent = normalized === 'theme-dark' ? '☀️' : '🌙';
+        btn.textContent = '';
         btn.setAttribute('aria-label', normalized === 'theme-dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme');
     }
 }
@@ -3473,229 +3496,6 @@ function applyCustomSkinConfig(config) {
     if (config.accentText) root.style.setProperty('--accent-text', config.accentText);
 }
 
-// ARCH: ARCHITECTURE.md §2 Full Component Map (Presentation Layer) — Option 3 Volumetric 3D + Sobel PBR Owl Icon
-/**
- * Initializes the Option 3 Volumetric 3D Stack + Normal-Lit Gold Specular Owl Icon.
- * Computes a Sobel 3D surface normal map from logo.png and animates 3D tilt + additive PBR gold lighting.
- *
- * # Arguments
- * - `containerId`: DOM element ID of the `.tc-logo-icon` / `.logo-icon` 3D stage container.
- * - `canvasId`: DOM element ID of the front `.owl-3d-pbr-canvas` additive specular layer.
- */
-function initOryxOwl3dIcon(containerId, canvasId) {
-    try {
-        const container = document.getElementById(containerId);
-        const canvas = document.getElementById(canvasId);
-        if (!container || !canvas || typeof canvas.getContext !== 'function') {
-            return;
-        }
-        if (container.dataset.owl3dInit === '1') {
-            return;
-        }
-        container.dataset.owl3dInit = '1';
-
-        const rig = container.querySelector('.owl-3d-rig');
-        const ctx = canvas.getContext('2d');
-        if (!rig || !ctx) {
-            return;
-        }
-
-        const w = canvas.width;
-        const h = canvas.height;
-        if (w <= 0 || h <= 0) {
-            return;
-        }
-        let basePixels = null;
-        let normals = null;
-        let outBuffer = null;
-
-        function renderPbrFrame(lx, ly, lz) {
-            if (!basePixels || !normals || !outBuffer) return;
-            const dst = outBuffer.data;
-            const hx = lx;
-            const hy = ly;
-            const hz = lz + 1.0;
-            const hLen = Math.hypot(hx, hy, hz) || 1.0;
-            const nhx = hx / hLen;
-            const nhy = hy / hLen;
-            const nhz = hz / hLen;
-
-            for (let i = 0; i < w * h; i++) {
-                const p = i * 4;
-                const n = i * 3;
-                const r = basePixels[p];
-                const g = basePixels[p + 1];
-                const b = basePixels[p + 2];
-                const nx = normals[n];
-                const ny = normals[n + 1];
-                const nz = normals[n + 2] || 1.0;
-
-                const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
-                const specAngle = Math.max(0, nx * nhx + ny * nhy + nz * nhz);
-                const isGoldOrEye = (r - b) > 24;
-                const specPower = isGoldOrEye
-                    ? Math.pow(specAngle, 12) * 145 + diff * 32
-                    : Math.pow(specAngle, 20) * 48;
-
-                dst[p] = Math.min(255, specPower * 1.2);
-                dst[p + 1] = Math.min(255, specPower * 0.92);
-                dst[p + 2] = Math.min(255, specPower * 0.36);
-                dst[p + 3] = 255;
-            }
-            ctx.putImageData(outBuffer, 0, 0);
-        }
-
-        const img = new Image();
-        img.onerror = (err) => {
-            console.warn('[Oryx3D] Failed to load owl texture:', err);
-        };
-        img.onload = () => {
-            try {
-                if (img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
-                const off = document.createElement('canvas');
-                off.width = w;
-                off.height = h;
-                const octx = off.getContext('2d');
-                if (!octx) return;
-                octx.drawImage(img, 0, 0, w, h);
-                basePixels = octx.getImageData(0, 0, w, h).data;
-                normals = new Float32Array(w * h * 3);
-                outBuffer = ctx.createImageData(w, h);
-
-                const heightMap = new Float32Array(w * h);
-                for (let i = 0; i < w * h; i++) {
-                    const r = basePixels[i * 4];
-                    const g = basePixels[i * 4 + 1];
-                    const b = basePixels[i * 4 + 2];
-                    const goldBias = Math.max(0, (r - b) * 0.65);
-                    heightMap[i] = (0.35 * r + 0.45 * g + 0.2 * b + goldBias) / 255;
-                }
-
-                for (let y = 1; y < h - 1; y++) {
-                    for (let x = 1; x < w - 1; x++) {
-                        const idx = y * w + x;
-                        const dx = (heightMap[idx + 1] - heightMap[idx - 1]) * 4.2;
-                        const dy = (heightMap[idx + w] - heightMap[idx - w]) * 4.2;
-                        const len = Math.hypot(dx, dy, 1.0) || 1.0;
-                        normals[idx * 3] = -dx / len;
-                        normals[idx * 3 + 1] = -dy / len;
-                        normals[idx * 3 + 2] = 1.0 / len;
-                    }
-                }
-                renderPbrFrame(0.35, -0.35, 0.87);
-            } catch (err) {
-                console.warn('[Oryx3D] Normal-map computation skipped:', err);
-            }
-        };
-        img.src = 'logo.png?v=20261121';
-
-        const mq = typeof window.matchMedia === 'function'
-            ? window.matchMedia('(prefers-reduced-motion: reduce)')
-            : null;
-        let reducedMotion = Boolean(mq && mq.matches);
-        let rafId = null;
-        let pointerActive = false;
-        let lastPointerTs = 0;
-        let targetRx = 11;
-        let targetRy = -15;
-        let curRx = 11;
-        let curRy = -15;
-        let phase = 0;
-
-        function stopLoop() {
-            if (rafId !== null) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-            }
-        }
-
-        function tick() {
-            rafId = null;
-            if (reducedMotion || document.hidden) {
-                return;
-            }
-            try {
-                phase += 0.025;
-                if (pointerActive && Date.now() - lastPointerTs > 1800) {
-                    pointerActive = false;
-                }
-                if (!pointerActive) {
-                    targetRy = Math.sin(phase) * 19;
-                    targetRx = Math.cos(phase * 0.8) * 13;
-                }
-                curRx += (targetRx - curRx) * 0.14;
-                curRy += (targetRy - curRy) * 0.14;
-                rig.style.transform = `rotateX(${curRx.toFixed(2)}deg) rotateY(${curRy.toFixed(2)}deg)`;
-
-                const lx = Math.cos(phase * 1.3) * 0.55 + (curRy / 30) * 0.45;
-                const ly = Math.sin(phase * 1.3) * 0.55 - (curRx / 30) * 0.45;
-                const lz = 0.78;
-                const lLen = Math.hypot(lx, ly, lz) || 1.0;
-
-                const sx = Math.round(50 + (lx / lLen) * 38);
-                const sy = Math.round(50 + (ly / lLen) * 38);
-                rig.style.setProperty('--owl-sheen-x', `${sx}%`);
-                rig.style.setProperty('--owl-sheen-y', `${sy}%`);
-
-                renderPbrFrame(lx / lLen, ly / lLen, lz / lLen);
-                rafId = requestAnimationFrame(tick);
-            } catch (err) {
-                console.warn('[Oryx3D] Render loop halted:', err);
-                stopLoop();
-            }
-        }
-
-        function startLoop() {
-            if (reducedMotion) {
-                stopLoop();
-                rig.style.transform = 'rotateX(10deg) rotateY(-14deg)';
-                return;
-            }
-            if (!document.hidden && rafId === null) {
-                rafId = requestAnimationFrame(tick);
-            }
-        }
-
-        if (mq && typeof mq.addEventListener === 'function') {
-            mq.addEventListener('change', (e) => {
-                reducedMotion = Boolean(e.matches);
-                startLoop();
-            });
-        }
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopLoop();
-            } else {
-                startLoop();
-            }
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            if (reducedMotion || document.hidden) return;
-            const rect = container.getBoundingClientRect();
-            const cx = rect.left + rect.width * 0.5;
-            const cy = rect.top + rect.height * 0.5;
-            const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / 220));
-            const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / 220));
-            pointerActive = true;
-            lastPointerTs = Date.now();
-            targetRy = dx * 25;
-            targetRx = -dy * 22;
-        }, { passive: true });
-
-        window.addEventListener('mouseout', (e) => {
-            if (!e.relatedTarget) {
-                pointerActive = false;
-            }
-        }, { passive: true });
-
-        startLoop();
-    } catch (err) {
-        console.warn('[Oryx3D] Failed to initialize 3D owl icon:', err);
-    }
-}
-
 function initStudioDeclarativeEvents() {
     const clickActions = {
         openStudioCommandPalette: () => openStudioCommandPalette(),
@@ -3800,7 +3600,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     initRadiogroupKeyboardNav();
     initStudioCommandPalette();
     loadPresetsFromFile();
-    initOryxOwl3dIcon('oryx-logo-3d', 'oryx-owl-pbr-canvas');
+    if (typeof OryxDomUtils !== 'undefined' && typeof OryxDomUtils.initHoverTiltEmblem === 'function') {
+        OryxDomUtils.initHoverTiltEmblem('oryx-logo-3d');
+    }
 
     // Hydrate session from HttpOnly cookie via GET /api/me (fallback to zero-auth sandbox).
     localStorage.removeItem('tce_token');
@@ -4061,7 +3863,7 @@ async function executeScenarioAggressiveCompress() {
     const btn = document.getElementById('scenario-compress-aggressive-btn');
     if (btn) {
         btn.disabled = true;
-        btn.textContent = '⏳ Compressing with Zero Hallucination...';
+        btn.textContent = 'Compressing with Zero Hallucination...';
     }
 
     try {
@@ -4092,7 +3894,7 @@ async function executeScenarioAggressiveCompress() {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.textContent = '🔥 Compress in Aggressive Mode for LLM';
+            btn.textContent = 'Compress in Aggressive Mode for LLM';
         }
     }
 }
