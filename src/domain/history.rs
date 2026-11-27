@@ -154,10 +154,13 @@ pub async fn record_explicit_feedback_scoped(
         .await
         .map_err(AppError::Database)?;
 
-    let _ = state
+    if let Err(err) = state
         .learning_pool
         .apply_feedback(tenant_id, u_id, &history.original_prompt, feedback_val)
-        .await;
+        .await
+    {
+        tracing::warn!(tenant_id = %tenant_id, user_id = %user_id, error = %err, "Failed to apply explicit learning feedback");
+    }
 
     let elapsed_ms = chrono::Utc::now()
         .signed_duration_since(history.created_at)
@@ -178,10 +181,13 @@ pub async fn record_explicit_feedback_scoped(
         if sig.signal_type == "long_engagement" {
             let weight = sig.map_to_weight();
             if weight != 0.0 {
-                let _ = state
+                if let Err(err) = state
                     .learning_pool
                     .apply_feedback(tenant_id, u_id, &history.original_prompt, weight)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(tenant_id = %tenant_id, user_id = %user_id, error = %err, "Failed to apply long-engagement learning feedback");
+                }
 
                 let sig_model = crate::models::feedback_signal::FeedbackSignal {
                     id: Uuid::new_v4().to_string(),
@@ -193,7 +199,11 @@ pub async fn record_explicit_feedback_scoped(
                     meta: sig.meta,
                     detected_at: chrono::Utc::now(),
                 };
-                let _ = Repository::insert_feedback_scoped(pool, &sig_model, tenant_id).await;
+                if let Err(err) =
+                    Repository::insert_feedback_scoped(pool, &sig_model, tenant_id).await
+                {
+                    tracing::warn!(tenant_id = %tenant_id, user_id = %user_id, error = %err, "Failed to persist long-engagement feedback signal");
+                }
             }
         }
     }

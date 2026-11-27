@@ -115,22 +115,43 @@ pub(crate) async fn npae_aggressive(
 
 /// Runs tri-layer hallucination verification via `POST /api/v1/hallucination-check`.
 pub(crate) async fn npae_hallucination_check(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<HallucinationCheckRequest>,
 ) -> Result<axum::response::Response, AppError> {
     validate_prompt_byte_and_word_bounds(&req.original_prompt)?;
     validate_prompt_byte_and_word_bounds(&req.output)?;
-    let default_cfg = crate::npae::schema::types::HallucinationGuardConfig {
-        self_critique_enabled: true,
-        confidence_threshold: 0.75,
-        contradiction_check: true,
-        claim_verification_rules: vec![],
-        uncertainty_markers: vec!["[UNCERTAIN]".into(), "[VERIFY]".into(), "[APPROX]".into()],
-    };
-    let cfg = req.guard_config.as_ref().unwrap_or(&default_cfg);
-    let report =
-        crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
-            .map_err(AppError::Engine)?;
+
+    let _permit = state
+        .compress_sem
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            AppError::TooManyRequests("Verification capacity reached; please retry shortly".into())
+        })?;
+
+    let report = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        tokio::task::spawn_blocking(move || {
+            let default_cfg = crate::npae::schema::types::HallucinationGuardConfig {
+                self_critique_enabled: true,
+                confidence_threshold: 0.75,
+                contradiction_check: true,
+                claim_verification_rules: vec![],
+                uncertainty_markers: vec![
+                    "[UNCERTAIN]".into(),
+                    "[VERIFY]".into(),
+                    "[APPROX]".into(),
+                ],
+            };
+            let cfg = req.guard_config.as_ref().unwrap_or(&default_cfg);
+            crate::npae::hallucination::guard::run_tri_layer(&req.output, &req.original_prompt, cfg)
+        }),
+    )
+    .await
+    .map_err(|_| AppError::Timeout("Hallucination check timed out".into()))?
+    .map_err(|e| AppError::Internal(format!("Worker join error: {e}")))?
+    .map_err(AppError::Engine)?;
+
     Ok((StatusCode::OK, Json(report)).into_response())
 }
 

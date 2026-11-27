@@ -312,10 +312,13 @@ async fn record_implicit_feedback_signals_scoped(
                 .as_ref()
                 .map_or(raw_text, |prev| prev.original_prompt.as_str());
 
-            let _ = state
+            if let Err(err) = state
                 .learning_pool
                 .apply_feedback(tenant_id, user_id, target_prompt, weight)
-                .await;
+                .await
+            {
+                tracing::warn!(tenant_id = %tenant_id, user_id = %user_id, error = %err, "Failed to apply implicit learning feedback");
+            }
 
             let sig_model = crate::models::feedback_signal::FeedbackSignal {
                 id: Uuid::new_v4().to_string(),
@@ -329,7 +332,11 @@ async fn record_implicit_feedback_signals_scoped(
                 meta: sig.meta,
                 detected_at: chrono::Utc::now(),
             };
-            let _ = Repository::insert_feedback_scoped(&state.pool, &sig_model, tenant_id).await;
+            if let Err(err) =
+                Repository::insert_feedback_scoped(&state.pool, &sig_model, tenant_id).await
+            {
+                tracing::warn!(tenant_id = %tenant_id, user_id = %user_id_str, error = %err, "Failed to persist implicit feedback signal");
+            }
         }
     }
 }

@@ -463,11 +463,6 @@ function switchSection(sectionId) {
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
 async function apiFetch(url, options = {}) {
-    const historySearchEl = document.getElementById('admin-history-search');
-    if (historySearchEl) historySearchEl.addEventListener('input', renderHistory);
-    const historyModeEl = document.getElementById('admin-history-mode');
-    if (historyModeEl) historyModeEl.addEventListener('change', renderHistory);
-
     const defaultOptions = {
         credentials: 'same-origin',
         headers: {
